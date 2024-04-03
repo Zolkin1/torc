@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# IDE Specific Files
+.idea/
+cmake-build-debug/
+cmake-build-debug_simulation/
+cmake-build-release/
+cmake-build-test/
+cmake-build-relwithdebinfo/
