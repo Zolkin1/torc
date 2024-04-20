@@ -1,0 +1,2 @@
+/usr/bin/ar qc libCost.a CMakeFiles/Cost.dir/costs/linear_cost.cpp.o
+/usr/bin/ranlib libCost.a

@@ -1,0 +1,12 @@
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/CMakeFiles/CostTests.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/CMakeFiles/Cost.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/CMakeFiles/edit_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/CMakeFiles/rebuild_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/models/CMakeFiles/edit_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/models/CMakeFiles/rebuild_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/costs/CMakeFiles/edit_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/costs/CMakeFiles/rebuild_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/constraints/CMakeFiles/edit_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/constraints/CMakeFiles/rebuild_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/tests/CMakeFiles/edit_cache.dir
+/home/gavinhua/surf2024/torc/cmake-build-debug-wsl/tests/CMakeFiles/rebuild_cache.dir

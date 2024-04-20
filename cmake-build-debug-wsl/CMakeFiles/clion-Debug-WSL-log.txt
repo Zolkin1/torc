@@ -1,0 +1,9 @@
+C:\Windows\system32\wsl.exe --distribution Ubuntu --exec "/mnt/c/Program Files/JetBrains/CLion 2023.3.4/bin/ttyfix" /bin/bash -l -c "export CLION_IDE=TRUE && export CMAKE_COLOR_DIAGNOSTICS=ON && export JETBRAINS_IDE=TRUE && cd /home/gavinhua/surf2024/torc/cmake-build-debug-wsl && /usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G 'CodeBlocks - Unix Makefiles' -S /home/gavinhua/surf2024/torc -B /home/gavinhua/surf2024/torc/cmake-build-debug-wsl"
+-- Building TORC Project
+-- Building models
+-- Building costs
+-- Building constraints
+-- Building tests
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/gavinhua/surf2024/torc/cmake-build-debug-wsl

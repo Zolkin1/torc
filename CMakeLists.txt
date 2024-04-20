@@ -17,8 +17,14 @@ if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+#include_directories("${PROJECT_SOURCE_DIR}/contraints")
+#include_directories("${PROJECT_SOURCE_DIR}/costs")
+#include_directories("${PROJECT_SOURCE_DIR}/models")
+#include_directories("${PROJECT_SOURCE_DIR}/tests")
+
 add_subdirectory(models)
 add_subdirectory(costs)
 add_subdirectory(constraints)
+add_subdirectory(tests)
 
 # TODO: Figure out the install structure for the library
