@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/lin_cost_test.dir/costs/linear_cost.cpp.o -o lin_cost_test  libbase.a 
