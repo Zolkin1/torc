@@ -7,6 +7,7 @@ project(torc
 message(STATUS "Building TORC Project")
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
+set(BUILD_TESTING True)
 
 if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_TESTING)
     include(CTest)

@@ -2,7 +2,7 @@
 
 #include <catch2/catch.hpp>
 #include <eigen3/Eigen/Dense>
-#include "linear_cost.h"
+#include "../costs/linear_cost.h"
 
 TEST_CASE("Linear Cost Test") {
     Eigen::Vector3d q1, x1, x2;
