@@ -13,7 +13,7 @@ namespace torc {
     template <class scalar_t>
     class BaseCost {
         using vectorx_t = Eigen::VectorX<scalar_t>;
-        using matrix_t = Eigen::MatrixX<scalar_t>;
+        using matrixx_t = Eigen::MatrixX<scalar_t>;
     public:
         /**
          * Evaluates the cost function at a given point
@@ -34,7 +34,7 @@ namespace torc {
          * @param x the input to the Hessian of the function
          * @return the Hessian of the function
          */
-        virtual matrix_t Hessian(const vectorx_t& x) const = 0;
+        virtual matrixx_t Hessian(const vectorx_t& x) const = 0;
 
         /**
          * Returns the identifier_ of the function

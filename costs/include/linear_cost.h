@@ -12,7 +12,7 @@ namespace torc {
     template <class scalar_t>
     class LinearCost: public BaseCost<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
-        using matrix_t = Eigen::MatrixX<scalar_t>;
+        using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
         LinearCost(const vectorx_t& coefficients, const std::string& identifier) {
@@ -60,8 +60,8 @@ namespace torc {
          * @param x the input
          * @return a square zero matrix of dimension dim(x)
          */
-        matrix_t Hessian(const vectorx_t& x) const {
-            return matrix_t::Zero(this->domain_dim_, this->domain_dim_);
+        matrixx_t Hessian(const vectorx_t& x) const {
+            return matrixx_t::Zero(this->domain_dim_, this->domain_dim_);
         }
 
       private:
