@@ -7,12 +7,15 @@
 namespace torc {
     /**
      * Class implementation of a linear cost function, f(x) = q^T x
-     * @tparam dtype the type of scalar used for the cost
+     * @tparam scalar_t the type of scalar used for the cost
      */
-    template <class dtype>
-    class LinearCost: public BaseCost<dtype> {
-      public:
-        LinearCost(const Eigen::VectorX<dtype> &coefficients, const std::string &identifier) {
+    template <class scalar_t>
+    class LinearCost: public BaseCost<scalar_t> {
+        using vectorx_t = Eigen::VectorX<scalar_t>;
+        using matrix_t = Eigen::MatrixX<scalar_t>;
+
+    public:
+        LinearCost(const vectorx_t& coefficients, const std::string &identifier) {
             q_ = coefficients;
             this->identifier_ = identifier;
             this->domain_dim_ = coefficients.size();
@@ -23,7 +26,7 @@ namespace torc {
          * @param x the input to the function
          * @return q^T x
          */
-        dtype Evaluate(const Eigen::VectorX<dtype> &x) const {
+        scalar_t Evaluate(const vectorx_t& x) const {
             return q_.dot(x);
         }
 
@@ -31,7 +34,7 @@ namespace torc {
          * Returns the q_ of the cost
          * @return the q_ q
          */
-        Eigen::VectorX<dtype> GetCoefficients() const {
+        vectorx_t GetCoefficients() const {
             return q_;
         }
 
@@ -40,7 +43,7 @@ namespace torc {
          * @param x the input
          * @return grad f(x) = q
          */
-        Eigen::VectorX<dtype> Gradient(const Eigen::VectorX<dtype> &x) const {
+        vectorx_t Gradient(const vectorx_t& x) const {
             return q_;
         }
 
@@ -48,7 +51,7 @@ namespace torc {
          * The gradient of a linear function is constant everywhere, so we don't need an input
          * @return grad f(x) = q for all x
          */
-        Eigen::VectorX<dtype> Gradient() const {
+        vectorx_t Gradient() const {
             return q_;
         }
 
@@ -57,12 +60,12 @@ namespace torc {
          * @param x the input
          * @return a square zero matrix of dimension dim(x)
          */
-        Eigen::MatrixX<dtype> Hessian(const Eigen::VectorX<dtype> &x) const {
-            return Eigen::MatrixX<dtype>::Zero(this->domain_dim_, this->domain_dim_);
+        matrix_t Hessian(const vectorx_t& x) const {
+            return matrix_t::Zero(this->domain_dim_, this->domain_dim_);
         }
 
       private:
-        Eigen::VectorX<dtype> q_; // the q_ of the linear cost
+        vectorx_t q_; // the coefficients of the linear cost
     };
 } // namespace torc
 
