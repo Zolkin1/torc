@@ -15,7 +15,7 @@ namespace torc {
         using matrix_t = Eigen::MatrixX<scalar_t>;
 
     public:
-        LinearCost(const vectorx_t& coefficients, const std::string &identifier) {
+        LinearCost(const vectorx_t& coefficients, const std::string& identifier) {
             q_ = coefficients;
             this->identifier_ = identifier;
             this->domain_dim_ = coefficients.size();
