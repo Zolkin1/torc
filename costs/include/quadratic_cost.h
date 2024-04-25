@@ -1,7 +1,3 @@
-//
-// Created by gavin on 4/23/2024.
-//
-
 #ifndef TORC_QUADRATIC_COST_H
 #define TORC_QUADRATIC_COST_H
 
