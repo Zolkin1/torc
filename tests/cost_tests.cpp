@@ -3,7 +3,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <eigen3/Eigen/Dense>
+#include <iostream>
 #include "linear_cost.h"
+#include "quadratic_cost.h"
 
 TEST_CASE("Linear Cost Test", "[cost]") {
     Eigen::Vector3d q1, x1, x2;
@@ -27,4 +29,51 @@ TEST_CASE("Linear Cost Test", "[cost]") {
     torc::LinearCost cost2 = torc::LinearCost<float>(q2, name2);
     REQUIRE(cost2.Evaluate(x3) == 26);
     REQUIRE(cost2.Gradient() == q2);
+};
+
+TEST_CASE("Quadratic Cost Test", "[cost]") {
+    Eigen::Matrix2d A, Au;
+    A << 1, 2,
+         2, 1;
+    Au << 1, 4,
+         0, 1;
+    Eigen::Matrix4d B, Bu;
+    B << 1, 0, 0, -3,
+         3, 0, 0, 0,
+         0.1, 0, 0, 0,
+         -1, 0, -10, 0;
+    Bu << 1, 3, 0.1, -4,    // the matrix where Bl is folded upwards
+          0, 0, 0, 0,
+          0, 0, 0, -10,
+          0, 0, 0, 0;
+    Eigen::Vector2d v1, zero1;
+    v1 << 1, 2;
+    zero1 << 0, 0;
+    std::string name = "quad cost 1";
+    std::string name2 = "quad cost 2";
+    torc::QuadraticCost cost1 = torc::QuadraticCost<double>(A, name);
+    torc::QuadraticCost cost1_u = torc::QuadraticCost<double>(Au, name);
+    torc::QuadraticCost cost2 = torc::QuadraticCost<double>(B, name2);
+    REQUIRE(Eigen::Matrix2d(cost1.GetCoefficients()) == Au);
+    REQUIRE(Eigen::Matrix2d(cost1_u.GetCoefficients()) == Au);
+    REQUIRE(cost1.Evaluate(v1) == 13);
+    REQUIRE(cost1.Evaluate(zero1) == 0);
+
+    Eigen::Vector2d v1_grad(10, 8);
+    REQUIRE(cost1.Gradient(v1) == v1_grad);
+
+    Eigen::Matrix2d cost1_hess;
+    cost1_hess << 2, 4,
+               4, 2;
+    REQUIRE(cost1.Hessian(v1) == cost1_hess);
+    REQUIRE(cost1.Hessian() == cost1_hess);
+
+    REQUIRE(Eigen::Matrix4d(cost2.GetCoefficients()) == Bu);
+    REQUIRE(cost2.GetIdentifier() == name2);
+    REQUIRE(cost2.GetDomainDim() == 4);
+
+    Eigen::Vector4d v3 (1, 2, 3, 4);
+    Eigen::Vector4d zero2(0, 0, 0, 0);
+    REQUIRE(cost2.Evaluate(v3) == -128.7);
+    REQUIRE(cost2.Evaluate(zero2) == 0);
 }

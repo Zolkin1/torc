@@ -18,6 +18,8 @@ if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+find_package(Eigen3 REQUIRED)
+
 add_subdirectory(models)
 add_subdirectory(costs)
 add_subdirectory(constraints)
