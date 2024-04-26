@@ -1,40 +1,30 @@
-#ifndef TORC_LINEAR_COST_H
-#define TORC_LINEAR_COST_H
+//
+// Created by gavin on 4/26/2024.
+//
+
+#ifndef TORC_FINITE_DIFF_COST_H
+#define TORC_FINITE_DIFF_COST_H
 
 #include "base_cost.h"
 
 namespace torc {
-    /**
-     * Class implementation of a linear cost function, f(x) = q^T x
-     * @tparam scalar_t the type of scalar used for the cost
-     */
     template <class scalar_t>
-    class LinearCost: public BaseCost<scalar_t> {
+    class FiniteDiffCost: public BaseCost<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
-
     public:
-        LinearCost(const vectorx_t& coefficients, const std::string& identifier) {
-            q_ = coefficients;
+        FiniteDiffCost(const std::function<scalar_t(vectorx_t)>& cost_fn,
+                       const std::string& identifier="Finite difference cost.") {
             this->identifier_ = identifier;
-            this->domain_dim_ = coefficients.size();
+            this->cost_fn_ = cost_fn;
         }
-
         /**
          * Evaluates the cost function at a given point
          * @param x the input to the function
          * @return q^T x
          */
         scalar_t Evaluate(const vectorx_t& x) const {
-            return q_.dot(x);
-        }
-
-        /**
-         * Returns the q_ of the cost
-         * @return the q_ q
-         */
-        vectorx_t GetCoefficients() const {
-            return q_;
+            return cost_fn_(x);
         }
 
         /**
@@ -62,10 +52,9 @@ namespace torc {
         matrixx_t Hessian(const vectorx_t& x) const {
             return matrixx_t::Zero(this->domain_dim_, this->domain_dim_);
         }
-
-      private:
-        vectorx_t q_; // the coefficients of the linear cost
+    private:
+        std::function<scalar_t(vectorx_t)> cost_fn_;
     };
-} // namespace torc
+}
 
-#endif //TORC_LINEAR_COST_H
+#endif //TORC_FINITE_DIFF_COST_H
