@@ -3,6 +3,7 @@
 
 #include <string>
 #include "base_cost.h"
+#include <iostream>
 
 namespace torc {
     /**
@@ -22,12 +23,12 @@ namespace torc {
          */
         QuadraticCost(const matrix_t& coefficients, const std::string& identifier) {
             if (coefficients.isUpperTriangular()) {
-                this->A_ = coefficients;
+                this->A_ = coefficients.template selfadjointView<Eigen::Upper>();
             } else {
-                // we fold the lower triangular matrix into the upper triangular part
-                // to restore the full quadratic form
-                this->A_ = matrix_t (coefficients.template triangularView<Eigen::Upper>())
-                           + matrix_t (coefficients.template triangularView<Eigen::StrictlyLower>().adjoint());
+                if ((coefficients.transpose() - coefficients).squaredNorm() < 1e-8) {
+                    throw std::runtime_error("Quadratic cost: matrix must be either symmetric or upper triangular.");
+                }
+                this->A_ = coefficients;
             }
             this->identifier_ = identifier;
             this->domain_dim_ = static_cast<int>(coefficients.cols());

@@ -35,17 +35,21 @@ TEST_CASE("Quadratic Cost Test", "[cost]") {
     Eigen::Matrix2d A, Au;
     A << 1, 2,
          2, 1;
-    Au << 1, 4,
+    Au << 1, 2,
          0, 1;
-    Eigen::Matrix4d B, Bu;
+    Eigen::Matrix4d B, Bu, Bfull;
     B << 1, 0, 0, -3,
          3, 0, 0, 0,
          0.1, 0, 0, 0,
          -1, 0, -10, 0;
-    Bu << 1, 3, 0.1, -4,    // the matrix where Bl is folded upwards
+    Bu << 1, 3, 0.1, -4,
           0, 0, 0, 0,
           0, 0, 0, -10,
           0, 0, 0, 0;
+    Bfull << 1, 3, 0.1, -4,
+             3, 0 ,0, 0,
+             0.1, 0, 0, -10,
+             -4, 0, -10, 0;
     Eigen::Vector2d v1, zero1;
     v1 << 1, 2;
     zero1 << 0, 0;
@@ -53,9 +57,8 @@ TEST_CASE("Quadratic Cost Test", "[cost]") {
     std::string name2 = "quad cost 2";
     torc::QuadraticCost cost1 = torc::QuadraticCost<double>(A, name);
     torc::QuadraticCost cost1_u = torc::QuadraticCost<double>(Au, name);
-    torc::QuadraticCost cost2 = torc::QuadraticCost<double>(B, name2);
-    REQUIRE(Eigen::Matrix2d(cost1.GetCoefficients()) == Au);
-    REQUIRE(Eigen::Matrix2d(cost1_u.GetCoefficients()) == Au);
+    REQUIRE(Eigen::Matrix2d(cost1.GetCoefficients()) == A);
+    REQUIRE(Eigen::Matrix2d(cost1_u.GetCoefficients()) == A);
     REQUIRE(cost1.Evaluate(v1) == 13);
     REQUIRE(cost1.Evaluate(zero1) == 0);
 
@@ -68,12 +71,14 @@ TEST_CASE("Quadratic Cost Test", "[cost]") {
     REQUIRE(cost1.Hessian(v1) == cost1_hess);
     REQUIRE(cost1.Hessian() == cost1_hess);
 
-    REQUIRE(Eigen::Matrix4d(cost2.GetCoefficients()) == Bu);
+    REQUIRE_THROWS(torc::QuadraticCost<double>(B, name2));
+    torc::QuadraticCost cost2 = torc::QuadraticCost<double>(Bu, name2);
+    REQUIRE(Eigen::Matrix4d(cost2.GetCoefficients()) == Bfull);
     REQUIRE(cost2.GetIdentifier() == name2);
     REQUIRE(cost2.GetDomainDim() == 4);
 
     Eigen::Vector4d v3 (1, 2, 3, 4);
     Eigen::Vector4d zero2(0, 0, 0, 0);
-    REQUIRE(cost2.Evaluate(v3) == -128.7);
+    REQUIRE(cost2.Evaluate(v3) == -258.4);
     REQUIRE(cost2.Evaluate(zero2) == 0);
 }

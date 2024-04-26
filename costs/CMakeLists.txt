@@ -5,8 +5,7 @@ set(COST_HEADER_INC_DIR "${torc_SOURCE_DIR}/costs/include")
 set(COST_HEADER_LIST
     "${COST_HEADER_INC_DIR}/base_cost.h"
     "${COST_HEADER_INC_DIR}/linear_cost.h"
-    "${COST_HEADER_INC_DIR}/quadratic_cost.h"
-        include/quadratic_cost.h)
+    "${COST_HEADER_INC_DIR}/quadratic_cost.h")
 
 add_library(Costs SHARED
         ${COST_HEADER_LIST})
