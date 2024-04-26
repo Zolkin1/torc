@@ -25,7 +25,7 @@ namespace torc {
             if (coefficients.isUpperTriangular()) {
                 this->A_ = coefficients.template selfadjointView<Eigen::Upper>();
             } else {
-                if ((coefficients.transpose() - coefficients).squaredNorm() < 1e-8) {
+                if ((coefficients.transpose() - coefficients).squaredNorm() == 0) {
                     throw std::runtime_error("Quadratic cost: matrix must be either symmetric or upper triangular.");
                 }
                 this->A_ = coefficients;
