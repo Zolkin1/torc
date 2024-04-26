@@ -3,7 +3,6 @@
 
 #include <string>
 #include "base_cost.h"
-#include <iostream>
 
 namespace torc {
     /**
@@ -25,13 +24,13 @@ namespace torc {
             if (coefficients.isUpperTriangular()) {
                 this->A_ = coefficients.template selfadjointView<Eigen::Upper>();
             } else {
-                if ((coefficients.transpose() - coefficients).squaredNorm() == 0) {
+                if ((coefficients.transpose() - coefficients).squaredNorm() != 0) {
                     throw std::runtime_error("Quadratic cost: matrix must be either symmetric or upper triangular.");
                 }
                 this->A_ = coefficients;
             }
             this->identifier_ = identifier;
-            this->domain_dim_ = static_cast<int>(coefficients.cols());
+            this->domain_dim_ = coefficients.cols();
         }
 
         /**
