@@ -20,7 +20,8 @@ namespace torc {
          * @param coefficients the A in x^T A x.
          * @param identifier the name of the cost
          */
-        QuadraticCost(const matrixx_t& coefficients, const std::string& identifier) {
+        QuadraticCost(const matrixx_t& coefficients,
+                      const std::string& identifier="Quadratic cost") {
             if (coefficients.isUpperTriangular()) {
                 this->A_ = coefficients.template selfadjointView<Eigen::Upper>();
             } else {
