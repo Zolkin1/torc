@@ -7,11 +7,11 @@ namespace torc {
     template <class scalar_t>
     class ExplicitDifferentialCost: public BaseCost<scalar_t> {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
-        using vectorx_t = Eigen::MatrixX<scalar_t>;
+        using vectorx_t = Eigen::VectorX<scalar_t>;
     public:
-        ExplicitDifferentialCost(std::function<scalar_t(vectorx_t)> cost,
-                                 std::function<vectorx_t(vectorx_t)> grad,
-                                 std::function<matrixx_t(vectorx_t)> hess,
+        ExplicitDifferentialCost(const std::function<scalar_t(vectorx_t)>& cost,
+                                 const std::function<vectorx_t(vectorx_t)>& grad,
+                                 const std::function<matrixx_t(vectorx_t)>& hess,
                                  size_t dim) {
             this->cost_ = cost;
             this->grad_ = grad;
@@ -19,20 +19,20 @@ namespace torc {
             this->domain_dim_ = dim;
         }
 
-        scalar_t Evaluate(vectorx_t x) {
+        scalar_t Evaluate(const vectorx_t& x) const {
             return cost_(x);
         }
 
-        vectorx_t Gradient(vectorx_t x) {
+        vectorx_t Gradient(const vectorx_t& x) const {
             return grad_(x);
         }
 
-        matrixx_t Hessian(vectorx_t x) {
+        matrixx_t Hessian(const vectorx_t& x) const {
             return hess_(x);
         }
 
     private:
-        std::function<vectorx_t(vectorx_t)> cost_;
+        std::function<scalar_t(vectorx_t)> cost_;
         std::function<vectorx_t(vectorx_t)> grad_;
         std::function<matrixx_t(vectorx_t)> hess_;
     };
