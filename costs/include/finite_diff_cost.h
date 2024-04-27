@@ -18,12 +18,23 @@ namespace torc {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
     public:
+        /**
+         * Constructor for the Finite Difference Cost class
+         *
+         * @param cost_fn the cost function
+         * @param dim   the dimensions of the input of the cost function
+         * @param identifier a string identifier of the cost function
+         */
         FiniteDiffCost(const std::function<scalar_t(vectorx_t)>& cost_fn,
                        const size_t& dim,
+                       const scalar_t grad_step=3e-8,   // approximately sqrt(ulp)
+                       const scalar_t hess_step=1e-3,   // approximately sqrt(grad_step)
                        const std::string& identifier="Finite difference cost.") {
             this->identifier_ = identifier;
             this->cost_fn_ = cost_fn;
             this->domain_dim_ = dim;
+            this->grad_step_ = grad_step;
+            this->hess_step_ = hess_step;
         }
 
         /**
@@ -42,14 +53,13 @@ namespace torc {
          */
         vectorx_t Gradient(const vectorx_t& x) const {
             unsigned dim = this->domain_dim_;
-            const double STEP = 3e-8;   // approximately sqrt(ulp)
-            matrixx_t perturbation = Eigen::MatrixXd::Identity(dim, dim) * STEP;
+            matrixx_t perturbation = Eigen::MatrixXd::Identity(dim, dim) * this->grad_step_;
 
             vectorx_t grad(dim);
             for (unsigned i=0; i<dim; i++) {
                 scalar_t pos_diff = this->cost_fn_(x + perturbation.col(i));
                 scalar_t neg_diff = this->cost_fn_(x - perturbation.col(i));
-                grad(i) = (pos_diff - neg_diff) / (2 * STEP);
+                grad(i) = (pos_diff - neg_diff) / (2 * this->grad_step_);
             }
             return grad;
         }
@@ -61,19 +71,20 @@ namespace torc {
          */
         matrixx_t Hessian(const vectorx_t& x) const {
             unsigned dim = this->domain_dim_;
-            const double STEP = 1e-3;   // approximately sqrt(step for grad)
-            matrixx_t perturbation = Eigen::MatrixXd::Identity(dim, dim) * STEP;
+            matrixx_t perturbation = Eigen::MatrixXd::Identity(dim, dim) * this->hess_step_;
 
             matrixx_t hess(dim, dim);
             for (unsigned i=0; i<dim; i++) {
                 vectorx_t pos_diff = this->Gradient(x + perturbation.col(i));
                 vectorx_t neg_diff = this->Gradient(x - perturbation.col(i));
-                hess.col(i) = (pos_diff - neg_diff) / (2 * STEP);
+                hess.col(i) = (pos_diff - neg_diff) / (2 * this->hess_step_);
             }
             return hess;
         }
     private:
         std::function<scalar_t(vectorx_t)> cost_fn_;
+        scalar_t grad_step_;
+        scalar_t hess_step_;
     };
 }
 
