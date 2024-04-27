@@ -6,13 +6,13 @@
 
 namespace torc {
     /**
-     * Class implementation of a linear cost function, f(x) = x^T A x.
+     * Class implementation of a linear cost function, f(x) = x^T A x, where A is a symmetric matrix.
      * @tparam scalar_t the type of scalar used for the cost
      */
     template <class scalar_t>
     class QuadraticCost: public BaseCost<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
-        using matrix_t = Eigen::MatrixX<scalar_t>;
+        using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
         /**
@@ -20,7 +20,7 @@ namespace torc {
          * @param coefficients the A in x^T A x.
          * @param identifier the name of the cost
          */
-        QuadraticCost(const matrix_t& coefficients, const std::string& identifier) {
+        QuadraticCost(const matrixx_t& coefficients, const std::string& identifier) {
             if (coefficients.isUpperTriangular()) {
                 this->A_ = coefficients.template selfadjointView<Eigen::Upper>();
             } else {
@@ -43,10 +43,10 @@ namespace torc {
         }
 
         /**
-         * Returns the A of the cost in upper triangular form.
+         * Returns the A of the cost.
          * @return the A_
          */
-        matrix_t GetCoefficients() const {
+        matrixx_t GetCoefficients() const {
             return A_;
         }
 
@@ -64,7 +64,7 @@ namespace torc {
          * @param x the input
          * @return (A + A^T)
          */
-        matrix_t Hessian(const vectorx_t& x) const {
+        matrixx_t Hessian(const vectorx_t& x) const {
             return A_ + A_.transpose();
         }
 
@@ -72,12 +72,12 @@ namespace torc {
          * The Hessian of a quadratic cost is always (A + A^T)
          * @return (A + A^T)
          */
-        matrix_t Hessian() const {
+        matrixx_t Hessian() const {
             return A_ + A_.transpose();
         }
 
     private:
-        matrix_t A_; // the coefficients of the linear cost
+        matrixx_t A_; // the coefficients of the linear cost
     };
 } // namespace torc
 
