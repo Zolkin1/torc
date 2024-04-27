@@ -11,12 +11,30 @@ namespace torc {
     public:
         ExplicitDifferentialCost(std::function<scalar_t(vectorx_t)> cost,
                                  std::function<vectorx_t(vectorx_t)> grad,
-                                 std::function<matrixx_t(vectorx_t)> hess) {
-
+                                 std::function<matrixx_t(vectorx_t)> hess,
+                                 size_t dim) {
+            this->cost_ = cost;
+            this->grad_ = grad;
+            this->hess_ = hess;
+            this->domain_dim_ = dim;
         }
+
+        scalar_t Evaluate(vectorx_t x) {
+            return cost_(x);
+        }
+
+        vectorx_t Gradient(vectorx_t x) {
+            return grad_(x);
+        }
+
+        matrixx_t Hessian(vectorx_t x) {
+            return hess_(x);
+        }
+
     private:
-        std::function<vectorx_t(vectorx_t)> grad;
-        std::function<matrixx_t(vectorx_t)> hess;
+        std::function<vectorx_t(vectorx_t)> cost_;
+        std::function<vectorx_t(vectorx_t)> grad_;
+        std::function<matrixx_t(vectorx_t)> hess_;
     };
 }
 #endif //TORC_EXPLICIT_DIFF_COST_H
