@@ -55,6 +55,10 @@ jobs:
         echo $APT_DEPENDENCIES
         sudo apt-get update -qq
         sudo apt-get install -qq ${APT_DEPENDENCIES}
+        export PATH=/opt/openrobots/bin:$PATH
+        export PKG_CONFIG_PATH=/opt/openrobots/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LD_LIBRARY_PATH=/opt/openrobots/lib:$LD_LIBRARY_PATH
+        export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
 
     - name: Set reusable strings
       id: strings
