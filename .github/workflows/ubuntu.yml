@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
 
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04, ubuntu-20.04]
+        os: [ubuntu-22.04] # for now just run on 22, but soon also use ubuntu-latest for 24
         build_type: [Release]
         c_compiler: [gcc, clang]
         include:
@@ -27,18 +27,12 @@ jobs:
           - os: ubuntu-22.04
             c_compiler: clang
             cpp_compiler: clang++
-          - os: ubuntu-20.04
-            c_compiler: gcc
-            cpp_compiler: g++
-          - os: ubuntu-20.04
-            c_compiler: clang
-            cpp_compiler: clang++
-          - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
-          - os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
+#          - os: ubuntu-latest
+#            c_compiler: gcc
+#            cpp_compiler: g++
+#          - os: ubuntu-latest
+#            c_compiler: clang
+#            cpp_compiler: clang++
 
     steps:
     - uses: actions/checkout@v4
