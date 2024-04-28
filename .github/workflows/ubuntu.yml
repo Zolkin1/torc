@@ -1,6 +1,4 @@
-# This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
-# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
-name: CMake on multiple platforms
+name: Ubuntu builds
 
 on:
   push:
@@ -41,12 +39,6 @@ jobs:
       run: |
         sudo sh -c "echo \"deb [arch=amd64] http://robotpkg.openrobots.org/packages/debian/pub $(lsb_release -cs) robotpkg\" >> /etc/apt/sources.list "
         sudo apt-key adv --fetch-keys http://robotpkg.openrobots.org/packages/debian/robotpkg.key
-#        sudo apt install -qqy lsb-release curl
-#        sudo mkdir -p /etc/apt/keyrings
-#        curl http://robotpkg.openrobots.org/packages/debian/robotpkg.asc \
-#        | sudo tee /etc/apt/keyrings/robotpkg.asc
-#        echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/robotpkg.asc] http://robotpkg.openrobots.org/packages/debian/pub $(lsb_release -cs) robotpkg" \
-#        | sudo tee /etc/apt/sources.list.d/robotpkg.list
 
     - name: Get dependencies
       run: |
@@ -61,15 +53,13 @@ jobs:
         export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
         echo $CMAKE_PREFIX_PATH
 
-    - name: Set reusable strings
+    - name: Set reusable strings\
       id: strings
       shell: bash
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
     - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
@@ -84,6 +74,4 @@ jobs:
 
     - name: Test
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest --build-config ${{ matrix.build_type }}
