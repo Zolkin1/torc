@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
   pull_request:
-    # branches: [ "main" ]
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -53,7 +53,7 @@ jobs:
         export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
         echo $CMAKE_PREFIX_PATH
 
-    - name: Set reusable strings\
+    - name: Set reusable strings
       id: strings
       shell: bash
       run: |
