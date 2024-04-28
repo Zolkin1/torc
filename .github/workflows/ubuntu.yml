@@ -37,15 +37,24 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Add robotpkg
+      run: |
+        sudo apt install -qqy lsb-release curl
+        sudo mkdir -p /etc/apt/keyrings
+        curl http://robotpkg.openrobots.org/packages/debian/robotpkg.asc \
+        | sudo tee /etc/apt/keyrings/robotpkg.asc
+        echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/robotpkg.asc] http://robotpkg.openrobots.org/packages/debian/pub $(lsb_release -cs) robotpkg" \
+        | sudo tee /etc/apt/sources.list.d/robotpkg.list
+
     - name: Get dependencies
       run: |
-        export APT_DEPENDENCIES="libeigen3-dev"
+        export APT_DEPENDENCIES="libeigen3-dev \
+                                 robotpkg-pinocchio-2.7.0"
         echo $APT_DEPENDENCIES
         sudo apt-get update -qq
         sudo apt-get install -qq ${APT_DEPENDENCIES}
 
     - name: Set reusable strings
-      # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
       shell: bash
       run: |
