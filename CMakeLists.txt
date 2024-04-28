@@ -7,8 +7,6 @@ project(torc
 
 message(STATUS "Building TORC Project")
 
-cmake_print_variables(CMAKE_PREFIX_PATH)
-
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
 set(BUILD_TESTING True)
 

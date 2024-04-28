@@ -60,7 +60,6 @@ jobs:
         export LD_LIBRARY_PATH=/opt/openrobots/lib:$LD_LIBRARY_PATH
         export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
         echo $CMAKE_PREFIX_PATH
-        ls -a /opt/openrobots
 
     - name: Set reusable strings
       id: strings
