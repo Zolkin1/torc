@@ -45,7 +45,7 @@ jobs:
 
     - name: Get dependencies
       run: |
-        export APT_DEPENDENCIES = "libeigen3-dev"
+        export APT_DEPENDENCIES="libeigen3-dev"
         echo $APT_DEPENDENCIES
         sudo apt-get update -qq
         sudo apt-get install -qq ${APT_DEPENDENCIES}
