@@ -51,7 +51,7 @@ jobs:
     - name: Get dependencies
       run: |
         export APT_DEPENDENCIES="libeigen3-dev \
-                                 robotpkg-pinocchio-2.7.0"
+                                 robotpkg-pinocchio"
         echo $APT_DEPENDENCIES
         sudo apt-get update -qq
         sudo apt-get install -qq ${APT_DEPENDENCIES}
