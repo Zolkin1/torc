@@ -7,7 +7,7 @@
 
 namespace torc::cost {
     /**
-     * Class implementation of a linear cost function, f(x) = x^T A x, where A is a symmetric matrix.
+     * Class implementation of a linear cost function, f(x) = (1/2) x^T A x + q^T x, where A is a symmetric matrix.
      * @tparam scalar_t the type of scalar used for the cost
      */
     template <class scalar_t>
@@ -91,7 +91,7 @@ namespace torc::cost {
         }
 
     private:
-        matrixx_t A_; // the coefficients of the linear cost
+        matrixx_t A_; // the coefficients of the quadratic cost
         LinearCost<scalar_t> linear_cost_ = LinearCost(vectorx_t(vectorx_t::Zero(0)), std::string(""));
     };
 } // namespace torc::cost
