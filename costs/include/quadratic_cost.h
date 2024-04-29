@@ -26,15 +26,16 @@ namespace torc::cost {
             this->domain_dim_ = coefficients.cols();
         }
 
-        explicit QuadraticCost(const matrixx_t& coefficients,
-                               const LinearCost<scalar_t>& linear_cost,
+        explicit QuadraticCost(const matrixx_t& coefficients, const LinearCost<scalar_t>& linear_cost,
                                const std::string& identifier="Quadratic cost") :
-               QuadraticCost(coefficients, identifier){
-            this->linear_cost_ = linear_cost;
-        }
+               QuadraticCost(coefficients, identifier) { this->linear_cost_ = linear_cost; }
 
-        template <int mat_dim>
-        explicit QuadraticCost(const Eigen::TriangularView<Eigen::Matrix<scalar_t, mat_dim, mat_dim>, Eigen::Upper>& coefficients,
+        explicit QuadraticCost(const matrixx_t& coefficients, const vectorx_t& lin_coefficients,
+                               const std::string& identifier="Quadratic cost", const std::string& lin_identifier="linear cost") :
+                QuadraticCost(coefficients, identifier) { this->linear_cost_ = LinearCost<scalar_t>(lin_coefficients, lin_identifier); }
+
+        template <int dim>
+        explicit QuadraticCost(const Eigen::TriangularView<Eigen::Matrix<scalar_t, dim, dim>, Eigen::Upper>& coefficients,
                                const std::string& identifier="Quadratic cost") :
                QuadraticCost(matrixx_t(matrixx_t(coefficients).template selfadjointView<Eigen::Upper>()), identifier) {}
 

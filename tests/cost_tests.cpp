@@ -55,7 +55,7 @@ TEST_CASE("Quadratic Cost Test", "[cost]") {
     zero1 << 0, 0;
     std::string name = "quad cost 1";
     std::string name2 = "quad cost 2";
-    torc::cost::QuadraticCost cost1 = torc::cost::QuadraticCost<double>(A.triangularView<Eigen::Upper>(), name);
+    torc::cost::QuadraticCost cost1 = torc::cost::QuadraticCost<double>(A, name);
     torc::cost::QuadraticCost cost1_u = torc::cost::QuadraticCost<double>(Au.triangularView<Eigen::Upper>(), name);
     std::cout << cost1.GetQuadCoefficients();
     REQUIRE(Eigen::Matrix2d(cost1.GetQuadCoefficients()) == A);
@@ -73,6 +73,8 @@ TEST_CASE("Quadratic Cost Test", "[cost]") {
     REQUIRE(cost1.Hessian() == cost1_hess);
 
     torc::cost::QuadraticCost cost2 = torc::cost::QuadraticCost<double>(Bu.triangularView<Eigen::Upper>(), name2);
+    torc::cost::QuadraticCost cost11 = torc::cost::QuadraticCost<double>(A, v1, name2);
+    std::cout << cost11.Evaluate(v1);
 //    REQUIRE(Eigen::Matrix4d(cost2.GetQuadCoefficients()) == Bfull);
 //    REQUIRE(cost2.GetIdentifier() == name2);
 //    REQUIRE(cost2.GetDomainDim() == 4);
