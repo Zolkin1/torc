@@ -3,8 +3,9 @@
 
 #include <string>
 #include "base_cost.h"
+#include "linear_cost.h"
 
-namespace torc {
+namespace torc::cost {
     /**
      * Class implementation of a linear cost function, f(x) = x^T A x, where A is a symmetric matrix.
      * @tparam scalar_t the type of scalar used for the cost
@@ -15,71 +16,84 @@ namespace torc {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
-        /**
-         * Constructor for the quadratic cost class
-         * @param coefficients the A in x^T A x.
-         * @param identifier the name of the cost
-         */
-        QuadraticCost(const matrixx_t& coefficients,
-                      const std::string& identifier="Quadratic cost") {
-            if (coefficients.isUpperTriangular()) {
-                this->A_ = coefficients.template selfadjointView<Eigen::Upper>();
-            } else {
-                if ((coefficients.transpose() - coefficients).squaredNorm() != 0) {
-                    throw std::runtime_error("Quadratic cost: matrix must be either symmetric or upper triangular.");
-                }
-                this->A_ = coefficients;
+        explicit QuadraticCost(const matrixx_t& coefficients, const std::string& identifier="Quadratic cost") {
+            if ((coefficients.transpose() - coefficients).squaredNorm() != 0) {
+                throw std::runtime_error("Quadratic cost: matrix must be symmetric.");
             }
+            this->A_ = coefficients;
+            this->linear_cost_ = LinearCost(vectorx_t(vectorx_t::Zero(coefficients.cols())));
             this->identifier_ = identifier;
             this->domain_dim_ = coefficients.cols();
         }
 
+        explicit QuadraticCost(const matrixx_t& coefficients,
+                               const LinearCost<scalar_t>& linear_cost,
+                               const std::string& identifier="Quadratic cost") :
+               QuadraticCost(coefficients, identifier){
+            this->linear_cost_ = linear_cost;
+        }
+
+        template <int mat_dim>
+        explicit QuadraticCost(const Eigen::TriangularView<Eigen::Matrix<scalar_t, mat_dim, mat_dim>, Eigen::Upper>& coefficients,
+                               const std::string& identifier="Quadratic cost") :
+               QuadraticCost(matrixx_t(matrixx_t(coefficients).template selfadjointView<Eigen::Upper>()), identifier) {}
+
         /**
          * Evaluates the cost function at a given point
          * @param x the input to the function
-         * @return x^T A x
+         * @return (1/2) x^T A x + q^T x
          */
         scalar_t Evaluate(const vectorx_t& x) const {
-            return x.dot(A_ * x);
+            return x.dot(A_ * x) * 0.5 + linear_cost_.Evaluate(x);
         }
 
         /**
-         * Returns the A of the cost.
+         * Get the A of the cost.
          * @return the A_
          */
-        matrixx_t GetCoefficients() const {
+        matrixx_t GetQuadCoefficients() const {
             return A_;
+        }
+
+        /**
+         * Get the q of the cost
+         * @return the q_
+         */
+        vectorx_t GetLinCoefficients() const {
+            return linear_cost_.GetCoefficients();
         }
 
         /**
          * Returns the gradient of the cost evaluated at x
          * @param x the input
-         * @return grad f(x) = (A + A^T) x
+         * @return grad f(x) = Ax + q
          */
         vectorx_t Gradient(const vectorx_t& x) const {
-            return (A_ + A_.transpose()) * x;
+            return A_ * x + GetLinCoefficients();
         }
 
         /**
          * Returns the Hessian of the cost function evaluated at x
          * @param x the input
-         * @return (A + A^T)
+         * @return A
          */
         matrixx_t Hessian(const vectorx_t& x) const {
-            return A_ + A_.transpose();
+            return A_;
         }
 
         /**
-         * The Hessian of a quadratic cost is always (A + A^T)
-         * @return (A + A^T)
+         * The Hessian of a quadratic cost is always A
+         * @return A
          */
         matrixx_t Hessian() const {
-            return A_ + A_.transpose();
+            return A_;
         }
 
     private:
         matrixx_t A_; // the coefficients of the linear cost
+        LinearCost<scalar_t> linear_cost_ = LinearCost(vectorx_t(vectorx_t::Zero(0)), std::string(""));
     };
-} // namespace torc
+} // namespace torc::cost
+
 
 #endif //TORC_QUADRATIC_COST_H
