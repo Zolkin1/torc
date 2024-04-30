@@ -4,83 +4,119 @@
 
 #include <eigen3/Eigen/Dense>
 #include <iostream>
+#include <random>
 #include "linear_cost.h"
 #include "quadratic_cost.h"
 
 TEST_CASE("Linear Cost Test", "[cost]") {
-    Eigen::Vector3d q1, x1, x2;
-    q1 << 1, 2, 3;
-    x1 << 0.1, 1, 10;
-    x2 << 0, 0, 0;
-    std::string name1 = "linear cost 1";
-    torc::cost::LinearCost cost1 = torc::cost::LinearCost<double>(q1, name1);
-    REQUIRE(cost1.Evaluate(x1) == 32.1);
-    REQUIRE(cost1.GetDomainDim() == 3);
-    REQUIRE(cost1.GetCoefficients() == q1);
-    REQUIRE(cost1.Gradient() == q1);
-    REQUIRE(cost1.Gradient(x2) == q1);
-    REQUIRE(cost1.Hessian(x1) == Eigen::MatrixXd::Zero(3, 3));
-    REQUIRE(cost1.GetIdentifier() == name1);
+    int n_tests = 20;
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist(1,6);
 
-    Eigen::Vector2f q2, x3;
-    q2 << 1.5, 2.5;
-    x3 << 4, 8;
-    std::string name2 = "linear cost 2";
-    torc::cost::LinearCost cost2 = torc::cost::LinearCost<float>(q2, name2);
-    REQUIRE(cost2.Evaluate(x3) == 26);
-    REQUIRE(cost2.Gradient() == q2);
-};
+    SECTION("Provided coefficients") {
+        for (int i=0; i<n_tests; i++) {
+            size_t dim = dist(rng);
+            Eigen::VectorX<double> q = Eigen::VectorX<double>::Random(dim);
+            torc::cost::LinearCost<double> cost = torc::cost::LinearCost(q);
+            for (int j=0; j<n_tests; j++) {
+                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                REQUIRE(cost.Evaluate(v) == q.dot(v));
+                REQUIRE(cost.GetCoefficients() == q);
+                REQUIRE(cost.Gradient() == q);
+                REQUIRE(cost.Hessian(v) == Eigen::MatrixX<double>::Zero(dim, dim));
+                REQUIRE(cost.GetDomainDim() == dim);
+            }
+        }
+    }
+
+    SECTION("Default coefficients") {
+        for (int dim=0; dim < n_tests; dim++) {
+            torc::cost::LinearCost<double> cost = torc::cost::LinearCost<double>(dim);
+            Eigen::VectorX<double> zero = Eigen::VectorX<double>::Zero(dim);
+            for (int j=0; j<n_tests; j++) {
+                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                REQUIRE(cost.Evaluate(v) == 0);
+                REQUIRE(cost.GetCoefficients() == zero);
+                REQUIRE(cost.Gradient() == zero);
+                REQUIRE(cost.Hessian(v) == Eigen::MatrixX<double>::Zero(dim, dim));
+                REQUIRE(cost.GetDomainDim() == dim);
+            }
+        }
+    }
+}
 
 TEST_CASE("Quadratic Cost Test", "[cost]") {
-    Eigen::Matrix2d A, Au;
-    A << 1, 2,
-         2, 1;
-    Au << 1, 2,
-         0, 1;
-    Eigen::Matrix4d B, Bu, Bfull;
-    B << 1, 0, 0, -3,
-         3, 0, 0, 0,
-         0.1, 0, 0, 0,
-         -1, 0, -10, 0;
-    Bu << 1, 3, 0.1, -4,
-          0, 0, 0, 0,
-          0, 0, 0, -10,
-          0, 0, 0, 0;
-    Bfull << 1, 3, 0.1, -4,
-             3, 0 ,0, 0,
-             0.1, 0, 0, -10,
-             -4, 0, -10, 0;
-    Eigen::Vector2d v1, zero1;
-    v1 << 1, 2;
-    zero1 << 0, 0;
-    std::string name = "quad cost 1";
-    std::string name2 = "quad cost 2";
-    torc::cost::QuadraticCost cost1 = torc::cost::QuadraticCost<double>(A, name);
-    torc::cost::QuadraticCost cost1_u = torc::cost::QuadraticCost<double>(Au.triangularView<Eigen::Upper>(), name);
-    std::cout << cost1.GetQuadCoefficients();
-    REQUIRE(Eigen::Matrix2d(cost1.GetQuadCoefficients()) == A);
-    REQUIRE(Eigen::Matrix2d(cost1_u.GetQuadCoefficients()) == A);
-    REQUIRE(cost1.Evaluate(v1) == 6.5);
-    REQUIRE(cost1.Evaluate(zero1) == 0);
+    int n_tests = 20;
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist(1,6);
+    SECTION("Default coefficients") {
+        for (int dim=0; dim < n_tests; dim++) {
+            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost<double>(dim);
+            for (int j = 0; j < n_tests; ++j) {
+                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                REQUIRE(cost.Evaluate(v) == 0);
+                REQUIRE(cost.GetQuadCoefficients() == Eigen::MatrixX<double>::Zero(dim, dim));
+                REQUIRE(cost.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
+                REQUIRE(cost.Gradient(v) == Eigen::VectorX<double>::Zero(dim));
+                REQUIRE(cost.Hessian(v) == Eigen::MatrixX<double>::Zero(dim, dim));
+                REQUIRE(cost.GetDomainDim() == dim);
+            }
+        }
+    }
 
-    Eigen::Vector2d v1_grad(5, 4);
-    REQUIRE(cost1.Gradient(v1) == v1_grad);
+    SECTION("Full matrix") {
+        for (int i=0; i<n_tests; i++) {
+            size_t dim = dist(rng);
+            Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
+            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A);
+            for (int j = 0; j < n_tests; ++j) {
+                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)));
+                REQUIRE(cost.GetQuadCoefficients() == A);
+                REQUIRE(cost.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
+                REQUIRE(cost.Gradient(v) == A*v);
+                REQUIRE(cost.Hessian(v) == A);
+                REQUIRE(cost.GetDomainDim() == dim);
+            }
+        }
+    }
 
-    Eigen::Matrix2d cost1_hess;
-    cost1_hess << 1, 2,
-                  2, 1;
-    REQUIRE(cost1.Hessian(v1) == cost1_hess);
-    REQUIRE(cost1.Hessian() == cost1_hess);
+    SECTION("Triangular View") {    // matrix has to be fixed-size at compile time to call triangularView
+        for (int i=0; i<n_tests; i++) {
+            Eigen::Matrix3d A = Eigen::Matrix3d::Random();
+            Eigen::TriangularView<Eigen::Matrix3d, Eigen::Upper> Au = A.triangularView<Eigen::Upper>();
+            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(Au);
+            A = A.selfadjointView<Eigen::Upper>();
+            for (int j = 0; j < n_tests; ++j) {
+                Eigen::Vector3d v = Eigen::Vector3d::Random();
+                REQUIRE(abs(cost.Evaluate(v) - 0.5 * (v.dot(A * v))) < 1e-8);
+                REQUIRE(cost.GetQuadCoefficients() == A);
+                REQUIRE(cost.GetLinCoefficients() == Eigen::Vector3d::Zero());
+                REQUIRE(cost.Gradient(v).isApprox(A*v));
+                REQUIRE(cost.Hessian(v).isApprox(A));
+                REQUIRE(cost.GetDomainDim() == 3);
+            }
+        }
+    }
 
-    torc::cost::QuadraticCost cost2 = torc::cost::QuadraticCost<double>(Bu.triangularView<Eigen::Upper>(), name2);
-    torc::cost::QuadraticCost cost11 = torc::cost::QuadraticCost<double>(A, v1, name2);
-    std::cout << cost11.Evaluate(v1);
-//    REQUIRE(Eigen::Matrix4d(cost2.GetQuadCoefficients()) == Bfull);
-//    REQUIRE(cost2.GetIdentifier() == name2);
-//    REQUIRE(cost2.GetDomainDim() == 4);
-//
-//    Eigen::Vector4d v3 (1, 2, 3, 4);
-//    Eigen::Vector4d zero2(0, 0, 0, 0);
-//    REQUIRE(cost2.Evaluate(v3) == -129.2);
-//    REQUIRE(cost2.Evaluate(zero2) == 0);
+    SECTION("Full matrix with linear cost") {
+        for (int i=0; i<n_tests; i++) {
+            size_t dim = dist(rng);
+            Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
+            Eigen::VectorX<double> q = Eigen::VectorX<double>::Random(dim);
+            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A, q);
+            for (int j = 0; j < n_tests; ++j) {
+                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)) + q.dot(v));
+                REQUIRE(cost.GetQuadCoefficients() == A);
+                REQUIRE(cost.GetLinCoefficients() == q);
+                REQUIRE(cost.Gradient(v) == A*v + q);
+                REQUIRE(cost.Hessian(v) == A);
+                REQUIRE(cost.Hessian() == A);
+                REQUIRE(cost.GetDomainDim() == dim);
+            }
+        }
+    }
 }

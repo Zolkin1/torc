@@ -16,7 +16,23 @@ namespace torc::cost {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
-        LinearCost(const vectorx_t &coefficients, const std::string &identifier="Linear cost") {
+        /**
+         * Overloaded constructor for the LinearCost class.
+         * @param dim input dimension, defaults coefficients to 0
+         * @param identifier string identifier
+         */
+        explicit LinearCost(const int& dim, const std::string &identifier="Linear cost") {
+            q_ = vectorx_t::Zero(dim);
+            this->identifier_ = identifier;
+            this->domain_dim_ = dim;
+        }
+
+        /**
+         * Overloaded constructor for the LinearCost class.
+         * @param coefficients the linear coefficients
+         * @param identifier string identifier
+         */
+        explicit LinearCost(const vectorx_t &coefficients, const std::string &identifier="Linear cost") {
             q_ = coefficients;
             this->identifier_ = identifier;
             this->domain_dim_ = coefficients.size();
@@ -62,6 +78,14 @@ namespace torc::cost {
          * @return a square zero matrix of dimension dim(x)
          */
         matrixx_t Hessian(const vectorx_t &x) const {
+            return matrixx_t::Zero(this->domain_dim_, this->domain_dim_);
+        }
+
+        /**
+         * The Hessian of a linear function is zero everywhere
+         * @return a square zero matrix of dimension dim(x)
+         */
+        matrixx_t Hessian() const {
             return matrixx_t::Zero(this->domain_dim_, this->domain_dim_);
         }
 
