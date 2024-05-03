@@ -51,20 +51,6 @@ TEST_CASE("Quadratic Cost Test", "[cost]") {
     std::random_device dev;
     std::mt19937 rng(dev());
     std::uniform_int_distribution<std::mt19937::result_type> dist(1,6);
-    SECTION("Default coefficients") {
-        for (int dim=0; dim < n_tests; dim++) {
-            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost<double>(dim);
-            for (int j = 0; j < n_tests; ++j) {
-                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
-                REQUIRE(cost.Evaluate(v) == 0);
-                REQUIRE(cost.GetQuadCoefficients() == Eigen::MatrixX<double>::Zero(dim, dim));
-                REQUIRE(cost.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
-                REQUIRE(cost.Gradient(v) == Eigen::VectorX<double>::Zero(dim));
-                REQUIRE(cost.Hessian(v) == Eigen::MatrixX<double>::Zero(dim, dim));
-                REQUIRE(cost.GetDomainDim() == dim);
-            }
-        }
-    }
 
     SECTION("Full matrix") {
         for (int i=0; i<n_tests; i++) {

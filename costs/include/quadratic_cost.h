@@ -16,16 +16,25 @@ namespace torc::cost {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
+
         /**
-         * Overloaded constructor for the QuadraticCost class. The linear component defaults to 0.
-         * @param dim input domain
+         * Overloaded constructor for the QuadraticCost class.
+         * @param coefficients matrix coefficients (A) for f(x) = (1/2) x^T A x + q^T x, must be symmetric
+         * @param lin_coefficients linear coefficients (q) for f(x)
          * @param identifier string identifier
          */
-        explicit QuadraticCost(const int& dim, const std::string& identifier="Quadratic cost") {
-            this->A_ = matrixx_t::Zero(dim, dim);
-            this->linear_cost_ = LinearCost<scalar_t>(dim);
+        explicit QuadraticCost(const matrixx_t& coefficients,
+                               const vectorx_t& lin_coefficients,
+                               const std::string& identifier="Quadratic cost")
+                : QuadraticCost(coefficients,
+                                identifier) {
+            if ((coefficients.transpose() - coefficients).squaredNorm() != 0) {
+                throw std::runtime_error("Quadratic cost: matrix must be symmetric.");
+            }
+            this->A_ = coefficients;
+            this->linear_cost_ = LinearCost<scalar_t>(lin_coefficients);
             this->identifier_ = identifier;
-            this->domain_dim_ = dim;
+            this->domain_dim_ = coefficients.cols();
         }
 
         /**
@@ -33,7 +42,8 @@ namespace torc::cost {
          * @param coefficients matrix coefficients for f(x) = (1/2) x^T A x, must be symmetric
          * @param identifier string identifier
          */
-        explicit QuadraticCost(const matrixx_t& coefficients, const std::string& identifier="Quadratic cost") {
+        explicit QuadraticCost(const matrixx_t& coefficients,
+                               const std::string& identifier="Quadratic cost") {
             if ((coefficients.transpose() - coefficients).squaredNorm() != 0) {
                 throw std::runtime_error("Quadratic cost: matrix must be symmetric.");
             }
@@ -42,43 +52,11 @@ namespace torc::cost {
             this->identifier_ = identifier;
             this->domain_dim_ = coefficients.cols();
         }
-
-        /**
-         * Overloaded constructor for the QuadraticCost class.
-         * @param coefficients matrix coefficients (A) for f(x) = (1/2) x^T A x + q^T x, must be symmetric
-         * @param linear_cost a LinearCost to represent the q^T x
-         * @param identifier string identifier
-         */
-        explicit QuadraticCost(const matrixx_t& coefficients, const LinearCost<scalar_t>& linear_cost,
-                               const std::string& identifier="Quadratic cost")
-                   : QuadraticCost(coefficients, identifier) { this->linear_cost_ = linear_cost; }
-
-       /**
-        * Overloaded constructor for the QuadraticCost class.
-        * @param coefficients matrix coefficients (A) for f(x) = (1/2) x^T A x + q^T x, must be symmetric
-        * @param lin_coefficients linear coefficients (q) for f(x)
-        * @param identifier string identifier
-        */
-        explicit QuadraticCost(const matrixx_t& coefficients,
-                               const vectorx_t& lin_coefficients,
-                               const std::string& identifier="Quadratic cost")
-                : QuadraticCost(coefficients,
-                                LinearCost<scalar_t>(lin_coefficients),
-                                identifier) {}
-
-        /**
-         * Overloaded constructor for the QuadraticCost class.
-         * @tparam dim input dimension
-         * @param coefficients an upper triangular view (A) of the coefficients. The full matrix is constructed by
-         *                     A^T + A, while the diagonal remains unchanged
-         * @param identifier string identifier
-         */
-        template <int dim>
-        explicit QuadraticCost(const Eigen::TriangularView<Eigen::Matrix<scalar_t, dim, dim>, Eigen::Upper>& coefficients,
-                               const std::string& identifier="Quadratic cost")
-                : QuadraticCost(matrixx_t(matrixx_t(coefficients).template selfadjointView<Eigen::Upper>()),
-                                LinearCost<scalar_t>(dim),
-                                identifier) {}
+//        explicit QuadraticCost(const matrixx_t& coefficients,
+//                               const std::string& identifier="Quadratic cost")
+//                   : QuadraticCost(coefficients,
+//                                   vectorx_t(vectorx_t::Zero(coefficients.cols())),
+//                                   identifier) {}
 
         /**
          * Overloaded constructor for the QuadraticCost class.
@@ -92,9 +70,23 @@ namespace torc::cost {
         explicit QuadraticCost(const Eigen::TriangularView<Eigen::Matrix<scalar_t, dim, dim>, Eigen::Upper>& coefficients,
                                const vectorx_t& lin_coefficients,
                                const std::string& identifier="Quadratic cost")
-               : QuadraticCost(matrixx_t(matrixx_t(coefficients).template selfadjointView<Eigen::Upper>()),
-                               lin_coefficients,
-                               identifier) {}
+                : QuadraticCost(matrixx_t(matrixx_t(coefficients).template selfadjointView<Eigen::Upper>()),
+                                lin_coefficients,
+                                identifier) {}
+
+        /**
+         * Overloaded constructor for the QuadraticCost class.
+         * @tparam dim input dimension
+         * @param coefficients an upper triangular view (A) of the coefficients. The full matrix is constructed by
+         *                     A^T + A, while the diagonal remains unchanged
+         * @param identifier string identifier
+         */
+        template <int dim>
+        explicit QuadraticCost(const Eigen::TriangularView<Eigen::Matrix<scalar_t, dim, dim>, Eigen::Upper>& coefficients,
+                               const std::string& identifier="Quadratic cost")
+                : QuadraticCost(coefficients,
+                                vectorx_t::Zero(dim),
+                                identifier) {}
 
         /**
          * Evaluates the cost function at a given point
