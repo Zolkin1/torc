@@ -7,7 +7,7 @@
 
 namespace torc::cost {
     /**
-     * Class implementation of a linear cost function, f(x) = (1/2) x^T A x + q^T x, where A is a symmetric matrix.
+     * Class implementation of a quadratic cost function, f(x) = (1/2) x^T A x + q^T x, where A is a symmetric matrix.
      * @tparam scalar_t the type of scalar used for the cost
      */
     template <class scalar_t>

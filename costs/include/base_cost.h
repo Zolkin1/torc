@@ -52,7 +52,7 @@ namespace torc::cost {
 
     protected:
         std::string identifier_; // the (not necessarily unique) name assigned to this function
-        size_t domain_dim_{};      // the function domain's dimension
+        size_t domain_dim_;      // the function domain's dimension
     };
 }
 
