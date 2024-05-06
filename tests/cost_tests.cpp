@@ -47,22 +47,23 @@ TEST_CASE("Auto-differentiation Cost Test", "[cost]") {
     };
 
     torc::AutodiffCost<double> cost(func, 3);
+
     Eigen::Vector3d input = {1, 2, 3};
 
-//    SECTION("Evaluation Test") {
-//        REQUIRE(cost.Evaluate(input) == 11);
-//    }
-//
-//    SECTION("Gradient Test") {
-//        Eigen::Vector3d expected_gradient = {5, 4, 3};
-//        REQUIRE(cost.Gradient(input).isApprox(expected_gradient));
-//    }
+    SECTION("Evaluation Test") {
+        REQUIRE(cost.Evaluate(input) == 11);
+    }
 
-//    SECTION("Hessian Test") {
-//        Eigen::MatrixXd expected_hessian(3, 3);
-//        expected_hessian << 0, 1, 1,
-//                1, 0, 1,
-//                1, 1, 0;
-//        REQUIRE(cost.Hessian(input).isApprox(expected_hessian));
-//    }
+    SECTION("Gradient Test") {
+        Eigen::Vector3d expected_gradient = {5, 4, 3};
+        REQUIRE(cost.Gradient(input).isApprox(expected_gradient));
+    }
+
+    SECTION("Hessian Test") {
+        Eigen::MatrixXd expected_hessian(3, 3);
+        expected_hessian << 0, 1, 1,
+                            1, 0, 1,
+                            1, 1, 0;
+        REQUIRE(cost.Hessian(input).isApprox(expected_hessian));
+    }
 }
