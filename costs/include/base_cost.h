@@ -5,6 +5,12 @@
 #include <string>
 #include <eigen3/Eigen/Dense>
 
+#include <vector>
+#include <iostream>
+#include <stdexcept>
+#include <cppad/cg.hpp>
+#include "base_cost.h"
+
 namespace torc {
     /**
      * Abstract class representing a cost function to be optimized.
@@ -35,6 +41,14 @@ namespace torc {
          * @return the Hessian of the function
          */
         virtual matrixx_t Hessian(const vectorx_t& x) const = 0;
+
+        bool IsValidIdentifier(const std::string& str) {
+            if (str[0] != '_' && !isalpha(str[0])) {
+                return false;
+            }
+//            return false;
+            return std::all_of(str.cbegin(), str.cend(), [](char c) {return (isalnum(c) || c=='_');});
+        }
 
         /**
          * Returns the identifier_ of the function

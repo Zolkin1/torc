@@ -32,30 +32,38 @@ namespace torc {
          * @param dim the input dimension
          * @param identifier string identifier for the cost
          */
-        AutodiffCost(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
-                     const size_t dim=0,
-                     const std::string& identifier="identifier") {
+        explicit AutodiffCost(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
+                             const size_t dim=0,
+                             const std::string& identifier="Auto_Differentiation_Cost_Instance") {
             this->fn_ = fn;
             this->dim_ = dim;
-            this->identifier_ = identifier;
+            // the library has some issue with the identifier if it contains spaces/special characters. We impose a
+            // more strict requirement on the identifier; strings like "-auto" will also work.
+            if (this->IsValidIdentifier(identifier)) {
+                this->identifier_ = identifier;
+            } else {
+                throw std::runtime_error("Identifier must be a valid variable name.");
+            }
 
+            // Record operations in the ADFun object
             std::vector<adcg_t> x(dim);
             CppAD::Independent(x);
             Eigen::VectorX<adcg_t> eigen_x = Eigen::Map<Eigen::VectorX<adcg_t> , Eigen::Unaligned>(x.data(), x.size());
             std::vector<adcg_t> y = {fn(eigen_x)};
             AD::ADFun<cg_t> ad_fn_(x, y);
 
+            // Generate library source code
             ADCG::ModelCSourceGen<double> cgen(ad_fn_, this->identifier_);
             cgen.setCreateJacobian(true);
             cgen.setCreateHessian(true);
             ADCG::ModelLibraryCSourceGen<double> libcgen(cgen);
 
-            // compile source code
+            // Compile source code TODO this takes a long time to compile, test if it affects run-time performance
             ADCG::DynamicModelLibraryProcessor<double> p(libcgen);
             ADCG::GccCompiler<double> compiler;
             this->cg_dynamic_lib_ = p.createDynamicLibrary(compiler);
 
-            // save to files
+            // Save to files
             ADCG::SaveFilesModelLibraryProcessor<double> p2(libcgen);
             p2.saveSources();
         }
@@ -70,9 +78,7 @@ namespace torc {
             for (int i = 0; i < this->dim_; ++i) {
                 x_eigen[i] = adcg_t(x[i]);
             }
-            adcg_t res = this->fn_(x_eigen);
-            scalar_t result = AD::Value(res).getValue();    // first get the cg_t, then extract the scalar_t
-            return result;
+            return AD::Value(this->fn_(x_eigen)).getValue();    // first get the cg_t, then extract the scalar_t
         }
 
         /**
@@ -99,14 +105,14 @@ namespace torc {
          */
         matrixx_t Hessian(const vectorx_t& x) const {
             std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model(this->identifier_);
-            std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
+            std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
             if (model->isHessianAvailable()) {
                 std::vector<scalar_t> hess = model->Hessian(x_std, 0);
                 matrixx_t grad_eigen(this->dim_, this->dim_);
-                for (size_t row=0; row<this->dim_; row++) {
-                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<vectorx_t , Eigen::Unaligned>(hess.data() + row*this->dim_, (row+1)*this->dim_);
-                    grad_row_eigen.conservativeResize(this->dim_);  // so row assignment doesn't complain
-                    grad_eigen.row(row) << grad_row_eigen;
+                for (size_t nrow=0; nrow < this->dim_; nrow++) {
+                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t> , Eigen::Unaligned>(hess.data() + nrow * this->dim_, (nrow + 1) * this->dim_);
+                    grad_row_eigen.conservativeResize(this->dim_);  // so nrow assignment doesn't complain
+                    grad_eigen.row(nrow) << grad_row_eigen;
                 }
                 return grad_eigen;
             } else {
@@ -115,10 +121,8 @@ namespace torc {
         }
 
     private:
-        // the original function
-        std::function<adcg_t(Eigen::VectorX<adcg_t>)> fn_;
-        // the dynamic library that stores the differential information
-        std::unique_ptr<ADCG::DynamicLib<double>> cg_dynamic_lib_;
+        std::function<adcg_t(Eigen::VectorX<adcg_t>)> fn_;          // the original function
+        std::unique_ptr<ADCG::DynamicLib<double>> cg_dynamic_lib_;  // stores the operation tape and differential information
     };
 } // namespace torc
 

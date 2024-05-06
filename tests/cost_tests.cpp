@@ -36,30 +36,36 @@ TEST_CASE("Auto-differentiation Cost Test", "[cost]") {
     namespace AD = CppAD;
     using cg_t = ADCG::CG<double>;  // CodeGen scalar
     using adcg_t = CppAD::AD<cg_t>;       // CppAD scalar templated by CodeGen scalar
-    using vectorx_t = Eigen::VectorX<double>;
-    using vectorx_adcg_t = Eigen::VectorX<adcg_t>;
-    using matrixx_t = Eigen::MatrixX<double>;
-    using matrixx_adcg_t = Eigen::MatrixX<adcg_t>;
-    using adfun_t = AD::ADFun<cg_t>;
 
-    std::function<adcg_t(vectorx_adcg_t)> func = [](const vectorx_adcg_t& r) {
+    std::function<adcg_t(Eigen::VectorX<adcg_t>)> func = [](const Eigen::VectorX<adcg_t>& r) {
         return r[0] * r[1] + r[1] * r[2] + r[2] * r[0];
     };
 
     torc::AutodiffCost<double> cost(func, 3);
+    SECTION("Valid Names") {
+        std::vector<std::string> invalid_names = {"-a", "-", "_-", "-_-", "?", "one2#"};
+        for (const std::string& str : invalid_names) {
+            REQUIRE(cost.IsValidIdentifier(str) == false);
+        }
+
+        std::vector<std::string> valid_names = {"_", "_one", "_one2", "_2", "one"};
+        for (const std::string& str : valid_names) {
+            REQUIRE(cost.IsValidIdentifier(str) == true);
+        }
+    }
 
     Eigen::Vector3d input = {1, 2, 3};
 
-    SECTION("Evaluation Test") {
+    SECTION("Evaluation") {
         REQUIRE(cost.Evaluate(input) == 11);
     }
 
-    SECTION("Gradient Test") {
+    SECTION("Gradient") {
         Eigen::Vector3d expected_gradient = {5, 4, 3};
         REQUIRE(cost.Gradient(input).isApprox(expected_gradient));
     }
 
-    SECTION("Hessian Test") {
+    SECTION("Hessian") {
         Eigen::MatrixXd expected_hessian(3, 3);
         expected_hessian << 0, 1, 1,
                             1, 0, 1,
