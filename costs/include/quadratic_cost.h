@@ -1,7 +1,6 @@
 #ifndef TORC_QUADRATIC_COST_H
 #define TORC_QUADRATIC_COST_H
 
-#include <string>
 #include "base_cost.h"
 #include "linear_cost.h"
 
@@ -16,7 +15,6 @@ namespace torc::cost {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
-
         /**
          * Overloaded constructor for the QuadraticCost class.
          * @param coefficients matrix coefficients (A) for f(x) = (1/2) x^T A x + q^T x, must be symmetric
@@ -52,11 +50,6 @@ namespace torc::cost {
             this->identifier_ = identifier;
             this->domain_dim_ = coefficients.cols();
         }
-//        explicit QuadraticCost(const matrixx_t& coefficients,
-//                               const std::string& identifier="Quadratic cost")
-//                   : QuadraticCost(coefficients,
-//                                   vectorx_t(vectorx_t::Zero(coefficients.cols())),
-//                                   identifier) {}
 
         /**
          * Overloaded constructor for the QuadraticCost class.
@@ -89,7 +82,7 @@ namespace torc::cost {
                                 identifier) {}
 
         /**
-         * Evaluates the cost function at a given point
+         * Evaluates the function at a given point
          * @param x the input to the function
          * @return (1/2) x^T A x + q^T x
          */
@@ -98,7 +91,7 @@ namespace torc::cost {
         }
 
         /**
-         * Get the full coefficient matrix of the cost.
+         * Get the full coefficient matrix of the function.
          * @return the A in f(x) = (1/2) x^T A x + q^T x
          */
         matrixx_t GetQuadCoefficients() const {
@@ -106,7 +99,7 @@ namespace torc::cost {
         }
 
         /**
-         * Get the linear coefficients of the cost
+         * Get the linear coefficients of the function
          * @return the q in (1/2) x^T A x + q^T x
          */
         vectorx_t GetLinCoefficients() const {
@@ -114,7 +107,7 @@ namespace torc::cost {
         }
 
         /**
-         * Returns the gradient of the cost evaluated at x
+         * Evaluates the gradient of the function evaluated at x
          * @param x the input
          * @return grad f(x) = Ax + q
          */
@@ -123,7 +116,7 @@ namespace torc::cost {
         }
 
         /**
-         * Returns the Hessian of the cost function evaluated at x
+         * Evaluates the Hessian of the function evaluated at x
          * @param x the input
          * @return A
          */
@@ -132,7 +125,7 @@ namespace torc::cost {
         }
 
         /**
-         * The Hessian of a quadratic cost is always A
+         * Evaluates the gradient of the function, which is always A
          * @return A
          */
         matrixx_t Hessian() const {
