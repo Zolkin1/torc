@@ -24,7 +24,7 @@ namespace torc::cost {
         explicit LinearCost(const int& dim, const std::string &identifier="Linear cost") {
             q_ = vectorx_t::Zero(dim);
             this->identifier_ = identifier;
-            this->domain_dim_ = dim;
+            this->dim_ = dim;
         }
 
         /**
@@ -35,7 +35,7 @@ namespace torc::cost {
         explicit LinearCost(const vectorx_t &coefficients, const std::string &identifier="Linear cost") {
             q_ = coefficients;
             this->identifier_ = identifier;
-            this->domain_dim_ = coefficients.size();
+            this->dim_ = coefficients.size();
         }
 
         /**
@@ -78,7 +78,7 @@ namespace torc::cost {
          * @return a square zero matrix of dimension dim(x)
          */
         matrixx_t Hessian(const vectorx_t &x) const {
-            return matrixx_t::Zero(this->domain_dim_, this->domain_dim_);
+            return matrixx_t::Zero(this->dim_, this->dim_);
         }
 
         /**
@@ -86,7 +86,7 @@ namespace torc::cost {
          * @return a square zero matrix of dimension dim(x)
          */
         matrixx_t Hessian() const {
-            return matrixx_t::Zero(this->domain_dim_, this->domain_dim_);
+            return matrixx_t::Zero(this->dim_, this->dim_);
         }
 
     private:

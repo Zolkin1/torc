@@ -48,11 +48,11 @@ namespace torc::cost {
          * Returns the domain's dimension of the function
          * @return the domain's dimension
          */
-        [[nodiscard]] size_t GetDomainDim() const { return domain_dim_; }
+        [[nodiscard]] size_t GetDomainDim() const { return dim_; }
 
     protected:
         std::string identifier_; // the (not necessarily unique) name assigned to this function
-        size_t domain_dim_;      // the function domain's dimension
+        size_t dim_;      // the function domain's dimension
     };
 }
 
