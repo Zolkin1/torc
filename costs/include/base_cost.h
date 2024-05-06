@@ -40,17 +40,17 @@ namespace torc {
          * Returns the identifier_ of the function
          * @return the function's name
          */
-        std::string GetIdentifier() const { return identifier_; }
+        [[nodiscard]] std::string GetIdentifier() const { return identifier_; }
 
         /**
          * Returns the domain's dimension of the function
          * @return the domain's dimension
          */
-        size_t GetDomainDim() const { return domain_dim_; }
+        [[nodiscard]] size_t GetDomainDim() const { return dim_; }
 
     protected:
         std::string identifier_; // the (not necessarily unique) name assigned to this function
-        size_t domain_dim_{};      // the function domain's dimension
+        size_t dim_{};      // the function domain's dimension
     };
 } // namespace torc
 

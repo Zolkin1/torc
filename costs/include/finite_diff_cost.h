@@ -20,19 +20,20 @@ namespace torc {
     public:
         /**
          * Constructor for the Finite Difference Cost class
-         *
-         * @param cost_fn the cost function
-         * @param dim   the dimensions of the input of the cost function
-         * @param identifier a string identifier of the cost function
+         * @param fn       the cost function
+         * @param dim           the dimensions of the input of the cost function
+         * @param grad_step     the step used for the gradient
+         * @param hess_step     the step used for the hessian
+         * @param identifier    a string identifier of the cost function
          */
-        FiniteDiffCost(const std::function<scalar_t(vectorx_t)>& cost_fn,
+        FiniteDiffCost(const std::function<scalar_t(vectorx_t)>& fn,
                        const size_t& dim,
                        const scalar_t grad_step=3e-8,   // approximately sqrt(ulp)
                        const scalar_t hess_step=1e-3,   // approximately sqrt(grad_step)
-                       const std::string& identifier="Finite difference cost.") {
+                       const std::string& identifier="Finite Difference Cost Instance") {
             this->identifier_ = identifier;
-            this->cost_fn_ = cost_fn;
-            this->domain_dim_ = dim;
+            this->fn_ = fn;
+            this->dim_ = dim;
             this->grad_step_ = grad_step;
             this->hess_step_ = hess_step;
         }
@@ -43,7 +44,7 @@ namespace torc {
          * @return f(x)
          */
         scalar_t Evaluate(const vectorx_t& x) const {
-            return cost_fn_(x);
+            return fn_(x);
         }
 
         /**
@@ -52,13 +53,13 @@ namespace torc {
          * @return grad f(x)
          */
         vectorx_t Gradient(const vectorx_t& x) const {
-            unsigned dim = this->domain_dim_;
+            unsigned dim = this->dim_;
             matrixx_t perturbation = Eigen::MatrixXd::Identity(dim, dim) * this->grad_step_;
 
             vectorx_t grad(dim);
             for (unsigned i=0; i<dim; i++) {
-                scalar_t pos_diff = this->cost_fn_(x + perturbation.col(i));
-                scalar_t neg_diff = this->cost_fn_(x - perturbation.col(i));
+                scalar_t pos_diff = this->fn_(x + perturbation.col(i));
+                scalar_t neg_diff = this->fn_(x - perturbation.col(i));
                 grad(i) = (pos_diff - neg_diff) / (2 * this->grad_step_);
             }
             return grad;
@@ -67,10 +68,10 @@ namespace torc {
         /**
          * Calculates the Hessian of the cost function evaluated at x using the central finite difference method
          * @param x the input
-         * @return Hf(x)
+         * @return H_f(x)
          */
         matrixx_t Hessian(const vectorx_t& x) const {
-            unsigned dim = this->domain_dim_;
+            unsigned dim = this->dim_;
             matrixx_t perturbation = Eigen::MatrixXd::Identity(dim, dim) * this->hess_step_;
 
             matrixx_t hess(dim, dim);
@@ -81,8 +82,9 @@ namespace torc {
             }
             return hess;
         }
+
     private:
-        std::function<scalar_t(vectorx_t)> cost_fn_;
+        std::function<scalar_t(vectorx_t)> fn_;
         scalar_t grad_step_;
         scalar_t hess_step_;
     };
