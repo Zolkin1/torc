@@ -12,11 +12,11 @@ namespace torc {
         ExplicitDifferentialCost(const std::function<scalar_t(vectorx_t)>& cost,
                                  const std::function<vectorx_t(vectorx_t)>& grad,
                                  const std::function<matrixx_t(vectorx_t)>& hess,
-                                 size_t dim) {
+                                 const size_t& dim) {
             this->cost_ = cost;
             this->grad_ = grad;
             this->hess_ = hess;
-            this->domain_dim_ = dim;
+            this->dim_ = dim;
         }
 
         scalar_t Evaluate(const vectorx_t& x) const {
