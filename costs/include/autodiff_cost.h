@@ -17,10 +17,10 @@ namespace torc {
      */
     template <class scalar_t>
     class AutodiffCost: public BaseCost<scalar_t> {
-        typedef ADCG::CG<scalar_t> cg_t;        // CodeGen scalar
-        typedef CppAD::AD<cg_t> adcg_t;         // CppAD scalar templated by CodeGen scalar
-        typedef Eigen::VectorX<scalar_t> vectorx_t;
-        typedef Eigen::MatrixX<scalar_t> matrixx_t;
+        using cg_t = ADCG::CG<scalar_t>;        // CodeGen scalar
+        using adcg_t = CppAD::AD<cg_t>;         // CppAD scalar templated by CodeGen scalar
+        using vectorx_t = Eigen::VectorX<scalar_t>;
+        using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
         // There's no avoiding some leaking of the AD interface, because the function the user provides must return
@@ -32,9 +32,9 @@ namespace torc {
          * @param dim the input dimension
          * @param identifier string identifier for the cost
          */
-        explicit AutodiffCost(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
-                              const size_t dim=0,
-                              const std::string& identifier="Auto-Differentiation Cost Instance") {
+        AutodiffCost(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
+                     const size_t dim=0,
+                     const std::string& identifier="identifier") {
             this->fn_ = fn;
             this->dim_ = dim;
             this->identifier_ = identifier;
@@ -42,15 +42,11 @@ namespace torc {
             std::vector<adcg_t> x(dim);
             CppAD::Independent(x);
             Eigen::VectorX<adcg_t> eigen_x = Eigen::Map<Eigen::VectorX<adcg_t> , Eigen::Unaligned>(x.data(), x.size());
-
             std::vector<adcg_t> y = {fn(eigen_x)};
+            AD::ADFun<cg_t> ad_fn_(x, y);
 
-            AD::ADFun<cg_t> ad_fn_(x, y);       // this is templated by two classes?
-            ADCG::ModelCSourceGen<double> cgen(ad_fn_, "identifier");
+            ADCG::ModelCSourceGen<double> cgen(ad_fn_, this->identifier_);
             cgen.setCreateJacobian(true);
-//            cgen.setCreateForwardOne(true);
-//            cgen.setCreateReverseOne(true);
-//            cgen.setCreateReverseTwo(true);
             cgen.setCreateHessian(true);
             ADCG::ModelLibraryCSourceGen<double> libcgen(cgen);
 
@@ -75,7 +71,7 @@ namespace torc {
                 x_eigen[i] = adcg_t(x[i]);
             }
             adcg_t res = this->fn_(x_eigen);
-            scalar_t result = ExtractADCGValue(res);
+            scalar_t result = AD::Value(res).getValue();    // first get the cg_t, then extract the scalar_t
             return result;
         }
 
@@ -85,7 +81,7 @@ namespace torc {
          * @return grad f(x)
          */
         vectorx_t Gradient(const vectorx_t& x) const {
-            std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model("identifier");
+            std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model(this->identifier_);
             std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
             if (model->isJacobianAvailable()) {
                 std::vector<scalar_t> jac = model->Jacobian(x_std);
@@ -94,7 +90,6 @@ namespace torc {
             } else {
                 throw std::runtime_error("Jacobian not available.");
             }
-
         }
 
         /**
@@ -103,14 +98,15 @@ namespace torc {
          * @return H_f(x)
          */
         matrixx_t Hessian(const vectorx_t& x) const {
-            std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model("identifier");
+            std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model(this->identifier_);
             std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
             if (model->isHessianAvailable()) {
                 std::vector<scalar_t> hess = model->Hessian(x_std, 0);
                 matrixx_t grad_eigen(this->dim_, this->dim_);
                 for (size_t row=0; row<this->dim_; row++) {
                     Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<vectorx_t , Eigen::Unaligned>(hess.data() + row*this->dim_, (row+1)*this->dim_);
-//                    grad_eigen.row(row) = grad_row_eigen;
+                    grad_row_eigen.conservativeResize(this->dim_);  // so row assignment doesn't complain
+                    grad_eigen.row(row) << grad_row_eigen;
                 }
                 return grad_eigen;
             } else {
@@ -119,10 +115,10 @@ namespace torc {
         }
 
     private:
+        // the original function
         std::function<adcg_t(Eigen::VectorX<adcg_t>)> fn_;
+        // the dynamic library that stores the differential information
         std::unique_ptr<ADCG::DynamicLib<double>> cg_dynamic_lib_;
-
-        static scalar_t ExtractADCGValue(adcg_t x) { return AD::Value(x).getValue(); }
     };
 } // namespace torc
 
