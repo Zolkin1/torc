@@ -7,7 +7,7 @@
 #include <cppad/cg.hpp>
 #include "base_cost.h"
 
-namespace torc {
+namespace torc::cost {
     namespace ADCG = CppAD::cg;
     namespace AD = CppAD;
 
@@ -87,12 +87,11 @@ namespace torc {
          * @return grad f(x)
          */
         vectorx_t Gradient(const vectorx_t& x) const {
+            const std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
             std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model(this->identifier_);
-            std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
             if (model->isJacobianAvailable()) {
                 std::vector<scalar_t> jac = model->Jacobian(x_std);
-                vectorx_t grad_eigen = Eigen::Map<vectorx_t , Eigen::Unaligned>(jac.data(), jac.size());
-                return grad_eigen;
+                return Eigen::Map<vectorx_t , Eigen::Unaligned>(jac.data(), jac.size());
             } else {
                 throw std::runtime_error("Jacobian not available.");
             }
@@ -104,8 +103,8 @@ namespace torc {
          * @return H_f(x)
          */
         matrixx_t Hessian(const vectorx_t& x) const {
+            const std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
             std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model(this->identifier_);
-            std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
             if (model->isHessianAvailable()) {
                 std::vector<scalar_t> hess = model->Hessian(x_std, 0);
                 matrixx_t grad_eigen(this->dim_, this->dim_);
