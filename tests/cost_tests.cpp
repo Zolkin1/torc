@@ -15,7 +15,7 @@ TEST_CASE("Linear Cost Test", "[cost]") {
     x1 << 0.1, 1, 10;
     x2 << 0, 0, 0;
     std::string name1 = "linear cost 1";
-    torc::LinearCost cost1 = torc::LinearCost<double>(q1, name1);
+    torc::cost::LinearCost cost1 = torc::cost::LinearCost<double>(q1, name1);
     REQUIRE(cost1.Evaluate(x1) == 32.1);
     REQUIRE(cost1.GetDomainDim() == 3);
     REQUIRE(cost1.GetCoefficients() == q1);
@@ -28,7 +28,7 @@ TEST_CASE("Linear Cost Test", "[cost]") {
     q2 << 1.5, 2.5;
     x3 << 4, 8;
     std::string name2 = "linear cost 2";
-    torc::LinearCost cost2 = torc::LinearCost<float>(q2, name2);
+    torc::cost::LinearCost cost2 = torc::cost::LinearCost<float>(q2, name2);
     REQUIRE(cost2.Evaluate(x3) == 26);
     REQUIRE(cost2.Gradient() == q2);
 }
@@ -39,7 +39,7 @@ TEST_CASE("Finite Difference Cost Test") {
         std::function<double(Eigen::VectorXd)> fn = [](const Eigen::VectorXd& x) {
             return x.squaredNorm();
         };;
-        torc::FiniteDiffCost cost1 = torc::FiniteDiffCost<double>(fn, 2);
+        torc::cost::FiniteDiffCost cost1 = torc::cost::FiniteDiffCost<double>(fn, 2);
 
         Eigen::Vector2d in = {1, 2};
         REQUIRE(cost1.Evaluate(in) == 5);
@@ -56,8 +56,9 @@ TEST_CASE("Finite Difference Cost Test") {
     SECTION("Test different input size") {
         std::function<double(Eigen::VectorXd)> fn = [](const Eigen::VectorXd& x) {
             return x.array().cube().sum();
-        };;
-        torc::FiniteDiffCost cost2 = torc::FiniteDiffCost<double>(fn, 3);
+        };
+
+        torc::cost::FiniteDiffCost cost2 = torc::cost::FiniteDiffCost<double>(fn, 3);
 
         Eigen::Vector3d in = {1, 2, 3};
         REQUIRE(cost2.Evaluate(in) == 36);
@@ -76,7 +77,7 @@ TEST_CASE("Finite Difference Cost Test") {
         std::function<double(Eigen::VectorXd)> fn = [](const Eigen::VectorXd& x) {
             return x.array().abs().sum();
         };;
-        torc::FiniteDiffCost cost3 = torc::FiniteDiffCost<double>(fn, 2);
+        torc::cost::FiniteDiffCost cost3 = torc::cost::FiniteDiffCost<double>(fn, 2);
 
         Eigen::Vector2d in = {-1, 0};
         REQUIRE(cost3.Evaluate(in) == 1);
@@ -89,7 +90,7 @@ TEST_CASE("Finite Difference Cost Test") {
         std::function<double(Eigen::VectorXd)> fn = [](Eigen::VectorXd vec) {
             return vec[0] * vec[1] + vec[1] * vec[2] + vec[2] * vec[0];
         };
-        torc::FiniteDiffCost cost = torc::FiniteDiffCost<double>(fn, 3);
+        torc::cost::FiniteDiffCost cost = torc::cost::FiniteDiffCost<double>(fn, 3);
 
         Eigen::Vector3d in = {1, 2, 3};
         REQUIRE(cost.Evaluate(in) == 11);
