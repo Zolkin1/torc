@@ -58,8 +58,8 @@ namespace torc::cost {
         [[nodiscard]] size_t GetDomainDim() const { return dim_; }
 
     protected:
-        std::string identifier_; // the (not necessarily unique) name assigned to this function
-        size_t dim_;      // the function domain's dimension
+        std::string identifier_ = "BaseCostInstance";   // the name assigned to this function
+        size_t dim_ = 0;                                // the function domain's dimension
     };
 }
 

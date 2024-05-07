@@ -23,7 +23,7 @@ namespace torc::cost {
          */
         explicit QuadraticCost(const matrixx_t& coefficients,
                                const vectorx_t& lin_coefficients,
-                               const std::string& identifier="Quadratic Cost Instance") {
+                               const std::string& identifier="QuadraticCostInstance") {
             if ((coefficients.transpose() - coefficients).squaredNorm() != 0) {
                 throw std::runtime_error("Matrix must be symmetric.");
             }
@@ -39,7 +39,7 @@ namespace torc::cost {
          * @param identifier string identifier
          */
         explicit QuadraticCost(const matrixx_t& coefficients,
-                               const std::string& identifier="Quadratic Cost Instance")
+                               const std::string& identifier="QuadraticCostInstance")
                    : QuadraticCost(coefficients,
                                    vectorx_t::Zero(coefficients.cols()),
                                    identifier) {}
@@ -55,7 +55,7 @@ namespace torc::cost {
         template <int dim>
         explicit QuadraticCost(const Eigen::TriangularView<Eigen::Matrix<scalar_t, dim, dim>, Eigen::Upper>& coefficients,
                                const vectorx_t& lin_coefficients=vectorx_t::Zero(dim),
-                               const std::string& identifier="Quadratic Cost Instance")
+                               const std::string& identifier="QuadraticCostInstance")
                 : QuadraticCost(matrixx_t(matrixx_t(coefficients).template selfadjointView<Eigen::Upper>()),
                                 lin_coefficients,
                                 identifier) {}

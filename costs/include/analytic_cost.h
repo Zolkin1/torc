@@ -23,12 +23,15 @@ namespace torc::cost {
         AnalyticCost(const std::function<scalar_t(vectorx_t)>& cost,
                      const std::function<vectorx_t(vectorx_t)>& grad,
                      const std::function<matrixx_t(vectorx_t)>& hess,
-                     const size_t& dim) {
+                     const size_t& dim,
+                     const std::string& identifier="AnalyticCostInstance") {
             this->cost_ = cost;
             this->grad_ = grad;
             this->hess_ = hess;
             this->dim_ = dim;
+            this->identifier_ = identifier;
         }
+
 
         /**
          * Evaluates the function at a point
@@ -39,6 +42,7 @@ namespace torc::cost {
             return cost_(x);
         }
 
+
         /**
          * Evaluates the gradient of the function at a point
          * @param x the input
@@ -48,6 +52,7 @@ namespace torc::cost {
             return grad_(x);
         }
 
+
         /**
          * Evaluates the Hessian of the function at a point
          * @param x the input
@@ -56,6 +61,7 @@ namespace torc::cost {
         matrixx_t Hessian(const vectorx_t& x) const {
             return hess_(x);
         }
+
 
     private:
         std::function<scalar_t(vectorx_t)> cost_;   // the original cost function

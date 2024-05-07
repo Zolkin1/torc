@@ -1,7 +1,3 @@
-//
-// Created by gavin on 4/26/2024.
-//
-
 #ifndef TORC_FINITE_DIFF_COST_H
 #define TORC_FINITE_DIFF_COST_H
 
@@ -21,21 +17,22 @@ namespace torc::cost {
          * Constructor for the Finite Difference Cost class
          * @param fn the cost function
          * @param dim the dimensions of the input of the cost function
-         * @param grad_step the step used for the gradient
-         * @param hess_step the step used for the hessian
+         * @param grad_step the step used for the gradient, defaults to sqrt(ulp)
+         * @param hess_step the step used for the hessian, defaults to sqrt(ulp_grad) = sqrt(sqrt(ulp))
          * @param identifier a string identifier of the cost function
          */
         FiniteDiffCost(const std::function<scalar_t(vectorx_t)>& fn,
                        const size_t& dim,
-                       const scalar_t& grad_step=3e-8,   // approximately sqrt(ulp)
-                       const scalar_t& hess_step=1e-3,   // approximately sqrt(grad_step)
-                       const std::string& identifier="Finite_Difference_Cost_Instance") {
+                       const scalar_t& grad_step=sqrt(std::numeric_limits<scalar_t>::epsilon()),
+                       const scalar_t& hess_step=sqrt(sqrt(std::numeric_limits<scalar_t>::epsilon())),
+                       const std::string& identifier="FiniteDifferenceCostInstance") {
             this->fn_ = fn;
             this->dim_ = dim;
             this->grad_step_ = grad_step;
             this->hess_step_ = hess_step;
             this->identifier_ = identifier;
         }
+
 
         /**
          * Evaluates the cost function at a given point
@@ -45,6 +42,7 @@ namespace torc::cost {
         scalar_t Evaluate(const vectorx_t& x) const {
             return fn_(x);
         }
+
 
         /**
          * Returns the gradient of the cost evaluated at x using the central finite difference method
@@ -63,6 +61,7 @@ namespace torc::cost {
             }
             return grad;
         }
+
 
         /**
          * Calculates the Hessian of the cost function evaluated at x using the central finite difference method

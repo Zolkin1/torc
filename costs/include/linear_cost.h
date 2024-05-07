@@ -20,7 +20,7 @@ namespace torc::cost {
          * @param dim input dimension, defaults coefficients to 0
          * @param identifier string identifier
          */
-        explicit LinearCost(const int& dim, const std::string &identifier="Linear cost") {
+        explicit LinearCost(const int& dim, const std::string &identifier="LinearCostInstance") {
             q_ = vectorx_t::Zero(dim);
             this->identifier_ = identifier;
             this->dim_ = dim;
@@ -31,7 +31,7 @@ namespace torc::cost {
          * @param coefficients the linear coefficients
          * @param identifier string identifier
          */
-        explicit LinearCost(const vectorx_t &coefficients, const std::string &identifier="Linear cost") {
+        explicit LinearCost(const vectorx_t &coefficients, const std::string &identifier="LinearCostInstance") {
             q_ = coefficients;
             this->identifier_ = identifier;
             this->dim_ = coefficients.size();

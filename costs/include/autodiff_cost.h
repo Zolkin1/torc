@@ -23,9 +23,6 @@ namespace torc::cost {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
-        // There's no avoiding some leaking of the AD interface, because the function the user provides must return
-        // an AD scalar and not a built-in one. Otherwise, the information used for differentiation stored in the result
-        // is lost. Best case scenario, the user just needs to replace the function declaration and nothing else.
         /**
          * Constructor for the AutodiffCost class.
          * @param fn the cost function
@@ -34,7 +31,7 @@ namespace torc::cost {
          */
         explicit AutodiffCost(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
                              const size_t dim=0,
-                             const std::string& identifier="Auto_Differentiation_Cost_Instance") {
+                             const std::string& identifier="AutodiffCostInstance") {
             this->fn_ = fn;
             this->dim_ = dim;
             // the library has some issue with the identifier if it contains spaces/special characters. We impose a
