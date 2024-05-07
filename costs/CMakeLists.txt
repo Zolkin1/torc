@@ -6,8 +6,8 @@ set(COST_HEADER_LIST
     "${COST_HEADER_INC_DIR}/base_cost.h"
     "${COST_HEADER_INC_DIR}/linear_cost.h"
     "${COST_HEADER_INC_DIR}/quadratic_cost.h"
-    "${COST_HEADER_INC_DIR}/analytic_cost.h")
-
+    "${COST_HEADER_INC_DIR}/analytic_cost.h"
+    "${COST_HEADER_INC_DIR}/finite_diff_cost.h")
 add_library(Costs SHARED
         ${COST_HEADER_LIST})
 

@@ -1,7 +1,6 @@
 #ifndef TORC_LINEAR_COST_H
 #define TORC_LINEAR_COST_H
 
-#include <string>
 #include "base_cost.h"
 
 
@@ -77,7 +76,7 @@ namespace torc::cost {
          * @param x the input
          * @return a square zero matrix of dimension dim(x)
          */
-        matrixx_t Hessian(const vectorx_t &x) const {
+        matrixx_t Hessian(const vectorx_t& x) const {
             return matrixx_t::Zero(this->dim_, this->dim_);
         }
 
