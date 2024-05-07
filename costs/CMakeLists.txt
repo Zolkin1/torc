@@ -3,9 +3,11 @@ message(STATUS "Building costs")
 set(COST_HEADER_INC_DIR "${torc_SOURCE_DIR}/costs/include")
 
 set(COST_HEADER_LIST
-    "${torc_SOURCE_DIR}/costs/include/base_cost.h"
-    "${torc_SOURCE_DIR}/costs/include/linear_cost.h"
-    "${torc_SOURCE_DIR}/costs/include/finite_diff_cost.h")
+    "${COST_HEADER_INC_DIR}/base_cost.h"
+    "${COST_HEADER_INC_DIR}/linear_cost.h"
+    "${COST_HEADER_INC_DIR}/quadratic_cost.h"
+    "${COST_HEADER_INC_DIR}/analytic_cost.h"
+    "${COST_HEADER_INC_DIR}/finite_diff_cost.h")
 add_library(Costs SHARED
         ${COST_HEADER_LIST})
 

@@ -10,7 +10,7 @@ namespace torc::cost {
      * @tparam scalar_t the type of scalar used for the cost
      */
     template<class scalar_t>
-    class LinearCost : public BaseCost<scalar_t> {
+    class LinearCost: public BaseCost<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
@@ -42,7 +42,7 @@ namespace torc::cost {
          * @param x the input to the function
          * @return q^T x
          */
-        scalar_t Evaluate(const vectorx_t &x) const {
+        scalar_t Evaluate(const vectorx_t& x) const {
             return q_.dot(x);
         }
 
@@ -59,7 +59,7 @@ namespace torc::cost {
          * @param x the input
          * @return grad f(x) = q
          */
-        vectorx_t Gradient(const vectorx_t &x) const {
+        vectorx_t Gradient(const vectorx_t& x) const {
             return q_;
         }
 
