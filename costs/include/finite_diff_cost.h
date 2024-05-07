@@ -6,7 +6,6 @@
 #define TORC_FINITE_DIFF_COST_H
 
 #include "base_cost.h"
-#include <iostream>
 
 namespace torc::cost {
     /**

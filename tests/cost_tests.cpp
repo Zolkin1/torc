@@ -3,7 +3,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <eigen3/Eigen/Dense>
-#include <iostream>
 #include <random>
 #include "linear_cost.h"
 #include "quadratic_cost.h"
