@@ -1,24 +1,40 @@
 #ifndef TORC_LINEAR_COST_H
 #define TORC_LINEAR_COST_H
 
-#include <string>
 #include "base_cost.h"
 
-namespace torc {
+
+namespace torc::cost {
     /**
      * Class implementation of a linear cost function, f(x) = q^T x
      * @tparam scalar_t the type of scalar used for the cost
      */
-    template <class scalar_t>
+    template<class scalar_t>
     class LinearCost: public BaseCost<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
     public:
-        LinearCost(const vectorx_t& coefficients, const std::string& identifier) {
+        /**
+         * Overloaded constructor for the LinearCost class.
+         * @param dim input dimension, defaults coefficients to 0
+         * @param identifier string identifier
+         */
+        explicit LinearCost(const int& dim, const std::string &identifier="Linear cost") {
+            q_ = vectorx_t::Zero(dim);
+            this->identifier_ = identifier;
+            this->dim_ = dim;
+        }
+
+        /**
+         * Overloaded constructor for the LinearCost class.
+         * @param coefficients the linear coefficients
+         * @param identifier string identifier
+         */
+        explicit LinearCost(const vectorx_t &coefficients, const std::string &identifier="Linear cost") {
             q_ = coefficients;
             this->identifier_ = identifier;
-            this->domain_dim_ = coefficients.size();
+            this->dim_ = coefficients.size();
         }
 
         /**
@@ -61,12 +77,21 @@ namespace torc {
          * @return a square zero matrix of dimension dim(x)
          */
         matrixx_t Hessian(const vectorx_t& x) const {
-            return matrixx_t::Zero(this->domain_dim_, this->domain_dim_);
+            return matrixx_t::Zero(this->dim_, this->dim_);
         }
 
-      private:
+        /**
+         * The Hessian of a linear function is zero everywhere
+         * @return a square zero matrix of dimension dim(x)
+         */
+        matrixx_t Hessian() const {
+            return matrixx_t::Zero(this->dim_, this->dim_);
+        }
+
+    private:
         vectorx_t q_; // the coefficients of the linear cost
     };
-} // namespace torc
+} // namespace torc::cost
+
 
 #endif //TORC_LINEAR_COST_H
