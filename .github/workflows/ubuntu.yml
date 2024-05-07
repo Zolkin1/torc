@@ -54,14 +54,11 @@ jobs:
         echo $CMAKE_PREFIX_PATH
 
     - name: Add GoogleTest (Required by CppAD)
-      # https://stackoverflow.com/a/33003612
       run: |
-        sudo apt-get install libgtest-dev
-        sudo apt-get install cmake
-        cd /usr/src/gtest
-        sudo cmake CMakeLists.txt
-        sudo make
-        sudo cp *.a /usr/lib
+        sudo apt install libgtest-dev build-essential cmake
+        cd /usr/src/googletest
+        sudo cmake .
+        sudo cmake --build . --target install
 
     - name: Add CppAD
       run: |
