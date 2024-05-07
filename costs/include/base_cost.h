@@ -5,12 +5,14 @@
 #include <string>
 #include <eigen3/Eigen/Dense>
 
-namespace torc {
+
+namespace torc::cost {
+
     /**
      * Abstract class representing a cost function to be optimized.
      * @tparam scalar_t the type of scalar used for the cost
      */
-    template <class scalar_t>
+    template<class scalar_t>
     class BaseCost {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
@@ -20,21 +22,21 @@ namespace torc {
          * @param x the input to the function
          * @return the output of the function
          */
-        virtual scalar_t Evaluate(const vectorx_t& x) const = 0;
+        virtual scalar_t Evaluate(const vectorx_t &x) const = 0;
 
         /**
          * Evaluates the gradient of the function at a given point.
          * @param x the input to the gradient of the function
          * @return the gradient of the function
          */
-        virtual vectorx_t Gradient(const vectorx_t& x) const = 0;
+        virtual vectorx_t Gradient(const vectorx_t &x) const = 0;
 
         /**
          * Evaluates the Hessian of the function at a given point.
          * @param x the input to the Hessian of the function
          * @return the Hessian of the function
          */
-        virtual matrixx_t Hessian(const vectorx_t& x) const = 0;
+        virtual matrixx_t Hessian(const vectorx_t &x) const = 0;
 
         /**
          * Returns the identifier_ of the function
@@ -52,6 +54,7 @@ namespace torc {
         std::string identifier_; // the (not necessarily unique) name assigned to this function
         size_t dim_;      // the function domain's dimension
     };
-} // namespace torc
+}
+
 
 #endif //TORC_BASE_COST_H

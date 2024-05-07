@@ -3,12 +3,12 @@
 
 #include "linear_cost.h"
 
-namespace torc {
-    template <class scalar_t>
+namespace torc::cost {
     /**
      * Class implementation of an explicit differential cost, where the differentials are provided by the user.
      * @tparam scalar_t the type of scalar used for the cost
      */
+    template <class scalar_t>
     class ExplicitDifferentialCost: public BaseCost<scalar_t> {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
         using vectorx_t = Eigen::VectorX<scalar_t>;
