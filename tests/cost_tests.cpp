@@ -3,7 +3,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <eigen3/Eigen/Dense>
+#include <iostream>
+#include <random>
 #include "linear_cost.h"
+#include "quadratic_cost.h"
 #include "finite_diff_cost.h"
 
 TEST_CASE("Linear Cost Test", "[cost]") {
@@ -99,5 +102,66 @@ TEST_CASE("Finite Difference Cost Test") {
                          1, 0, 1,
                          1, 1, 0;
         REQUIRE(cost.Hessian(in).isApprox(hess_expected, 1e-4));
+    }
+}
+
+TEST_CASE("Quadratic Cost Test", "[cost]") {
+    int n_tests = 20;
+    std::random_device dev;
+    std::mt19937 rng(dev());
+    std::uniform_int_distribution<std::mt19937::result_type> dist(1,6);
+
+    SECTION("Full matrix") {
+        for (int i=0; i<n_tests; i++) {
+            size_t dim = dist(rng);
+            Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
+            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A);
+            for (int j = 0; j < n_tests; ++j) {
+                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)));
+                REQUIRE(cost.GetQuadCoefficients() == A);
+                REQUIRE(cost.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
+                REQUIRE(cost.Gradient(v) == A*v);
+                REQUIRE(cost.Hessian(v) == A);
+                REQUIRE(cost.GetDomainDim() == dim);
+            }
+        }
+    }
+
+    SECTION("Triangular View") {    // matrix has to be fixed-size at compile time to call triangularView
+        for (int i=0; i<n_tests; i++) {
+            Eigen::Matrix3d A = Eigen::Matrix3d::Random();
+            Eigen::TriangularView<Eigen::Matrix3d, Eigen::Upper> Au = A.triangularView<Eigen::Upper>();
+            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(Au);
+            A = A.selfadjointView<Eigen::Upper>();
+            for (int j = 0; j < n_tests; ++j) {
+                Eigen::Vector3d v = Eigen::Vector3d::Random();
+                REQUIRE(abs(cost.Evaluate(v) - 0.5 * (v.dot(A * v))) < 1e-8);
+                REQUIRE(cost.GetQuadCoefficients() == A);
+                REQUIRE(cost.GetLinCoefficients() == Eigen::Vector3d::Zero());
+                REQUIRE(cost.Gradient(v).isApprox(A*v));
+                REQUIRE(cost.Hessian(v).isApprox(A));
+                REQUIRE(cost.GetDomainDim() == 3);
+            }
+        }
+    }
+
+    SECTION("Full matrix with linear cost") {
+        for (int i=0; i<n_tests; i++) {
+            size_t dim = dist(rng);
+            Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
+            Eigen::VectorX<double> q = Eigen::VectorX<double>::Random(dim);
+            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A, q);
+            for (int j = 0; j < n_tests; ++j) {
+                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)) + q.dot(v));
+                REQUIRE(cost.GetQuadCoefficients() == A);
+                REQUIRE(cost.GetLinCoefficients() == q);
+                REQUIRE(cost.Gradient(v) == A*v + q);
+                REQUIRE(cost.Hessian(v) == A);
+                REQUIRE(cost.Hessian() == A);
+                REQUIRE(cost.GetDomainDim() == dim);
+            }
+        }
     }
 }

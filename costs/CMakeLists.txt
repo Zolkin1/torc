@@ -1,10 +1,11 @@
 message(STATUS "Building costs")
 
+set(COST_HEADER_INC_DIR "${torc_SOURCE_DIR}/costs/include")
+
 set(COST_HEADER_LIST
     "${torc_SOURCE_DIR}/costs/include/base_cost.h"
     "${torc_SOURCE_DIR}/costs/include/linear_cost.h"
     "${torc_SOURCE_DIR}/costs/include/finite_diff_cost.h")
-
 add_library(Costs SHARED
         ${COST_HEADER_LIST})
 
