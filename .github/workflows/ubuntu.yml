@@ -53,6 +53,16 @@ jobs:
         export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
         echo $CMAKE_PREFIX_PATH
 
+    - name: Add GoogleTest (Required by CppAD)
+      # https://stackoverflow.com/a/33003612
+      run: |
+        sudo apt-get install libgtest-dev
+        sudo apt-get install cmake
+        cd /usr/src/gtest
+        sudo cmake CMakeLists.txt
+        sudo make
+        sudo cp *.a /usr/lib
+
     - name: Add CppAD
       run: |
         cd ~
