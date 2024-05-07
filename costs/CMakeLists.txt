@@ -19,5 +19,3 @@ target_include_directories(Costs PUBLIC
 
 #----------- Eigen ----------- #
 find_package(Eigen3 REQUIRED)
-
-#find_package(CppAD REQUIRED)
