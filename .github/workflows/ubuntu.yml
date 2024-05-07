@@ -53,6 +53,31 @@ jobs:
         export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
         echo $CMAKE_PREFIX_PATH
 
+    - name: Add GoogleTest (Required by CppAD)
+      run: |
+        sudo apt install libgtest-dev build-essential cmake
+        cd /usr/src/googletest
+        sudo cmake .
+        sudo cmake --build . --target install
+
+    - name: Add CppAD
+      run: |
+        cd ~
+        git clone https://github.com/coin-or/CppAD.git cppad
+        cd cppad
+        mkdir build && cd build
+        cmake ..
+        sudo make install
+
+    - name: Add CppADCodeGen
+      run: |
+        cd ~
+        git clone https://github.com/joaoleal/CppADCodeGen.git CppADCodeGen
+        cd CppADCodeGen
+        mkdir build && cd build
+        cmake ..
+        sudo make install
+
     - name: Set reusable strings
       id: strings
       shell: bash
