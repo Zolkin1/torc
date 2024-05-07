@@ -1,29 +1,29 @@
-#ifndef TORC_EXPLICIT_DIFF_COST_H
-#define TORC_EXPLICIT_DIFF_COST_H
+#ifndef TORC_ANALYTIC_COST_H
+#define TORC_ANALYTIC_COST_H
 
 #include "linear_cost.h"
 
 namespace torc::cost {
     /**
-     * Class implementation of an explicit differential cost, where the differentials are provided by the user.
+     * Class implementation of an analytic cost, where the differentials are provided by the user.
      * @tparam scalar_t the type of scalar used for the cost
      */
     template <class scalar_t>
-    class ExplicitDifferentialCost: public BaseCost<scalar_t> {
+    class AnalyticCost: public BaseCost<scalar_t> {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
         using vectorx_t = Eigen::VectorX<scalar_t>;
     public:
         /**
-         * Constructor for the ExplicitDifferentialCost class
+         * Constructor for the AnalyticCost class
          * @param cost the cost function
          * @param grad the gradient of the function
          * @param hess the hessian of the function
          * @param dim the dimension of the function
          */
-        ExplicitDifferentialCost(const std::function<scalar_t(vectorx_t)>& cost,
-                                 const std::function<vectorx_t(vectorx_t)>& grad,
-                                 const std::function<matrixx_t(vectorx_t)>& hess,
-                                 const size_t& dim) {
+        AnalyticCost(const std::function<scalar_t(vectorx_t)>& cost,
+                     const std::function<vectorx_t(vectorx_t)>& grad,
+                     const std::function<matrixx_t(vectorx_t)>& hess,
+                     const size_t& dim) {
             this->cost_ = cost;
             this->grad_ = grad;
             this->hess_ = hess;
@@ -63,4 +63,4 @@ namespace torc::cost {
         std::function<matrixx_t(vectorx_t)> hess_;  // the hessian of the cost function
     };
 }
-#endif //TORC_EXPLICIT_DIFF_COST_H
+#endif //TORC_ANALYTIC_COST_H

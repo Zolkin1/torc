@@ -7,7 +7,7 @@
 #include <random>
 #include "linear_cost.h"
 #include "quadratic_cost.h"
-#include "explicit_diff_cost.h"
+#include "analytic_cost.h"
 
 TEST_CASE("Linear Cost Test", "[cost]") {
     int n_tests = 20;
@@ -133,7 +133,7 @@ TEST_CASE("Explicit Differential Cost Tests") {
         return hessian;
     };
 
-    torc::cost::ExplicitDifferentialCost<double> cost(func, grad, hess, 3);
+    torc::cost::AnalyticCost<double> cost(func, grad, hess, 3);
     Eigen::Vector3d input = {1, 2, 3};
 
     SECTION("Evaluation Test") {
