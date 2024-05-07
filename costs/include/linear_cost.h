@@ -1,7 +1,6 @@
 #ifndef TORC_LINEAR_COST_H
 #define TORC_LINEAR_COST_H
 
-#include <string>
 #include "base_cost.h"
 
 
@@ -11,7 +10,7 @@ namespace torc::cost {
      * @tparam scalar_t the type of scalar used for the cost
      */
     template<class scalar_t>
-    class LinearCost : public BaseCost<scalar_t> {
+    class LinearCost: public BaseCost<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 
