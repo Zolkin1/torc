@@ -60,7 +60,7 @@ jobs:
         cd cppad
         mkdir build && cd build
         cmake ..
-        make install
+        sudo make install
 
     - name: Add CppADCodeGen
       run: |
@@ -69,7 +69,7 @@ jobs:
         cd CppADCodeGen
         mkdir build && cd build
         cmake ..
-        make install
+        sudo make install
 
     - name: Set reusable strings
       id: strings
