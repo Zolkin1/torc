@@ -1,6 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <eigen3/Eigen/Dense>
 #include "base_model.h"
 #include "pinocchio_model.h"
 

@@ -13,7 +13,7 @@ namespace torc::models {
 
         // Verify that we are given a .urdf
         if (urdf_.extension() != ".urdf") {
-            throw std::runtime_error("Provided urdf does not end if a .urdf");
+            throw std::runtime_error("Provided urdf does not end in a .urdf");
         }
 
         // Create the pinocchio model from the urdf
@@ -21,6 +21,4 @@ namespace torc::models {
 
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
-
-
 } // torc::models
