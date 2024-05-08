@@ -55,10 +55,11 @@ namespace torc::cost {
             cgen.setCreateHessian(true);
             ADCG::ModelLibraryCSourceGen<double> libcgen(cgen);
 
-            // Compile source code TODO this takes a long time to compile, test if it affects run-time performance
+            // Compile source code
             ADCG::DynamicModelLibraryProcessor<double> p(libcgen);
             ADCG::GccCompiler<double> compiler;
             this->cg_dynamic_lib_ = p.createDynamicLibrary(compiler);
+            this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
         }
 
         /**
@@ -81,9 +82,8 @@ namespace torc::cost {
          */
         vectorx_t Gradient(const vectorx_t& x) const {
             const std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
-            std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model(this->identifier_);
-            if (model->isJacobianAvailable()) {
-                std::vector<scalar_t> jac = model->Jacobian(x_std);
+            if (cg_model_->isJacobianAvailable()) {
+                std::vector<scalar_t> jac = cg_model_->Jacobian(x_std);
                 return Eigen::Map<vectorx_t , Eigen::Unaligned>(jac.data(), jac.size());
             } else {
                 throw std::runtime_error("Jacobian not available.");
@@ -97,12 +97,12 @@ namespace torc::cost {
          */
         matrixx_t Hessian(const vectorx_t& x) const {
             const std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
-            std::unique_ptr<ADCG::GenericModel<double>> model = this->cg_dynamic_lib_->model(this->identifier_);
-            if (model->isHessianAvailable()) {
-                std::vector<scalar_t> hess = model->Hessian(x_std, 0);
-                matrixx_t grad_eigen(this->dim_, this->dim_);
-                for (size_t nrow=0; nrow < this->dim_; nrow++) {
-                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t> , Eigen::Unaligned>(hess.data() + nrow * this->dim_, (nrow + 1) * this->dim_);
+            const int dim = this->dim_;
+            if (cg_model_->isHessianAvailable()) {
+                std::vector<scalar_t> hess = cg_model_->Hessian(x_std, 0);
+                matrixx_t grad_eigen(dim, dim);
+                for (size_t nrow=0; nrow < dim; nrow++) {
+                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t> , Eigen::Unaligned>(hess.data() + nrow * dim, (nrow + 1) * dim);
                     grad_row_eigen.conservativeResize(this->dim_);  // so nrow assignment doesn't complain
                     grad_eigen.row(nrow) << grad_row_eigen;
                 }
@@ -115,6 +115,7 @@ namespace torc::cost {
     private:
         std::function<adcg_t(Eigen::VectorX<adcg_t>)> fn_;          // the original function
         std::unique_ptr<ADCG::DynamicLib<double>> cg_dynamic_lib_;  // stores the operation tape and differential information
+        std::unique_ptr<ADCG::GenericModel<double>> cg_model_;
     };
 } // namespace torc::cost
 

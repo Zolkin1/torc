@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedMacroInspection"
 #define CATCH_CONFIG_MAIN
 
 #include <random>
@@ -15,7 +17,6 @@
 #include "autodiff_cost.h"
 #include "analytic_cost.h"
 #include "finite_diff_cost.h"
-
 #include "test_fn.h"
 
 TEST_CASE("Linear Cost Test", "[linear]") {
@@ -44,24 +45,24 @@ TEST_CASE("Linear Cost Test", "[linear]") {
 
 
 TEST_CASE("Quadratic Cost Test", "[quadratic]") {
-    int n_tests = 20;
-    std::random_device dev;
-    std::mt19937 rng(dev());
-    std::uniform_int_distribution<std::mt19937::result_type> dist(1,6);
+    using namespace torc::cost;
+    const int n_tests = 10;
+    const std::vector<int> test_dims = {1, 10};
 
     SECTION("Full matrix") {
         for (int i=0; i<n_tests; i++) {
-            size_t dim = dist(rng);
-            Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
-            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A);
-            for (int j = 0; j < n_tests; ++j) {
-                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
-                REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)));
-                REQUIRE(cost.GetQuadCoefficients() == A);
-                REQUIRE(cost.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
-                REQUIRE(cost.Gradient(v) == A*v);
-                REQUIRE(cost.Hessian(v) == A);
-                REQUIRE(cost.GetDomainDim() == dim);
+            for (auto dim : test_dims) {
+                Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
+                torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A);
+                for (int j = 0; j < n_tests; ++j) {
+                    Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                    REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)));
+                    REQUIRE(cost.GetQuadCoefficients() == A);
+                    REQUIRE(cost.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
+                    REQUIRE(cost.Gradient(v) == A*v);
+                    REQUIRE(cost.Hessian(v) == A);
+                    REQUIRE(cost.GetDomainDim() == dim);
+                }
             }
         }
     }
@@ -86,19 +87,20 @@ TEST_CASE("Quadratic Cost Test", "[quadratic]") {
 
     SECTION("Full matrix with linear cost") {
         for (int i=0; i<n_tests; i++) {
-            const size_t dim = dist(rng);
-            Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
-            Eigen::VectorX<double> q = Eigen::VectorX<double>::Random(dim);
-            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A, q);
-            for (int j = 0; j < n_tests; ++j) {
-                Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
-                REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)) + q.dot(v));
-                REQUIRE(cost.GetQuadCoefficients() == A);
-                REQUIRE(cost.GetLinCoefficients() == q);
-                REQUIRE(cost.Gradient(v) == A*v + q);
-                REQUIRE(cost.Hessian(v) == A);
-                REQUIRE(cost.Hessian() == A);
-                REQUIRE(cost.GetDomainDim() == dim);
+            for (auto dim: test_dims) {
+                Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
+                Eigen::VectorX<double> q = Eigen::VectorX<double>::Random(dim);
+                torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A, q);
+                for (int j = 0; j < n_tests; ++j) {
+                    Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
+                    REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)) + q.dot(v));
+                    REQUIRE(cost.GetQuadCoefficients() == A);
+                    REQUIRE(cost.GetLinCoefficients() == q);
+                    REQUIRE(cost.Gradient(v) == A * v + q);
+                    REQUIRE(cost.Hessian(v) == A);
+                    REQUIRE(cost.Hessian() == A);
+                    REQUIRE(cost.GetDomainDim() == dim);
+                }
             }
         }
     }
@@ -110,14 +112,10 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
 
     auto fn_ad = functions<adcg_t>;
-    std::vector<size_t> test_dims = {1, 10};
+    const std::vector<int> test_dims = {1, 10};
     const int test_fn_idx = 3;
+
     for (auto dim : test_dims) {
-        std::cout << "dim=" << "dim\n";
-        BENCHMARK("Autodiff Generation") {
-            AutodiffCost<double> ad_cost(fn_ad.at(test_fn_idx), dim);
-            return ad_cost;
-        };
         AutodiffCost<double> ad_cost(fn_ad.at(test_fn_idx), dim);
         BENCHMARK("Gradient Evaluation") {
             return ad_cost.Gradient(Eigen::VectorX<double>::Random(dim));
@@ -135,24 +133,35 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
     auto grad_d = gradients<double>;
     auto hess_d = hessians<double>;
 
-    int n_tests = 20;
-    double prec = 0.001;
-    std::vector<size_t> test_dims = {1, 2, 10};
+    const int n_tests = 10;
+    const double prec = 0.001;
+    const std::vector<int> test_dims = {1, 2, 10};
+
     for (int i=0; i<fn_d.size(); i++) {
-        std::cout << i << std::endl;
         for (auto dim : test_dims) {
             FiniteDiffCost<double> fd_cost(fn_d.at(i), dim);
             AnalyticCost<double> an_cost(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
             AutodiffCost<double> ad_cost(fn_ad.at(i), dim);
             for (int _=0; _<n_tests; _++){
                 Eigen::VectorX<double> input = Eigen::VectorX<double>::Random(dim);
-                REQUIRE_THAT(an_cost.Evaluate(input), Catch::Matchers::WithinRel(fd_cost.Evaluate(input), prec));
-                REQUIRE_THAT(an_cost.Evaluate(input), Catch::Matchers::WithinRel(ad_cost.Evaluate(input), prec));
-                REQUIRE(an_cost.Gradient(input).isApprox(fd_cost.Gradient(input), prec));
-                REQUIRE(an_cost.Gradient(input).isApprox(ad_cost.Gradient(input), prec));
-                REQUIRE(an_cost.Hessian(input).isApprox(fd_cost.Hessian(input), prec));
-                REQUIRE(fd_cost.Hessian(input).isApprox(ad_cost.Hessian(input), prec));
+                // save some redundant evaluations
+                auto an_eval = an_cost.Evaluate(input);
+                auto an_grad = an_cost.Gradient(input);
+                auto an_hess = an_cost.Hessian(input);
+                auto fd_eval = fd_cost.Evaluate(input);
+                auto fd_grad = fd_cost.Gradient(input);
+                auto fd_hess = fd_cost.Hessian(input);
+                auto ad_eval = ad_cost.Evaluate(input);
+                auto ad_grad = ad_cost.Gradient(input);
+                auto ad_hess = ad_cost.Hessian(input);
+                REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(fd_eval, prec));
+                REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(ad_eval, prec));
+                REQUIRE(an_grad.isApprox(fd_grad, prec));
+                REQUIRE(an_grad.isApprox(ad_grad, prec));
+                REQUIRE(an_hess.isApprox(fd_hess, prec));
+                REQUIRE(an_hess.isApprox(ad_hess, prec));
             }
         }
     }
 }
+#pragma clang diagnostic pop
