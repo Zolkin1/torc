@@ -60,9 +60,9 @@ namespace torc::cost {
             ADCG::GccCompiler<double> compiler;
             this->cg_dynamic_lib_ = p.createDynamicLibrary(compiler);
 
-            // Save to files
-            ADCG::SaveFilesModelLibraryProcessor<double> p2(libcgen);
-            p2.saveSources();
+//            // Save to files
+//            ADCG::SaveFilesModelLibraryProcessor<double> p2(libcgen);
+//            p2.saveSources();
         }
 
         /**

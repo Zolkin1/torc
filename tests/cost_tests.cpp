@@ -4,7 +4,9 @@
 #include <iostream>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <eigen3/Eigen/Dense>
+#include <cppad/cg.hpp>
 
 #include "linear_cost.h"
 #include "quadratic_cost.h"
@@ -12,6 +14,7 @@
 #include "analytic_cost.h"
 #include "finite_diff_cost.h"
 
+#include "test_fn.h"
 
 TEST_CASE("Linear Cost Test", "[cost]") {
     Eigen::Vector3d q1, x1, x2;
@@ -263,6 +266,29 @@ TEST_CASE("Auto-differentiation Cost Test", "[cost]") {
 }
 
 
-TEST_CASE("Cost Consistency Tests", "[cost]") {
+TEST_CASE("Differential Consistency Tests", "[cost]") {
+    using namespace torc::cost;
+    using namespace test;
+    using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;         // CppAD scalar templated by CodeGen scalar
 
+    auto fn_d = functions<double>;
+    auto fn_ad = functions<adcg_t>;
+    auto grad_d = gradients<double>;
+    auto hess_d = hessians<double>;
+    double prec = 0.001;
+
+    for (int i=0; i<fn_d.size(); i++) {
+        for (auto dim : {1, 2, 10}) {
+            Eigen::VectorX<double> input = Eigen::VectorX<double>::Random(dim);
+            FiniteDiffCost<double> fd_cost(fn_d.at(i), dim);
+            AnalyticCost<double> an_cost(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
+            AutodiffCost<double> ad_cost(fn_ad.at(i), dim);
+            REQUIRE_THAT(an_cost.Evaluate(input), Catch::Matchers::WithinRel(fd_cost.Evaluate(input), 0.0001));
+            REQUIRE_THAT(an_cost.Evaluate(input), Catch::Matchers::WithinRel(ad_cost.Evaluate(input), 0.0001));
+            REQUIRE(an_cost.Gradient(input).isApprox(fd_cost.Gradient(input), prec));
+            REQUIRE(an_cost.Gradient(input).isApprox(ad_cost.Gradient(input), prec));
+            REQUIRE(an_cost.Hessian(input).isApprox(fd_cost.Hessian(input), prec));
+            REQUIRE(fd_cost.Hessian(input).isApprox(ad_cost.Hessian(input), prec));
+        }
+    }
 }
