@@ -17,10 +17,10 @@ namespace torc::cost {
      */
     template <class scalar_t>
     class AutodiffCost: public BaseCost<scalar_t> {
-        using cg_t = ADCG::CG<scalar_t>;        // CodeGen scalar
-        using adcg_t = CppAD::AD<cg_t>;         // CppAD scalar templated by CodeGen scalar
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
+        using cg_t = ADCG::CG<scalar_t>;
+        using adcg_t = CppAD::AD<cg_t>;
 
     public:
         /**
@@ -59,10 +59,6 @@ namespace torc::cost {
             ADCG::DynamicModelLibraryProcessor<double> p(libcgen);
             ADCG::GccCompiler<double> compiler;
             this->cg_dynamic_lib_ = p.createDynamicLibrary(compiler);
-
-//            // Save to files
-//            ADCG::SaveFilesModelLibraryProcessor<double> p2(libcgen);
-//            p2.saveSources();
         }
 
         /**
@@ -120,6 +116,6 @@ namespace torc::cost {
         std::function<adcg_t(Eigen::VectorX<adcg_t>)> fn_;          // the original function
         std::unique_ptr<ADCG::DynamicLib<double>> cg_dynamic_lib_;  // stores the operation tape and differential information
     };
-} // namespace torc
+} // namespace torc::cost
 
 #endif //TORC_AUTODIFF_COST_H

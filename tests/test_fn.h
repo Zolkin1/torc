@@ -9,12 +9,12 @@
 namespace test {
     template <typename scalar_t=double>
     std::vector<std::function<scalar_t(Eigen::VectorX<scalar_t>)>> functions {
-            [](const Eigen::VectorX<scalar_t>& x) { return x.sum(); }, // 1
-            [](const Eigen::VectorX<scalar_t>& x) { return x.dot(x); }, // 2
-            [](const Eigen::VectorX<scalar_t>& x) { return x.sum() * x.sum() * x.sum(); }, // 3: cube of sum
-            [](const Eigen::VectorX<scalar_t>& x) { return x.prod(); }, // 4: product of elements
-            [](const Eigen::VectorX<scalar_t>& x) { return exp(3 * x.sum()); }, // 5: exp of sum
-            [](const Eigen::VectorX<scalar_t>& x) { return sin(3 * x.sum()); } // 6
+            [](const Eigen::VectorX<scalar_t>& x) { return x.sum(); },                      // 1: sum
+            [](const Eigen::VectorX<scalar_t>& x) { return x.dot(x); },                     // 2: dot product
+            [](const Eigen::VectorX<scalar_t>& x) { return x.sum() * x.sum() * x.sum(); },  // 3: cube of sum
+            [](const Eigen::VectorX<scalar_t>& x) { return x.prod(); },                     // 4: product of elements
+            [](const Eigen::VectorX<scalar_t>& x) { return exp(3 * x.sum()); },             // 5: exp of sum
+            [](const Eigen::VectorX<scalar_t>& x) { return sin(3 * x.sum()); }              // 6: sin of sum
     };
 
     template <typename scalar_t=double>

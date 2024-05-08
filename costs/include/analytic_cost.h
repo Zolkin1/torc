@@ -12,6 +12,7 @@ namespace torc::cost {
     class AnalyticCost: public BaseCost<scalar_t> {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
         using vectorx_t = Eigen::VectorX<scalar_t>;
+
     public:
         /**
          * Constructor for the AnalyticCost class
@@ -64,9 +65,9 @@ namespace torc::cost {
 
 
     private:
-        std::function<scalar_t(vectorx_t)> cost_;   // the original cost function
-        std::function<vectorx_t(vectorx_t)> grad_;  // the gradient of the cost function
-        std::function<matrixx_t(vectorx_t)> hess_;  // the hessian of the cost function
+        std::function<scalar_t(vectorx_t)> cost_;   // the original function
+        std::function<vectorx_t(vectorx_t)> grad_;  // the gradient of the function
+        std::function<matrixx_t(vectorx_t)> hess_;  // the hessian of the function
     };
 }
 #endif //TORC_ANALYTIC_COST_H

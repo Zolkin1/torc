@@ -16,6 +16,7 @@ namespace torc::cost {
     class BaseCost {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
+
     public:
         /**
          * Evaluates the cost function at a given point

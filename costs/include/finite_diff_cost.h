@@ -12,6 +12,7 @@ namespace torc::cost {
     class FiniteDiffCost: public BaseCost<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
+
     public:
         /**
          * Constructor for the Finite Difference Cost class
