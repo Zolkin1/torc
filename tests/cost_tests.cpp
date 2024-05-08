@@ -5,6 +5,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/benchmark/catch_constructor.hpp>
 #include <eigen3/Eigen/Dense>
 #include <cppad/cg.hpp>
 
@@ -99,6 +101,27 @@ TEST_CASE("Quadratic Cost Test", "[quadratic]") {
                 REQUIRE(cost.GetDomainDim() == dim);
             }
         }
+    }
+}
+
+TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
+    using namespace torc::cost;
+    using namespace test;
+    using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
+
+    auto fn_ad = functions<adcg_t>;
+    std::vector<size_t> test_dims = {1, 10};
+    const int test_fn_idx = 3;
+    for (auto dim : test_dims) {
+        std::cout << "dim=" << "dim\n";
+        BENCHMARK("Autodiff Generation") {
+            AutodiffCost<double> ad_cost(fn_ad.at(test_fn_idx), dim);
+            return ad_cost;
+        };
+        AutodiffCost<double> ad_cost(fn_ad.at(test_fn_idx), dim);
+        BENCHMARK("Gradient Evaluation") {
+            return ad_cost.Gradient(Eigen::VectorX<double>::Random(dim));
+        };
     }
 }
 
