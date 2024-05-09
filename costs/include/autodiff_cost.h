@@ -47,7 +47,6 @@ namespace torc::cost {
             std::filesystem::path libpath(this->identifier_ + ".so");
             bool create_lib = true;
             if (std::filesystem::exists(libpath) and prev_if_found) {
-                create_lib = false;
                 ADCG::LinuxDynamicLib<double> dlib(libpath.string());
                 this->cg_dynamic_lib_ = std::unique_ptr<ADCG::DynamicLib<scalar_t>>(new ADCG::LinuxDynamicLib<double>(std::move(dlib)));
                 this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);

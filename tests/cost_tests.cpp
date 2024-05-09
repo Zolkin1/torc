@@ -112,9 +112,9 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
 
     auto fn_ad = functions<adcg_t>;
-
     const auto tst_dim = 20;
     const auto tst_fn = 6;
+
     BENCHMARK("Instantiation (No Dynamic Libraries)"){      // ~3e8 ns
         AutodiffCost<double> ad_cost(fn_ad.at(tst_fn), tst_dim, false);
         return ad_cost;
@@ -137,7 +137,6 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
     }
 }
 
-
 TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
     using namespace torc::cost;
     using namespace test;
@@ -151,12 +150,14 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
     // current precision is around 0.003 for Hessians
     const double prec = sqrt(sqrt(std::numeric_limits<double>::epsilon())) * 20;
     const std::vector<int> test_dims = {1, 50};
+    const int n_tests = 20;
 
     for (int i=0; i<fn_d.size(); i++) {
         for (auto dim : test_dims) {
             FiniteDiffCost<double> fd_cost(fn_d.at(i), dim);
             AnalyticCost<double> an_cost(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
             AutodiffCost<double> ad_cost(fn_ad.at(i), dim);
+            AutodiffCost<double> ad_cost2(fn_ad.at(i), dim, true);  // test load SO
             for (int _=0; _<n_tests; _++){
                 Eigen::VectorX<double> input = Eigen::VectorX<double>::Random(dim);
                 auto an_eval = an_cost.Evaluate(input);
@@ -168,12 +169,18 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
                 auto ad_eval = ad_cost.Evaluate(input);
                 auto ad_grad = ad_cost.Gradient(input);
                 auto ad_hess = ad_cost.Hessian(input);
+                auto ad_eval2 = ad_cost2.Evaluate(input);
+                auto ad_grad2 = ad_cost2.Gradient(input);
+                auto ad_hess2 = ad_cost2.Hessian(input);
                 REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(fd_eval, prec));
                 REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(ad_eval, prec));
+                REQUIRE_THAT(ad_eval, Catch::Matchers::WithinRel(ad_eval2, prec));
                 REQUIRE(an_grad.isApprox(fd_grad, prec));
                 REQUIRE(an_grad.isApprox(ad_grad, prec));
+                REQUIRE(ad_grad.isApprox(ad_grad2, prec));
                 REQUIRE(an_hess.isApprox(fd_hess, prec));
                 REQUIRE(an_hess.isApprox(ad_hess, prec));
+                REQUIRE(ad_hess2.isApprox(ad_hess2, prec));
             }
         }
     }
