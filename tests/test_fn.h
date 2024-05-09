@@ -14,7 +14,8 @@ namespace test {
             [](const Eigen::VectorX<scalar_t>& x) { return x.sum() * x.sum() * x.sum(); },  // 3: cube of sum
             [](const Eigen::VectorX<scalar_t>& x) { return x.prod(); },                     // 4: product of elements
             [](const Eigen::VectorX<scalar_t>& x) { return exp(3 * x.sum()); },             // 5: exp of sum
-            [](const Eigen::VectorX<scalar_t>& x) { return sin(3 * x.sum()); }              // 6: sin of sum
+            [](const Eigen::VectorX<scalar_t>& x) { return sin(3 * x.sum()); },             // 6: sin of sum
+            [](const Eigen::VectorX<scalar_t>& x) { return exp(sin(x.sum())); },            // 7: exp(sin(x^T x))
     };
 
     template <typename scalar_t=double>
@@ -32,7 +33,8 @@ namespace test {
                 return result;
             },  // 4
             [](const Eigen::VectorX<scalar_t>& x) { return 3 * exp(3 * x.sum()) * Eigen::VectorX<scalar_t>::Ones(x.size()); }, // 5
-            [](const Eigen::VectorX<scalar_t>& x) { return 3 * cos(3 * x.sum()) * Eigen::VectorX<scalar_t>::Ones(x.size()); } // 6
+            [](const Eigen::VectorX<scalar_t>& x) { return 3 * cos(3 * x.sum()) * Eigen::VectorX<scalar_t>::Ones(x.size()); }, // 6
+            [](const Eigen::VectorX<scalar_t>& x) { return exp(sin(x.sum())) * cos(x.sum()) * Eigen::VectorX<scalar_t>::Ones(x.size()); }  // 7
     };
 
     template <typename scalar_t=double>
@@ -53,6 +55,7 @@ namespace test {
                 return result;
             }, // 4
             [](const Eigen::VectorX<scalar_t>& x) { return 9 * exp(3 * x.sum()) * Eigen::MatrixX<scalar_t>::Ones(x.size(), x.size()); }, // 5
-            [](const Eigen::VectorX<scalar_t>& x) { return -9 * sin(3 * x.sum()) * Eigen::MatrixX<scalar_t>::Ones(x.size(), x.size()); } // 6
+            [](const Eigen::VectorX<scalar_t>& x) { return -9 * sin(3 * x.sum()) * Eigen::MatrixX<scalar_t>::Ones(x.size(), x.size()); }, // 6
+            [](const Eigen::VectorX<scalar_t>& x) { return exp(sin(x.sum())) * (cos(x.sum()) * cos(x.sum()) - sin(x.sum())) * Eigen::MatrixX<scalar_t>::Ones(x.size(), x.size()); } // 7
     };
 }

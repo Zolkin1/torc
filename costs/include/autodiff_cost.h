@@ -60,6 +60,8 @@ namespace torc::cost {
             ADCG::GccCompiler<double> compiler;
             this->cg_dynamic_lib_ = p.createDynamicLibrary(compiler);
             this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
+
+            // TODO write to file
         }
 
         /**
