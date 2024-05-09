@@ -112,17 +112,28 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
 
     auto fn_ad = functions<adcg_t>;
-    const std::vector<int> test_dims = {1, 50};
-    const int test_fn_idx = 3;
 
+    const auto tst_dim = 20;
+    const auto tst_fn = 6;
+    BENCHMARK("Instantiation (No Dynamic Libraries)"){      // ~3e8 ns
+        AutodiffCost<double> ad_cost(fn_ad.at(tst_fn), tst_dim, false);
+        return ad_cost;
+    };
+
+    BENCHMARK("Instantiation (Using Dynamic Libraries)"){   // ~2e4 ns
+          AutodiffCost<double> ad_cost(fn_ad.at(tst_fn), tst_dim, true);
+          return ad_cost;
+    };
+
+    const std::vector<int> test_dims = {1, 50};
     for (auto dim : test_dims) {
-        AutodiffCost<double> ad_cost(fn_ad.at(test_fn_idx), dim);
+        AutodiffCost<double> ad_cost(fn_ad.at(tst_fn), dim, false);     // different dimensions, we avoid the previous
         BENCHMARK("Gradient Evaluation") {
             return ad_cost.Gradient(Eigen::VectorX<double>::Random(dim));
         };
         BENCHMARK("Hessian Evaluation") {
             return ad_cost.Hessian(Eigen::VectorX<double>::Random(dim));
-         };
+        };
     }
 }
 
@@ -137,9 +148,6 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
     auto grad_d = gradients<double>;
     auto hess_d = hessians<double>;
 
-    const int n_tests = 1;
-
-    // I couldn't figure out what the problem was with larger dimensions
     // current precision is around 0.003 for Hessians
     const double prec = sqrt(sqrt(std::numeric_limits<double>::epsilon())) * 20;
     const std::vector<int> test_dims = {1, 50};

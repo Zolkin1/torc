@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <filesystem>
 #include <cppad/cg.hpp>
 #include "base_cost.h"
 
@@ -31,6 +32,7 @@ namespace torc::cost {
          */
         explicit AutodiffCost(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
                              const size_t dim=0,
+                             const bool& prev_if_found=false,
                              const std::string& identifier="AutodiffCostInstance") {
             this->fn_ = fn;
             this->dim_ = dim;
@@ -42,26 +44,36 @@ namespace torc::cost {
                 throw std::runtime_error("Identifier must be a valid variable name.");
             }
 
-            // Record operations in the ADFun object
-            std::vector<adcg_t> x(dim);
-            CppAD::Independent(x);
-            Eigen::VectorX<adcg_t> eigen_x = Eigen::Map<Eigen::VectorX<adcg_t> , Eigen::Unaligned>(x.data(), x.size());
-            std::vector<adcg_t> y = {fn(eigen_x)};
-            AD::ADFun<cg_t> ad_fn_(x, y);
-
-            // Generate library source code
-            ADCG::ModelCSourceGen<double> cgen(ad_fn_, this->identifier_);
-            cgen.setCreateJacobian(true);
-            cgen.setCreateHessian(true);
-            ADCG::ModelLibraryCSourceGen<double> libcgen(cgen);
-
-            // Compile source code
-            ADCG::DynamicModelLibraryProcessor<double> p(libcgen);
-            ADCG::GccCompiler<double> compiler;
-            this->cg_dynamic_lib_ = p.createDynamicLibrary(compiler);
+            std::filesystem::path libpath(this->identifier_ + ".so");
+            bool create_lib = true;
+            if (std::filesystem::exists(libpath) and prev_if_found) {
+                create_lib = false;
+                ADCG::LinuxDynamicLib<double> dlib(libpath.string());
+                this->cg_dynamic_lib_ = std::unique_ptr<ADCG::DynamicLib<scalar_t>>(new ADCG::LinuxDynamicLib<double>(std::move(dlib)));
+                this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
+                create_lib = (cg_model_->Domain() != dim);
+            }
+            if (create_lib) {
+                // Record operations in the ADFun object
+                std::vector<adcg_t> x(dim);
+                CppAD::Independent(x);
+                Eigen::VectorX<adcg_t> eigen_x = Eigen::Map<Eigen::VectorX<adcg_t> , Eigen::Unaligned>(x.data(), x.size());
+                std::vector<adcg_t> y = {fn(eigen_x)};
+                AD::ADFun<cg_t> ad_fn_(x, y);
+                // Generate library source code
+                ADCG::ModelCSourceGen<double> cgen(ad_fn_, this->identifier_);
+                cgen.setCreateJacobian(true);
+                cgen.setCreateHessian(true);
+                ADCG::ModelLibraryCSourceGen<double> libcgen(cgen);
+                ADCG::DynamicModelLibraryProcessor<double> libprocessor(libcgen, this->identifier_);
+                // Compile source code
+                ADCG::GccCompiler<double> compiler;
+                this->cg_dynamic_lib_ = libprocessor.createDynamicLibrary(compiler);
+                // save to dynamic libraries
+                ADCG::SaveFilesModelLibraryProcessor<double> p2(libcgen);
+                p2.saveSources();
+            }
             this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
-
-            // TODO write to file
         }
 
         /**
