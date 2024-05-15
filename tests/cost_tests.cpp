@@ -10,41 +10,41 @@
 #include <eigen3/Eigen/Dense>
 #include <cppad/cg.hpp>
 
-#include "linear_cost.h"
-#include "quadratic_cost.h"
-#include "autodiff_cost.h"
-#include "analytic_cost.h"
-#include "finite_diff_cost.h"
+#include "linear_fn.h"
+#include "quadratic_fn.h"
+#include "autodiff_fn.h"
+#include "analytic_fn.h"
+#include "finite_diff_fn.h"
 #include "test_fn.h"
 
 
-TEST_CASE("Linear Cost Test", "[linear]") {
+TEST_CASE("Linear Function Test", "[linear]") {
     Eigen::Vector3d q1, x1, x2;
     q1 << 1, 2, 3;
     x1 << 0.1, 1, 10;
     x2 << 0, 0, 0;
-    std::string name1 = "LinearCost1";
-    torc::cost::LinearCost cost1 = torc::cost::LinearCost<double>(q1, name1);
-    REQUIRE(cost1.Evaluate(x1) == 32.1);
-    REQUIRE(cost1.GetDomainDim() == 3);
-    REQUIRE(cost1.GetCoefficients() == q1);
-    REQUIRE(cost1.Gradient() == q1);
-    REQUIRE(cost1.Gradient(x2) == q1);
-    REQUIRE(cost1.Hessian(x1) == Eigen::MatrixXd::Zero(3, 3));
-    REQUIRE(cost1.GetIdentifier() == name1);
+    std::string name1 = "LinearFn1";
+    torc::fn::LinearFn lin1 = torc::fn::LinearFn<double>(q1, name1);
+    REQUIRE(lin1.Evaluate(x1) == 32.1);
+    REQUIRE(lin1.GetDomainDim() == 3);
+    REQUIRE(lin1.GetCoefficients() == q1);
+    REQUIRE(lin1.Gradient() == q1);
+    REQUIRE(lin1.Gradient(x2) == q1);
+    REQUIRE(lin1.Hessian(x1) == Eigen::MatrixXd::Zero(3, 3));
+    REQUIRE(lin1.GetIdentifier() == name1);
 
     Eigen::Vector2f q2, x3;
     q2 << 1.5, 2.5;
     x3 << 4, 8;
-    std::string name2 = "LinearCost2";
-    torc::cost::LinearCost cost2 = torc::cost::LinearCost<float>(q2, name2);
-    REQUIRE(cost2.Evaluate(x3) == 26);
-    REQUIRE(cost2.Gradient() == q2);
+    std::string name2 = "LinearFn1";
+    torc::fn::LinearFn lin2 = torc::fn::LinearFn<float>(q2, name2);
+    REQUIRE(lin2.Evaluate(x3) == 26);
+    REQUIRE(lin2.Gradient() == q2);
 }
 
 
-TEST_CASE("Quadratic Cost Test", "[quadratic]") {
-    using namespace torc::cost;
+TEST_CASE("Quadratic Function Test", "[quadratic]") {
+    using namespace torc::fn;
     const int n_tests = 10;
     const std::vector<int> test_dims = {1, 50};
 
@@ -52,15 +52,15 @@ TEST_CASE("Quadratic Cost Test", "[quadratic]") {
         for (int i=0; i<n_tests; i++) {
             for (auto dim : test_dims) {
                 Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
-                torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A);
+                torc::fn::QuadraticFn<double> quad = torc::fn::QuadraticFn(A);
                 for (int j = 0; j < n_tests; ++j) {
                     Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
-                    REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)));
-                    REQUIRE(cost.GetQuadCoefficients() == A);
-                    REQUIRE(cost.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
-                    REQUIRE(cost.Gradient(v) == A*v);
-                    REQUIRE(cost.Hessian(v) == A);
-                    REQUIRE(cost.GetDomainDim() == dim);
+                    REQUIRE(quad.Evaluate(v) == 0.5 * (v.dot(A * v)));
+                    REQUIRE(quad.GetQuadCoefficients() == A);
+                    REQUIRE(quad.GetLinCoefficients() == Eigen::VectorX<double>::Zero(dim));
+                    REQUIRE(quad.Gradient(v) == A * v);
+                    REQUIRE(quad.Hessian(v) == A);
+                    REQUIRE(quad.GetDomainDim() == dim);
                 }
             }
         }
@@ -70,35 +70,35 @@ TEST_CASE("Quadratic Cost Test", "[quadratic]") {
         for (int i=0; i<n_tests; i++) {
             Eigen::Matrix3d A = Eigen::Matrix3d::Random();
             Eigen::TriangularView<Eigen::Matrix3d, Eigen::Upper> Au = A.triangularView<Eigen::Upper>();
-            torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(Au);
+            torc::fn::QuadraticFn<double> quad = torc::fn::QuadraticFn(Au);
             A = A.selfadjointView<Eigen::Upper>();
             for (int j = 0; j < n_tests; ++j) {
                 Eigen::Vector3d v = Eigen::Vector3d::Random();
-                REQUIRE(abs(cost.Evaluate(v) - 0.5 * (v.dot(A * v))) < 1e-8);
-                REQUIRE(cost.GetQuadCoefficients() == A);
-                REQUIRE(cost.GetLinCoefficients() == Eigen::Vector3d::Zero());
-                REQUIRE(cost.Gradient(v).isApprox(A*v));
-                REQUIRE(cost.Hessian(v).isApprox(A));
-                REQUIRE(cost.GetDomainDim() == 3);
+                REQUIRE(abs(quad.Evaluate(v) - 0.5 * (v.dot(A * v))) < 1e-8);
+                REQUIRE(quad.GetQuadCoefficients() == A);
+                REQUIRE(quad.GetLinCoefficients() == Eigen::Vector3d::Zero());
+                REQUIRE(quad.Gradient(v).isApprox(A * v));
+                REQUIRE(quad.Hessian(v).isApprox(A));
+                REQUIRE(quad.GetDomainDim() == 3);
             }
         }
     }
 
-    SECTION("Full matrix with linear cost") {
+    SECTION("Full matrix with linear fn") {
         for (int i=0; i<n_tests; i++) {
             for (auto dim: test_dims) {
                 Eigen::MatrixX<double> A = Eigen::MatrixX<double>::Random(dim, dim).selfadjointView<Eigen::Upper>();
                 Eigen::VectorX<double> q = Eigen::VectorX<double>::Random(dim);
-                torc::cost::QuadraticCost<double> cost = torc::cost::QuadraticCost(A, q);
+                torc::fn::QuadraticFn<double> quad = torc::fn::QuadraticFn(A, q);
                 for (int j = 0; j < n_tests; ++j) {
                     Eigen::VectorX<double> v = Eigen::VectorX<double>::Random(dim);
-                    REQUIRE(cost.Evaluate(v) == 0.5 * (v.dot(A * v)) + q.dot(v));
-                    REQUIRE(cost.GetQuadCoefficients() == A);
-                    REQUIRE(cost.GetLinCoefficients() == q);
-                    REQUIRE(cost.Gradient(v) == A * v + q);
-                    REQUIRE(cost.Hessian(v) == A);
-                    REQUIRE(cost.Hessian() == A);
-                    REQUIRE(cost.GetDomainDim() == dim);
+                    REQUIRE(quad.Evaluate(v) == 0.5 * (v.dot(A * v)) + q.dot(v));
+                    REQUIRE(quad.GetQuadCoefficients() == A);
+                    REQUIRE(quad.GetLinCoefficients() == q);
+                    REQUIRE(quad.Gradient(v) == A * v + q);
+                    REQUIRE(quad.Hessian(v) == A);
+                    REQUIRE(quad.Hessian() == A);
+                    REQUIRE(quad.GetDomainDim() == dim);
                 }
             }
         }
@@ -107,7 +107,7 @@ TEST_CASE("Quadratic Cost Test", "[quadratic]") {
 
 
 TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
-    using namespace torc::cost;
+    using namespace torc::fn;
     using namespace test;
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
 
@@ -116,29 +116,30 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
     const auto tst_fn = 6;
 
     BENCHMARK("Instantiation (No Dynamic Libraries)"){      // ~3e8 ns
-        AutodiffCost<double> ad_cost(fn_ad.at(tst_fn), tst_dim, false);
-        return ad_cost;
+        AutodiffFn<double> ad_fn(fn_ad.at(tst_fn), tst_dim, false);
+        return ad_fn;
     };
 
     BENCHMARK("Instantiation (Using Dynamic Libraries)"){   // ~2e4 ns
-          AutodiffCost<double> ad_cost(fn_ad.at(tst_fn), tst_dim, true);
-          return ad_cost;
+          AutodiffFn<double> ad_fn(fn_ad.at(tst_fn), tst_dim, true);
+          return ad_fn;
     };
 
     const std::vector<int> test_dims = {1, 50};
     for (auto dim : test_dims) {
-        AutodiffCost<double> ad_cost(fn_ad.at(tst_fn), dim, false);     // different dimensions, we avoid the previous
+        AutodiffFn<double> ad_fn(fn_ad.at(tst_fn), dim, false);     // different dimensions, we avoid the previous
         BENCHMARK("Gradient Evaluation") {
-            return ad_cost.Gradient(Eigen::VectorX<double>::Random(dim));
+            return ad_fn.Gradient(Eigen::VectorX<double>::Random(dim));
         };
         BENCHMARK("Hessian Evaluation") {
-            return ad_cost.Hessian(Eigen::VectorX<double>::Random(dim));
+            return ad_fn.Hessian(Eigen::VectorX<double>::Random(dim));
         };
     }
 }
 
+
 TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
-    using namespace torc::cost;
+    using namespace torc::fn;
     using namespace test;
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
 
@@ -154,24 +155,24 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
 
     for (int i=0; i<fn_d.size(); i++) {
         for (auto dim : test_dims) {
-            FiniteDiffCost<double> fd_cost(fn_d.at(i), dim);
-            AnalyticCost<double> an_cost(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
-            AutodiffCost<double> ad_cost(fn_ad.at(i), dim);
-            AutodiffCost<double> ad_cost2(fn_ad.at(i), dim, true);  // test load SO
+            FiniteDiffFn<double> fd_fn(fn_d.at(i), dim);
+            AnalyticalFn<double> an_fn(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
+            AutodiffFn<double> ad_fn(fn_ad.at(i), dim);
+            AutodiffFn<double> ad_fn2(fn_ad.at(i), dim, true);  // test load SO
             for (int _=0; _<n_tests; _++){
                 Eigen::VectorX<double> input = Eigen::VectorX<double>::Random(dim);
-                auto an_eval = an_cost.Evaluate(input);
-                auto an_grad = an_cost.Gradient(input);
-                auto an_hess = an_cost.Hessian(input);
-                auto fd_eval = fd_cost.Evaluate(input);
-                auto fd_grad = fd_cost.Gradient(input);
-                auto fd_hess = fd_cost.Hessian(input);
-                auto ad_eval = ad_cost.Evaluate(input);
-                auto ad_grad = ad_cost.Gradient(input);
-                auto ad_hess = ad_cost.Hessian(input);
-                auto ad_eval2 = ad_cost2.Evaluate(input);
-                auto ad_grad2 = ad_cost2.Gradient(input);
-                auto ad_hess2 = ad_cost2.Hessian(input);
+                auto an_eval = an_fn.Evaluate(input);
+                auto an_grad = an_fn.Gradient(input);
+                auto an_hess = an_fn.Hessian(input);
+                auto fd_eval = fd_fn.Evaluate(input);
+                auto fd_grad = fd_fn.Gradient(input);
+                auto fd_hess = fd_fn.Hessian(input);
+                auto ad_eval = ad_fn.Evaluate(input);
+                auto ad_grad = ad_fn.Gradient(input);
+                auto ad_hess = ad_fn.Hessian(input);
+                auto ad_eval2 = ad_fn2.Evaluate(input);
+                auto ad_grad2 = ad_fn2.Gradient(input);
+                auto ad_hess2 = ad_fn2.Hessian(input);
                 REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(fd_eval, prec));
                 REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(ad_eval, prec));
                 REQUIRE_THAT(ad_eval, Catch::Matchers::WithinRel(ad_eval2, prec));

@@ -1,10 +1,10 @@
 #include <eigen3/Eigen/Dense>
 #include <cmath>
-#include "linear_cost.h"
-#include "quadratic_cost.h"
-#include "autodiff_cost.h"
-#include "analytic_cost.h"
-#include "finite_diff_cost.h"
+#include "linear_fn.h"
+#include "quadratic_fn.h"
+#include "autodiff_fn.h"
+#include "analytic_fn.h"
+#include "finite_diff_fn.h"
 
 namespace test {
     template <typename scalar_t=double>
