@@ -39,13 +39,6 @@ namespace torc::fn {
          */
         virtual matrixx_t Hessian(const vectorx_t &x) const = 0;
 
-        bool IsValidIdentifier(const std::string &str) {
-            if (!isalpha(str[0]) && str[0] != '_') {
-                return false;
-            }
-            return std::all_of(str.cbegin(), str.cend(), [](char c) {return (isalnum(c) || c=='_');});
-        }
-
         /**
          * Returns the identifier_ of the function
          * @return the function's name
@@ -61,8 +54,33 @@ namespace torc::fn {
     protected:
         std::string identifier_ = "BaseCostInstance";   // the name assigned to this function
         size_t dim_ = 0;                                // the function domain's dimension
+
+        /**
+         * Setter for the identifier attribute. Checks whether the string given is a valid variable name. This function
+         * is intended for internal use in subclasses only.
+         * @param str the identifier
+         */
+        void SetIdentifier(const std::string &str) {
+            if (this->IsValidIdentifier(str)) {
+                this->identifier_ = str;
+            } else {
+                throw std::runtime_error("Identifier must be a valid variable name.");
+            }
+        }
+
+        /**
+         * Checks whether a string is a valid identifier (i.e., starts with a alphabetical character and contains only
+         * alpha-numerical characters and underscores).
+         * @param str the string to check
+         * @return true if the string is a valid identifier, false otherwise
+         */
+        bool IsValidIdentifier(const std::string &str) {
+            if (!isalpha(str[0]) && str[0] != '_') {
+                return false;
+            }
+            return std::all_of(str.cbegin(), str.cend(), [](char c) {return (isalnum(c) || c=='_');});
+        }
     };
 }
-
 
 #endif //TORC_BASE_COST_H

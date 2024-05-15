@@ -1,20 +1,23 @@
-#ifndef TORC_AUTODIFF_COST_H
-#define TORC_AUTODIFF_COST_H
+#ifndef TORC_AUTODIFF_FN_H
+#define TORC_AUTODIFF_FN_H
 
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 #include <filesystem>
+#include <ctime>
 #include <cppad/cg.hpp>
 #include "base_fn.h"
 
 namespace torc::fn {
     namespace ADCG = CppAD::cg;
     namespace AD = CppAD;
+    namespace fs = std::filesystem;
 
     /**
      * Class implementation of an arbitrary function, with auto-differentiation functionalities.
-     * @tparam scalar_t the type of scalar used for the fn
+     * @tparam scalar_t the type of scalar used for the function
      */
     template <class scalar_t>
     class AutodiffFn: public BaseFn<scalar_t> {
@@ -25,59 +28,71 @@ namespace torc::fn {
 
     public:
         /**
-         * Constructor for the AutodiffFn class.
+         * Overloaded constructor for the AutodiffFn class.
          * @param fn the fn function
          * @param dim the input dimension
+         * @param force_generate whether or not to generate even when a library of the same name is found
+         * @param timestamp_files whether or not to timestamp the dynamic libraries
          * @param identifier string identifier for the fn
          */
         explicit AutodiffFn(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
-                            const size_t dim=0,
-                            const bool& prev_if_found=false,
-                            const std::string& identifier="AutodiffCostInstance") {
+                            const size_t dim,
+                            const bool& force_generate=false,
+                            const bool& timestamp_files=false,
+                            const std::string& identifier="AutodiffFnInstance") {
             this->fn_ = fn;
-            this->dim_ = dim;
             // the library has some issue with the identifier if it contains spaces/special characters. We impose a
-            // more strict requirement on the identifier; strings like "-auto" will also work.
-            if (this->IsValidIdentifier(identifier)) {
-                this->identifier_ = identifier;
-            } else {
-                throw std::runtime_error("Identifier must be a valid variable name.");
-            }
-
-            std::filesystem::path lib_dir_path = std::filesystem::current_path() / ADCG_SOURCE_DIR;
-            std::filesystem::path lib_file_path = lib_dir_path / (this->identifier_ + ".so");
+            // stricter requirement on the identifier; strings like "-auto" will also work.
+            this->SetIdentifier(identifier);
+            std::string lib_file_no_ext = FileSetup_(timestamp_files);
+            std::string lib_file_path = lib_file_no_ext + LIB_EXT_;
             bool create_lib = true;
-            if (std::filesystem::exists(lib_file_path) and prev_if_found) {
-                ADCG::LinuxDynamicLib<double> dlib(lib_file_path.string());
-                this->cg_dynamic_lib_ = std::unique_ptr<ADCG::DynamicLib<scalar_t>>(new ADCG::LinuxDynamicLib<double>(std::move(dlib)));
-                this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
-                create_lib = (cg_model_->Domain() != dim);
+            if ((fs::exists(lib_file_path)) && (!force_generate)) {
+                LoadADCGModelLib_(lib_file_path);
+                create_lib = (this->dim_ != dim);
             }
             if (create_lib) {
-                // Record operations in the ADFun object
+                // record operations in the ADFun object
                 std::vector<adcg_t> x(dim);
                 CppAD::Independent(x);
                 Eigen::VectorX<adcg_t> eigen_x = Eigen::Map<Eigen::VectorX<adcg_t> , Eigen::Unaligned>(x.data(), x.size());
                 std::vector<adcg_t> y = {fn(eigen_x)};
-                AD::ADFun<cg_t> ad_fn_(x, y);
-                // Generate library source code
-                ADCG::ModelCSourceGen<double> cgen(ad_fn_, this->identifier_);
-                cgen.setCreateJacobian(true);
-                cgen.setCreateHessian(true);
-                ADCG::ModelLibraryCSourceGen<double> libcgen(cgen);
-                ADCG::DynamicModelLibraryProcessor<double> libprocessor(libcgen, this->identifier_);
-                // Compile source code
+                AD::ADFun<cg_t> ad_fn(x, y);
+
+                // generate library source code
+                ADCG::ModelCSourceGen<double> c_gen(ad_fn, this->identifier_);
+                c_gen.setCreateJacobian(true);
+                c_gen.setCreateHessian(true);
+                ADCG::ModelLibraryCSourceGen<double> lib_gen(c_gen);
+                ADCG::DynamicModelLibraryProcessor<double> libprocessor(lib_gen, lib_file_no_ext);
+
+                // compile source code into a dynamic library
                 ADCG::GccCompiler<double> compiler;
                 this->cg_dynamic_lib_ = libprocessor.createDynamicLibrary(compiler);
-                // save to dynamic libraries
-                ADCG::SaveFilesModelLibraryProcessor<double> p2(libcgen);
-                p2.saveSourcesTo(lib_dir_path);
+                this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
+                this->dim_ = dim;
             }
-            this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
         }
 
         /**
-         * Evaluates the fn function at a given point
+         * Overloaded constructor for the AutodiffFn class which loads a dynamic library generated by CppAD CodeGen.
+         * @param fn the original function (not serialized by codegen)
+         * @param path the path to the dynamic library
+         * @param identifier string identifier, must match the identifier name that was used for the library
+         */
+        AutodiffFn(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& fn,
+                   const std::string& path,
+                   const std::string& identifier="AutodiffFnInstance") {
+            if (!fs::exists(path)) {
+                throw std::runtime_error("Specified path does not exist.");
+            }
+            this->fn_ = fn;
+            this->SetIdentifier(identifier);
+            LoadADCGModelLib_(path);
+        }
+
+        /**
+         * Evaluates the function at a given point
          * @param x the input to the function
          * @return f(x)
          */
@@ -130,8 +145,44 @@ namespace torc::fn {
         std::function<adcg_t(Eigen::VectorX<adcg_t>)> fn_;          // the original function
         std::unique_ptr<ADCG::DynamicLib<double>> cg_dynamic_lib_;  // stores the operation tape and differential information
         std::unique_ptr<ADCG::GenericModel<double>> cg_model_;
-        const std::string ADCG_SOURCE_DIR = "adcg_sources";
+        const std::string ADCG_SOURCE_DIR_ = "adcg_sources";
+        const std::string LIB_EXT_ = ".so";
+
+        /**
+         * Sets up the directory structure. Creates a directory ./ADCG_SOURCE_DIR, and scans the directory for previously
+         * created dynamic libraries to determine what the current one's path should be. The library files are named
+         * identifier-time(y-m-d-h-m-s).so
+         * @param timestamp Whether or not to timestamp the file. If false, then the file will be named identifier.so
+         * @return the full file path without the extension
+         */
+        std::string FileSetup_(const bool &timestamp) {
+            std::string time_str;
+            if (timestamp) {
+                const int TIM_PATH_LEN = 80;
+                time_t raw_time;
+                time (&raw_time);
+                char buffer[TIM_PATH_LEN];
+                strftime(buffer,sizeof(buffer),"%Y-%m-%d-%H-%M-%S", localtime(&raw_time));
+                time_str = buffer;
+            }
+            fs::path lib_dir_path = fs::current_path() / ADCG_SOURCE_DIR_;
+            std::string lib_name = this->identifier_ + time_str;
+            fs::create_directories(lib_dir_path);
+            return lib_dir_path / lib_name;
+        }
+
+        /**
+         * Loads an Autodiff CodeGen dynamic library into the AutodiffFn object. Updates the cg_model_, cg_dynamic_lib_,
+         * and dim_ attributes of the class.
+         * @param path the absolute file path to the dynamic library
+         */
+        void LoadADCGModelLib_(const std::string &path) {
+            ADCG::LinuxDynamicLib<double> dlib(path);
+            this->cg_dynamic_lib_ = std::unique_ptr<ADCG::DynamicLib<scalar_t>>(new ADCG::LinuxDynamicLib<double>(std::move(dlib)));
+            this->cg_model_ = cg_dynamic_lib_->model(this->identifier_);
+            this->dim_ = this->cg_model_->Domain();
+        }
     };
 } // namespace torc::fn
 
-#endif //TORC_AUTODIFF_COST_H
+#endif //TORC_AUTODIFF_FN_H

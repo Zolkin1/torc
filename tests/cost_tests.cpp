@@ -115,19 +115,24 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
     const auto tst_dim = 20;
     const auto tst_fn = 6;
 
+    auto fn = fn_ad.at(tst_fn);
+
     BENCHMARK("Instantiation (No Dynamic Libraries)"){      // ~3e8 ns
-        AutodiffFn<double> ad_fn(fn_ad.at(tst_fn), tst_dim, false);
+        AutodiffFn<double> ad_fn(fn, tst_dim, true, false);
         return ad_fn;
     };
-
-    BENCHMARK("Instantiation (Using Dynamic Libraries)"){   // ~2e4 ns
-          AutodiffFn<double> ad_fn(fn_ad.at(tst_fn), tst_dim, true);
-          return ad_fn;
+    BENCHMARK("Instantiation (Automatically Using Dynamic Libraries)"){   // ~2e4 ns
+        AutodiffFn<double> ad_fn(fn, tst_dim, false, false);
+        return ad_fn;
+    };
+    BENCHMARK("Instantiation (Manually Using Dynamic Libraries)"){   // ~2e4 ns
+        AutodiffFn<double> ad_fn(fn, "./adcg_sources/AutodiffFnInstance.so");
+        return ad_fn;
     };
 
     const std::vector<int> test_dims = {1, 50};
     for (auto dim : test_dims) {
-        AutodiffFn<double> ad_fn(fn_ad.at(tst_fn), dim, false);     // different dimensions, we avoid the previous
+        AutodiffFn<double> ad_fn(fn_ad.at(tst_fn), dim, true);     // different dimensions, we avoid the previous
         BENCHMARK("Gradient Evaluation") {
             return ad_fn.Gradient(Eigen::VectorX<double>::Random(dim));
         };
@@ -157,8 +162,9 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
         for (auto dim : test_dims) {
             FiniteDiffFn<double> fd_fn(fn_d.at(i), dim);
             AnalyticalFn<double> an_fn(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
-            AutodiffFn<double> ad_fn(fn_ad.at(i), dim);
-            AutodiffFn<double> ad_fn2(fn_ad.at(i), dim, true);  // test load SO
+            AutodiffFn<double> ad_fn(fn_ad.at(i), dim, true);
+            AutodiffFn<double> ad_fn2(fn_ad.at(i), dim, false);  // test load library implicitly
+            AutodiffFn<double> ad_fn3(fn_ad.at(i), "./adcg_sources/AutodiffFnInstance.so");  // test load library from filename
             for (int _=0; _<n_tests; _++){
                 Eigen::VectorX<double> input = Eigen::VectorX<double>::Random(dim);
                 auto an_eval = an_fn.Evaluate(input);
@@ -173,15 +179,21 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
                 auto ad_eval2 = ad_fn2.Evaluate(input);
                 auto ad_grad2 = ad_fn2.Gradient(input);
                 auto ad_hess2 = ad_fn2.Hessian(input);
+                auto ad_eval3 = ad_fn3.Evaluate(input);
+                auto ad_grad3 = ad_fn3.Gradient(input);
+                auto ad_hess3 = ad_fn3.Hessian(input);
                 REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(fd_eval, prec));
                 REQUIRE_THAT(an_eval, Catch::Matchers::WithinRel(ad_eval, prec));
                 REQUIRE_THAT(ad_eval, Catch::Matchers::WithinRel(ad_eval2, prec));
+                REQUIRE_THAT(ad_eval, Catch::Matchers::WithinRel(ad_eval3, prec));
                 REQUIRE(an_grad.isApprox(fd_grad, prec));
                 REQUIRE(an_grad.isApprox(ad_grad, prec));
                 REQUIRE(ad_grad.isApprox(ad_grad2, prec));
+                REQUIRE(ad_grad.isApprox(ad_grad3, prec));
                 REQUIRE(an_hess.isApprox(fd_hess, prec));
                 REQUIRE(an_hess.isApprox(ad_hess, prec));
                 REQUIRE(ad_hess2.isApprox(ad_hess2, prec));
+                REQUIRE(ad_hess2.isApprox(ad_hess3, prec));
             }
         }
     }
