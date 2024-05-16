@@ -56,16 +56,80 @@ namespace torc::fn {
          */
         scalar_t operator() (const vectorx_t& x) const { return this->func_(x); }
 
-        ExplicitFn<scalar_t> operator+ (const ExplicitFn<scalar_t>& other) {
+        /**
+         * Adds two functions. Taking derivatives is a linear operation, so the gradients and the hessians are added.
+         * @param other the other function
+         * @return the sum of the two functions
+         */
+        ExplicitFn<scalar_t> operator+ (const ExplicitFn<scalar_t>& other) const {
             if (this->dim_ != other.dim_) {
                 throw std::runtime_error("Two functions must have the same dimension.");
             }
-            auto func = [this, other](const vectorx_t& x) { return this->Evaluate(x) + other.Evaluate(x); };
-            auto grad = [this, other](const vectorx_t& x) { return this->Gradient(x) + other.Gradient(x); };
-            auto hess = [this, other](const vectorx_t& x) { return this->Hessian(x) + other.Hessian(x); };
-            size_t dim = this->dim_;
-            std::string name = this->name_ + "+" + other.name_;
-            return ExplicitFn<scalar_t>(func, grad, hess, dim, name);
+            ExplicitFn<scalar_t> fn {};
+            fn.func_ = [this, other](const vectorx_t& x) { return this->func_(x) + other.func_(x); };
+            fn.grad_ = [this, other](const vectorx_t& x) {
+                const size_t dim = this->dim_;
+                vectorx_t grad(dim);
+                vectorx_t grad1 = this->grad_(x);
+                vectorx_t grad2 = other.grad_(x);
+                for (int i=0; i<dim; i++) {
+                    grad(i) = grad1(i) + grad2(i);  // add manually to prevent bad_alloc from adding two dynamic sized
+                }
+                return grad;
+            };
+            fn.hess_ = [this, other](const vectorx_t& x) {
+                const size_t dim = this->dim_;
+                matrixx_t hess(dim, dim);
+                matrixx_t hess1 = this->hess_(x);
+                matrixx_t hess2 = other.hess_(x);
+                for (int i=0; i<dim; i++) {
+                    for (int j=0; j<dim; j++) {
+                        hess(i, j) = hess1(i, j) + hess2(i, j);
+                    }
+                }
+                return hess;
+            };
+            fn.dim_ = this->dim_;
+            fn.name_ = this->name_ + "_sum_" + other.name_;
+            return fn;
+        }
+
+        /**
+         * Subtracts two functions. Differentiation is linear, so the derivatives are subtracted.
+         * @param other the other function
+         * @return the difference of the two functions
+         */
+        ExplicitFn<scalar_t> operator- (const ExplicitFn<scalar_t>& other) const {
+            if (this->dim_ != other.dim_) {
+                throw std::runtime_error("Two functions must have the same dimension.");
+            }
+            ExplicitFn<scalar_t> fn {};
+            fn.func_ = [this, other](const vectorx_t& x) { return this->func_(x) - other.func_(x); };
+            fn.grad_ = [this, other](const vectorx_t& x) {
+                const size_t dim = this->dim_;
+                vectorx_t grad(dim);
+                vectorx_t grad1 = this->grad_(x);
+                vectorx_t grad2 = other.grad_(x);
+                for (int i=0; i<dim; i++) {
+                    grad(i) = grad1(i) - grad2(i);  // add manually to prevent bad_alloc from adding two dynamic sized
+                }
+                return grad;
+            };
+            fn.hess_ = [this, other](const vectorx_t& x) {
+                const size_t dim = this->dim_;
+                matrixx_t hess(dim, dim);
+                matrixx_t hess1 = this->hess_(x);
+                matrixx_t hess2 = other.hess_(x);
+                for (int i=0; i<dim; i++) {
+                    for (int j=0; j<dim; j++) {
+                        hess(i, j) = hess1(i, j) - hess2(i, j);
+                    }
+                }
+                return hess;
+            };
+            fn.dim_ = this->dim_;
+            fn.name_ = this->name_ + "_sum_" + other.name_;
+            return fn;
         }
 
         /**

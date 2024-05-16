@@ -140,7 +140,7 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
 }
 
 
-TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
+TEST_CASE("Differential Consistency Tests", "[explicit][autodiff][finite]") {
     using namespace torc::fn;
     using namespace test;
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
@@ -191,6 +191,57 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
                 REQUIRE(an_hess.isApprox(ad_hess, prec));
                 REQUIRE(ad_hess.isApprox(ad_hess2, prec));
                 REQUIRE(ad_hess2.isApprox(ad_hess3, prec));
+            }
+        }
+    }
+}
+
+
+TEST_CASE("Function Addition", "[explicit]") {
+    using namespace torc::fn;
+    using namespace test;
+    using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
+
+    auto fn_d = functions<double>;
+    auto fn_ad = functions<adcg_t>;
+    auto grad_d = gradients<double>;
+    auto hess_d = hessians<double>;
+
+    // current precision is around 0.003 for Hessians
+    const double prec = sqrt(sqrt(std::numeric_limits<double>::epsilon())) * 20;
+    const std::vector<int> test_dims = {1, 50};
+    const int n_tests = 20;
+
+    for (int i=0; i<fn_d.size() - 4; i++) {
+        for (auto dim : test_dims) {
+            FiniteDiffFn<double> fd_fn(fn_d.at(i), dim);
+            ExplicitFn<double> an_fn(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
+            AutodiffFn<double> ad_fn(fn_ad.at(i), dim, true);
+            ExplicitFn<double> sum1 = fd_fn + an_fn;
+            ExplicitFn<double> sum2 = ad_fn + an_fn;
+            for (int _=0; _<n_tests; _++){
+                Eigen::VectorX<double> input = Eigen::VectorX<double>::Random(dim);
+                auto an_eval = an_fn.Evaluate(input);
+                auto an_grad = an_fn.Gradient(input);
+                auto an_hess = an_fn.Hessian(input);
+                auto fd_eval = fd_fn.Evaluate(input);
+                auto fd_grad = fd_fn.Gradient(input);
+                auto fd_hess = fd_fn.Hessian(input);
+                auto ad_eval = ad_fn.Evaluate(input);
+                auto ad_grad = ad_fn.Gradient(input);
+                auto ad_hess = ad_fn.Hessian(input);
+                auto sm_eval1 = sum1.Evaluate(input);
+                auto sm_grad1 = sum1.Gradient(input);
+                auto sm_hess1 = sum1.Hessian(input);
+                auto sm_eval2 = sum2.Evaluate(input);
+                auto sm_grad2 = sum2.Gradient(input);
+                auto sm_hess2 = sum2.Hessian(input);
+                REQUIRE_THAT(fd_eval + an_eval, Catch::Matchers::WithinRel(sm_eval1, prec));
+                REQUIRE_THAT(ad_eval + an_eval, Catch::Matchers::WithinRel(sm_eval2, prec));
+                REQUIRE((fd_grad + an_grad).isApprox(sm_grad1, prec));
+                REQUIRE((ad_grad + an_grad).isApprox(sm_grad2, prec));
+                REQUIRE((fd_hess + an_hess).isApprox(sm_hess1, prec));
+                REQUIRE((ad_hess + an_hess).isApprox(sm_hess2, prec));
             }
         }
     }
