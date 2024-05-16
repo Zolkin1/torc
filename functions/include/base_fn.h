@@ -1,71 +1,113 @@
-#ifndef TORC_BASE_COST_H
-#define TORC_BASE_COST_H
+//
+// Created by gavin on 5/16/2024.
+//
 
-#include <cstdint>
-#include <string>
+#ifndef TORC_BASE_FN_H
+#define TORC_BASE_FN_H
+
 #include <eigen3/Eigen/Dense>
-
+#include "linear_fn.h"
 
 namespace torc::fn {
-
     /**
-     * Abstract class representing a fn function to be optimized.
+     * Class implementation of an explicit function, where the differentials are provided by the user.
      * @tparam scalar_t the type of scalar used for the fn
      */
-    template<class scalar_t>
+    template <class scalar_t>
     class BaseFn {
-        using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
+        using vectorx_t = Eigen::VectorX<scalar_t>;
 
     public:
         /**
-         * Evaluates the fn function at a given point
-         * @param x the input to the function
-         * @return the output of the function
+         * Constructor for the ExplicitFn class
+         * @param fn the fn function
+         * @param grad the gradient of the function
+         * @param hess the hessian of the function
+         * @param dim the dimension of the function
+         * @param fn_name the name of the function
          */
-        virtual scalar_t Evaluate(const vectorx_t &x) const = 0;
+        BaseFn(const std::function<scalar_t(vectorx_t)>& fn,
+               const std::function<vectorx_t(vectorx_t)>& grad,
+               const std::function<matrixx_t(vectorx_t)>& hess,
+               const size_t& dim = 1,
+               const std::string& fn_name="ExplicitCostInstance") {
+            this->func_ = fn;
+            this->grad_ = grad;
+            this->hess_ = hess;
+            if (dim <= 0) {
+                throw std::runtime_error("Dimension must be greater than 1.");
+            }
+            this->dim_ = dim;
+            this->SetName(fn_name);
+        }
 
         /**
-         * Evaluates the gradient of the function at a given point.
-         * @param x the input to the gradient of the function
-         * @return the gradient of the function
+         * Evaluates the function at a point
+         * @param x the input
+         * @return f(x)
          */
-        virtual vectorx_t Gradient(const vectorx_t &x) const = 0;
+        scalar_t Evaluate(const vectorx_t& x) const {
+            return this->cost_(x);
+        }
+
+        scalar_t operator() (const vectorx_t& x) const {
+            return this->func_(x);
+        }
+
+        ExplicitFn<scalar_t> operator+ (ExplicitFn<scalar_t> other_fn) {
+            ;
+        }
 
         /**
-         * Evaluates the Hessian of the function at a given point.
-         * @param x the input to the Hessian of the function
-         * @return the Hessian of the function
+         * Evaluates the gradient of the function at a point
+         * @param x the input
+         * @return grad f(x)
          */
-        virtual matrixx_t Hessian(const vectorx_t &x) const = 0;
+        vectorx_t Gradient(const vectorx_t& x) const {
+            return this->grad_(x);
+        }
+
+        /**
+         * Evaluates the Hessian of the function at a point
+         * @param x the input
+         * @return H_f(x)
+         */
+        matrixx_t Hessian(const vectorx_t& x) const {
+            return this->hess_(x);
+        }
+
 
         /**
          * Returns the identifier_ of the function
          * @return the function's name
          */
-        [[nodiscard]] std::string GetIdentifier() const { return identifier_; }
+        [[nodiscard]] std::string GetName() const { return this->fn_name_; }
 
         /**
          * Returns the domain's dimension of the function
          * @return the domain's dimension
          */
-        [[nodiscard]] size_t GetDomainDim() const { return dim_; }
+        [[nodiscard]] size_t GetDim() const { return this->dim_; }
+
 
     protected:
-        std::string identifier_ = "BaseCostInstance";   // the name assigned to this function
-        size_t dim_ = 0;                                // the function domain's dimension
+        std::function<scalar_t(vectorx_t)> func_;   // the original function
+        std::function<vectorx_t(vectorx_t)> grad_;  // the gradient of the function
+        std::function<matrixx_t(vectorx_t)> hess_;  // the hessian of the function
+        size_t dim_ = 0;
+        std::string fn_name_ = "ExplicitFnInstance";
 
         /**
          * Setter for the identifier attribute. Checks whether the string given is a valid variable name. This function
          * is intended for internal use in subclasses only.
          * @param str the identifier
          */
-        void SetIdentifier(const std::string &str) {
-            if (this->IsValidIdentifier(str)) {
-                this->identifier_ = str;
-            } else {
+        void SetName(const std::string &str) {
+            if (!IsValidName(str)) {
                 throw std::runtime_error("Identifier must be a valid variable name.");
             }
+            this->fn_name_ = str;
         }
 
         /**
@@ -74,7 +116,7 @@ namespace torc::fn {
          * @param str the string to check
          * @return true if the string is a valid identifier, false otherwise
          */
-        bool IsValidIdentifier(const std::string &str) {
+        static bool IsValidName(const std::string &str) {
             if (!isalpha(str[0]) && str[0] != '_') {
                 return false;
             }
@@ -82,5 +124,4 @@ namespace torc::fn {
         }
     };
 }
-
-#endif //TORC_BASE_COST_H
+#endif //TORC_BASE_FN_H

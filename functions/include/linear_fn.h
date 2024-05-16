@@ -1,7 +1,7 @@
 #ifndef TORC_LINEAR_COST_H
 #define TORC_LINEAR_COST_H
 
-#include "base_fn.h"
+#include "explicit_fn.h"
 
 
 namespace torc::fn {
@@ -9,8 +9,8 @@ namespace torc::fn {
      * Class implementation of a linear fn function, f(x) = q^T x
      * @tparam scalar_t the type of scalar used for the fn
      */
-    template<class scalar_t>
-    class LinearFn: public BaseFn<scalar_t> {
+    template <class scalar_t>
+    class LinearFn: public ExplicitFn<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 

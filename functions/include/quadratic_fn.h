@@ -1,7 +1,7 @@
 #ifndef TORC_QUADRATIC_COST_H
 #define TORC_QUADRATIC_COST_H
 
-#include "base_fn.h"
+#include "explicit_fn.h"
 #include "linear_fn.h"
 
 namespace torc::fn {
@@ -10,7 +10,7 @@ namespace torc::fn {
      * @tparam scalar_t the type of scalar used for the fn
      */
     template <class scalar_t>
-    class QuadraticFn: public BaseFn<scalar_t> {
+    class QuadraticFn: public ExplicitFn<scalar_t> {
         using vectorx_t = Eigen::VectorX<scalar_t>;
         using matrixx_t = Eigen::MatrixX<scalar_t>;
 

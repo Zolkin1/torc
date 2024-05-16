@@ -3,12 +3,12 @@ message(STATUS "Building costs")
 set(FN_HEADER_INC_DIR "${torc_SOURCE_DIR}/functions/include")
 
 set(FN_HEADER_LIST
-    "${FN_HEADER_INC_DIR}/base_fn.h"
-    "${FN_HEADER_INC_DIR}/linear_fn.h"
-    "${FN_HEADER_INC_DIR}/quadratic_fn.h"
+#    "${FN_HEADER_INC_DIR}/linear_fn.h"
+#    "${FN_HEADER_INC_DIR}/quadratic_fn.h"
     "${FN_HEADER_INC_DIR}/autodiff_fn.h"
-    "${FN_HEADER_INC_DIR}/analytic_fn.h"
-    "${FN_HEADER_INC_DIR}/finite_diff_fn.h")
+#    "${FN_HEADER_INC_DIR}/finite_diff_fn.h"
+    "${FN_HEADER_INC_DIR}/explicit_fn.h"
+    )
 add_library(Functions SHARED ${FN_HEADER_LIST})
 
 set_target_properties(Functions PROPERTIES LINKER_LANGUAGE CXX)

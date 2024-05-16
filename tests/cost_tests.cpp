@@ -13,7 +13,7 @@
 #include "linear_fn.h"
 #include "quadratic_fn.h"
 #include "autodiff_fn.h"
-#include "analytic_fn.h"
+#include "explicit_fn.h"
 #include "finite_diff_fn.h"
 #include "test_fn.h"
 
@@ -161,7 +161,7 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
     for (int i=0; i<fn_d.size(); i++) {
         for (auto dim : test_dims) {
             FiniteDiffFn<double> fd_fn(fn_d.at(i), dim);
-            AnalyticalFn<double> an_fn(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
+            ExplicitFn<double> an_fn(fn_d.at(i), grad_d.at(i), hess_d.at(i), dim);
             AutodiffFn<double> ad_fn(fn_ad.at(i), dim, true);
             AutodiffFn<double> ad_fn2(fn_ad.at(i), dim, false);  // test load library implicitly
             AutodiffFn<double> ad_fn3(fn_ad.at(i), "./adcg_sources/AutodiffFnInstance.so");  // test load library from filename
