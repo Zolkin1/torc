@@ -14,7 +14,6 @@ namespace torc::fn {
     public:
         ExplicitFn() {
             const size_t dim = 1;
-            this->dim_ = dim;
             this->func_ = [](const vectorx_t& x) {return scalar_t(0);};
             this->grad_ = [](const vectorx_t& x) {return vectorx_t::Zero(dim);};
             this->hess_ = [](const vectorx_t& x) {return matrixx_t::Zero(dim, dim);};
@@ -31,7 +30,7 @@ namespace torc::fn {
         ExplicitFn(const std::function<scalar_t(vectorx_t)>& func,
                    const std::function<vectorx_t(vectorx_t)>& grad,
                    const std::function<matrixx_t(vectorx_t)>& hess,
-                   const size_t& dim = 1,
+                   const size_t& dim=1,
                    const std::string& fn_name="ExplicitCostInstance") {
             this->func_ = func;
             this->grad_ = grad;
@@ -49,7 +48,7 @@ namespace torc::fn {
          * @return f(x)
          */
         scalar_t Evaluate(const vectorx_t& x) const {
-            return this->cost_(x);
+            return this->func_(x);
         }
 
         scalar_t operator() (const vectorx_t& x) const {
@@ -78,7 +77,6 @@ namespace torc::fn {
             return this->hess_(x);
         }
 
-
         /**
          * Returns the identifier_ of the function
          * @return the function's name
@@ -96,12 +94,13 @@ namespace torc::fn {
         std::function<scalar_t(vectorx_t)> func_;   // the original function
         std::function<vectorx_t(vectorx_t)> grad_;  // the gradient of the function
         std::function<matrixx_t(vectorx_t)> hess_;  // the hessian of the function
-        size_t dim_ = 0;
+        size_t dim_ = 1;
         std::string fn_name_ = "ExplicitFnInstance";
 
         /**
          * Setter for the identifier attribute. Checks whether the string given is a valid variable name. This function
-         * is intended for internal use in subclasses only.
+         * is intended for internal use in subclasses only, since changing the name of a function after it has been
+         * loaded into dynamic libraries cause complications for later loading.
          * @param str the identifier
          */
         void SetName(const std::string &str) {
