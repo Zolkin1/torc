@@ -4,6 +4,7 @@
 #include <vector>
 #include <fstream>
 #include <stdexcept>
+#include <iostream>
 #include <filesystem>
 #include <ctime>
 #include <cppad/cg.hpp>
@@ -36,25 +37,22 @@ namespace torc::fn {
          * @param identifier string identifier for the cg_fn
          */
         explicit AutodiffFn(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& cg_fn,
-                            const size_t dim=-1,
+                            const size_t dim=1,
                             const bool& force_generate=false,
                             const bool& timestamp_files=false,
                             const std::string& identifier="AutodiffFnInstance"){
             this->SetName(identifier);
             std::string lib_file_no_ext = FileSetup_(timestamp_files);
             std::string lib_file_path = lib_file_no_ext + LIB_EXT_;
+            this->dim_ = dim;
 
             bool create_lib = true;
             if ((fs::exists(lib_file_path)) && (!force_generate)) {
-                size_t loaded_dim = LoadADCGModelLib_(lib_file_path);
-                if (dim == -1) {
-                    this->dim_ = loaded_dim;
-                    create_lib = false;
-                } else  {
-                    create_lib = (loaded_dim != dim);
-                }
+                size_t loaded_dim = LoadADCGLib_(lib_file_path);
+                create_lib = (loaded_dim != dim);
             }
             if (create_lib) {
+                this->dim_ = dim;
                 // record operations in the ADFun object
                 std::vector<adcg_t> x(dim);
                 CppAD::Independent(x);
@@ -63,7 +61,7 @@ namespace torc::fn {
                 AD::ADFun<cg_t> ad_fn(x, y);
 
                 // generate library source code
-                ADCG::ModelCSourceGen<double> c_gen(ad_fn, this->fn_name_);
+                ADCG::ModelCSourceGen<double> c_gen(ad_fn, this->name_);
                 c_gen.setCreateJacobian(true);
                 c_gen.setCreateHessian(true);
                 ADCG::ModelLibraryCSourceGen<double> lib_gen(c_gen);
@@ -72,10 +70,31 @@ namespace torc::fn {
                 // compile source code into a dynamic library
                 ADCG::GccCompiler<double> compiler;
                 this->cg_lib_ = lib_processor.createDynamicLibrary(compiler);
-                this->cg_model_ = this->cg_lib_->model(this->fn_name_);
+                this->cg_model_ = this->cg_lib_->model(this->name_);
             }
             LoadFunction(cg_fn);
             LoadDifferentials();
+            // gradient
+            this->grad_ = [this](const vectorx_t& x) {
+                const std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
+                std::vector<scalar_t> jac = this->cg_model_->Jacobian(x_std);
+                vectorx_t grad = Eigen::Map<vectorx_t , Eigen::Unaligned>(jac.data(), jac.size());
+                return grad;
+            };
+
+            // Hessian
+            this->hess_ = [this](const vectorx_t& x) {
+                const std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
+                const size_t dim  = this->dim_;
+                std::vector<scalar_t> hess = this->cg_model_->Hessian(x_std, 0);
+                matrixx_t grad_eigen(dim, dim);
+                for (size_t n_row=0; n_row < dim; n_row++) {
+                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t>, Eigen::Unaligned>(hess.data() + n_row * dim, (n_row + 1) * dim);
+                    grad_row_eigen.conservativeResize(dim);  // so row assignment doesn't complain
+                    grad_eigen.row(n_row) << grad_row_eigen;
+                }
+                return grad_eigen;
+            };
         }
 
         /**
@@ -91,7 +110,7 @@ namespace torc::fn {
                 throw std::runtime_error("Specified path does not exist.");
             }
             this->SetName(identifier);
-            LoadADCGModelLib_(path);
+            this->dim_ = LoadADCGLib_(path);
             LoadFunction(cg_fn);
             LoadDifferentials();
         }
@@ -120,7 +139,7 @@ namespace torc::fn {
                 time_str = buffer;
             }
             fs::path lib_dir_path = fs::current_path() / ADCG_SOURCE_DIR_;
-            std::string lib_name = this->fn_name_ + time_str;
+            std::string lib_name = this->name_ + time_str;
             fs::create_directories(lib_dir_path);
             return lib_dir_path / lib_name;
         }
@@ -131,10 +150,10 @@ namespace torc::fn {
          * @param path the absolute file path to the dynamic library
          * @return the domain dimension of the loaded library
          */
-        size_t LoadADCGModelLib_(const std::string &path) {
+        size_t LoadADCGLib_(const std::string &path) {
             ADCG::LinuxDynamicLib<double> dlib(path);
             this->cg_lib_ = std::unique_ptr<ADCG::DynamicLib<scalar_t>>(new ADCG::LinuxDynamicLib<double>(std::move(dlib)));
-            this->cg_model_ = cg_lib_->model(this->fn_name_);
+            this->cg_model_ = cg_lib_->model(this->name_);
             return this->cg_model_->Domain();
         }
 
@@ -160,26 +179,7 @@ namespace torc::fn {
          * dynamic library model. Assumes the dimension of the class is correct.
          */
         void LoadDifferentials() {
-            // gradient
-            this->grad_ = [this](const vectorx_t& x) {
-                const std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
-                std::vector<scalar_t> jac = this->cg_model_->Jacobian(x_std);
-                return Eigen::Map<vectorx_t , Eigen::Unaligned>(jac.data(), jac.size());
-            };
 
-            // Hessian
-            this->hess_ = [this](const vectorx_t& x) {
-                const std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
-                const size_t dim  = this->dim_;
-                std::vector<scalar_t> hess = this->cg_model_->Hessian(x_std, 0);
-                matrixx_t grad_eigen(dim, dim);
-                for (size_t n_row=0; n_row < dim; n_row++) {
-                    vectorx_t grad_row_eigen = Eigen::Map<vectorx_t, Eigen::Unaligned>(hess.data() + n_row * dim, (n_row + 1) * dim);
-                    grad_row_eigen.conservativeResize(dim);  // so row assignment doesn't complain
-                    grad_eigen.row(n_row) << grad_row_eigen.transpose();
-                }
-                return grad_eigen;
-            };
         }
     };
 } // namespace torc::fn

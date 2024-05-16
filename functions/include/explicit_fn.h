@@ -31,15 +31,15 @@ namespace torc::fn {
                    const std::function<vectorx_t(vectorx_t)>& grad,
                    const std::function<matrixx_t(vectorx_t)>& hess,
                    const size_t& dim=1,
-                   const std::string& fn_name="ExplicitCostInstance") {
-            this->func_ = func;
-            this->grad_ = grad;
-            this->hess_ = hess;
+                   const std::string& fn_name="ExplicitFnInstance") {
             if (dim <= 0) {
                 throw std::runtime_error("Dimension must be greater than 1.");
             }
             this->dim_ = dim;
             this->SetName(fn_name);
+            this->func_ = func;
+            this->grad_ = grad;
+            this->hess_ = hess;
         }
 
         /**
@@ -47,16 +47,20 @@ namespace torc::fn {
          * @param x the input
          * @return f(x)
          */
-        scalar_t Evaluate(const vectorx_t& x) const {
-            return this->func_(x);
-        }
+        scalar_t Evaluate(const vectorx_t& x) const { return this->func_(x); }
 
-        scalar_t operator() (const vectorx_t& x) const {
-            return this->func_(x);
-        }
+        scalar_t operator() (const vectorx_t& x) const { return this->func_(x); }
 
-        ExplicitFn<scalar_t> operator+ (ExplicitFn<scalar_t> other_fn) {
-            ;
+        ExplicitFn<scalar_t> operator+ (const ExplicitFn<scalar_t>& other) {
+            if (this->dim_ != other.dim_) {
+                throw std::runtime_error("Two functions must have the same dimension.");
+            }
+            auto func = [this, other](const vectorx_t& x) { return this->Evaluate(x) + other.Evaluate(x); };
+            auto grad = [this, other](const vectorx_t& x) { return this->Gradient(x) + other.Gradient(x); };
+            auto hess = [this, other](const vectorx_t& x) { return this->Hessian(x) + other.Hessian(x); };
+            size_t dim = this->dim_;
+            std::string name = this->name_ + "+" + other.name_;
+            return ExplicitFn<scalar_t>(func, grad, hess, dim, name);
         }
 
         /**
@@ -64,9 +68,7 @@ namespace torc::fn {
          * @param x the input
          * @return grad f(x)
          */
-        vectorx_t Gradient(const vectorx_t& x) const {
-            return this->grad_(x);
-        }
+        vectorx_t Gradient(const vectorx_t& x) const { return this->grad_(x); }
 
         /**
          * Evaluates the Hessian of the function at a point
@@ -81,7 +83,7 @@ namespace torc::fn {
          * Returns the identifier_ of the function
          * @return the function's name
          */
-        [[nodiscard]] std::string GetName() const { return this->fn_name_; }
+        [[nodiscard]] std::string GetName() const { return this->name_; }
 
         /**
          * Returns the domain's dimension of the function
@@ -95,7 +97,7 @@ namespace torc::fn {
         std::function<vectorx_t(vectorx_t)> grad_;  // the gradient of the function
         std::function<matrixx_t(vectorx_t)> hess_;  // the hessian of the function
         size_t dim_ = 1;
-        std::string fn_name_ = "ExplicitFnInstance";
+        std::string name_ = "ExplicitFnInstance";
 
         /**
          * Setter for the identifier attribute. Checks whether the string given is a valid variable name. This function
@@ -107,7 +109,7 @@ namespace torc::fn {
             if (!IsValidName(str)) {
                 throw std::runtime_error("Identifier must be a valid variable name.");
             }
-            this->fn_name_ = str;
+            this->name_ = str;
         }
 
         /**

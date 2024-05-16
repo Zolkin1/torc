@@ -1,8 +1,7 @@
-#ifndef TORC_LINEAR_COST_H
-#define TORC_LINEAR_COST_H
+#ifndef TORC_LINEAR_FN_H
+#define TORC_LINEAR_FN_H
 
 #include "explicit_fn.h"
-
 
 namespace torc::fn {
     /**
@@ -17,81 +16,24 @@ namespace torc::fn {
     public:
         /**
          * Overloaded constructor for the LinearFn class.
-         * @param dim input dimension, defaults coefficients to 0
-         * @param identifier string identifier
-         */
-        explicit LinearFn(const int& dim, const std::string &identifier="LinearCostInstance") {
-            q_ = vectorx_t::Zero(dim);
-            this->identifier_ = identifier;
-            this->dim_ = dim;
-        }
-
-        /**
-         * Overloaded constructor for the LinearFn class.
          * @param coefficients the linear coefficients
          * @param identifier string identifier
          */
-        explicit LinearFn(const vectorx_t &coefficients, const std::string &identifier="LinearCostInstance") {
+        explicit LinearFn(const vectorx_t &coefficients, const std::string &identifier="LinearFnInstance") {
             q_ = coefficients;
-            this->identifier_ = identifier;
+            this->SetName(identifier);
             this->dim_ = coefficients.size();
+
+            this->func_ = [this](const vectorx_t& x) { return this->q_.dot(x); };
+            this->grad_ = [this](const vectorx_t& x) { return this->q_; };
+            this->hess_ = [this](const vectorx_t& x) { return matrixx_t::Zero(this->dim_, this->dim_); };
         }
 
-        /**
-         * Evaluates the fn function at a given point
-         * @param x the input to the function
-         * @return q^T x
-         */
-        scalar_t Evaluate(const vectorx_t& x) const {
-            return q_.dot(x);
-        }
-
-        /**
-         * Returns the q_ of the fn
-         * @return the q_ q
-         */
-        vectorx_t GetCoefficients() const {
-            return q_;
-        }
-
-        /**
-         * Returns the gradient of the fn evaluated at x
-         * @param x the input
-         * @return grad f(x) = q
-         */
-        vectorx_t Gradient(const vectorx_t& x) const {
-            return q_;
-        }
-
-        /**
-         * The gradient of a linear function is constant everywhere, so we don't need an input
-         * @return grad f(x) = q for all x
-         */
-        vectorx_t Gradient() const {
-            return q_;
-        }
-
-        /**
-         * The Hessian of a linear function is zero everywhere
-         * @param x the input
-         * @return a square zero matrix of dimension dim(x)
-         */
-        matrixx_t Hessian(const vectorx_t& x) const {
-            return matrixx_t::Zero(this->dim_, this->dim_);
-        }
-
-        /**
-         * The Hessian of a linear function is zero everywhere
-         * @return a square zero matrix of dimension dim(x)
-         */
-        matrixx_t Hessian() const {
-            return matrixx_t::Zero(this->dim_, this->dim_);
-        }
-
+        vectorx_t GetCoefficients() { return this->q_; }
     private:
         vectorx_t q_; // the coefficients of the linear fn
     };
 } // namespace torc::fn
 
 
-#endif //TORC_LINEAR_COST_H
+#endif //TORC_LINEAR_FN_H
