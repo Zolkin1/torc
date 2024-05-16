@@ -48,7 +48,7 @@ namespace torc::fn {
 
             bool create_lib = true;
             if ((fs::exists(lib_file_path)) && (!force_generate)) {
-                size_t loaded_dim = LoadADCGLib_(lib_file_path);
+                size_t loaded_dim = LoadADCGLib_(lib_file_path, this->name_);
                 create_lib = (loaded_dim != dim);
             }
             if (create_lib) {
@@ -72,29 +72,8 @@ namespace torc::fn {
                 this->cg_lib_ = lib_processor.createDynamicLibrary(compiler);
                 this->cg_model_ = this->cg_lib_->model(this->name_);
             }
-            LoadFunction(cg_fn);
+            LoadFunction(cg_fn, dim);
             LoadDifferentials();
-            // gradient
-            this->grad_ = [this](const vectorx_t& x) {
-                const std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
-                std::vector<scalar_t> jac = this->cg_model_->Jacobian(x_std);
-                vectorx_t grad = Eigen::Map<vectorx_t , Eigen::Unaligned>(jac.data(), jac.size());
-                return grad;
-            };
-
-            // Hessian
-            this->hess_ = [this](const vectorx_t& x) {
-                const std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
-                const size_t dim  = this->dim_;
-                std::vector<scalar_t> hess = this->cg_model_->Hessian(x_std, 0);
-                matrixx_t grad_eigen(dim, dim);
-                for (size_t n_row=0; n_row < dim; n_row++) {
-                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t>, Eigen::Unaligned>(hess.data() + n_row * dim, (n_row + 1) * dim);
-                    grad_row_eigen.conservativeResize(dim);  // so row assignment doesn't complain
-                    grad_eigen.row(n_row) << grad_row_eigen;
-                }
-                return grad_eigen;
-            };
         }
 
         /**
@@ -110,8 +89,8 @@ namespace torc::fn {
                 throw std::runtime_error("Specified path does not exist.");
             }
             this->SetName(identifier);
-            this->dim_ = LoadADCGLib_(path);
-            LoadFunction(cg_fn);
+            this->dim_ = LoadADCGLib_(path, this->name_);
+            LoadFunction(cg_fn, this->dim_);
             LoadDifferentials();
         }
 
@@ -147,13 +126,13 @@ namespace torc::fn {
         /**
          * Loads an Autodiff CodeGen dynamic library into the AutodiffFn object. Updates the cg_model_, cg_lib_,
          * and dim_ attributes of the class.
-         * @param path the absolute file path to the dynamic library
+         * @param path the path to the dynamic library
          * @return the domain dimension of the loaded library
          */
-        size_t LoadADCGLib_(const std::string &path) {
+        size_t LoadADCGLib_(const std::string &path, const std::string& name) {
             ADCG::LinuxDynamicLib<double> dlib(path);
             this->cg_lib_ = std::unique_ptr<ADCG::DynamicLib<scalar_t>>(new ADCG::LinuxDynamicLib<double>(std::move(dlib)));
-            this->cg_model_ = cg_lib_->model(this->name_);
+            this->cg_model_ = cg_lib_->model(name);
             return this->cg_model_->Domain();
         }
 
@@ -161,10 +140,9 @@ namespace torc::fn {
          * Loads a ADCG function into the func_ attribute of the class, which operates on scalar_t
          * @param cg_fn the ADCG function
          */
-        void LoadFunction(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& cg_fn) {
+        void LoadFunction(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& cg_fn, const size_t& dim) {
             // original function
-            const std::function<scalar_t(vectorx_t)> func = [this, cg_fn](const vectorx_t& x) {
-                const size_t dim = this->dim_;
+            const std::function<scalar_t(vectorx_t)> func = [cg_fn, dim](const vectorx_t& x) {
                 Eigen::VectorX<adcg_t> x_eigen(dim);
                 for (int i = 0; i < dim; ++i) {
                     x_eigen[i] = adcg_t(x[i]);
@@ -179,7 +157,27 @@ namespace torc::fn {
          * dynamic library model. Assumes the dimension of the class is correct.
          */
         void LoadDifferentials() {
+            // gradient
+            this->grad_ = [this](const vectorx_t& x) {
+                const std::vector<scalar_t> x_std(x.data(), x.data() + x.size());
+                std::vector<scalar_t> jac = this->cg_model_->Jacobian(x_std);
+                vectorx_t grad = Eigen::Map<vectorx_t , Eigen::Unaligned>(jac.data(), jac.size());
+                return grad;
+            };
 
+            // Hessian
+            this->hess_ = [this](const vectorx_t& x) {
+                const std::vector<scalar_t> x_std(x.data(), x.data()+x.size());
+                const size_t dim  = this->dim_;
+                std::vector<scalar_t> hess = this->cg_model_->Hessian(x_std, 0);
+                matrixx_t grad_eigen(dim, dim);
+                for (size_t n_row=0; n_row < dim; n_row++) {
+                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t>, Eigen::Unaligned>(hess.data() + n_row * dim, (n_row + 1) * dim);
+                    grad_row_eigen.conservativeResize(dim);  // so row assignment doesn't complain
+                    grad_eigen.row(n_row) << grad_row_eigen;
+                }
+                return grad_eigen;
+            };
         }
     };
 } // namespace torc::fn

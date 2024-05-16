@@ -48,11 +48,11 @@ for (int i=0; i<fn_d.size(); i++) {
                 auto ad_grad3 = ad_fn3.Gradient(input);
                 auto ad_hess3 = ad_fn3.Hessian(input);
                 REQUIRE_THAT(ad_eval, Catch::Matchers::WithinRel(ad_eval2, 1e-7));
-//                REQUIRE_THAT(ad_eval, Catch::Matchers::WithinRel(ad_eval3, 1e-7));
+                REQUIRE_THAT(ad_eval, Catch::Matchers::WithinRel(ad_eval3, 1e-7));
                 REQUIRE(ad_grad.isApprox(ad_grad2, prec));
-//                REQUIRE(ad_grad.isApprox(ad_grad3, prec));
+                REQUIRE(ad_grad.isApprox(ad_grad3, prec));
                 REQUIRE(ad_hess2.isApprox(ad_hess2, prec));
-//                REQUIRE(ad_hess2.isApprox(ad_hess3, prec));
+                REQUIRE(ad_hess2.isApprox(ad_hess3, prec));
             }
         }
     }

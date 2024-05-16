@@ -13,7 +13,6 @@
 #include "linear_fn.h"
 #include "quadratic_fn.h"
 #include "autodiff_fn.h"
-#include "explicit_fn.h"
 #include "finite_diff_fn.h"
 #include "test_fn.h"
 
@@ -123,7 +122,7 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
         AutodiffFn<double> ad_fn(fn, tst_dim, false, false);
         return ad_fn;
     };
-    BENCHMARK("Instantiation (Manually Using Dynamic Libraries)"){   // ~2e4 ns
+    BENCHMARK("Instantiation (Manually Using Dynamic Libraries)"){   // ~1.8e4 ns
         AutodiffFn<double> ad_fn(fn, "./adcg_sources/AutodiffFnInstance.so");
         return ad_fn;
     };
@@ -187,11 +186,11 @@ TEST_CASE("Differential Consistency Tests", "[analytic][autodiff][finite]") {
                 REQUIRE(an_grad.isApprox(fd_grad, prec));
                 REQUIRE(an_grad.isApprox(ad_grad, prec));
                 REQUIRE(ad_grad.isApprox(ad_grad2, prec));
-//                REQUIRE(ad_grad.isApprox(ad_grad3, prec));
+                REQUIRE(ad_grad.isApprox(ad_grad3, prec));
                 REQUIRE(an_hess.isApprox(fd_hess, prec));
                 REQUIRE(an_hess.isApprox(ad_hess, prec));
                 REQUIRE(ad_hess.isApprox(ad_hess2, prec));
-//                REQUIRE(ad_hess2.isApprox(ad_hess3, prec));
+                REQUIRE(ad_hess2.isApprox(ad_hess3, prec));
             }
         }
     }

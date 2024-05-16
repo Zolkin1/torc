@@ -49,6 +49,11 @@ namespace torc::fn {
          */
         scalar_t Evaluate(const vectorx_t& x) const { return this->func_(x); }
 
+        /**
+         * Evaluates the function at a point
+         * @param x the input
+         * @return f(x)
+         */
         scalar_t operator() (const vectorx_t& x) const { return this->func_(x); }
 
         ExplicitFn<scalar_t> operator+ (const ExplicitFn<scalar_t>& other) {
