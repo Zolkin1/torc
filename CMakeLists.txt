@@ -20,6 +20,7 @@ endif()
 
 add_subdirectory(models)
 add_subdirectory(costs)
+add_subdirectory(functions)
 add_subdirectory(constraints)
 
 # TODO: Figure out the install structure for the library
