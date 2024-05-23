@@ -11,9 +11,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 # ---------- Cost Tests ---------- #
-add_executable(cost_tests cost_tests.cpp)
+add_executable(cost_tests
+                function_tests.cpp
+                test_fn.h)
 target_link_libraries(cost_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(cost_tests PUBLIC Costs)
+target_link_libraries(cost_tests PUBLIC Functions)
 
 # ---------- Model Tests ---------- #
 add_executable(model_tests model_tests.cpp)
