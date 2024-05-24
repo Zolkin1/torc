@@ -6,7 +6,7 @@
 #define TORC_RIGID_BODY_H
 
 #include "pinocchio_model.h"
-#include "robot_state.h"
+#include "robot_state_types.h"
 #include "contact_state.h"
 
 namespace torc::models {
@@ -18,13 +18,18 @@ namespace torc::models {
 
         RigidBody(std::string name, std::filesystem::path urdf);
 
-        [[nodiscard]] vectorx_t GetDynamics(const RobotState& state, const vectorx_t& input) const override;
+        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const override;
 
-        [[nodiscard]] vectorx_t GetDynamicsContacts(const RobotState& state, const vectorx_t& input,
+        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input,
                                                     const ContactState& contacts ) const;
 
-        matrixx_t Dfdx(const RobotState& state, const vectorx_t& input) const override;
-        matrixx_t Dfdu(const RobotState& state, const vectorx_t& input) const override;
+        void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
+                                matrixx_t& A, matrixx_t& B) const override;
+
+
+        void DynamicsDerivative(const RobotState& state, const vectorx_t& input, const ContactState& contacts,
+                                matrixx_t& A, matrixx_t& B) const;
+
     protected:
 
         matrixx_t ConstraintJacobian(const ContactState& contacts) const;

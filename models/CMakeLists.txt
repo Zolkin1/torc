@@ -5,14 +5,13 @@ set(MODELS_HEADER_LIST
         "${MODELS_INC}/base_model.h"
         "${MODELS_INC}/pinocchio_model.h"
         "${MODELS_INC}/rigid_body.h"
-        "${MODELS_INC}/robot_state.h"
+        "${MODELS_INC}/robot_state_types.h"
         "${MODELS_INC}/contact_state.h")
 
 add_library(Models
         base_model.cpp
         pinocchio_model.cpp
         rigid_body.cpp
-        robot_state.cpp
         contact_state.cpp
         ${MODELS_HEADER_LIST})
 

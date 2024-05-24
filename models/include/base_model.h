@@ -3,7 +3,7 @@
 
 #include <eigen3/Eigen/Dense>
 #include <utility>
-#include "robot_state.h"
+#include "robot_state_types.h"
 
 namespace torc::models {
     class BaseModel {
@@ -15,11 +15,10 @@ namespace torc::models {
 
         std::string GetName() const;
 
-        virtual vectorx_t GetDynamics(const RobotState& state, const vectorx_t& input) const = 0;
+        virtual RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const = 0;
 
-        virtual matrixx_t Dfdx(const RobotState& state, const vectorx_t& input) const = 0;
-
-        virtual matrixx_t Dfdu(const RobotState& state, const vectorx_t& input) const = 0;
+        virtual void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
+                                        matrixx_t& A, matrixx_t& b) const = 0;
     protected:
         std::string name_;
     private:

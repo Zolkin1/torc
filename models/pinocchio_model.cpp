@@ -21,4 +21,8 @@ namespace torc::models {
 
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
+
+    vectorx_t PinocchioModel::InputsToFullTau(const vectorx_t& input) const {
+        // TODO: Implement
+    }
 } // torc::models
