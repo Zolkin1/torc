@@ -12,10 +12,17 @@
 namespace torc::models {
 
     class PinocchioModel : public BaseModel {
-        using vectorx_t = Eigen::VectorXd;
-
     public:
+        using vectorx_t = Eigen::VectorXd;
+        using matrixx_t = Eigen::MatrixXd;
+
+        /**
+         * Create the pinocchio model
+         * @param name Name of the model
+         * @param urdf path to the urdf
+         */
         PinocchioModel(std::string name, std::filesystem::path urdf);
+
     protected:
         std::filesystem::path urdf_;
 

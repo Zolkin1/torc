@@ -3,11 +3,17 @@ message(STATUS "Building models")
 set(MODELS_INC "${torc_SOURCE_DIR}/models/include")
 set(MODELS_HEADER_LIST
         "${MODELS_INC}/base_model.h"
-        "${MODELS_INC}/pinocchio_model.h")
+        "${MODELS_INC}/pinocchio_model.h"
+        "${MODELS_INC}/rigid_body.h"
+        "${MODELS_INC}/robot_state.h"
+        "${MODELS_INC}/contact_state.h")
 
 add_library(Models
         base_model.cpp
         pinocchio_model.cpp
+        rigid_body.cpp
+        robot_state.cpp
+        contact_state.cpp
         ${MODELS_HEADER_LIST})
 
 set_target_properties(Models PROPERTIES LINKER_LANGUAGE CXX)
