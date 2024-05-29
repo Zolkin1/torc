@@ -33,6 +33,7 @@ namespace torc::models {
     protected:
 
         matrixx_t ConstraintJacobian(const ContactState& contacts) const;
+
         vectorx_t ConstraintDrift(const ContactState& contacts) const;
 
     private:

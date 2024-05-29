@@ -23,6 +23,20 @@ namespace torc::models {
             this->v = v;
             this->a = a;
         }
+
+        RobotStateDerivative& operator=(const RobotStateDerivative& other) {
+            if (this == &other) {
+                return *this;
+            }
+            v = other.v;
+            a = other.a;
+
+            return *this;
+        }
+
+        bool operator==(const RobotStateDerivative& other) const {
+            return other.v == v && other.a == a;
+        }
     };
 
     struct RobotState {
@@ -37,6 +51,20 @@ namespace torc::models {
         RobotState(const vectorx_t& q, const vectorx_t& v) {
             this->q = q;
             this->v = v;
+        }
+
+        RobotState& operator=(const RobotState& other) {
+            if (this == &other) {
+                return *this;
+            }
+            v = other.v;
+            q = other.q;
+
+            return *this;
+        }
+
+        bool operator==(const RobotState& other) const {
+            return other.q == q && other.v == v;
         }
     };
 } // torc::models

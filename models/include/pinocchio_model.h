@@ -24,18 +24,26 @@ namespace torc::models {
         PinocchioModel(std::string name, std::filesystem::path urdf);
 
         /**
-         * Takes the torques on the actuated coordiantes and maps to a vector of
+         * Takes the torques on the actuated coordinates and maps to a vector of
          * dimension model.nv with zeros on underacutated joints
          * @param input
          * @return full input vector
          */
-        vectorx_t InputsToFullTau(const vectorx_t& input) const;
+        [[nodiscard]] vectorx_t InputsToFullTau(const vectorx_t& input) const;
+
+        [[nodiscard]] int GetConfigDim() const;
+
+        [[nodiscard]] int GetVelDim() const;
+
+        [[nodiscard]] double GetMass() const;
 
     protected:
         std::filesystem::path urdf_;
 
         pinocchio::Model pin_model_;
         std::unique_ptr<pinocchio::Data> pin_data_;
+
+        double mass_;
 
     private:
     };

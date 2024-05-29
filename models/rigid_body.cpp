@@ -12,12 +12,15 @@
 
 namespace torc::models {
     RigidBody::RigidBody(std::string name, std::filesystem::path urdf)
-        : PinocchioModel(std::move(name), std::move(urdf)) {}
+        : PinocchioModel(std::move(name), std::move(urdf)) {
+        // TODO: Set size of J_ and gamma_
+    }
 
     RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input) const {
+        assert(state.q.size() - 1 == state.v.size());
+
         const vectorx_t& tau = InputsToFullTau(input);
 
-        // TODO: Do I need to account for external GRFs?
         pinocchio::aba(pin_model_, *pin_data_, state.q, state.v, tau);
 
         RobotStateDerivative xdot(state.v, pin_data_->ddq);
@@ -27,9 +30,10 @@ namespace torc::models {
 
     RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input,
                                              const ContactState& contacts) const {
+        assert(state.q.size() - 1 == state.v.size());
 
-        const matrixx_t J = ConstraintJacobian(contacts);
-        const vectorx_t gamma = ConstraintDrift(contacts);
+        matrixx_t J = ConstraintJacobian(contacts);
+        vectorx_t gamma = ConstraintDrift(contacts);
         const vectorx_t& tau = InputsToFullTau(input);
 
         pinocchio::forwardDynamics(pin_model_, *pin_data_, state.q, state.v, tau,
@@ -42,6 +46,8 @@ namespace torc::models {
 
     void RigidBody::DynamicsDerivative(const RobotState& state, const vectorx_t& input,
                             matrixx_t& A, matrixx_t& B) const{
+        assert(state.q.size() - 1 == state.v.size());
+
         const vectorx_t& tau = InputsToFullTau(input);
 
         // TODO: Do I need to account for external GRFs?
