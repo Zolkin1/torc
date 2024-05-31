@@ -40,12 +40,6 @@ namespace torc::models {
         }
     };
 
-    // Does not work (never finishes linking)
-//    std::ostream& operator<<(std::ostream& os, const RobotStateDerivative& deriv) {
-//        os << "v: \n" << deriv.v << "a: \n" << deriv.a << std::endl;
-//        return os;
-//    }
-
     struct RobotState {
         vectorx_t q;
         vectorx_t v;
@@ -81,6 +75,12 @@ namespace torc::models {
 //        return os;
 //    }
 } // torc::models
+
+// Does not work (never finishes linking)
+//std::ostream& operator<<(std::ostream& os, const torc::models::RobotStateDerivative& deriv) {
+//    os << "v: \n" << deriv.v << "a: \n" << deriv.a << std::endl;
+//    return os;
+//}
 
 
 #endif //TORC_ROBOT_STATE_TYPES_H

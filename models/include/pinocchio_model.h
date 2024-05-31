@@ -25,8 +25,7 @@ namespace torc::models {
          * @param name Name of the model
          * @param urdf path to the urdf
          */
-        PinocchioModel(std::string name, std::filesystem::path urdf,
-                       const RobotContactInfo& contact_info);
+        PinocchioModel(std::string name, std::filesystem::path urdf);
 
         /**
          * Create the pinocchio model. User provides a list of joints that are not actuated.
@@ -35,8 +34,7 @@ namespace torc::models {
          * @param underactuated_joints
          */
         PinocchioModel(std::string name, std::filesystem::path urdf,
-                       const std::vector<std::string>& underactuated_joints,
-                       const RobotContactInfo& contact_info);
+                       const std::vector<std::string>& underactuated_joints);
 
         /**
          * Takes the torques on the actuated coordinates and maps to a vector of
@@ -70,6 +68,10 @@ namespace torc::models {
 
         void CreateActuationMatrix(const std::vector<std::string>& underactuated_joints);
 
+        void MakePinocchioContacts(const RobotContactInfo& contact_info,
+                                   std::vector<pinocchio::RigidConstraintModel>& contact_models,
+                                   std::vector<pinocchio::RigidConstraintData>& contact_datas) const;
+
         std::filesystem::path urdf_;
 
         pinocchio::Model pin_model_;
@@ -79,13 +81,8 @@ namespace torc::models {
 
         double mass_;
 
-        // TODO: Note that the RigidConstraint* classes are likely to change to just be generic constraint classes
-        //  when the pinocchio 3 api is more stabilized. For now this is what we have.
-        std::vector<pinocchio::RigidConstraintModel> contact_model_;
-        std::vector<pinocchio::RigidConstraintData> contact_data_;
-
     private:
-        void CreatePinModel(const RobotContactInfo& contact_info);
+        void CreatePinModel();
     };
 } // torc::models
 

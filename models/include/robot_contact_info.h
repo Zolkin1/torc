@@ -19,9 +19,23 @@ namespace torc::models {
         ContactType type;
         bool state;
 
-        Contact(ContactType otype, bool ostate) {
-            type = otype;
-            state = ostate;
+        /**
+         * Create a contact with a given type and contact state
+         * @param ctype
+         * @param cstate
+         */
+        Contact(ContactType ctype, bool cstate) {
+            type = ctype;
+            state = cstate;
+        }
+
+        /**
+         * Create a contact with a specific type, state defaults to false (out of contact)
+         * @param ctype
+         */
+        Contact(ContactType ctype) {
+            type = ctype;
+            state = false;
         }
     };
 

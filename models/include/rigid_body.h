@@ -16,12 +16,15 @@ namespace torc::models {
     class RigidBody : public PinocchioModel{
     public:
 
-        RigidBody(std::string name, std::filesystem::path urdf, const RobotContactInfo& contact_info);
+        RigidBody(std::string name, std::filesystem::path urdf);
 
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const override;
 
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input,
-                                                    const RobotContactInfo& contacts ) const;
+                                                    const RobotContactInfo& contact_info) const;
+
+        RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
+                                      const RobotContactInfo& contact_info) const;
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
                                 matrixx_t& A, matrixx_t& B) const override;
@@ -30,11 +33,11 @@ namespace torc::models {
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input, const RobotContactInfo& contacts,
                                 matrixx_t& A, matrixx_t& B) const;
 
+
+        void ImpulseDerivative(const RobotContactInfo& contact_info,
+                               matrixx_t& A, matrixx_t& B) const;
+
     protected:
-
-        [[nodiscard]] matrixx_t ConstraintJacobian(const RobotContactInfo& contacts) const;
-
-        [[nodiscard]] vectorx_t ConstraintDrift(const RobotContactInfo& contacts) const;
 
     private:
 
