@@ -6,6 +6,7 @@
 #define TORC_ROBOT_STATE_TYPES_H
 
 #include <eigen3/Eigen/Dense>
+#include <iostream>
 
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
@@ -35,9 +36,15 @@ namespace torc::models {
         }
 
         bool operator==(const RobotStateDerivative& other) const {
-            return other.v == v && other.a == a;
+            return (other.v == v) && (other.a == a);
         }
     };
+
+    // Does not work (never finishes linking)
+//    std::ostream& operator<<(std::ostream& os, const RobotStateDerivative& deriv) {
+//        os << "v: \n" << deriv.v << "a: \n" << deriv.a << std::endl;
+//        return os;
+//    }
 
     struct RobotState {
         vectorx_t q;
@@ -67,6 +74,12 @@ namespace torc::models {
             return other.q == q && other.v == v;
         }
     };
+
+    // Does not work (linker never finishes)
+//    std::ostream& operator<<(std::ostream& os, const RobotState& state) {
+//        os << "q: \n" << state.q << "v: \n" << state.v << std::endl;
+//        return os;
+//    }
 } // torc::models
 
 

@@ -7,7 +7,7 @@
 
 #include "pinocchio_model.h"
 #include "robot_state_types.h"
-#include "contact_state.h"
+#include "robot_contact_info.h"
 
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
@@ -16,25 +16,25 @@ namespace torc::models {
     class RigidBody : public PinocchioModel{
     public:
 
-        RigidBody(std::string name, std::filesystem::path urdf);
+        RigidBody(std::string name, std::filesystem::path urdf, const RobotContactInfo& contact_info);
 
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const override;
 
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input,
-                                                    const ContactState& contacts ) const;
+                                                    const RobotContactInfo& contacts ) const;
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
                                 matrixx_t& A, matrixx_t& B) const override;
 
 
-        void DynamicsDerivative(const RobotState& state, const vectorx_t& input, const ContactState& contacts,
+        void DynamicsDerivative(const RobotState& state, const vectorx_t& input, const RobotContactInfo& contacts,
                                 matrixx_t& A, matrixx_t& B) const;
 
     protected:
 
-        matrixx_t ConstraintJacobian(const ContactState& contacts) const;
+        [[nodiscard]] matrixx_t ConstraintJacobian(const RobotContactInfo& contacts) const;
 
-        vectorx_t ConstraintDrift(const ContactState& contacts) const;
+        [[nodiscard]] vectorx_t ConstraintDrift(const RobotContactInfo& contacts) const;
 
     private:
 

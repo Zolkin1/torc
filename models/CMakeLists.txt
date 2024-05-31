@@ -26,5 +26,5 @@ find_package(Eigen3 REQUIRED)
 target_link_libraries(Models PUBLIC Eigen3::Eigen)
 
 #----------- Pinocchio -----------#
-find_package(pinocchio)
-target_link_libraries(Models PRIVATE pinocchio)
+find_package(pinocchio 3.0.0 REQUIRED)
+target_link_libraries(Models PUBLIC pinocchio::pinocchio)
