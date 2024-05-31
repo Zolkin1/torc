@@ -72,7 +72,6 @@ namespace torc::models {
 
             // Get the contact location in the joint frame
             const pinocchio::SE3 location = pin_model_.frames.at(frame_idx).placement;
-            std::cout << "location of " << contact.first << ": " << location << std::endl;
 
             // Get the contact type
             pinocchio::ContactType ct = pinocchio::CONTACT_UNDEFINED;

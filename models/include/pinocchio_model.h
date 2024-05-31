@@ -62,9 +62,9 @@ namespace torc::models {
 
         [[nodiscard]] int GetNumJoints() const;
 
-        std::string GetFrameName(int j) const;
+        [[nodiscard]] std::string GetFrameName(int j) const;
 
-        std::string GetFrameType(int j) const;
+        [[nodiscard]] std::string GetFrameType(int j) const;
 
     protected:
 

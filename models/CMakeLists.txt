@@ -6,13 +6,12 @@ set(MODELS_HEADER_LIST
         "${MODELS_INC}/pinocchio_model.h"
         "${MODELS_INC}/rigid_body.h"
         "${MODELS_INC}/robot_state_types.h"
-        "${MODELS_INC}/contact_state.h")
+        "${MODELS_INC}/robot_contact_info.h")
 
 add_library(Models
         base_model.cpp
         pinocchio_model.cpp
         rigid_body.cpp
-        contact_state.cpp
         ${MODELS_HEADER_LIST})
 
 set_target_properties(Models PROPERTIES LINKER_LANGUAGE CXX)
