@@ -1,6 +1,7 @@
 
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/algorithm/center-of-mass.hpp"
+#include "pinocchio/algorithm/frames.hpp"
 
 #include "pinocchio_model.h"
 
@@ -106,6 +107,15 @@ namespace torc::models {
         throw std::runtime_error("Invalid return type from pinocchio.");
     }
 
+    unsigned long PinocchioModel::GetFrameIdx(const std::string& frame) const {
+        unsigned long idx = pin_model_.getFrameId(frame);
+        if (idx == pin_model_.frames.size()) {
+            return -1;
+        } else {
+            return idx;
+        }
+    }
+
     void PinocchioModel::CreateActuationMatrix(const std::vector<std::string>& underactuated_joints) {
         assert(pin_model_.idx_vs.at(1) == 0);
         assert(pin_model_.nvs.at(1) == FLOATING_VEL);
@@ -198,6 +208,34 @@ namespace torc::models {
                 contact_datas.emplace_back(*(contact_models.end()-1));
             }
         }
+    }
+
+    void PinocchioModel::ForwardKinematics(const vectorx_t& q) {
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+    }
+
+    void PinocchioModel::ForwardKinematics(const RobotState& state) {
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, state.q, state.v);
+    }
+
+    void PinocchioModel::ForwardKinematics(const RobotState& state, const RobotStateDerivative& deriv) {
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, state.q, state.v, deriv.a);
+    }
+
+    FrameState PinocchioModel::GetFrameState(const std::string& frame) {
+        const unsigned long idx = GetFrameIdx(frame);
+        if (idx != -1) {
+            FrameState state(pin_data_->oMf.at(idx),
+                             pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx));
+            return state;
+        } else {
+            throw std::runtime_error("Provided frame does not exist.");
+        }
+    }
+
+    FrameState PinocchioModel::GetFrameState(const std::string& frame, const torc::models::RobotState& state) {
+        ForwardKinematics(state);
+        return GetFrameState(frame);
     }
 
 } // torc::models

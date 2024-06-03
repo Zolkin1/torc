@@ -64,6 +64,33 @@ namespace torc::models {
 
         [[nodiscard]] std::string GetFrameType(int j) const;
 
+        [[nodiscard]] unsigned long GetFrameIdx(const std::string& frame) const;
+
+
+        // -------------------------------------- //
+        // ------------- Kinematics ------------- //
+        // -------------------------------------- //
+        void ForwardKinematics(const vectorx_t& q);
+
+        void ForwardKinematics(const RobotState& state);
+
+        void ForwardKinematics(const RobotState& state, const RobotStateDerivative& deriv);
+
+        /**
+         * Calculate the frame state.
+         * @param frame name
+         * @return frame placement (in world frame) and velocity (in local frame).
+         */
+        FrameState GetFrameState(const std::string& frame);
+
+        /**
+         * Calculate the frame state after calling the forward kinematics.
+         * @param frame name
+         * @param state of the robot
+         * @return frame placement (in world frame) and velocity (in local frame).
+         */
+        FrameState GetFrameState(const std::string& frame, const RobotState& state);
+
     protected:
 
         void CreateActuationMatrix(const std::vector<std::string>& underactuated_joints);
