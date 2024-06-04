@@ -25,24 +25,9 @@ namespace torc::models {
          * @param name Name of the model
          * @param urdf path to the urdf
          */
-        PinocchioModel(std::string name, std::filesystem::path urdf);
+        PinocchioModel(const std::string& name, const std::filesystem::path& urdf);
 
-        /**
-         * Create the pinocchio model. User provides a list of joints that are not actuated.
-         * @param name
-         * @param urdf
-         * @param underactuated_joints
-         */
-        PinocchioModel(std::string name, std::filesystem::path urdf,
-                       const std::vector<std::string>& underactuated_joints);
-
-        /**
-         * Takes the torques on the actuated coordinates and maps to a vector of
-         * dimension model.nv with zeros on underacutated joints
-         * @param input
-         * @return full input vector
-         */
-        [[nodiscard]] vectorx_t InputsToFullTau(const vectorx_t& input) const;
+        virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
 
         [[nodiscard]] long GetNumInputs() const;
 
@@ -66,6 +51,7 @@ namespace torc::models {
 
         [[nodiscard]] unsigned long GetFrameIdx(const std::string& frame) const;
 
+        void GetNeutralConfig(vectorx_t& q) const;
 
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
@@ -96,8 +82,6 @@ namespace torc::models {
 
     protected:
 
-        void CreateActuationMatrix(const std::vector<std::string>& underactuated_joints);
-
         void MakePinocchioContacts(const RobotContactInfo& contact_info,
                                    std::vector<pinocchio::RigidConstraintModel>& contact_models,
                                    std::vector<pinocchio::RigidConstraintData>& contact_datas) const;
@@ -107,9 +91,11 @@ namespace torc::models {
         pinocchio::Model pin_model_;
         std::unique_ptr<pinocchio::Data> pin_data_;
 
-        matrixx_t act_mat_;
-
         double mass_;
+
+        long num_inputs_;
+
+        static const std::string ROOT_JOINT;
 
     private:
         void CreatePinModel();

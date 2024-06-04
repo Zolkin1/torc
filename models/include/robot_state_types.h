@@ -12,6 +12,7 @@
 
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
+    using matrixx_t = Eigen::MatrixXd;
 
     struct RobotStateDerivative {
         vectorx_t v;

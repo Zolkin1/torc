@@ -2,30 +2,20 @@
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/algorithm/center-of-mass.hpp"
 #include "pinocchio/algorithm/frames.hpp"
+#include "pinocchio/algorithm/model.hpp"
 
 #include "pinocchio_model.h"
 
 namespace torc::models {
-    PinocchioModel::PinocchioModel(std::string name, std::filesystem::path urdf)
-        : BaseModel(std::move(name)), urdf_(std::move(urdf)) {
+    const std::string PinocchioModel::ROOT_JOINT = "root_joint";
+
+    PinocchioModel::PinocchioModel(const std::string& name, const std::filesystem::path& urdf)
+        : BaseModel(name), urdf_(urdf), num_inputs_(-1) {
 
         // Create the pinocchio model
         CreatePinModel();
 
-        // Assuming all joints (not "root_joint") are actuated
-        std::vector<std::string> underactuated_joints;
-        underactuated_joints.push_back("root_joint");
-
-        CreateActuationMatrix(underactuated_joints);
-    }
-
-    PinocchioModel::PinocchioModel(std::string name, std::filesystem::path urdf,
-                                   const std::vector<std::string>& underactuated_joints)
-        : BaseModel(std::move(name)), urdf_(std::move(urdf)) {
-        // Create the pinocchio model
-        CreatePinModel();
-
-        CreateActuationMatrix(underactuated_joints);
+        mass_ = pinocchio::computeTotalMass(pin_model_);
     }
 
     void PinocchioModel::CreatePinModel() {
@@ -45,17 +35,10 @@ namespace torc::models {
         pinocchio::urdf::buildModel(urdf_, pinocchio::JointModelFreeFlyer(), pin_model_);
 
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
-
-        mass_ = pinocchio::computeTotalMass(pin_model_);
-    }
-
-    vectorx_t PinocchioModel::InputsToFullTau(const vectorx_t& input) const {
-        assert(input.size() == act_mat_.cols());
-        return act_mat_*input;
     }
 
     long PinocchioModel::GetNumInputs() const {
-        return act_mat_.cols();
+        return num_inputs_;
     }
 
     int PinocchioModel::GetConfigDim() const {
@@ -90,6 +73,10 @@ namespace torc::models {
         return pin_model_.frames.at(j).name;
     }
 
+    void PinocchioModel::GetNeutralConfig(vectorx_t& q) const {
+        q = pinocchio::neutral(pin_model_);
+    }
+
     std::string PinocchioModel::GetFrameType(int j) const {
         switch (pin_model_.frames.at(j).type) {
             case pinocchio::OP_FRAME:
@@ -113,48 +100,6 @@ namespace torc::models {
             return -1;
         } else {
             return idx;
-        }
-    }
-
-    void PinocchioModel::CreateActuationMatrix(const std::vector<std::string>& underactuated_joints) {
-        assert(pin_model_.idx_vs.at(1) == 0);
-        assert(pin_model_.nvs.at(1) == FLOATING_VEL);
-
-        int num_actuators = pin_model_.nv;
-
-        std::vector<int> unact_joint_idx;
-
-        unact_joint_idx.push_back(0);   // Universe joint is never actuated
-
-        // Get the number of actuators
-        for (std::string joint_name : underactuated_joints) {
-            for (int i = 0; i < GetNumJoints(); i++) {
-                if (joint_name == pin_model_.names.at(i)) {
-                    num_actuators -= pin_model_.joints.at(i).nv();
-                    unact_joint_idx.push_back(i);
-                    break;
-                }
-            }
-        }
-
-        act_mat_ = matrixx_t::Zero(pin_model_.nv, num_actuators);
-        int act_idx = 0;
-
-        for (int joint_idx = 0; joint_idx < GetNumJoints(); joint_idx++) {
-            bool act = true;
-            for (int idx : unact_joint_idx) {
-                if (joint_idx == idx) {
-                    act = false;
-                    break;
-                }
-            }
-
-            if (act) {
-                const int nv = pin_model_.joints.at(joint_idx).nv();
-                act_mat_.block(pin_model_.joints.at(joint_idx).idx_v(), act_idx, nv, nv) =
-                        matrixx_t::Identity(nv, nv);
-                act_idx += nv;
-            }
         }
     }
 
@@ -243,6 +188,8 @@ namespace torc::models {
         if (idx == -1) {
             throw std::runtime_error("Provided frame does not exist.");
         }
+
+        J.setZero();
 
         pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, J);
     }

@@ -13,10 +13,13 @@ namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
 
-    class RigidBody : public PinocchioModel{
+    class RigidBody : public PinocchioModel {
     public:
 
-        RigidBody(std::string name, std::filesystem::path urdf);
+        RigidBody(const std::string& name, const std::filesystem::path& urdf);
+
+        RigidBody(const std::string& name, const std::filesystem::path& urdf,
+                  const std::vector<std::string>& underactuated_joints);
 
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const override;
@@ -38,8 +41,17 @@ namespace torc::models {
         void ImpulseDerivative(const RobotContactInfo& contact_info,
                                matrixx_t& A, matrixx_t& B) const;
 
+        /**
+         * Takes the torques on the actuated coordinates and maps to a vector of
+         * dimension model.nv with zeros on underacutated joints
+         * @param input
+         * @return full input vector
+         */
+        [[nodiscard]] vectorx_t InputsToTau(const vectorx_t& input) const override;
     protected:
+        void CreateActuationMatrix(const std::vector<std::string>& underactuated_joints);
 
+        matrixx_t act_mat_;
     private:
 
     };

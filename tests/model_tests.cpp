@@ -54,6 +54,7 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     REQUIRE(pin_model.GetDerivativeDim() == DERIV_SIZE);
     REQUIRE(pin_model.GetNumJoints() == JOINT_SIZE);
     REQUIRE(pin_model.GetNumFrames() == FRAME_SIZE);
+    REQUIRE(pin_model.GetSystemType() == HybridSystemImpulse);
 
 
     // ----------------------------------------------- //
@@ -133,4 +134,7 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
     REQUIRE(pin_model.GetStateDim() == STATE_SIZE);
     REQUIRE(pin_model.GetDerivativeDim() == DERIV_SIZE);
     REQUIRE(pin_model.GetNumJoints() == JOINT_SIZE);
+    REQUIRE(pin_model.GetSystemType() == HybridSystemImpulse);
 }
+
+//TODO: Check dynamics derivatives against finite differences of dynamics
