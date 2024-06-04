@@ -17,6 +17,7 @@
 namespace torc::models {
     RigidBody::RigidBody(std::string name, std::filesystem::path urdf)
         : PinocchioModel(std::move(name), std::move(urdf)) {
+        system_type_ = HybridSystemImpulse;
     }
 
     RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input) const {

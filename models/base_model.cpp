@@ -6,4 +6,6 @@ namespace torc::models {
 
     std::string BaseModel::GetName() const  { return name_; }
 
+    SystemType BaseModel::GetSystemType() const { return system_type_; }
+
 } // torc::models
