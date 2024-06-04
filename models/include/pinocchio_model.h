@@ -76,6 +76,7 @@ namespace torc::models {
 
         void ForwardKinematics(const RobotState& state, const RobotStateDerivative& deriv);
 
+        // TODO: Should these functions accept frame ID instead?
         /**
          * Calculate the frame state.
          * @param frame name
@@ -90,6 +91,8 @@ namespace torc::models {
          * @return frame placement (in world frame) and velocity (in local frame).
          */
         FrameState GetFrameState(const std::string& frame, const RobotState& state);
+
+        void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J);
 
     protected:
 

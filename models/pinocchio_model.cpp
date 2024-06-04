@@ -238,4 +238,13 @@ namespace torc::models {
         return GetFrameState(frame);
     }
 
+    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) {
+        const unsigned long idx = GetFrameIdx(frame);
+        if (idx == -1) {
+            throw std::runtime_error("Provided frame does not exist.");
+        }
+
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, J);
+    }
+
 } // torc::models

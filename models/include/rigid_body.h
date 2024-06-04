@@ -18,6 +18,7 @@ namespace torc::models {
 
         RigidBody(std::string name, std::filesystem::path urdf);
 
+        // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const override;
 
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input,
