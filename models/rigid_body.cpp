@@ -16,7 +16,7 @@
 
 namespace torc::models {
     RigidBody::RigidBody(const std::string& name, const std::filesystem::path& urdf)
-        : PinocchioModel(std::move(name), std::move(urdf)) {
+        : PinocchioModel(name, urdf) {
 
         system_type_ = HybridSystemImpulse;
 
@@ -64,8 +64,13 @@ namespace torc::models {
         // Call initConstraintDynamics
         pinocchio::initConstraintDynamics(pin_model_, *pin_data_, contact_model);
 
+        // TODO: Adjust settings
+//        pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
+//        settings.max_iter = 10;
+//        settings.absolute_accuracy = 1e-12;
         // Call constraintDynamics
-        pinocchio::constraintDynamics(pin_model_, *pin_data_, state.q, state.v, tau, contact_model, contact_data);
+        pinocchio::constraintDynamics(pin_model_, *pin_data_, state.q, state.v, tau,
+                                      contact_model, contact_data);
 
         RobotStateDerivative xdot(state.v, pin_data_->ddq);
 
@@ -73,7 +78,7 @@ namespace torc::models {
     }
 
     RobotState RigidBody::GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
-                                                  const RobotContactInfo& contact_info) const {
+                                                  const RobotContactInfo& contact_info) {
         // Create contact data
         std::vector<pinocchio::RigidConstraintModel> contact_model;
         std::vector<pinocchio::RigidConstraintData> contact_data;
@@ -104,9 +109,12 @@ namespace torc::models {
 
         const vectorx_t& tau = InputsToTau(input);
 
+        // Note; may consider putting FK call in if I get weird bugs again
+
         pinocchio::computeABADerivatives(pin_model_, *pin_data_, state.q, state.v, tau);
 
-        A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv), matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
+        A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv),
+                matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
                 pin_data_->ddq_dq, pin_data_->ddq_dv;
 
         // Make into a full matrix
@@ -116,12 +124,56 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_mat_;
     }
 
-    void RigidBody::ImpulseDerivative(const torc::models::RobotContactInfo& contact_info,
-                                      matrixx_t& A, matrixx_t& B) const {
+    void RigidBody::DynamicsDerivative(const RobotState& state, const vectorx_t& input,
+                                       const RobotContactInfo& contacts,
+                                       matrixx_t& A, matrixx_t& B) {
+        assert(state.q.size() - 1 == state.v.size());
         assert(A.rows() == GetDerivativeDim());
         assert(A.cols() == GetDerivativeDim());
         assert(B.rows() == GetDerivativeDim());
         assert(B.cols() == act_mat_.cols());
+
+        const vectorx_t& tau = InputsToTau(input);
+
+        // Create contact data
+        std::vector<pinocchio::RigidConstraintModel> contact_model;
+        std::vector<pinocchio::RigidConstraintData> contact_data;
+
+        MakePinocchioContacts(contacts, contact_model, contact_data);
+
+        // Call initConstraintDynamics
+        pinocchio::initConstraintDynamics(pin_model_, *pin_data_, contact_model);
+
+        pinocchio::constraintDynamics(pin_model_, *pin_data_, state.q, state.v, tau,
+                                      contact_model, contact_data);
+
+        pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
+//        settings.max_iter = 10;
+//        settings.absolute_accuracy = 1e-12;
+        pinocchio::computeConstraintDynamicsDerivatives(pin_model_, *pin_data_,
+                                                        contact_model, contact_data,
+                                                        settings);
+
+        A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv),
+                matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
+                pin_data_->ddq_dq, pin_data_->ddq_dv;
+
+        // Make into a full matrix
+        pin_data_->Minv.triangularView<Eigen::StrictlyLower>() =
+                pin_data_->Minv.transpose().triangularView<Eigen::StrictlyLower>();
+
+        B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_mat_;
+    }
+
+    void RigidBody::ImpulseDerivative(const RobotState& state, const vectorx_t& input,
+                                      const RobotContactInfo& contact_info,
+                                      matrixx_t& A, matrixx_t& B) {
+        assert(A.rows() == GetDerivativeDim());
+        assert(A.cols() == GetDerivativeDim());
+        assert(B.rows() == GetDerivativeDim());
+        assert(B.cols() == act_mat_.cols());
+
+        GetImpulseDynamics(state, input, contact_info);
 
         // Create contact data
         std::vector<pinocchio::RigidConstraintModel> contact_model;
@@ -132,14 +184,18 @@ namespace torc::models {
         // initConstraintDynamics
         pinocchio::initConstraintDynamics(pin_model_, *pin_data_, contact_model);
 
-        // impulseDynamicsDerivatives
         const pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
         const double eps = 0;                           // Coefficient of restitution
+        pinocchio::impulseDynamics(pin_model_, *pin_data_, state.q, state.v,
+                                   contact_model, contact_data, eps, settings);
+
+        // impulseDynamicsDerivatives
         pinocchio::computeImpulseDynamicsDerivatives(pin_model_, *pin_data_, contact_model,
                                    contact_data, eps, settings);
 
-        A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv), matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
-                pin_data_->ddq_dq, pin_data_->ddq_dv;
+        A << matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
+                matrixx_t::Zero(pin_model_.nv, pin_model_.nv),
+                pin_data_->ddq_dq, pin_data_->ddq_dv + matrixx_t::Identity(pin_model_.nv, pin_model_.nv);
 
         B.setZero();
     }

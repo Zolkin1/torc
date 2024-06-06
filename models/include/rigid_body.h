@@ -28,18 +28,19 @@ namespace torc::models {
                                                     const RobotContactInfo& contact_info) const;
 
         RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
-                                      const RobotContactInfo& contact_info) const;
+                                      const RobotContactInfo& contact_info);
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
                                 matrixx_t& A, matrixx_t& B) const override;
 
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input, const RobotContactInfo& contacts,
-                                matrixx_t& A, matrixx_t& B) const;
+                                matrixx_t& A, matrixx_t& B);
 
 
-        void ImpulseDerivative(const RobotContactInfo& contact_info,
-                               matrixx_t& A, matrixx_t& B) const;
+        void ImpulseDerivative(const RobotState& state, const vectorx_t& input,
+                               const RobotContactInfo& contact_info,
+                               matrixx_t& A, matrixx_t& B);
 
         /**
          * Takes the torques on the actuated coordinates and maps to a vector of

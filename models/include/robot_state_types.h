@@ -70,6 +70,18 @@ namespace torc::models {
         bool operator==(const RobotState& other) const {
             return other.q == q && other.v == v;
         }
+
+        [[nodiscard]] Eigen::Quaterniond Quat() const {
+            return static_cast<Eigen::Quaterniond>(q.segment<4>(3));
+        }
+
+        static bool IndexIsQuaternion(int idx) {
+            if (idx >= 3 && idx <= 6) {
+                return true;
+            }
+
+            return false;
+        }
     };
 
     struct FrameState {

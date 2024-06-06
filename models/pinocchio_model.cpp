@@ -77,6 +77,35 @@ namespace torc::models {
         q = pinocchio::neutral(pin_model_);
     }
 
+    vectorx_t PinocchioModel::GetRandomConfig() const {
+        // Make dummy limits
+        const vectorx_t ub = vectorx_t::Constant(GetConfigDim(), 10);
+        const vectorx_t lb = vectorx_t::Constant(GetConfigDim(), -10);
+
+        vectorx_t q;
+        q.resize(GetConfigDim());
+
+        pinocchio::randomConfiguration(pin_model_, lb, ub, q);
+
+        return q;
+    }
+
+    vectorx_t PinocchioModel::GetRandomVel() const {
+        vectorx_t v;
+        v.setRandom(GetVelDim());
+        v = v*5;
+
+        return v;
+    }
+
+    RobotState PinocchioModel::GetRandomState() const {
+        RobotState x(GetConfigDim(), GetVelDim());
+        x.q = GetRandomConfig();
+        x.v = GetRandomVel();
+
+        return x;
+    }
+
     std::string PinocchioModel::GetFrameType(int j) const {
         switch (pin_model_.frames.at(j).type) {
             case pinocchio::OP_FRAME:

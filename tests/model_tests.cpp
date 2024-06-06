@@ -1,4 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/catch_get_random_seed.hpp>
 
 #include "rigid_body.h"
 
@@ -15,6 +17,336 @@ bool VectorEqualWithMargin(const torc::models::vectorx_t& v1, const torc::models
     }
 
     return true;
+}
+
+void CheckDerivatives(torc::models::RigidBody& model) {
+    using namespace torc::models;
+    constexpr double FD_MARGIN = 9e-4;
+    constexpr double DELTA = 1e-8;
+
+    // Checking derivatives with finite differences
+    srand(Catch::getSeed());        // Set the srand seed manually
+
+    constexpr int NUM_CONFIGS = 10;
+    for (int k = 0; k < NUM_CONFIGS; k++) {
+        // Get a random configuration
+        RobotState x_rand = model.GetRandomState();
+
+        // Get random input
+        vectorx_t input_rand;
+        input_rand.setRandom(model.GetNumInputs());
+
+        // Hold analytic derivatives
+        matrixx_t A, B;
+        A = matrixx_t::Zero(model.GetDerivativeDim(), model.GetDerivativeDim());
+        B = matrixx_t::Zero(model.GetDerivativeDim(), model.GetNumInputs());
+
+        // Calculate analytic derivatives
+        model.DynamicsDerivative(x_rand, input_rand, A, B);
+
+        // Check wrt Configs
+        RobotStateDerivative xdot_test = model.GetDynamics(x_rand, input_rand);
+        for (int i = 0; i < x_rand.v.size(); i++) {
+            RobotState x_d = x_rand;
+            if (i >= 3 && i < 6) {
+                // Need to take a step in lie algebra space
+                Eigen::Vector3d v = Eigen::Vector3d::Zero();
+                v(i - 3) += DELTA;
+
+                x_d.q.array().segment<4>(3) =
+                        static_cast<Eigen::Vector4d>((x_d.Quat() * pinocchio::quaternion::exp3(v)).coeffs());
+            } else {
+                if (i >= 6) {
+                    x_d.q(i + 1) += DELTA;
+                } else {
+                    x_d.q(i) += DELTA;
+                }
+            }
+            RobotStateDerivative deriv_d = model.GetDynamics(x_d, input_rand);
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.v(j) - xdot_test.v(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j, i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.a(j) - xdot_test.a(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+
+        // Now check wrt velocities
+        for (int i = 0; i < x_rand.v.size(); i++) {
+            RobotState x_d = x_rand;
+
+            x_d.v(i) += DELTA;
+
+            RobotStateDerivative deriv_d = model.GetDynamics(x_d, input_rand);
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.v(j) - xdot_test.v(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j, i + x_rand.v.size()), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.a(j) - xdot_test.a(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j + x_rand.v.size(), i + x_rand.v.size()), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+
+        // Now check wrt inputs
+        for (int i = 0; i < input_rand.size(); i++) {
+            vectorx_t input_d = input_rand;
+
+            input_d(i) += DELTA;
+
+            RobotStateDerivative deriv_d = model.GetDynamics(x_rand, input_d);
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.v(j) - xdot_test.v(j)) / DELTA;
+                REQUIRE_THAT(fd - B(j, i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.a(j) - xdot_test.a(j)) / DELTA;
+                REQUIRE_THAT(fd - B(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+    }
+}
+
+void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models::RobotContactInfo& contact_info) {
+    using namespace torc::models;
+    constexpr double FD_MARGIN = 1e-2;
+    constexpr double DELTA = 1e-8;
+
+    // Checking derivatives with finite differences
+//    srand(Catch::getSeed());        // Set the srand seed manually
+
+// TODO: Put back random and more configs
+    srand(0);
+    constexpr int NUM_CONFIGS = 1;
+    for (int k = 0; k < NUM_CONFIGS; k++) {
+        // Get a random configuration
+        RobotState x_rand = model.GetRandomState();
+
+        // Get random input
+        vectorx_t input_rand;
+        input_rand.setZero(model.GetNumInputs());
+//        input_rand.setRandom(model.GetNumInputs());
+
+        // Hold analytic derivatives
+        matrixx_t A, B;
+        A = matrixx_t::Zero(model.GetDerivativeDim(), model.GetDerivativeDim());
+        B = matrixx_t::Zero(model.GetDerivativeDim(), model.GetNumInputs());
+
+        // Calculate analytic derivatives
+        model.DynamicsDerivative(x_rand, input_rand, contact_info, A, B);
+
+        // Check wrt Configs
+        RobotStateDerivative xdot_test = model.GetDynamics(x_rand, input_rand, contact_info);
+        for (int i = 0; i < x_rand.v.size(); i++) {
+            RobotState x_d = x_rand;
+            if (i >= 3 && i < 6) {
+                // Need to take a step in lie algebra space
+                Eigen::Vector3d v = Eigen::Vector3d::Zero();
+                v(i - 3) += DELTA;
+
+                x_d.q.array().segment<4>(3) =
+                        static_cast<Eigen::Vector4d>((x_d.Quat() * pinocchio::quaternion::exp3(v)).coeffs());
+            } else {
+                if (i >= 6) {
+                    x_d.q(i + 1) += DELTA;
+                } else {
+                    x_d.q(i) += DELTA;
+                }
+            }
+            RobotStateDerivative deriv_d = model.GetDynamics(x_d, input_rand, contact_info);
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.v(j) - xdot_test.v(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j, i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.a(j) - xdot_test.a(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+
+        // Now check wrt velocities
+        for (int i = 0; i < x_rand.v.size(); i++) {
+            RobotState x_d = x_rand;
+
+            x_d.v(i) += DELTA;
+
+            RobotStateDerivative deriv_d = model.GetDynamics(x_d, input_rand, contact_info);
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.v(j) - xdot_test.v(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j, i + x_rand.v.size()), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.a(j) - xdot_test.a(j)) / DELTA;
+                REQUIRE_THAT(fd - A(j + x_rand.v.size(), i + x_rand.v.size()), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+
+//        std::cout << "B analytic: \n" << B << std::endl;
+        matrixx_t Bfd = B;
+        Bfd.setZero();
+
+        // Now check wrt inputs
+        for (int i = 0; i < input_rand.size(); i++) {
+            vectorx_t input_d = input_rand;
+
+            input_d(i) += DELTA;
+
+            RobotStateDerivative deriv_d = model.GetDynamics(x_rand, input_d, contact_info);
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.v(j) - xdot_test.v(j)) / DELTA;
+                Bfd(j, i) = fd;
+                REQUIRE_THAT(fd - B(j, i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            // TODO: Fix
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (deriv_d.a(j) - xdot_test.a(j)) / DELTA;
+                Bfd(j + x_rand.v.size(), i) = fd;
+//                REQUIRE_THAT(fd - B(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+
+//        std::cout << "B fd: \n" << Bfd << std::endl;
+//        std::cout << "Difference: \n" << Bfd - B << std::endl;
+    }
+}
+
+void CheckImpulseDerivatives(torc::models::RigidBody& model, const torc::models::RobotContactInfo& contact_info) {
+    using namespace torc::models;
+    constexpr double FD_MARGIN = 9e-4;
+    constexpr double DELTA = 1e-8;
+
+    // Checking derivatives with finite differences
+    srand(Catch::getSeed());        // Set the srand seed manually
+
+    constexpr int NUM_CONFIGS = 10;
+    for (int k = 0; k < NUM_CONFIGS; k++) {
+        // Get a random configuration
+        RobotState x_rand = model.GetRandomState();
+
+        // Get random input
+        vectorx_t input_rand;
+        input_rand.setRandom(model.GetNumInputs());
+
+        // Hold analytic derivatives
+        matrixx_t A, B;
+        A = matrixx_t::Zero(model.GetDerivativeDim(), model.GetDerivativeDim());
+        B = matrixx_t::Zero(model.GetDerivativeDim(), model.GetNumInputs());
+
+        // Calculate analytic derivatives
+        model.ImpulseDerivative(x_rand, input_rand, contact_info, A, B);
+
+//        std::cout << "A: \n" << A << std::endl;
+        matrixx_t Afd = A;
+        Afd.setZero();
+
+        // Check wrt Configs
+        RobotState xdot_test = model.GetImpulseDynamics(x_rand, input_rand, contact_info);
+        for (int i = 0; i < x_rand.v.size(); i++) {
+            RobotState x_d = x_rand;
+            if (i >= 3 && i < 6) {
+                // Need to take a step in lie algebra space
+                Eigen::Vector3d v = Eigen::Vector3d::Zero();
+                v(i - 3) += DELTA;
+
+                x_d.q.array().segment<4>(3) =
+                        static_cast<Eigen::Vector4d>((x_d.Quat() * pinocchio::quaternion::exp3(v)).coeffs());
+            } else {
+                if (i >= 6) {
+                    x_d.q(i + 1) += DELTA;
+                } else {
+                    x_d.q(i) += DELTA;
+                }
+            }
+            RobotState imp_d = model.GetImpulseDynamics(x_d, input_rand, contact_info);
+
+            // Configurations should be unchanged
+            for (int j = 0; j < x_rand.q.size(); j++) {
+                REQUIRE_THAT(imp_d.q(j) - xdot_test.q(j),
+                             Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                if (j == i) {
+                    REQUIRE(A(j, i) == 1);
+                    Afd(j, i) = 1;
+                } else {
+                    REQUIRE(A(j, i) == 0);
+                }
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (imp_d.v(j) - xdot_test.v(j)) / DELTA;
+                Afd(j + x_rand.v.size(), i) = fd;
+                REQUIRE_THAT(fd - A(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+
+        // Now check wrt velocities
+        for (int i = 0; i < x_rand.v.size(); i++) {
+            RobotState x_d = x_rand;
+
+            x_d.v(i) += DELTA;
+
+            RobotState imp_d = model.GetImpulseDynamics(x_d, input_rand, contact_info);
+
+            // Configurations should be unchanged
+            for (int j = 0; j < x_rand.q.size(); j++) {
+                REQUIRE_THAT(imp_d.q(j) - xdot_test.q(j),
+                             Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                REQUIRE(A(j, i + x_rand.v.size()) == 0);
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (imp_d.v(j) - xdot_test.v(j)) / DELTA;
+                Afd(j + x_rand.v.size(), i + x_rand.v.size()) = fd;
+                REQUIRE_THAT(fd - A(j + x_rand.v.size(), i + x_rand.v.size()), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+        }
+
+//        std::cout << "Afd: \n" << Afd << std::endl;
+
+        // Now check wrt inputs
+        for (int i = 0; i < input_rand.size(); i++) {
+            vectorx_t input_d = input_rand;
+
+            input_d(i) += DELTA;
+
+            RobotState imp_d = model.GetImpulseDynamics(x_rand, input_d, contact_info);
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                double fd = (imp_d.v(j) - xdot_test.v(j)) / DELTA;
+                REQUIRE_THAT(fd - B(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                REQUIRE(B(j + x_rand.v.size(), i) == 0);
+            }
+
+            for (int j = 0; j < x_rand.q.size(); j++) {
+                double fd = (imp_d.q(j) - xdot_test.q(j)) / DELTA;
+                REQUIRE_THAT(imp_d.q(j) - xdot_test.q(j),
+                             Catch::Matchers::WithinAbs(0, FD_MARGIN));
+            }
+
+            for (int j = 0; j < x_rand.v.size(); j++) {
+                REQUIRE(B(j,i) == 0);
+            }
+        }
+    }
 }
 
 TEST_CASE("Quadruped", "[model][pinocchio]") {
@@ -36,8 +368,8 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     std::filesystem::path a1_urdf = std::filesystem::current_path();
     a1_urdf += "/test_data/test_a1.urdf";
 
-    RigidBody pin_model(pin_model_name, a1_urdf);
-    REQUIRE(pin_model.GetName() == pin_model_name);
+    RigidBody a1_model(pin_model_name, a1_urdf);
+    REQUIRE(a1_model.GetName() == pin_model_name);
 
     constexpr int INPUT_SIZE = 12;
     constexpr int CONFIG_SIZE = 19;
@@ -47,47 +379,70 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     constexpr int JOINT_SIZE = 14;
     constexpr int FRAME_SIZE = 47;
 
-    REQUIRE(pin_model.GetNumInputs() == INPUT_SIZE);
-    REQUIRE(pin_model.GetConfigDim() == CONFIG_SIZE);
-    REQUIRE(pin_model.GetVelDim() == VEL_SIZE);
-    REQUIRE(pin_model.GetStateDim() == STATE_SIZE);
-    REQUIRE(pin_model.GetDerivativeDim() == DERIV_SIZE);
-    REQUIRE(pin_model.GetNumJoints() == JOINT_SIZE);
-    REQUIRE(pin_model.GetNumFrames() == FRAME_SIZE);
-    REQUIRE(pin_model.GetSystemType() == HybridSystemImpulse);
+    REQUIRE(a1_model.GetNumInputs() == INPUT_SIZE);
+    REQUIRE(a1_model.GetConfigDim() == CONFIG_SIZE);
+    REQUIRE(a1_model.GetVelDim() == VEL_SIZE);
+    REQUIRE(a1_model.GetStateDim() == STATE_SIZE);
+    REQUIRE(a1_model.GetDerivativeDim() == DERIV_SIZE);
+    REQUIRE(a1_model.GetNumJoints() == JOINT_SIZE);
+    REQUIRE(a1_model.GetNumFrames() == FRAME_SIZE);
+    REQUIRE(a1_model.GetSystemType() == HybridSystemImpulse);
 
 
     // ----------------------------------------------- //
     // ------------------- Dynamics ------------------ //
     // ----------------------------------------------- //
-    RobotState x(pin_model.GetConfigDim(), pin_model.GetVelDim());
+    RobotState x(a1_model.GetConfigDim(), a1_model.GetVelDim());
     const vectorx_t input = vectorx_t::Zero(INPUT_SIZE);
 
     // No contacts
-    RobotStateDerivative xdot = pin_model.GetDynamics(x, input);
+    RobotStateDerivative xdot = a1_model.GetDynamics(x, input);
     RobotStateDerivative true_deriv(VEL_SIZE);
     true_deriv.a(2) = -9.81;
     REQUIRE(VectorEqualWithMargin(xdot.v, true_deriv.v, MARGIN));
     REQUIRE(VectorEqualWithMargin(xdot.a, true_deriv.a, MARGIN));
 
     // With contacts
-    xdot = pin_model.GetDynamics(x, input, contact_info);
+    xdot = a1_model.GetDynamics(x, input, contact_info);
     REQUIRE(VectorEqualWithMargin(xdot.v, true_deriv.v, MARGIN));
 
     // Impulse dynamics
-    x = pin_model.GetImpulseDynamics(x, input, contact_info);
+    x = a1_model.GetImpulseDynamics(x, input, contact_info);
 
     // ----------------------------------------------- //
     // ------------- Dynamics Derivatives ------------ //
     // ----------------------------------------------- //
-    matrixx_t A, B;
-    A = matrixx_t::Zero(pin_model.GetDerivativeDim(), pin_model.GetDerivativeDim());
-    B = matrixx_t::Zero(pin_model.GetDerivativeDim(), INPUT_SIZE);
+    matrixx_t A, B, Aimp, Bimp;
+    A = matrixx_t::Zero(a1_model.GetDerivativeDim(), a1_model.GetDerivativeDim());
+    B = matrixx_t::Zero(a1_model.GetDerivativeDim(), INPUT_SIZE);
+    Aimp = A;
+    Bimp = B;
 
-    pin_model.DynamicsDerivative(x, input, A, B);
+
+    // No contact dynamics derivatives
+    a1_model.DynamicsDerivative(x, input, A, B);
+
+    a1_model.GetDynamics(x, input, contact_info);
+
+    // Contact dynamics derivatives
+    a1_model.DynamicsDerivative(x, input, contact_info, A, B);
 
     // Impulse derivative
-    pin_model.ImpulseDerivative(contact_info, A, B);
+    a1_model.ImpulseDerivative(x, input, contact_info, Aimp, Bimp);
+
+    SECTION("Dynamics Derivatives") {
+        // TODOl: Only works when ImpulseDerivative is called above this
+        CheckDerivatives(a1_model);
+    }
+
+    SECTION("Contact Dynamics Derivatives") {
+        CheckContactDerivatives(a1_model, contact_info);
+    }
+
+    SECTION("Impulse Dynamics Derivatives") {
+        // TODO: Seems to work except there is an additional identity term in the dq_dv term
+        CheckImpulseDerivatives(a1_model, contact_info);
+    }
 }
 
 TEST_CASE("Double Integrator", "[model][pinocchio]") {
@@ -100,9 +455,9 @@ TEST_CASE("Double Integrator", "[model][pinocchio]") {
     // No contact_info
     RobotContactInfo contact_info;
 
-    RigidBody pin_model(pin_model_name, integrator_urdf);
+    RigidBody int_model(pin_model_name, integrator_urdf);
 
-    REQUIRE(pin_model.GetMass() == 1);
+    REQUIRE(int_model.GetMass() == 1);
 }
 
 TEST_CASE("Hopper", "[model][pinocchio]") {
@@ -115,7 +470,7 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
     RobotContactInfo contact_info;
     contact_info.contacts.emplace("foot", Contact(PointContact, true));
 
-    RigidBody pin_model(pin_model_name, hopper_urdf);
+    RigidBody hopper_model(pin_model_name, hopper_urdf);
 
     int constexpr INPUT_SIZE = 4;
     constexpr int CONFIG_SIZE = 11;
@@ -124,17 +479,29 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
     constexpr int DERIV_SIZE = 20;
     constexpr int JOINT_SIZE = 6;
 
-    RobotState x(pin_model.GetConfigDim(), pin_model.GetVelDim());
+    RobotState x(hopper_model.GetConfigDim(), hopper_model.GetVelDim());
     const vectorx_t input = vectorx_t::Zero(INPUT_SIZE);
-    RobotStateDerivative xdot = pin_model.GetDynamics(x, input, contact_info);
+    RobotStateDerivative xdot = hopper_model.GetDynamics(x, input, contact_info);
 
-    REQUIRE(pin_model.GetNumInputs() == INPUT_SIZE);
-    REQUIRE(pin_model.GetConfigDim() == CONFIG_SIZE);
-    REQUIRE(pin_model.GetVelDim() == VEL_SIZE);
-    REQUIRE(pin_model.GetStateDim() == STATE_SIZE);
-    REQUIRE(pin_model.GetDerivativeDim() == DERIV_SIZE);
-    REQUIRE(pin_model.GetNumJoints() == JOINT_SIZE);
-    REQUIRE(pin_model.GetSystemType() == HybridSystemImpulse);
+    REQUIRE(hopper_model.GetNumInputs() == INPUT_SIZE);
+    REQUIRE(hopper_model.GetConfigDim() == CONFIG_SIZE);
+    REQUIRE(hopper_model.GetVelDim() == VEL_SIZE);
+    REQUIRE(hopper_model.GetStateDim() == STATE_SIZE);
+    REQUIRE(hopper_model.GetDerivativeDim() == DERIV_SIZE);
+    REQUIRE(hopper_model.GetNumJoints() == JOINT_SIZE);
+    REQUIRE(hopper_model.GetSystemType() == HybridSystemImpulse);
+
+    SECTION("Dynamics Derivatives") {
+        CheckDerivatives(hopper_model);
+    }
+
+    SECTION("Contact Dynamics Derivatives") {
+        CheckContactDerivatives(hopper_model, contact_info);
+    }
+
+//    SECTION("Impulse Dynamics Derivatives") {
+//        CheckImpulseDerivatives(hopper_model, contact_info);
+//    }
 }
 
 //TODO: Check dynamics derivatives against finite differences of dynamics

@@ -53,6 +53,12 @@ namespace torc::models {
 
         void GetNeutralConfig(vectorx_t& q) const;
 
+        vectorx_t GetRandomConfig() const;
+
+        vectorx_t GetRandomVel() const;
+
+        RobotState GetRandomState() const;
+
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
         // -------------------------------------- //
