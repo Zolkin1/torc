@@ -22,7 +22,7 @@ namespace torc::models {
                   const std::vector<std::string>& underactuated_joints);
 
         // @note These are not actually const functions as we modify the pin_data struct
-        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const override;
+        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) override;
 
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input,
                                                     const RobotContactInfo& contact_info) const;
@@ -31,7 +31,7 @@ namespace torc::models {
                                       const RobotContactInfo& contact_info);
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                matrixx_t& A, matrixx_t& B) const override;
+                                matrixx_t& A, matrixx_t& B) override;
 
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input, const RobotContactInfo& contacts,
@@ -53,6 +53,10 @@ namespace torc::models {
         void CreateActuationMatrix(const std::vector<std::string>& underactuated_joints);
 
         matrixx_t act_mat_;
+
+        int prev_deriv_;
+
+        std::unique_ptr<pinocchio::Data> contact_data_;
     private:
 
     };

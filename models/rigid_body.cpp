@@ -25,6 +25,10 @@ namespace torc::models {
         underactuated_joints.emplace_back("root_joint");
 
         CreateActuationMatrix(underactuated_joints);
+
+        contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
+
+        prev_deriv_ = -1;
     }
 
     RigidBody::RigidBody(const std::string& name, const std::filesystem::path& urdf,
@@ -33,9 +37,13 @@ namespace torc::models {
         system_type_ = HybridSystemImpulse;
 
         CreateActuationMatrix(underactuated_joints);
+
+        contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
+
+        prev_deriv_ = -1;
     }
 
-    RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input) const {
+    RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input) {
         assert(state.q.size() - 1 == state.v.size());
 
         const vectorx_t& tau = InputsToTau(input);
@@ -100,7 +108,7 @@ namespace torc::models {
     }
 
     void RigidBody::DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                            matrixx_t& A, matrixx_t& B) const{
+                            matrixx_t& A, matrixx_t& B) {
         assert(state.q.size() - 1 == state.v.size());
         assert(A.rows() == GetDerivativeDim());
         assert(A.cols() == GetDerivativeDim());
@@ -109,9 +117,25 @@ namespace torc::models {
 
         const vectorx_t& tau = InputsToTau(input);
 
-        // Note; may consider putting FK call in if I get weird bugs again
+        // TODO: try a different pinocchio data for each function (constrainted, unconstrained, impulse)
 
-        pinocchio::computeABADerivatives(pin_model_, *pin_data_, state.q, state.v, tau);
+        // TODO: Come back to this comment
+        // @Note: just calling aba derivatives after a constrained dynamics call doesn't work, but we can
+        // call the constrained dynamics with no constraints to get the same value
+//        if (prev_deriv_ == 1) {
+//            std::vector<pinocchio::RigidConstraintModel> contact_model;
+//            std::vector<pinocchio::RigidConstraintData> contact_data;
+//
+//            pinocchio::initConstraintDynamics(pin_model_, *pin_data_, contact_model);
+//            pinocchio::constraintDynamics(pin_model_, *pin_data_, state.q, state.v, tau, contact_model, contact_data);
+//            pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
+//            pinocchio::computeConstraintDynamicsDerivatives(pin_model_, *pin_data_,
+//                                                            contact_model, contact_data,
+//                                                            settings);
+//        }
+
+        pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
+        pinocchio::computeABADerivatives(pin_model_, *pin_data_, state.q, state.v, tau); // state.q, state.v, tau
 
         A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv),
                 matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
@@ -122,6 +146,8 @@ namespace torc::models {
                 pin_data_->Minv.transpose().triangularView<Eigen::StrictlyLower>();
 
         B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_mat_;
+
+        prev_deriv_ = 0;
     }
 
     void RigidBody::DynamicsDerivative(const RobotState& state, const vectorx_t& input,
@@ -163,6 +189,8 @@ namespace torc::models {
                 pin_data_->Minv.transpose().triangularView<Eigen::StrictlyLower>();
 
         B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_mat_;
+
+        prev_deriv_ = 1;
     }
 
     void RigidBody::ImpulseDerivative(const RobotState& state, const vectorx_t& input,
@@ -198,6 +226,8 @@ namespace torc::models {
                 pin_data_->ddq_dq, pin_data_->ddq_dv + matrixx_t::Identity(pin_model_.nv, pin_model_.nv);
 
         B.setZero();
+
+        prev_deriv_ = 2;
     }
 
     void RigidBody::CreateActuationMatrix(const std::vector<std::string>& underactuated_joints) {

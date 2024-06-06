@@ -63,7 +63,7 @@ namespace torc::models {
     }
 
     RobotStateDerivative SingleRigidBody::GetDynamics(const torc::models::RobotState& state,
-                                                      const torc::models::PinocchioModel::vectorx_t& input) const {
+                                                      const torc::models::PinocchioModel::vectorx_t& input) {
         assert(state.q.size() == SRB_CONFIG_DIM);
         assert(state.v.size() == SRB_VEL_DIM);
 
@@ -79,7 +79,7 @@ namespace torc::models {
     void SingleRigidBody::DynamicsDerivative(const RobotState& state,
                                              const vectorx_t& input,
                                              matrixx_t& A,
-                                             matrixx_t& B) const {
+                                             matrixx_t& B) {
         assert(state.q.size() == SRB_CONFIG_DIM);
         assert(state.v.size() == SRB_VEL_DIM);
         assert(A.rows() == GetDerivativeDim());

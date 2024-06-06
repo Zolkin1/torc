@@ -21,10 +21,10 @@ namespace torc::models {
 
         std::string GetName() const;
 
-        virtual RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const = 0;
+        virtual RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) = 0;
 
         virtual void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                        matrixx_t& A, matrixx_t& b) const = 0;
+                                        matrixx_t& A, matrixx_t& b) = 0;
 
         SystemType GetSystemType() const;
     protected:

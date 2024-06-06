@@ -44,10 +44,10 @@ namespace torc::models {
 
         [[nodiscard]] vectorx_t GetRefConfig() const;
 
-        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) const override;
+        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) override;
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                matrixx_t& A, matrixx_t& B) const override;
+                                matrixx_t& A, matrixx_t& B) override;
 
         static constexpr int SRB_CONFIG_DIM = 7;
         static constexpr int SRB_VEL_DIM = 6;

@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/catch_get_random_seed.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/benchmark/catch_benchmark.hpp>
 
 #include "rigid_body.h"
 
@@ -418,31 +420,83 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     Aimp = A;
     Bimp = B;
 
-
-    // No contact dynamics derivatives
-    a1_model.DynamicsDerivative(x, input, A, B);
-
-    a1_model.GetDynamics(x, input, contact_info);
-
-    // Contact dynamics derivatives
-    a1_model.DynamicsDerivative(x, input, contact_info, A, B);
-
-    // Impulse derivative
-    a1_model.ImpulseDerivative(x, input, contact_info, Aimp, Bimp);
-
-    SECTION("Dynamics Derivatives") {
-        // TODOl: Only works when ImpulseDerivative is called above this
-        CheckDerivatives(a1_model);
+    bool dyn_deriv = GENERATE(true, false);
+    if (dyn_deriv) {
+        // No contact dynamics derivatives
+        a1_model.DynamicsDerivative(x, input, A, B);
     }
 
-    SECTION("Contact Dynamics Derivatives") {
-        CheckContactDerivatives(a1_model, contact_info);
+    bool contact_deriv = GENERATE(true, false);
+    if (contact_deriv) {
+        // Contact dynamics derivatives
+        a1_model.DynamicsDerivative(x, input, contact_info, A, B);
     }
 
-    SECTION("Impulse Dynamics Derivatives") {
-        // TODO: Seems to work except there is an additional identity term in the dq_dv term
-        CheckImpulseDerivatives(a1_model, contact_info);
+    bool impulse_deriv = GENERATE(true, false);
+    if (impulse_deriv) {
+        // Impulse derivative
+        a1_model.ImpulseDerivative(x, input, contact_info, Aimp, Bimp);
     }
+
+    bool deriv_sec = GENERATE(true, false);
+    if (deriv_sec) {
+        SECTION("Dynamics Derivatives") {
+            // TODOl: Only works when ImpulseDerivative is called above this
+            CheckDerivatives(a1_model);
+        }
+    }
+
+    bool contact_sec = GENERATE(true, false);
+    if (contact_sec) {
+        SECTION("Contact Dynamics Derivatives") {
+            CheckContactDerivatives(a1_model, contact_info);
+        }
+    }
+
+    bool impulse_sec = GENERATE(true, false);
+    if (impulse_sec) {
+        SECTION("Impulse Dynamics Derivatives") {
+            CheckImpulseDerivatives(a1_model, contact_info);
+
+            contact_info.contacts.at("FR_foot").state = true;
+            CheckImpulseDerivatives(a1_model, contact_info);
+        }
+    }
+}
+
+TEST_CASE("Quadruped Benchmarks", "[model][pinocchio][benchmarks]") {
+    using namespace torc::models;
+
+    std::filesystem::path a1_urdf = std::filesystem::current_path();
+    a1_urdf += "/test_data/test_a1.urdf";
+
+    RigidBody a1_model("a1", a1_urdf);
+
+    matrixx_t A, B, Aimp, Bimp;
+    A = matrixx_t::Zero(a1_model.GetDerivativeDim(), a1_model.GetDerivativeDim());
+    B = matrixx_t::Zero(a1_model.GetDerivativeDim(), a1_model.GetNumInputs());
+
+    RobotContactInfo contact_info;
+    contact_info.contacts.emplace("FR_foot", Contact(ContactType::PointContact));
+    contact_info.contacts.emplace("FL_foot", Contact(ContactType::PointContact, true));
+    contact_info.contacts.emplace("RR_foot", Contact(ContactType::PointContact, true));
+    contact_info.contacts.emplace("RL_foot", Contact(ContactType::PointContact));
+
+    RobotState x_rand = a1_model.GetRandomState();
+    vectorx_t input_rand;
+    input_rand.setRandom(a1_model.GetNumInputs());
+    // Benchmarks
+    BENCHMARK("Dynamics Derivatives") {
+      return a1_model.DynamicsDerivative(x_rand, input_rand, A, B);
+    };
+
+    BENCHMARK("Contact Dynamics Derivatives") {
+          return a1_model.DynamicsDerivative(x_rand, input_rand, contact_info, A, B);
+      };
+
+    BENCHMARK("Impulse Dynamics Derivatives") {
+          return a1_model.ImpulseDerivative(x_rand, input_rand, contact_info, A, B);
+      };
 }
 
 TEST_CASE("Double Integrator", "[model][pinocchio]") {
@@ -499,9 +553,10 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
         CheckContactDerivatives(hopper_model, contact_info);
     }
 
-//    SECTION("Impulse Dynamics Derivatives") {
-//        CheckImpulseDerivatives(hopper_model, contact_info);
-//    }
-}
+    SECTION("Impulse Dynamics Derivatives") {
+        CheckImpulseDerivatives(hopper_model, contact_info);
 
-//TODO: Check dynamics derivatives against finite differences of dynamics
+        contact_info.contacts.at("foot").state = false;
+        CheckImpulseDerivatives(hopper_model, contact_info);
+    }
+}
