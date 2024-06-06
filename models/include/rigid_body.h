@@ -54,8 +54,6 @@ namespace torc::models {
 
         matrixx_t act_mat_;
 
-        int prev_deriv_;
-
         std::unique_ptr<pinocchio::Data> contact_data_;
     private:
 

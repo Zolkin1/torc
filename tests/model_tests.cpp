@@ -123,19 +123,16 @@ void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models:
     constexpr double DELTA = 1e-8;
 
     // Checking derivatives with finite differences
-//    srand(Catch::getSeed());        // Set the srand seed manually
+    srand(Catch::getSeed());        // Set the srand seed manually
 
-// TODO: Put back random and more configs
-    srand(0);
-    constexpr int NUM_CONFIGS = 1;
+    constexpr int NUM_CONFIGS = 10;
     for (int k = 0; k < NUM_CONFIGS; k++) {
         // Get a random configuration
         RobotState x_rand = model.GetRandomState();
 
         // Get random input
         vectorx_t input_rand;
-        input_rand.setZero(model.GetNumInputs());
-//        input_rand.setRandom(model.GetNumInputs());
+        input_rand.setRandom(model.GetNumInputs());
 
         // Hold analytic derivatives
         matrixx_t A, B;
@@ -195,10 +192,6 @@ void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models:
             }
         }
 
-//        std::cout << "B analytic: \n" << B << std::endl;
-        matrixx_t Bfd = B;
-        Bfd.setZero();
-
         // Now check wrt inputs
         for (int i = 0; i < input_rand.size(); i++) {
             vectorx_t input_d = input_rand;
@@ -209,20 +202,14 @@ void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models:
 
             for (int j = 0; j < x_rand.v.size(); j++) {
                 double fd = (deriv_d.v(j) - xdot_test.v(j)) / DELTA;
-                Bfd(j, i) = fd;
                 REQUIRE_THAT(fd - B(j, i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
             }
 
-            // TODO: Fix
             for (int j = 0; j < x_rand.v.size(); j++) {
                 double fd = (deriv_d.a(j) - xdot_test.a(j)) / DELTA;
-                Bfd(j + x_rand.v.size(), i) = fd;
-//                REQUIRE_THAT(fd - B(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                REQUIRE_THAT(fd - B(j + x_rand.v.size(), i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
             }
         }
-
-//        std::cout << "B fd: \n" << Bfd << std::endl;
-//        std::cout << "Difference: \n" << Bfd - B << std::endl;
     }
 }
 
@@ -363,8 +350,8 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
 
     RobotContactInfo contact_info;
     contact_info.contacts.emplace("FR_foot", Contact(ContactType::PointContact));
-    contact_info.contacts.emplace("FL_foot", Contact(ContactType::PointContact, true));
-    contact_info.contacts.emplace("RR_foot", Contact(ContactType::PointContact, true));
+    contact_info.contacts.emplace("FL_foot", Contact(ContactType::PointContact, false));
+    contact_info.contacts.emplace("RR_foot", Contact(ContactType::PointContact, false));
     contact_info.contacts.emplace("RL_foot", Contact(ContactType::PointContact));
 
     std::filesystem::path a1_urdf = std::filesystem::current_path();
@@ -487,16 +474,28 @@ TEST_CASE("Quadruped Benchmarks", "[model][pinocchio][benchmarks]") {
     input_rand.setRandom(a1_model.GetNumInputs());
     // Benchmarks
     BENCHMARK("Dynamics Derivatives") {
-      return a1_model.DynamicsDerivative(x_rand, input_rand, A, B);
+        return a1_model.DynamicsDerivative(x_rand, input_rand, A, B);
     };
 
     BENCHMARK("Contact Dynamics Derivatives") {
-          return a1_model.DynamicsDerivative(x_rand, input_rand, contact_info, A, B);
-      };
+        return a1_model.DynamicsDerivative(x_rand, input_rand, contact_info, A, B);
+    };
 
     BENCHMARK("Impulse Dynamics Derivatives") {
-          return a1_model.ImpulseDerivative(x_rand, input_rand, contact_info, A, B);
-      };
+        return a1_model.ImpulseDerivative(x_rand, input_rand, contact_info, A, B);
+    };
+
+    BENCHMARK("Dynamics") {
+        return a1_model.GetDynamics(x_rand, input_rand);
+    };
+
+    BENCHMARK("Contact Dynamics") {
+        return a1_model.GetDynamics(x_rand, input_rand, contact_info);
+    };
+
+    BENCHMARK("Impulse Dynamics") {
+        return a1_model.GetImpulseDynamics(x_rand, input_rand, contact_info);
+    };
 }
 
 TEST_CASE("Double Integrator", "[model][pinocchio]") {
@@ -551,6 +550,9 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
 
     SECTION("Contact Dynamics Derivatives") {
         CheckContactDerivatives(hopper_model, contact_info);
+
+        contact_info.contacts.at("foot").state = false;
+        CheckImpulseDerivatives(hopper_model, contact_info);
     }
 
     SECTION("Impulse Dynamics Derivatives") {
