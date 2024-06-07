@@ -30,6 +30,8 @@ namespace torc::models {
         RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
                                       const RobotContactInfo& contact_info);
 
+        // TODO: Lineaization function that calculates the FD and derivatives so we don't have redundant calls
+
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
                                 matrixx_t& A, matrixx_t& B) override;
 

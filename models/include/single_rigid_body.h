@@ -35,10 +35,10 @@ namespace torc::models {
         using srb_vel_t = Eigen::Vector<double, 6>;
 
     public:
-        SingleRigidBody(const std::string& name, const std::filesystem::path& urdf);
+        SingleRigidBody(const std::string& name, const std::filesystem::path& urdf, int max_contacts);
 
         SingleRigidBody(const std::string& name, const std::filesystem::path& urdf,
-                        const vectorx_t& ref_config);
+                        const vectorx_t& ref_config, int max_contacts);
 
         void SetRefConfig(const vectorx_t& ref_config);
 
@@ -63,6 +63,7 @@ namespace torc::models {
 
 
         vectorx_t ref_config_;
+        int max_contacts_;
 
     private:
         void MakeSingleRigidBody(const torc::models::PinocchioModel::vectorx_t& ref_config,

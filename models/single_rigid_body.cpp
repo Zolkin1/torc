@@ -11,9 +11,10 @@
 #include <utility>
 
 namespace torc::models {
-    SingleRigidBody::SingleRigidBody(const std::string& name, const std::filesystem::path& urdf)
-            : PinocchioModel(name, urdf) {
+    SingleRigidBody::SingleRigidBody(const std::string& name, const std::filesystem::path& urdf, int max_contacts)
+            : PinocchioModel(name, urdf), max_contacts_(max_contacts) {
         system_type_ = HybridSystemNoImpulse;
+        num_inputs_ = max_contacts_*6;
 
         // Make the SRB model
         ref_config_ = pinocchio::neutral(pin_model_);    // Create neutral ref configuration
@@ -22,9 +23,10 @@ namespace torc::models {
     }
 
     SingleRigidBody::SingleRigidBody(const std::string& name, const std::filesystem::path& urdf,
-                                     const vectorx_t& ref_config)
-            : PinocchioModel(name, urdf), ref_config_(ref_config) {
+                                     const vectorx_t& ref_config, int max_contacts)
+            : PinocchioModel(name, urdf), ref_config_(ref_config), max_contacts_(max_contacts) {
         system_type_ = HybridSystemNoImpulse;
+        num_inputs_ = max_contacts_*6;
 
         MakeSingleRigidBody(ref_config);
 
@@ -33,7 +35,7 @@ namespace torc::models {
     void SingleRigidBody::MakeSingleRigidBody(const vectorx_t& ref_config, bool reassign_full_model) {
         // Move the full pinocchio model
         if (reassign_full_model) {
-            full_pin_model_ = pin_model_;
+            full_pin_model_ = pinocchio::Model(pin_model_);
             full_pin_data_ = std::move(pin_data_);
         }
 
@@ -41,14 +43,16 @@ namespace torc::models {
         std::vector<long unsigned int> joints_to_lock;
         int idx = 0;
         for (const auto& it : full_pin_model_.names) {
-            if (it != "root_joint") {
+            if (it != "root_joint" && it != "universe") {
                 joints_to_lock.push_back(idx);
             }
             idx++;
         }
 
-        pinocchio::buildReducedModel(full_pin_model_, joints_to_lock,
-                                     ref_config, pin_model_);
+//        pin_model_ = pinocchio::Model();
+
+        pin_model_ = pinocchio::buildReducedModel(full_pin_model_, joints_to_lock,
+                                     ref_config);
 
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
@@ -85,7 +89,7 @@ namespace torc::models {
         assert(A.rows() == GetDerivativeDim());
         assert(A.cols() == GetDerivativeDim());
         assert(B.rows() == GetDerivativeDim());
-//        assert(B.cols() == act_mat_.cols());
+        assert(B.cols() == GetNumInputs());
 
         const vectorx_t& tau = InputsToTau(input);
 
@@ -98,7 +102,9 @@ namespace torc::models {
         pin_data_->Minv.triangularView<Eigen::StrictlyLower>() =
                 pin_data_->Minv.transpose().triangularView<Eigen::StrictlyLower>();
 
-        B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * ActuationMapDerivative(input);
+        matrixx_t act_map_deriv = ActuationMapDerivative(input);
+
+        B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_map_deriv;
     }
 
     vectorx_t SingleRigidBody::InputsToTau(const vectorx_t& input) const {
@@ -126,23 +132,21 @@ namespace torc::models {
             input_vars = input.size()/2;
         }
 
-        matrixx_t B(GetStateDim(), input_vars);
+        matrixx_t B(pin_model_.nv, input_vars);
+        B.setZero();
+
+        // Linear forces
+        B.block(0, 0, 3, pos_start) =
+                matrixx_t::Ones(3, pos_start);
 
         if (!force_and_pos) {
-            // Linear forces
-            B.block(0, 0, 3, input_vars) =
-                    matrixx_t::Ones(3, pos_start);
-
             // Torques
             // TODO
         } else {
-            // Linear forces
-            B.block(0, 0, 3, input_vars) << matrixx_t::Ones(3, pos_start),
-                    matrixx_t::Zero(3, input_vars - pos_start);
-
             // Torques
             // TODO
         }
+
         return B;
     }
 

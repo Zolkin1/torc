@@ -18,10 +18,13 @@ target_link_libraries(cost_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(cost_tests PUBLIC Functions)
 
 # ---------- Model Tests ---------- #
-add_executable(model_tests model_tests.cpp)
-target_link_libraries(model_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(model_tests PUBLIC Models)
+add_executable(rigid_body_tests rigid_body_tests.cpp)
+target_link_libraries(rigid_body_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(rigid_body_tests PUBLIC Models)
 
+add_executable(srb_tests srb_tests.cpp)
+target_link_libraries(srb_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(srb_tests PUBLIC Models)
 
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
