@@ -22,6 +22,7 @@ add_subdirectory(models)
 add_subdirectory(costs)
 add_subdirectory(functions)
 add_subdirectory(constraints)
+add_subdirectory(solver_interfaces)
 
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library
