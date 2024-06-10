@@ -11,21 +11,7 @@
 
 namespace torc::solvers {
 
-    IPOPTInterface::IPOPTInterface() {
-        app = IpoptApplicationFactory();
-    }
-
-    IPOPTInterface::IPOPTInterface(const IPOPTSettings& settings)
-        : IPOPTInterface() {
-        settings_ = settings;
-        AssignSettings();
-    }
-
-     IPOPTInterface::IPOPTInterface(const std::filesystem::path& settings_file)
-        : IPOPTInterface() {
-        settings_file_ = settings_file;
-        app->Options()->SetStringValue("option_file_name", settings_file.string());
-    }
+    IPOPTInterface::IPOPTInterface() = default;
 
     bool IPOPTInterface::get_nlp_info(Ipopt::Index& n, Ipopt::Index& m, Ipopt::Index& nnz_jac_g, Ipopt::Index& nnz_h_lag,
                                  Ipopt::TNLP::IndexStyleEnum& index_style) {
@@ -56,13 +42,13 @@ namespace torc::solvers {
         assert(m == 2);
 
         // the variables have lower bounds of 1
-        for( Index i = 0; i < 4; i++ )
+        for( Ipopt::Index i = 0; i < 4; i++ )
         {
             x_l[i] = 1.0;
         }
 
         // the variables have upper bounds of 5
-        for( Index i = 0; i < 4; i++ )
+        for( Ipopt::Index i = 0; i < 4; i++ )
         {
             x_u[i] = 5.0;
         }
@@ -188,10 +174,10 @@ namespace torc::solvers {
             // triangle only.
 
             // the hessian for this problem is actually dense
-            Index idx = 0;
-            for( Index row = 0; row < 4; row++ )
+            Ipopt::Index idx = 0;
+            for( Ipopt::Index row = 0; row < 4; row++ )
             {
-                for( Index col = 0; col <= row; col++ )
+                for( Ipopt::Index col = 0; col <= row; col++ )
                 {
                     iRow[idx] = row;
                     jCol[idx] = col;
@@ -253,17 +239,17 @@ namespace torc::solvers {
 
         // For this example, we write the solution to the console
         std::cout << std::endl << std::endl << "Solution of the primal variables, x" << std::endl;
-        for( Index i = 0; i < n; i++ )
+        for( Ipopt::Index i = 0; i < n; i++ )
         {
             std::cout << "x[" << i << "] = " << x[i] << std::endl;
         }
 
         std::cout << std::endl << std::endl << "Solution of the bound multipliers, z_L and z_U" << std::endl;
-        for( Index i = 0; i < n; i++ )
+        for( Ipopt::Index i = 0; i < n; i++ )
         {
             std::cout << "z_L[" << i << "] = " << z_L[i] << std::endl;
         }
-        for( Index i = 0; i < n; i++ )
+        for( Ipopt::Index i = 0; i < n; i++ )
         {
             std::cout << "z_U[" << i << "] = " << z_U[i] << std::endl;
         }
@@ -272,31 +258,9 @@ namespace torc::solvers {
         std::cout << "f(x*) = " << obj_value << std::endl;
 
         std::cout << std::endl << "Final value of the constraints:" << std::endl;
-        for( Index i = 0; i < m; i++ )
+        for( Ipopt::Index i = 0; i < m; i++ )
         {
             std::cout << "g(" << i << ") = " << g[i] << std::endl;
-        }
-    }
-
-    void IPOPTInterface::AssignSettings() {
-        if (settings_.tol > 0) {
-            app->Options()->SetNumericValue("tol", settings_.tol);
-        }
-
-        if (settings_.max_iter > 0) {
-            app->Options()->SetNumericValue("max_iter", settings_.max_iter);
-        }
-
-        if (settings_.max_time > 0) {
-            app->Options()->SetNumericValue("max_time", settings_.max_time);
-        }
-
-        if (settings_.dual_inf_tol > 0) {
-            app->Options()->SetNumericValue("dual_inf_tol", settings_.dual_inf_tol);
-        }
-
-        if (std::filesystem::exists(settings_.output_file)) {
-            app->Options()->SetStringValue("output_file", settings_.output_file);
         }
     }
 }

@@ -6,32 +6,24 @@
 #define TORC_IPOPT_INTERFACE_H
 
 #include <filesystem>
+#include <IpIpoptApplication.hpp>
 
 #include "IpTNLP.hpp"
 
 namespace torc::solvers {
 
-    struct IPOPTSettings {
-        double tol;
-        double max_iter;
-        double max_time;
-        double dual_inf_tol;
-        std::filesystem::path output_file;
-    };
-
     class IPOPTInterface : public Ipopt::TNLP {
     public:
         IPOPTInterface();
 
-        IPOPTInterface(const IPOPTSettings& settings);
+        // TODO: Think about this interface more
+        //  Will either hold a copy of a specific object (like a function object)
+        //  Or, we can just hold function pointers here.
+        //  Whatever we pass needs to also hold derivative information
+        void AddConstraints();
 
-        IPOPTInterface(const std::filesystem::path& settings_file);
-
-        // TODO: What should this interface look like?
-        //  Want to allow an MPC object and generic optimization problems be solved
-        bool SolveNLP();
-
-
+        // TODO: see constraint notes
+        void AddCosts();
 
         // ------------------------------------------------- //
         // -------------- IPOPT API functions -------------- //
@@ -64,12 +56,6 @@ namespace torc::solvers {
                                const Ipopt::Number *g, const Ipopt::Number *lambda, Ipopt::Number obj_value,
                                const Ipopt::IpoptData *ip_data, Ipopt::IpoptCalculatedQuantities *ip_cq) override;
     protected:
-        void AssignSettings();
-
-        IPOPTSettings settings_;
-        std::filesystem::path settings_file_;
-
-        Ipopt::SmartPtr<Ipopt::IpoptApplication> app;
 
     private:
     };
