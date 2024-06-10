@@ -13,7 +13,9 @@ namespace torc::solvers {
         MaxIters,
         TimeLimit,
         InvalidSetting,
+        InvalidData,
         InitializationFailed,
+        Ok,
         Error
     };
 

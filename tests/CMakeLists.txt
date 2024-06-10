@@ -31,6 +31,11 @@ add_executable(ipopt_tests ipopt_tests.cpp)
 target_link_libraries(ipopt_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(ipopt_tests PUBLIC SolverInterfaces)
 
+# ---------- OSQPInterface Tests ---------- #
+add_executable(osqp_tests osqp_tests.cpp)
+target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 

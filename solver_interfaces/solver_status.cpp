@@ -24,7 +24,13 @@ namespace torc::solvers {
                 out << "Maximum Iterations";
                 break;
             case InvalidSetting:
-                out << "Invalid settings";
+                out << "Invalid Settings";
+                break;
+            case Ok:
+                out << "Ok";
+                break;
+            case InvalidData:
+                out << "Invalid Data";
                 break;
             default:
                 out << "Error";
