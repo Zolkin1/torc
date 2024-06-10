@@ -6,6 +6,7 @@
 #define TORC_IPOPT_H
 
 #include "ipopt_interface.h"
+#include "solver_status.h"
 
 namespace torc::solvers {
     struct IPOPTSettings {
@@ -30,6 +31,7 @@ namespace torc::solvers {
 
     class IPOPT {
     public:
+        // TODO: Support different forms of logging (i.e. not just printing to cout)
         IPOPT();
 
         IPOPT(const IPOPTSettings& settings);
@@ -43,7 +45,7 @@ namespace torc::solvers {
         //  be of different types, but they will need to all be able to provide a derivative.
         //  Then there can be a second interface that will take in some MPC type object and just solve that.
         //  In both cases and initial guess can be provided, and if one is not provided, then we will guess all zeros
-        bool SolveNLP();
+        SolverStatus SolveNLP();
 
         void UpdateSettings(const IPOPTSettings& settings);
 

@@ -10,5 +10,6 @@ TEST_CASE("Basic IPOPT Test", "[optimization][ipopt]") {
     using namespace torc::solvers;
 
     IPOPT nlp;
-    nlp.SolveNLP();
+    SolverStatus status = nlp.SolveNLP();
+    PrintStatus(std::cout, status);
 }

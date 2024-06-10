@@ -21,31 +21,34 @@ namespace torc::solvers {
         app_->Options()->SetStringValue("option_file_name", settings_file.string());
     }
 
-    bool IPOPT::SolveNLP() {
+    SolverStatus IPOPT::SolveNLP() {
         // Initialize the IpoptApplication and process the options
-        Initialize();
+        if (!Initialize()) {
+            return InitializationFailed;
+        }
 
-        // Ask Ipopt to solve the problem
+        // Solve the problem
         Ipopt::SmartPtr<Ipopt::TNLP> nlp = new IPOPTInterface();
 
         Ipopt::ApplicationReturnStatus status;
         status = app_->OptimizeTNLP(nlp);
 
-        if( status == Ipopt::Solve_Succeeded )
+        if(status == Ipopt::Solve_Succeeded )
         {
-            std::cout << std::endl << std::endl << "*** The problem solved!" << std::endl;
+            return Solved;
+        } else if (status == Ipopt::Solved_To_Acceptable_Level) {
+            return SolvedLowTol;
+        } else if (status == Ipopt::Infeasible_Problem_Detected) {
+            return Infeasible;
+        } else if (status == Ipopt::Maximum_CpuTime_Exceeded || status == Ipopt::Maximum_WallTime_Exceeded) {
+            return TimeLimit;
+        } else if (status == Ipopt::Maximum_Iterations_Exceeded) {
+            return MaxIters;
+        } else if (status == Ipopt::Invalid_Option) {
+            return InvalidSetting;
+        } else {
+            return Error;
         }
-        else
-        {
-            std::cout << std::endl << std::endl << "*** The problem FAILED!" << std::endl;
-        }
-
-        // As the SmartPtrs go out of scope, the reference count
-        // will be decremented and the objects will automatically
-        // be deleted.
-
-        std::cout << "status: " << (int) status << std::endl;
-        return (int) status;
     }
 
     void IPOPT::UpdateSettings(const torc::solvers::IPOPTSettings& settings) {
@@ -69,7 +72,10 @@ namespace torc::solvers {
         {
             std::cout << std::endl << std::endl << "*** Error during initialization!" << std::endl;
             std::cout << "status: " << (int) status << std::endl;
+            return false;
         }
+
+        return true;
     }
 
     void IPOPT::AssignSettings() {

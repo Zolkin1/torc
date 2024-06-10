@@ -3,11 +3,13 @@ message(STATUS "Building solver interfaces")
 set(SOLVERS_INC "${torc_SOURCE_DIR}/solver_interfaces/include")
 set(SOLVER_HEADER_LIST
     "${SOLVERS_INC}/ipopt_interface.h"
-    "${SOLVERS_INC}/ipopt.h")
+    "${SOLVERS_INC}/ipopt.h"
+    "${SOLVERS_INC}/solver_status")
 
 add_library(SolverInterfaces
     ipopt_interface.cpp
-    ipopt.cpp)
+    ipopt.cpp
+    solver_status.cpp)
 
 target_include_directories(SolverInterfaces PUBLIC
     $<BUILD_INTERFACE:${SOLVERS_INC}>
