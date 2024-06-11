@@ -65,7 +65,7 @@ namespace torc::solvers {
             max_iter = 30;
             warm_start = NoWarmStart;
             sqr_root_alg = Riccati;
-            mode = BALANCE;
+            mode = SPEED_ABS;
             pred_corr = true;
             cond_pred_corr = false;
             alpha_min = 1e-8;
@@ -76,6 +76,29 @@ namespace torc::solvers {
             reg_prim = 1e-12;
         }
 
+    };
+
+    struct HPIPMData {
+        // Dynamics
+        std::vector<matrixx_t> Ak;
+        std::vector<matrixx_t> Bk;
+        std::vector<vectorx_t> Ck;  // b in the HPIPM documentation
+        vectorx_t ic;
+
+        // Cost
+        std::vector<matrixx_t> Rk;
+        std::vector<matrixx_t> Qk;
+        std::vector<matrixx_t> Sk;
+        std::vector<vectorx_t> rk;
+        std::vector<vectorx_t> qk;
+
+        // Constraints
+        std::vector<matrixx_t> Dk;
+        std::vector<matrixx_t> Gk;  // C in the HPIPM documentation
+        std::vector<vectorx_t> xub;
+        std::vector<vectorx_t> xlb;
+        std::vector<vectorx_t> uub;
+        std::vector<vectorx_t> ulb;
     };
 
     bool operator==(const HPIPMQPSize& size1, const HPIPMQPSize& size2);
@@ -96,7 +119,7 @@ namespace torc::solvers {
 
         void UpdateSettings(const HPIPMSettings& settings);
 
-        SolverStatus Solve(std::vector<vectorx_t>& u, std::vector<vectorx_t>& x, double& time);
+        SolverStatus Solve(HPIPMData& data, std::vector<vectorx_t>& u, std::vector<vectorx_t>& x, double& time);
 
         ~HPIPM();
 

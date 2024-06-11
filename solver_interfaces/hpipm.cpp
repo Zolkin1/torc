@@ -8,6 +8,8 @@
 
 #include "hpipm.h"
 
+// TODO: Write tests
+
 namespace torc::solvers {
     bool operator==(const HPIPMQPSize& size1, const HPIPMQPSize& size2) {
          return (size1.num_states == size2.num_states) && (size1.nodes == size2.nodes)
@@ -161,19 +163,75 @@ namespace torc::solvers {
         d_ocp_qp_ipm_arg_set_default(mode_default, &arg_);
     }
 
-    SolverStatus HPIPM::Solve(std::vector<vectorx_t>& u, std::vector<vectorx_t>& x, double& time) {
+    SolverStatus HPIPM::Solve(HPIPMData& data, std::vector<vectorx_t>& u, std::vector<vectorx_t>& x, double& time) {
 
         // Timer -- including setup, solving, and parsing
         hpipm_timer timer;
         hpipm_tic(&timer);
 
         // Set all the data
-//        d_ocp_qp_set_all(hA, hB, hb, hQ,
-//                         hS, hR, hq, hr,
-//                         hidxbx, hlbx, hubx,
-//                         hidxbu, hlbu, hubu, hC,
-//                         hD, hlg, hug, hZl, hZu,
-//                         hzl, hzu, hidxs, hlls, hlus, &qp);
+        // Dynamics
+        std::vector<double*> AA(qp_size_.nodes, nullptr);
+        std::vector<double*> BB(qp_size_.nodes, nullptr);
+        std::vector<double*> CC(qp_size_.nodes, nullptr);
+
+        // TODO: Deal with ic
+
+        for (int i = 1; i < qp_size_.nodes; i++) {
+            AA.at(i) = data.Ak.at(i).data();
+            BB.at(i) = data.Bk.at(i).data();
+            CC.at(i) = data.Ck.at(i).data();
+        }
+
+        // Cost
+        std::vector<double*> QQ(qp_size_.nodes, nullptr);
+        std::vector<double*> RR(qp_size_.nodes, nullptr);
+        std::vector<double*> SS(qp_size_.nodes, nullptr);
+        std::vector<double*> qq(qp_size_.nodes, nullptr);
+        std::vector<double*> rr(qp_size_.nodes, nullptr);
+
+        for (int i = 1; i < qp_size_.nodes; i++) {
+            QQ.at(i) = data.Qk.at(i).data();
+            RR.at(i) = data.Rk.at(i).data();
+            SS.at(i) = data.Sk.at(i).data();
+            qq.at(i) = data.qk.at(i).data();
+            rr.at(i) = data.rk.at(i).data();
+        }
+
+        // Constraints
+        std::vector<double*> DD(qp_size_.nodes, nullptr);
+        std::vector<double*> GG(qp_size_.nodes, nullptr);
+        std::vector<double*> uub(qp_size_.nodes, nullptr);
+        std::vector<double*> llb(qp_size_.nodes, nullptr);
+
+        for (int i = 1; i < qp_size_.nodes; i++) {
+            DD.at(i) = data.Dk.at(i).data();
+            GG.at(i) = data.Gk.at(i).data();
+            uub.at(i) = data.uub.at(i).data();
+            llb.at(i) = data.ulb.at(i).data();
+        }
+
+        // TODO: Check these
+        int** hidxbx = nullptr;
+        double** hlbx = nullptr;
+        double** hubx = nullptr;
+        int** hidxbu = nullptr;
+        double** hlbu = nullptr;
+        double** hubu = nullptr;
+        double** hZl = nullptr;
+        double** hZu = nullptr;
+        double** hzl = nullptr;
+        double** hzu = nullptr;
+        int** hidxs = nullptr;
+        double** hlls = nullptr;
+        double** hlus = nullptr;
+
+        d_ocp_qp_set_all(AA.data(), BB.data(), CC.data(), QQ.data(),
+                         SS.data(), RR.data(), qq.data(), rr.data(),
+                         hidxbx, hlbx, hubx,
+                         hidxbu, hlbu, hubu, GG.data(),
+                         DD.data(), llb.data(), uub.data(), hZl, hZu,
+                         hzl, hzu, hidxs, hlls, hlus, &qp_);
 
         // Solve
         d_ocp_qp_ipm_solve(&qp_, &qp_sol_, &arg_, &workspace_);
