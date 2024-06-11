@@ -4,12 +4,14 @@ set(SOLVERS_INC "${torc_SOURCE_DIR}/solver_interfaces/include")
 set(SOLVER_HEADER_LIST
     "${SOLVERS_INC}/ipopt_interface.h"
     "${SOLVERS_INC}/ipopt.h"
-    "${SOLVERS_INC}/solver_status")
+    "${SOLVERS_INC}/solver_status.h"
+    "${SOLVERS_ING}/hpipm.h")
 
 add_library(SolverInterfaces
     ipopt_interface.cpp
     ipopt.cpp
-    solver_status.cpp)
+    solver_status.cpp
+    hpipm.cpp)
 
 target_include_directories(SolverInterfaces PUBLIC
     $<BUILD_INTERFACE:${SOLVERS_INC}>
@@ -37,7 +39,12 @@ target_include_directories(SolverInterfaces PUBLIC
 
 link_directories(${IPOPT_LIB_DIR})
 
-target_link_libraries(SolverInterfaces
+target_link_libraries(SolverInterfaces PUBLIC
         ${IPOPT_LIB_DIR}/libipopt.so.3
         ${IPOPT_LIB_DIR}/libcoinmumps.so.3)
 
+# ----------- HPIPM --------- #
+find_package(hpipm REQUIRED)
+find_package(blasfeo REQUIRED)
+target_link_libraries(SolverInterfaces PUBLIC hpipm)
+target_link_libraries(SolverInterfaces PUBLIC blasfeo)
