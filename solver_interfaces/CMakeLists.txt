@@ -51,9 +51,6 @@ set(CLARABEL_LIB_PATH "~/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.
         CACHE STRING "Path to the clarabel shared library")
 set(CLARABEL_INCLUDE_DIR CACHE STRING "~/Clarabel.cpp/include")
 
-# ---------- Utils ----------- #
-target_link_libraries(SolverInterfaces PUBLIC Utils)
-
 add_library(clarabel STATIC IMPORTED)
 set_property(TARGET clarabel PROPERTY
         IMPORTED_LOCATION "${CLARABEL_LIB_PATH}")
