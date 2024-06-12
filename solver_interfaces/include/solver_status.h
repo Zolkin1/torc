@@ -14,6 +14,8 @@ namespace torc::solvers {
         TimeLimit,
         InvalidSetting,
         InitializationFailed,
+        Ok,
+        Unsolved,
         Error
     };
 

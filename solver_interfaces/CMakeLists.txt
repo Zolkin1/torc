@@ -4,16 +4,21 @@ set(SOLVERS_INC "${torc_SOURCE_DIR}/solver_interfaces/include")
 set(SOLVER_HEADER_LIST
     "${SOLVERS_INC}/ipopt_interface.h"
     "${SOLVERS_INC}/ipopt.h"
-    "${SOLVERS_INC}/solver_status")
+    "${SOLVERS_INC}/solver_status.h"
+    "${SOLVERS_INC}/clarabel_interface.h")
 
 add_library(SolverInterfaces
     ipopt_interface.cpp
     ipopt.cpp
-    solver_status.cpp)
+    solver_status.cpp
+    clarabel_interface.cpp)
 
 target_include_directories(SolverInterfaces PUBLIC
     $<BUILD_INTERFACE:${SOLVERS_INC}>
     $<INSTALL_INTERFACE:solver_interfaces/include>)
+
+find_package(Eigen3 REQUIRED)
+target_link_libraries(SolverInterfaces PUBLIC Eigen3::Eigen)
 
 #----------- IPOPT ----------- #
 set(IPOPT_INC_DIR /usr/local/include/coin-or  CACHE STRING "Directory where IPOPT header file are located.")
@@ -37,7 +42,20 @@ target_include_directories(SolverInterfaces PUBLIC
 
 link_directories(${IPOPT_LIB_DIR})
 
-target_link_libraries(SolverInterfaces
+target_link_libraries(SolverInterfaces PUBLIC
         ${IPOPT_LIB_DIR}/libipopt.so.3
         ${IPOPT_LIB_DIR}/libcoinmumps.so.3)
 
+#----------- Clarabel ----------- #
+set(CLARABEL_LIB_PATH "~/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so"
+        CACHE STRING "Path to the clarabel shared library")
+set(CLARABEL_INCLUDE_DIR CACHE STRING "~/Clarabel.cpp/include")
+
+# ---------- Utils ----------- #
+target_link_libraries(SolverInterfaces PUBLIC Utils)
+
+add_library(clarabel STATIC IMPORTED)
+set_property(TARGET clarabel PROPERTY
+        IMPORTED_LOCATION "${CLARABEL_LIB_PATH}")
+target_include_directories(SolverInterfaces PUBLIC "${CLARABEL_INCLUDE_DIR}")
+target_link_libraries(SolverInterfaces PUBLIC clarabel)
