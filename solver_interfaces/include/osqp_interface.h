@@ -35,6 +35,7 @@ namespace torc::solvers {
 
         OSQPInterface(const OSQPInterfaceSettings& settings);
 
+        // TODO: Change this to take in a generic upper bound/lower bound QP data struct
         // TODO: Figure out how to make the vectors const (issues with OSQPEigen I think)
         SolverStatus ResetData(const sp_matrixx_t& P, vectorx_t& w,
                                const sp_matrixx_t& A, vectorx_t& lb, vectorx_t& ub);
