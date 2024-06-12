@@ -16,6 +16,7 @@ namespace torc::solvers {
         InvalidData,
         InitializationFailed,
         Ok,
+        Unsolved,
         Error
     };
 

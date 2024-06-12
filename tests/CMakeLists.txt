@@ -36,6 +36,16 @@ add_executable(osqp_tests osqp_tests.cpp)
 target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
 
+# ----------- Utils Tests ---------- #
+add_executable(utils_tests utils_tests.cpp)
+target_link_libraries(utils_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(utils_tests PUBLIC Utils)
+
+# --------- Clarabel Tests --------- #
+add_executable(clarabel_tests clarabel_tests.cpp)
+target_link_libraries(clarabel_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
