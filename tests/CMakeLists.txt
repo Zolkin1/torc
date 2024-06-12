@@ -31,6 +31,11 @@ add_executable(ipopt_tests ipopt_tests.cpp)
 target_link_libraries(ipopt_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(ipopt_tests PUBLIC SolverInterfaces)
 
+# ---------- OSQPInterface Tests ---------- #
+add_executable(osqp_tests osqp_tests.cpp)
+target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
+
 # ----------- Utils Tests ---------- #
 add_executable(utils_tests utils_tests.cpp)
 target_link_libraries(utils_tests PRIVATE Catch2::Catch2WithMain)

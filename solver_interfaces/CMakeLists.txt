@@ -5,11 +5,14 @@ set(SOLVER_HEADER_LIST
     "${SOLVERS_INC}/ipopt_interface.h"
     "${SOLVERS_INC}/ipopt.h"
     "${SOLVERS_INC}/solver_status.h"
-    "${SOLVERS_INC}/clarabel_interface.h")
+    "${SOLVERS_INC}/clarabel_interface.h"
+    "${SOLVERS_INC}/osqp_interface.h"
+    "${SOLVERS_INC}/qp_interface.h")
 
 add_library(SolverInterfaces
     ipopt_interface.cpp
     ipopt.cpp
+    osqp_interface.cpp
     solver_status.cpp
     clarabel_interface.cpp)
 
@@ -45,6 +48,11 @@ link_directories(${IPOPT_LIB_DIR})
 target_link_libraries(SolverInterfaces PUBLIC
         ${IPOPT_LIB_DIR}/libipopt.so.3
         ${IPOPT_LIB_DIR}/libcoinmumps.so.3)
+
+# ------------ OSQPInterface & OSQPInterface Eigen ---------- #
+find_package(osqp REQUIRED)
+find_package(OsqpEigen REQUIRED)
+target_link_libraries(SolverInterfaces PUBLIC osqp::osqp OsqpEigen::OsqpEigen)
 
 #----------- Clarabel ----------- #
 set(CLARABEL_LIB_PATH "~/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so"
