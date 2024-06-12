@@ -131,4 +131,11 @@ TEST_CASE("Basic Clarabel Test", "[optimization][clarabel]") {
         std::cout << "\nChanging Settings Result: ";
         PrintStatus(std::cout, status);
     }
+
+    SECTION("Invalid Data") {
+        ClarabelInterface qp;
+        data.constraint_data.erase(data.constraint_data.begin());
+
+        REQUIRE(qp.SetData(data) == InvalidData);
+    }
 }

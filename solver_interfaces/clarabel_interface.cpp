@@ -57,7 +57,7 @@ namespace torc::solvers {
 
     SolverStatus ClarabelInterface::SetData(ClarabelData& data) {
         if (!data.ConsistencyCheck()) {
-            return InitializationFailed;
+            return InvalidData;
         }
 
         data_ = data;
