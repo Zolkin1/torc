@@ -27,24 +27,29 @@ target_link_libraries(srb_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(srb_tests PUBLIC Models)
 
 # ---------- IPOPT Tests ---------- #
-add_executable(ipopt_tests ipopt_tests.cpp)
-target_link_libraries(ipopt_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(ipopt_tests PUBLIC SolverInterfaces)
+if (BUILD_WITH_IPOPT)
+    add_executable(ipopt_tests ipopt_tests.cpp)
+    target_link_libraries(ipopt_tests PRIVATE Catch2::Catch2WithMain)
+    target_link_libraries(ipopt_tests PUBLIC SolverInterfaces)
+endif ()
 
 # ---------- OSQPInterface Tests ---------- #
-add_executable(osqp_tests osqp_tests.cpp)
-target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
-
+if (BUILD_WITH_OSQP)
+    add_executable(osqp_tests osqp_tests.cpp)
+    target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
+    target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
+endif ()
 # ----------- Utils Tests ---------- #
 add_executable(utils_tests utils_tests.cpp)
 target_link_libraries(utils_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(utils_tests PUBLIC Utils)
 
 # --------- Clarabel Tests --------- #
-add_executable(clarabel_tests clarabel_tests.cpp)
-target_link_libraries(clarabel_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
+if (BUILD_WITH_CLARABEL)
+    add_executable(clarabel_tests clarabel_tests.cpp)
+    target_link_libraries(clarabel_tests PRIVATE Catch2::Catch2WithMain)
+    target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
+endif ()
 
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
