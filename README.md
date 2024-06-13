@@ -15,7 +15,7 @@ Dependencies (optional):
 - Clarabel.cpp
 - IPOPT
 
-Supported Systems:
+Officially Supported Systems:
 - Ubuntu 22.04
 We hope to expand the supported systems soon.
 
@@ -27,7 +27,8 @@ library if desired. The following cmake variables can be set to build these inte
 - `BUILD_WITH_OSQP`
 - `BUILD_WITH_CLARABEL`
 
-We currently default all of these to `ON`. If we want to turn off IPOPT, for example, then we can pass `-DBUILD_WITH_IPOPT=OFF`.
+We currently default all of these to `ON`. If we want to turn off IPOPT, for example, then we can pass 
+`-DBUILD_WITH_IPOPT=OFF`.
 
 ### IPOPT
 `IPOPT_INC_PATH` and `IPOPT_LIB_PATH` may need to be set. They set the location to search for the header files,
