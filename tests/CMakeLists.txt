@@ -18,13 +18,15 @@ target_link_libraries(cost_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(cost_tests PUBLIC Functions)
 
 # ---------- Model Tests ---------- #
-add_executable(rigid_body_tests rigid_body_tests.cpp)
-target_link_libraries(rigid_body_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(rigid_body_tests PUBLIC Models)
+if (BUILD_WITH_PINOCCHIO)
+    add_executable(rigid_body_tests rigid_body_tests.cpp)
+    target_link_libraries(rigid_body_tests PRIVATE Catch2::Catch2WithMain)
+    target_link_libraries(rigid_body_tests PUBLIC Models)
 
-add_executable(srb_tests srb_tests.cpp)
-target_link_libraries(srb_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(srb_tests PUBLIC Models)
+    add_executable(srb_tests srb_tests.cpp)
+    target_link_libraries(srb_tests PRIVATE Catch2::Catch2WithMain)
+    target_link_libraries(srb_tests PUBLIC Models)
+endif ()
 
 # ---------- IPOPT Tests ---------- #
 if (BUILD_WITH_IPOPT)

@@ -45,7 +45,8 @@ endif ()
 
 # -------- Create the library -------- #
 add_library(SolverInterfaces
-        ${SOLVER_SOURCES_LIST})
+        ${SOLVER_SOURCES_LIST}
+        ${SOLVER_HEADER_LIST})
 
 target_include_directories(SolverInterfaces PUBLIC
         $<BUILD_INTERFACE:${SOLVERS_INC}>

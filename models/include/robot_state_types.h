@@ -8,8 +8,6 @@
 #include <eigen3/Eigen/Dense>
 #include <iostream>
 
-#include "pinocchio/multibody/liegroup/liegroup.hpp"
-
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
@@ -83,22 +81,6 @@ namespace torc::models {
             return false;
         }
     };
-
-    struct FrameState {
-        pinocchio::SE3 placement;
-        pinocchio::Motion vel;
-
-        FrameState(const pinocchio::SE3& p, const pinocchio::Motion v) {
-            placement = p;
-            vel = v;
-        }
-
-        bool operator==(const FrameState& other) const {
-            return other.placement == placement && other.vel == vel;
-        }
-    };
-
-
 } // torc::models
 
 // Does not work (linker never finishes)
