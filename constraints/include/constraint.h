@@ -2,15 +2,16 @@
 #define TORC_CONSTRAINT_H
 
 #include <eigen3/Eigen/Dense>
-#include "explicit_fn.h"
 #include <string>
 #include <ranges>
+#include "explicit_fn.h"
+#include "eigen_utils.h"
 
 
 namespace torc::constraint {
-    enum CONSTRAINT_TYPE {EQ, LEQ, GEQ};
+    enum CONSTRAINT_T {EQ, LEQ, GEQ};
 
-    CONSTRAINT_TYPE reverse_type(CONSTRAINT_TYPE& ct) {
+    CONSTRAINT_T reverse_type(CONSTRAINT_T& ct) {
         return (ct == EQ) ? EQ : (ct == LEQ) ? GEQ : LEQ;
     }
 
@@ -18,12 +19,16 @@ namespace torc::constraint {
     class Constraint {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
         using vectorx_t = Eigen::VectorX<scalar_t>;
-        using rowvecx_t = Eigen::RowVectorX<scalar_t>;
+        using rowvecx_t = Eigen::VectorX<scalar_t>;
 
     public:
+        Constraint() {
+            this->name_ = "ConstraintInstance";
+        }
+
         Constraint(const std::vector<fn::ExplicitFn<scalar_t>>& functions,
                    const std::vector<scalar_t>& bounds,
-                   const std::vector<CONSTRAINT_TYPE>& constraint_types,
+                   const std::vector<CONSTRAINT_T>& constraint_types,
                    const std::string& name="ConstraintInstance") {
             this->functions_ = functions;
             this->bounds_ = bounds;
@@ -32,15 +37,78 @@ namespace torc::constraint {
         }
 
         bool Check(const vectorx_t& x) {
-            return true;
+            for (int i=0; i<this->functions_.size(); i++) {
+                fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
+                scalar_t bound = this->bounds_.at(i);
+                switch (this->constraint_types_.at(i)) {
+                    case GEQ:
+                        if (fn(x) > bound) {
+                            return true;
+                        }
+                        break;
+                }
+            }
         }
 
         void AddConstraint(const fn::ExplicitFn<scalar_t>& fn,
                            const scalar_t& bound,
-                           const CONSTRAINT_TYPE& constraint_type) {
+                           const CONSTRAINT_T& constraint_type) {
             this->functions_.push_back(fn);
             this->bounds_.push_back(bound);
             this->constraint_types_(constraint_type);
+        }
+
+        void RawForm(const vectorx_t& x,
+                     matrixx_t& A,
+                     vectorx_t& bounds,
+                     Eigen::VectorX<CONSTRAINT_T>& constraints) {
+            if (this->constraint_types_.size() == 0) {
+                return;
+            }
+            std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
+            size_t n_rows = this->functions_.size();
+            A.resize(n_rows, x.size());
+            constraints = this->constraint_types_;
+            bounds.resize(n_rows);
+            for (int i=0; i < n_rows; i++) {
+                fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
+                A.row(i) = fn.Gradient(x).transposeInPlace();
+                bounds(i)= this->bounds_(i) - fn(x);
+            }
+        }
+
+        void RawFormCompact(const vectorx_t& x,
+                            matrixx_t& A,
+                            vectorx_t& bounds,
+                            Eigen::VectorX<CONSTRAINT_T>& constraints,
+                            vectorx_t& annotations) {
+            if (this->constraint_types_.size() == 0) {
+                return;
+            }
+            std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
+            std::vector<CONSTRAINT_T> constraints_ = {};
+            std::vector<size_t> annotations_ = {};
+
+            size_t n_rows = this->functions_.size();
+            A.resize(n_rows, x.size());
+            bounds.resize(n_rows);
+
+            CONSTRAINT_T prev_type = this->constraint_types_.at(0);
+            annotations_.push_back(1);
+
+            for (int i=0; i < n_rows; i++) {
+                fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
+                A.row(i) = fn.Gradient(x).transposeInPlace();
+                bounds(i) = this->bounds_(i) - fn(x);
+
+                CONSTRAINT_T curr_type = this->constraint_types_.at(i);
+                if (curr_type == prev_type) {
+                    annotations_.back()++;
+                } else {
+                    constraints_.push_back(curr_type);
+                    annotations_.push_back(1);
+                }
+            }
         }
 
         /**
@@ -50,7 +118,10 @@ namespace torc::constraint {
          * @param upper_bound a vector to hold the upper bounds
          */
         void UnilateralForm(const vectorx_t& x, matrixx_t& A, vectorx_t& upper_bound) {
-            std::vector<CONSTRAINT_TYPE> c_types = this->constraint_types_;
+            if (this->constraint_types_.size() == 0) {
+                return;
+            }
+            std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             size_t n_rows = this->functions_.size() + std::count(c_types.cbegin(), c_types.cend(), EQ);
             A.resize(n_rows, x.size());
             upper_bound.resize(n_rows);
@@ -79,11 +150,19 @@ namespace torc::constraint {
             }
         }
 
-        std::tuple<matrixx_t, vectorx_t> SparseUnilateralForm(const vectorx_t& x) {
-            return std::make_tuple(1, 1);
+        void SparseUnilateralForm(const vectorx_t& x) {
+            if (this->constraint_types_.size() == 0) {
+                return;
+            }
         }
 
-        void BoxForm(const vectorx_t& x, matrixx_t& A, vectorx_t& lower_bound, vectorx_t& upper_bound) {
+        void BoxForm(const vectorx_t& x,
+                     matrixx_t& A,
+                     vectorx_t& lower_bound,
+                     vectorx_t& upper_bound) {
+            if (this->constraint_types_.size() == 0) {
+                return;
+            }
             scalar_t min = std::numeric_limits<scalar_t>::min();
             scalar_t max = std::numeric_limits<scalar_t>::max();
             size_t n_rows = this->functions_.size();
@@ -113,6 +192,9 @@ namespace torc::constraint {
             }
         }
 
+        // make another function, constraints are "sparse" in the sense that one constraint is valid for a certain amount of rows
+        // also returns the annotation vector
+
         std::tuple<vectorx_t, matrixx_t, vectorx_t> SparseBoxForm(const vectorx_t& x) {
             return std::make_tuple(1, 1, 1);
         }
@@ -122,7 +204,10 @@ namespace torc::constraint {
                                     vectorx_t& upper_bound,
                                     matrixx_t& G,
                                     vectorx_t& equality_bound) {
-            std::vector<CONSTRAINT_TYPE> c_types = this->constraint_types_;
+            if (this->constraint_types_.size() == 0) {
+                return;
+            }
+            std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             size_t n_functions = this->functions_.size();
             size_t G_n_rows = n_functions - std::count(c_types.cbegin(), c_types.cend(), EQ);
             size_t A_n_rows = n_functions - G_n_rows;
@@ -154,14 +239,17 @@ namespace torc::constraint {
             }
         }
 
+
         std::tuple<vectorx_t, matrixx_t, vectorx_t> SparseInequalityEqualityForm(const vectorx_t& x) {
             return std::make_tuple(1, 1, 1);
         }
 
+
+
     private:
         std::vector<fn::ExplicitFn<scalar_t>>& functions_;
         std::vector<scalar_t> bounds_;
-        std::vector<CONSTRAINT_TYPE>& constraint_types_;
+        std::vector<CONSTRAINT_T>& constraint_types_;
         std::string name_;
     };
 }
