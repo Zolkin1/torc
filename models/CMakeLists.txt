@@ -3,7 +3,6 @@ message(STATUS "Building models")
 set(MODELS_INC "${torc_SOURCE_DIR}/models/include")
 set(MODELS_HEADER_LIST
         "${MODELS_INC}/base_model.h"
-
         "${MODELS_INC}/robot_state_types.h"
         "${MODELS_INC}/robot_contact_info.h")
 
