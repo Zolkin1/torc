@@ -10,7 +10,7 @@ Dependencies (required):
 - Eigen 3
 
 Dependencies (optional):
-- Pinocchio
+- Pinocchio 3.0
 - OSQP & OSQP Eigen
 - Clarabel.cpp
 - IPOPT
