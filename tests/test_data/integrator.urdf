@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<robot name="double_integrator">
+<!--    <link name="world"/>-->
+
+    <link name="body">
+        <visual>
+            <geometry>
+                <sphere radius="0.1"/>
+            </geometry>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
+        </visual>
+        <inertial>
+            <mass value="1"/>
+            <inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+        </inertial>
+    </link>
+
+<!--    <joint name="point" type="prismatic">-->
+<!--        <parent link="world"/>-->
+<!--        <child link="body"/>-->
+<!--        <limit effort="1000.0" lower="-1000" upper="1000" velocity="1000"/>-->
+<!--        <origin rpy="0 0 0" xyz="0 0 0"/>-->
+<!--    </joint>-->
+
+<!--    <joint name="point" type="prismatic">-->
+<!--        <parent link="world"/>-->
+<!--        <child link="body"/>-->
+<!--        <limit effort="1000.0" lower="-1000" upper="1000" velocity="1000"/>-->
+<!--        <origin rpy="0 0 0" xyz="0 0 0"/>-->
+<!--    </joint>-->
+
+<!--    <joint name="point" type="prismatic">-->
+<!--        <parent link="world"/>-->
+<!--        <child link="body"/>-->
+<!--        <limit effort="1000.0" lower="-1000" upper="1000" velocity="1000"/>-->
+<!--        <origin rpy="0 0 0" xyz="0 0 0"/>-->
+<!--    </joint>-->
+
+</robot>

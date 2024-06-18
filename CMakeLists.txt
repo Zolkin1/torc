@@ -9,6 +9,10 @@ message(STATUS "Building TORC Project")
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
 set(BUILD_TESTING True)
 
+option(BUILD_WITH_IPOPT "Build with IPOPT interface" ON)
+option(BUILD_WITH_OSQP "Build with OSQP interface" ON)
+option(BUILD_WITH_CLARABEL "Build with Clarabel interface" ON)
+
 if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_TESTING)
     include(CTest)
     add_subdirectory(tests)
@@ -22,6 +26,8 @@ add_subdirectory(models)
 add_subdirectory(costs)
 add_subdirectory(functions)
 add_subdirectory(constraints)
+add_subdirectory(solver_interfaces)
 add_subdirectory(utils)
 
 # TODO: Figure out the install structure for the library
+# TODO: Make different linking targets if they only want part of the library
