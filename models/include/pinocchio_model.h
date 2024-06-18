@@ -9,6 +9,7 @@
 
 #include "base_model.h"
 #include "robot_contact_info.h"
+#include "frame_state_types.h"
 
 namespace torc::models {
 

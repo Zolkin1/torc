@@ -3,20 +3,32 @@ message(STATUS "Building models")
 set(MODELS_INC "${torc_SOURCE_DIR}/models/include")
 set(MODELS_HEADER_LIST
         "${MODELS_INC}/base_model.h"
-        "${MODELS_INC}/pinocchio_model.h"
-        "${MODELS_INC}/rigid_body.h"
         "${MODELS_INC}/robot_state_types.h"
-        "${MODELS_INC}/robot_contact_info.h"
-        "${MODELS_INC}/single_rigid_body.h")
+        "${MODELS_INC}/robot_contact_info.h")
 
-add_library(Models
-        base_model.cpp
+set(MODELS_SOURCES_LIST
+    base_model.cpp)
+
+#----------- Pinocchio -----------#
+if (BUILD_WITH_PINOCCHIO)
+    message(STATUS "Building with Pinocchio")
+
+    list(APPEND MODELS_SOURCES_LIST
         pinocchio_model.cpp
         rigid_body.cpp
-        single_rigid_body.cpp
-        ${MODELS_HEADER_LIST})
+        single_rigid_body.cpp)
 
-set_target_properties(Models PROPERTIES LINKER_LANGUAGE CXX)
+    list(APPEND MODELS_HEADER_LIST
+        "${MODELS_INC}/pinocchio_model.h"
+        "${MODELS_INC}/rigid_body.h"
+        "${MODELS_INC}/frame_state_types.h"
+        "${MODELS_INC}/single_rigid_body.h")
+endif ()
+
+# -------  Create Library -------- #
+add_library(Models
+        ${MODELS_SOURCES_LIST}
+        ${MODELS_HEADER_LIST})
 
 target_include_directories(Models PUBLIC
         $<BUILD_INTERFACE:${MODELS_INC}>
@@ -27,5 +39,7 @@ find_package(Eigen3 REQUIRED)
 target_link_libraries(Models PUBLIC Eigen3::Eigen)
 
 #----------- Pinocchio -----------#
-find_package(pinocchio 3.0.0 REQUIRED)
-target_link_libraries(Models PUBLIC pinocchio::pinocchio)
+if (BUILD_WITH_PINOCCHIO)
+    find_package(pinocchio 3.0.0 REQUIRED)
+    target_link_libraries(Models PUBLIC pinocchio::pinocchio)
+endif ()
