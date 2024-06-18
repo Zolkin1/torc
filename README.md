@@ -8,9 +8,9 @@ setup reduced and full order models for robots, and create, manage, and approxim
 ## Dependencies and Supported Systems
 Dependencies (required):
 - Eigen 3
-- Pinocchio
 
 Dependencies (optional):
+- Pinocchio
 - OSQP & OSQP Eigen
 - Clarabel.cpp
 - IPOPT
@@ -20,9 +20,10 @@ Officially Supported Systems:
 We hope to expand the supported systems soon.
 
 ## CMake Options
-A number of optimization solver interfaces are provided and can be built with the 
+A number of external dependency interfaces (optimization solvers, rigid body dynamics) are provided and can be built with the 
 library if desired. The following cmake variables can be set to build these interfaces:
 
+- `BUILD_WITH_PINOCCHIO`
 - `BUILD_WITH_IPOPT`
 - `BUILD_WITH_OSQP`
 - `BUILD_WITH_CLARABEL`
@@ -49,3 +50,8 @@ If you have installed Clarabel in a different location then these variables must
 
 ### OSQP
 If OSQP is installed properly, then the library will be automatically found and linked.
+
+### Pinocchio
+If Pinocchio is installed properly, then the library will be automatically found and linked.
+Note that we rely on Pinocchio 3.0, which as of 6/18/24 is only available as a build from source 
+(but note that it is an officially supported release, not a preview branch).
