@@ -39,6 +39,11 @@ namespace torc::models {
         bool operator==(const RobotStateDerivative& other) const {
             return (other.v == v) && (other.a == a);
         }
+
+        void ToVector(vectorx_t& vec) const {
+            vec.resize(v.size() + a.size());
+            vec << v, a;
+        }
     };
 
     struct RobotState {
@@ -79,6 +84,11 @@ namespace torc::models {
             }
 
             return false;
+        }
+
+        void ToVector(vectorx_t& vec) const {
+            vec.resize(q.size() + v.size());
+            vec << q, v;
         }
     };
 } // torc::models

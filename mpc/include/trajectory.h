@@ -13,10 +13,12 @@ namespace torc::mpc {
     struct Trajectory {
         std::vector<models::RobotState> states;
         std::vector<models::vectorx_t> inputs;
+        double dt;  // Time difference between each node
     };
 
     struct ContactTrajectory : public Trajectory {
         std::vector<models::RobotContactInfo> contacts;
+        std::vector<double> impulse_times;
     };
 }
 
