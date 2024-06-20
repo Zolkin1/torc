@@ -34,6 +34,14 @@ namespace torc::mpc {
      *  a line search. This will return a new trajectory.
      *
      *  We will provide a call to perform the IPOPT solve if the user does not want to use RTI.
+     *
+     *  MPC will always structure the QP vector as [states, inputs]^T (when it can).
+     *
+     *  TODO: For now I will just write an MPC implementation that uses one model and interfaces with one
+     *   solver. Once that is done I will be able to see more clearly what is needed.
+     *   One option is making base model have some of the functions I need (abstract), then the contact
+     *   and smooth interfaces and inherit from base model. PinocchioModel would not inherit from BaseModel.
+     *   User models would need to inherit from the interfaces that inherit from BaseModel.
      */
     class MPCBase {
     public:
@@ -65,6 +73,11 @@ namespace torc::mpc {
         // Hold a constraint object
 
         // Hold a cost object
+
+        // Hold all the metadata associated with the constraints and dynamics
+
+        int nodes_;
+
     private:
     };
 } // torc::mpc

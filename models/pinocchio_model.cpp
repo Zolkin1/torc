@@ -18,6 +18,17 @@ namespace torc::models {
         mass_ = pinocchio::computeTotalMass(pin_model_);
     }
 
+    PinocchioModel::PinocchioModel(const torc::models::PinocchioModel& other)
+        : BaseModel(other.name_) {
+        this->system_type_ = other.system_type_;
+
+        urdf_ = other.urdf_;
+        pin_model_ = other.pin_model_;
+        pin_data_ = std::make_unique<pinocchio::Data>(*other.pin_data_); // TODO: Check that this works as expected
+        mass_ = other.mass_;
+        num_inputs_ = other.num_inputs_;
+    }
+
     void PinocchioModel::CreatePinModel() {
         // Verify that the given file exists
         if (!std::filesystem::exists(urdf_)) {

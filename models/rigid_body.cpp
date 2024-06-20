@@ -39,6 +39,14 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
+    RigidBody::RigidBody(const torc::models::RigidBody& other)
+        : PinocchioModel(other.name_, other.urdf_) {
+        num_inputs_ = other.num_inputs_;
+
+        act_mat_ = other.act_mat_;
+        contact_data_ = std::make_unique<pinocchio::Data>(*other.contact_data_);
+    }
+
     RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input) {
         assert(state.q.size() - 1 == state.v.size());
 

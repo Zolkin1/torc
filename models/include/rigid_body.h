@@ -21,6 +21,8 @@ namespace torc::models {
         RigidBody(const std::string& name, const std::filesystem::path& urdf,
                   const std::vector<std::string>& underactuated_joints);
 
+        RigidBody(const RigidBody& other);
+
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) override;
 
@@ -30,7 +32,7 @@ namespace torc::models {
         RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
                                       const RobotContactInfo& contact_info);
 
-        // TODO: Lineaization function that calculates the FD and derivatives so we don't have redundant calls
+        // TODO: Linearization function that calculates the FD and derivatives so we don't have redundant calls
 
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
                                 matrixx_t& A, matrixx_t& B) override;

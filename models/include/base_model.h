@@ -19,6 +19,8 @@ namespace torc::models {
 
         BaseModel(std::string name);
 
+        BaseModel(const BaseModel& other);
+
         std::string GetName() const;
 
         virtual RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) = 0;

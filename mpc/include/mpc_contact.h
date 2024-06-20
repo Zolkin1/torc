@@ -8,19 +8,25 @@
 #include <memory>
 
 #include "contact_model.h"
-#include "mpc_base.h"
+#include "rigid_body.h"
+
+#include "trajectory.h"
 
 namespace torc::mpc {
-    class MPCContact : public MPCBase {
+    class MPCContact {
     public:
         MPCContact(const models::ContactModel& model);
 
         // Want to provide this function for all the generic data types and any of the special ones
         //  that I provide an interface for.
-//        void GetQPData()
+        void ToHPIPMData(const Trajectory& traj);
 
     protected:
-       std::unique_ptr<models::ContactModel> model_;
+       models::RigidBody model_;
+
+       // cost fcn
+
+       // constraints
 
     private:
     };

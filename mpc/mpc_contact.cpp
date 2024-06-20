@@ -5,5 +5,8 @@
 #include "mpc_contact.h"
 
 namespace torc::mpc {
+    MPCContact::MPCContact(const models::ContactModel& model)
+        : model_(model) {
 
+    }
 } // torc::mpc

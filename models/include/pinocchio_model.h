@@ -28,6 +28,8 @@ namespace torc::models {
          */
         PinocchioModel(const std::string& name, const std::filesystem::path& urdf);
 
+        PinocchioModel(const PinocchioModel& other);
+
         virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
 
         [[nodiscard]] long GetNumInputs() const;
