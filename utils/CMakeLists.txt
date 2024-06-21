@@ -3,11 +3,12 @@ message(STATUS "Building Utils")
 set(UTILS_INC "${torc_SOURCE_DIR}/utils/include")
 set(UTILS_HEADER_LIST
     "${UTILS_INC}/torc_timer.h"
-    "${UTILS_INC}/eigen_utils.h")
-add_library(Utils SHARED ${UTILS_HEADER_LIST})
+    "${UTILS_INC}/eigen_utils.h"
+    "${UTILS_INC}/sparse_matrix_builder.h")
 
 add_library(Utils
-    torc_timer.cpp)
+    torc_timer.cpp
+    sparse_matrix_builder.cpp)
 
 set_target_properties(Utils PROPERTIES LINKER_LANGUAGE CXX)
 

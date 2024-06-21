@@ -24,7 +24,6 @@ if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_EXAMPLES)
 endif()
 
 add_subdirectory(models)
-add_subdirectory(costs)
 add_subdirectory(functions)
 add_subdirectory(constraints)
 add_subdirectory(solver_interfaces)

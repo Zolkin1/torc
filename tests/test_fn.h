@@ -1,3 +1,6 @@
+#ifndef TEST_FN_H
+#define TEST_FN_H
+
 #include <eigen3/Eigen/Dense>
 #include <cmath>
 #include "linear_fn.h"
@@ -59,3 +62,5 @@ namespace test {
             [](const Eigen::VectorX<scalar_t>& x) { return exp(sin(x.sum())) * (cos(x.sum()) * cos(x.sum()) - sin(x.sum())) * Eigen::MatrixX<scalar_t>::Ones(x.size(), x.size()); } // 7
     };
 }
+
+#endif

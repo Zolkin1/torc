@@ -6,8 +6,8 @@ set(CONSTRAINT_HEADER_LIST
         "${CONSTRAINT_INC_DIR}/constraint.h")
 
 add_library(Constraints SHARED ${CONSTRAINT_HEADER_LIST})
-target_link_libraries(Constraints SHARED Functions)
-target_link_libraries(Constraints SHARED Utils)
+target_link_libraries(Constraints Functions)
+target_link_libraries(Constraints Utils)
 
 set_target_properties(Constraints PROPERTIES LINKER_LANGUAGE CXX)
 
