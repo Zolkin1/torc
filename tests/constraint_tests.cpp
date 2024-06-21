@@ -5,6 +5,7 @@
 #include "constraint.h"
 #include "explicit_fn.h"
 #include "test_fn.h"
+#include "catch2/benchmark/catch_benchmark.hpp"
 
 TEST_CASE("Constraint Initialization and Check", "[constraint]") {
     using namespace torc;
@@ -44,7 +45,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
     using namespace torc::constraint;
     using namespace torc::fn;
     auto constraint0 = Constraint<double>();
-    const auto func_d = test::functions<double>;
+    const auto func_d = test::functions<double>;    // prepare to instantiate functions
     const auto grad_d = test::gradients<double>;
     const auto hess_d = test::hessians<double>;
     constraint0.AddConstraint(
@@ -75,13 +76,11 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         1,
         EQ
     );
-    const Eigen::Vector3d vec = {1, 2, 3};
-    Eigen::MatrixXd A;
-    Eigen::MatrixXd G;
-    Eigen::SparseMatrix<double> A_sp;
-    Eigen::SparseMatrix<double> G_sp;
-    Eigen::VectorXd bounds0;
-    Eigen::VectorXd bounds1;
+
+    const Eigen::Vector3d vec = {1, 2, 3};      // vector to test
+    Eigen::MatrixXd A, G;       // prepare matrices for reuse, no need to re-declare for every section
+    Eigen::SparseMatrix<double> A_sp, G_sp;
+    Eigen::VectorXd bounds0, bounds1;
     std::vector<CONSTRAINT_T> types;
     std::vector<size_t> annotations;
 
@@ -129,6 +128,10 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         Eigen::VectorXd bounds_true(5);
         bounds_true << 7, 13, -216, -5, 5;
         REQUIRE(bounds0 == bounds_true);
+
+        constraint0.SparseUnilateralForm(vec, A_sp, bounds0);
+        REQUIRE(A_true == A_sp.toDense());
+        REQUIRE(bounds0 == bounds_true);
     }
 
     SECTION("Box Form") {
@@ -146,6 +149,11 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         ubounds_true << max, max, -216, -5;
         REQUIRE(bounds0 == lbounds_true);
         REQUIRE(bounds1 == ubounds_true);
+
+        constraint0.SparseBoxForm(vec, A_sp, bounds0, bounds1);
+        REQUIRE(A_true == A_sp.toDense());
+        REQUIRE(bounds0 == lbounds_true);
+        REQUIRE(bounds1 == ubounds_true);
     }
 
     SECTION("Inequality Equality Form") {
@@ -161,6 +169,12 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         Eigen::VectorXd bounds0_true(3), bounds1_true(1);
         bounds0_true << 7, 13, -216;
         bounds1_true << -5;
+        REQUIRE(bounds0 == bounds0_true);
+        REQUIRE(bounds1 == bounds1_true);
+
+        constraint0.SparseInequalityEqualityForm(vec, A_sp, bounds0, G_sp, bounds1);
+        REQUIRE(A_true == A_sp.toDense());
+        REQUIRE(G_true == G_sp.toDense());
         REQUIRE(bounds0 == bounds0_true);
         REQUIRE(bounds1 == bounds1_true);
     }

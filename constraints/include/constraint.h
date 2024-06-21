@@ -1,10 +1,13 @@
 #ifndef TORC_CONSTRAINT_H
 #define TORC_CONSTRAINT_H
 
+#include <eigen3/Eigen/Sparse>
 #include <eigen3/Eigen/Dense>
 #include <string>
+#include <iostream>
 #include "explicit_fn.h"
-#include "sparse_matrix_builder.h"
+
+#define CONSTRAINT_CHECK_EMPTY if (this->constraint_types_.empty()) { return; }
 
 namespace torc::constraint {
     enum CONSTRAINT_T {
@@ -22,7 +25,7 @@ namespace torc::constraint {
     class Constraint {
         using matrixx_t = Eigen::MatrixX<scalar_t>;
         using vectorx_t = Eigen::VectorX<scalar_t>;
-        using rowvecx_t = Eigen::VectorX<scalar_t>;
+        using rowvecx_t = Eigen::RowVectorX<scalar_t>;
         using sp_matrix_t = Eigen::SparseMatrix<scalar_t>;
 
     public:
@@ -88,17 +91,23 @@ namespace torc::constraint {
             this->constraint_types_.push_back(constraint_type);
         }
 
+        /**
+         * Computes the linearzation of all the constraints, and returns them in the form Ax <=/=/>= b
+         * @param x the point to linearize the constraint functions
+         * @param A the matrix comprised to be loaded from the transposed gradients of the function
+         * @param bounds the vector to be loaded from the constraint bounds
+         * @param constraint_types the std vector to be loaded from the constriant types
+         */
         void RawForm(const vectorx_t& x,
                      matrixx_t& A,
                      vectorx_t& bounds,
-                     std::vector<CONSTRAINT_T>& constraints) {
-            if (this->constraint_types_.size() == 0) {
-                return;
-            }
+                     std::vector<CONSTRAINT_T>& constraint_types) {
+            CONSTRAINT_CHECK_EMPTY
+
             std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             size_t n_rows = this->functions_.size();
             A.resize(n_rows, x.size());
-            constraints = this->constraint_types_;
+            constraint_types = this->constraint_types_;
             bounds.resize(n_rows);
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
@@ -107,39 +116,36 @@ namespace torc::constraint {
             }
         }
 
+
+        /**
+         *
+         * @param x the point to lienarize the constraint functions
+         * @param A the matrix to be loaded from the transposed gradients of the function
+         * @param bounds the vector to be loaded from the constraint bounds
+         * @param constraints the std vector to be loaded from the constraint types
+         * @param annotations the number of repetitions that each constraint type appears in sequence
+         */
         void CompactRawForm(const vectorx_t& x,
                             matrixx_t& A,
                             vectorx_t& bounds,
                             std::vector<CONSTRAINT_T>& constraints,
                             std::vector<size_t>& annotations) {
-            size_t n_rows = this->constraint_types_.size();
-            if (n_rows == 0) {
-                return;
-            }
-            std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
-            std::vector<CONSTRAINT_T> constraints_ = {};
-            std::vector<size_t> annotations_ = {};
+            CONSTRAINT_CHECK_EMPTY
 
-            n_rows = this->functions_.size();
-            A.resize(n_rows, x.size());
-            bounds.resize(n_rows);
+            this->RawForm(x, A, bounds, constraints);
 
-            CONSTRAINT_T prev_type = this->constraint_types_.at(0);
+            CONSTRAINT_T prev_type = constraints.at(0);
             constraints.clear();
             annotations.clear();
 
-            for (int i=0; i < n_rows; i++) {
-                fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                A.row(i) = fn.Gradient(x).transpose();
-                bounds(i) = this->bounds_.at(i) - fn(x);
-
-                const CONSTRAINT_T curr_type = this->constraint_types_.at(i);
-                if ((curr_type != prev_type) || annotations.empty()) {
-                    constraints.push_back(curr_type);
+            for (auto type : this->constraint_types_) {
+                if ((type != prev_type) || annotations.empty()) {
+                    constraints.push_back(type);
                     annotations.push_back(1);
                 } else {
                     annotations.back()++;
                 }
+                prev_type = type;
             }
         }
 
@@ -150,11 +156,10 @@ namespace torc::constraint {
          * @param upper_bound a vector to hold the upper bounds
          */
         void UnilateralForm(const vectorx_t& x, matrixx_t& A, vectorx_t& upper_bound) {
-            if (this->constraint_types_.size() == 0) {
-                return;
-            }
-            std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
-            size_t n_rows = this->functions_.size() + std::count(c_types.cbegin(), c_types.cend(), EQ);
+            CONSTRAINT_CHECK_EMPTY
+            const std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
+            const size_t n_rows = this->functions_.size() + this->CountEq();
+
             A.resize(n_rows, x.size());
             upper_bound.resize(n_rows);
             for (int i=0, i_row=0; i < this->functions_.size(); i++, i_row++) {
@@ -182,48 +187,33 @@ namespace torc::constraint {
             }
         }
 
-        void SparseUnilateralForm(const vectorx_t& x, sp_matrix_t& A, vectorx_t& upper_bound) {
-            if (this->constraint_types_.size() == 0) {
-                return;
-            }
-            utils::SparseMatrixBuilder sp_builder = utils::SparseMatrixBuilder();
-            std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
-            size_t n_rows = this->functions_.size() + std::count(c_types.cbegin(), c_types.cend(), EQ);
-            upper_bound.resize(n_rows);
 
-            for (int i=0, i_row=0; i < this->functions_.size(); i++, i_row++) {
-                fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_.at(i) - fn(x);
-                rowvecx_t grad_t = fn.Gradient(x).transpose();
-                switch (c_types.at(i)) {
-                    case EQ:
-                        sp_builder.SetMatrix(grad_t, i_row, 0);
-                        upper_bound(i_row++) = bound;
-                        sp_builder.SetMatrix(grad_t * -1, i_row, 0);
-                        upper_bound(i_row) = bound * -1.;
-                        break;
-                    case LEQ:
-                        sp_builder.SetMatrix(grad_t, i_row, 0);
-                        upper_bound(i_row) = bound;
-                        break;
-                    case GEQ:
-                        sp_builder.SetMatrix(grad_t * -1, i_row, 0);
-                        upper_bound(i_row) = bound * -1.;
-                        break;
-                    default:
-                        break;
-                }
-                A.setFromTriplets(sp_builder.GetTriplet().cbegin(), sp_builder.GetTriplet().cend());
-            }
+        /**
+         * Linearizes the constraints at the point x, into the form Ax <= b, where A is sparse
+         * @param x the point at which to linearize
+         * @param A a sparse matrix to hold the transposed gradients of the functions
+         * @param upper_bound a vector to hold the upper bounds
+         */
+        void SparseUnilateralForm(const vectorx_t& x, sp_matrix_t& A, vectorx_t& upper_bound) {
+            CONSTRAINT_CHECK_EMPTY
+            matrixx_t A_dense;
+            this->UnilateralForm(x, A_dense, upper_bound);
+            A = A_dense.sparseView();
         }
 
+
+        /**
+         * Linearizes the constraints at the point x, into the form lb <= Ax <= ub
+         * @param x the point at which to linearize
+         * @param A a matrix to hold the transposed gradients of the functions
+         * @param lower_bound a vector to hold the lower bounds
+         * @param upper_bound a vector to hold the upper bounds
+         */
         void BoxForm(const vectorx_t& x,
                      matrixx_t& A,
                      vectorx_t& lower_bound,
                      vectorx_t& upper_bound) {
-            if (this->constraint_types_.size() == 0) {
-                return;
-            }
+            CONSTRAINT_CHECK_EMPTY
             scalar_t max = std::numeric_limits<scalar_t>::max();
             scalar_t min = -max;
             size_t n_rows = this->functions_.size();
@@ -254,54 +244,41 @@ namespace torc::constraint {
         }
 
 
+        /**
+         * Linearizes the constraints at the point x, into the form lb <= Ax <= ub, where A is sparse
+         * @param x the point at which to linearize
+         * @param A a sparse matrix to hold the transposed gradients of the functions
+         * @param lower_bound a vector to hold the lower bounds
+         * @param upper_bound a vector to hold the upper bounds
+         */
         void SparseBoxForm(const vectorx_t& x,
                            sp_matrix_t& A,
                            vectorx_t& lower_bound,
                            vectorx_t& upper_bound) {
-            if (this->constraint_types_.size() == 0) {
-                return;
-            }
-            const scalar_t max = std::numeric_limits<scalar_t>::max();
-            const scalar_t min = -max;
-            auto sp_builder = utils::SparseMatrixBuilder();
-            size_t n_rows = this->functions_.size();
-            A.resize(n_rows, x.size());
-            upper_bound.resize(n_rows);
-            lower_bound.resize(n_rows);
-            for (int i=0; i < n_rows; i++) {
-                fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_.at(i) - fn(x);
-                sp_builder.SetMatrix(fn.Gradient(x).transpose(), i, 0);
-                switch (this->constraint_types_.at(i)) {
-                    case EQ:
-                        upper_bound(i) = bound;
-                        lower_bound(i) = bound;
-                        break;
-                    case LEQ:
-                        upper_bound(i) = bound;
-                        lower_bound(i) = min;
-                        break;
-                    case GEQ:
-                        upper_bound(i) = max;
-                        lower_bound(i) = bound;
-                        break;
-                    default:
-                        break;
-                }
-            }
+            CONSTRAINT_CHECK_EMPTY
+            matrixx_t A_dense;
+            this->BoxForm(x, A_dense, lower_bound, upper_bound);
+            A = A_dense.sparseView();
         }
 
+
+        /**
+         * Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb
+         * @param x the point at which to linearizes
+         * @param A a matrix to hold the transposed gradients of the functions in inequality constraints
+         * @param upper_bound a vector to hold the upper bounds of the inequality constraints
+         * @param G a matrix to hold the transposed gradients of the functions in equality constraints
+         * @param equality_bound a vector to hold the lower bounds of the equality constraints
+         */
         void InequalityEqualityForm(const vectorx_t& x,
                                     matrixx_t& A,
                                     vectorx_t& upper_bound,
                                     matrixx_t& G,
                                     vectorx_t& equality_bound) {
+            CONSTRAINT_CHECK_EMPTY
             const std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
-            if (c_types.empty()) {
-                return;
-            }
             const size_t n_functions = c_types.size();
-            const size_t n_eq = std::count(c_types.cbegin(), c_types.cend(), EQ);
+            const size_t n_eq = this->CountEq();
             const size_t n_ineq = n_functions - n_eq;
 
             A.resize(n_ineq, x.rows());
@@ -333,59 +310,36 @@ namespace torc::constraint {
         }
 
 
+        /**
+         * Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb, where A and G are sparse
+         * @param x the point at which to linearizes
+         * @param A a sparse matrix to hold the transposed gradients of the functions in inequality constraints
+         * @param upper_bound a vector to hold the upper bounds of the inequality constraints
+         * @param G a sparse matrix to hold the transposed gradients of the functions in equality constraints
+         * @param equality_bound a vector to hold the lower bounds of the equality constraints
+         */
         void SparseInequalityEqualityForm(const vectorx_t& x,
                                           sp_matrix_t& A,
                                           vectorx_t& upper_bound,
                                           sp_matrix_t& G,
                                           vectorx_t& equality_bound) {
-            const std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
-            if (c_types.empty()) {
-                return;
-            }
-            auto sp_builderA = utils::SparseMatrixBuilder();
-            auto sp_builderG = utils::SparseMatrixBuilder();
-
-            const size_t n_functions = c_types.size();
-            const size_t n_eq = std::count(c_types.cbegin(), c_types.cend(), EQ);
-            const size_t n_ineq = n_functions - n_eq;
-
-            upper_bound.resize(n_ineq);
-            equality_bound.resize(n_eq);
-
-            for (int i=0, ineq_row=0, eq_row=0; i < n_functions; i++) {
-                auto fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_.at(i) - fn(x);
-                rowvecx_t grad = fn.Gradient(x).transpose();
-                switch (c_types.at(i)) {
-                    case EQ:
-                        sp_builderG.SetMatrix(grad, eq_row, 0);
-                        equality_bound.row(eq_row++) = grad;
-                        break;
-                    case LEQ:
-                        sp_builderA.SetMatrix(grad, ineq_row, 0);
-                        upper_bound(ineq_row++) = bound;
-                        break;
-                    case GEQ:
-                        sp_builderA.SetMatrix(grad * -1., ineq_row, 0);
-                        upper_bound(ineq_row++) = bound * -1.;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            std::vector<Eigen::Triplet<scalar_t>> a_triplets = sp_builderA.GetTriplet();
-            std::vector<Eigen::Triplet<scalar_t>> g_triplets = sp_builderG.GetTriplet();
-            A.setFromTriplets(a_triplets.cbegin(), a_triplets.cend());
-            G.setFromTriplets(g_triplets.cbegin(), g_triplets.cend());
+            CONSTRAINT_CHECK_EMPTY
+            matrixx_t A_dense, G_dense;
+            this->InequalityEqualityForm(x, A_dense, upper_bound, G_dense, equality_bound);
+            A = A_dense.sparseView();
+            G = G_dense.sparseView();
         }
 
 
-
     private:
-        std::vector<fn::ExplicitFn<scalar_t>> functions_;
-        std::vector<scalar_t> bounds_;
-        std::vector<CONSTRAINT_T> constraint_types_;
-        std::string name_;
+        std::vector<fn::ExplicitFn<scalar_t>> functions_;   // the functions to evaluate in the constraint
+        std::vector<scalar_t> bounds_;      // the bounds of the functions in the constraint
+        std::vector<CONSTRAINT_T> constraint_types_;    // the constraint types (i.e., LEQ, GEQ, EQ)
+        std::string name_;  // string identifier
+
+        [[nodiscard]] size_t CountEq() const {
+            return std::count(constraint_types_.cbegin(), constraint_types_.cend(), EQ);
+        }
     };
 }
 
