@@ -73,6 +73,7 @@ namespace torc::constraint {
             return true;
         }
 
+
         /**
          * Adds a single constraint to the constraint collection.
          * @param fn the function to be evaluated in the constraint
@@ -90,7 +91,7 @@ namespace torc::constraint {
         void RawForm(const vectorx_t& x,
                      matrixx_t& A,
                      vectorx_t& bounds,
-                     Eigen::VectorX<CONSTRAINT_T>& constraints) {
+                     std::vector<CONSTRAINT_T>& constraints) {
             if (this->constraint_types_.size() == 0) {
                 return;
             }
@@ -101,16 +102,16 @@ namespace torc::constraint {
             bounds.resize(n_rows);
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                A.row(i) = fn.Gradient(x).transposeInPlace();
-                bounds(i)= this->bounds_(i) - fn(x);
+                A.row(i) = fn.Gradient(x).transpose();
+                bounds(i)= this->bounds_.at(i) - fn(x);
             }
         }
 
         void CompactRawForm(const vectorx_t& x,
                             matrixx_t& A,
                             vectorx_t& bounds,
-                            Eigen::VectorX<CONSTRAINT_T>& constraints,
-                            vectorx_t& annotations) {
+                            std::vector<CONSTRAINT_T>& constraints,
+                            std::vector<size_t>& annotations) {
             size_t n_rows = this->constraint_types_.size();
             if (n_rows == 0) {
                 return;
@@ -124,20 +125,21 @@ namespace torc::constraint {
             bounds.resize(n_rows);
 
             CONSTRAINT_T prev_type = this->constraint_types_.at(0);
-            constraints.resize(n_rows);
-            annotations = vectorx_t::Zero(n_rows);
-
-            int row_compact = 0;
+            constraints.clear();
+            annotations.clear();
 
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                A.row(i) = fn.Gradient(x).transposeInPlace();
-                bounds(i) = this->bounds_(i) - fn(x);
+                A.row(i) = fn.Gradient(x).transpose();
+                bounds(i) = this->bounds_.at(i) - fn(x);
 
-                CONSTRAINT_T curr_type = this->constraint_types_.at(i);
-                row_compact += (curr_type != prev_type);
-                ++annotations(row_compact);
-                constraints(row_compact) = curr_type;
+                const CONSTRAINT_T curr_type = this->constraint_types_.at(i);
+                if ((curr_type != prev_type) || annotations.empty()) {
+                    constraints.push_back(curr_type);
+                    annotations.push_back(1);
+                } else {
+                    annotations.back()++;
+                }
             }
         }
 
@@ -157,8 +159,8 @@ namespace torc::constraint {
             upper_bound.resize(n_rows);
             for (int i=0, i_row=0; i < this->functions_.size(); i++, i_row++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_(i) - fn(x);
-                rowvecx_t grad_t = fn.Gradient(x).transposeInPlace();
+                scalar_t bound = this->bounds_.at(i) - fn(x);
+                rowvecx_t grad_t = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
                     case EQ:
                         A.row(i_row) = grad_t;
@@ -191,8 +193,8 @@ namespace torc::constraint {
 
             for (int i=0, i_row=0; i < this->functions_.size(); i++, i_row++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_(i) - fn(x);
-                rowvecx_t grad_t = fn.Gradient(x).transposeInPlace();
+                scalar_t bound = this->bounds_.at(i) - fn(x);
+                rowvecx_t grad_t = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
                     case EQ:
                         sp_builder.SetMatrix(grad_t, i_row, 0);
@@ -222,16 +224,16 @@ namespace torc::constraint {
             if (this->constraint_types_.size() == 0) {
                 return;
             }
-            scalar_t min = std::numeric_limits<scalar_t>::min();
             scalar_t max = std::numeric_limits<scalar_t>::max();
+            scalar_t min = -max;
             size_t n_rows = this->functions_.size();
             A.resize(n_rows, x.size());
             upper_bound.resize(n_rows);
             lower_bound.resize(n_rows);
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_(i) - fn(x);
-                A.row(i) = fn.Gradient(x).transposeInPlace();
+                scalar_t bound = this->bounds_.at(i) - fn(x);
+                A.row(i) = fn.Gradient(x).transpose();
                 switch (this->constraint_types_.at(i)) {
                     case EQ:
                         upper_bound(i) = bound;
@@ -259,8 +261,8 @@ namespace torc::constraint {
             if (this->constraint_types_.size() == 0) {
                 return;
             }
-            const scalar_t min = std::numeric_limits<scalar_t>::min();
             const scalar_t max = std::numeric_limits<scalar_t>::max();
+            const scalar_t min = -max;
             auto sp_builder = utils::SparseMatrixBuilder();
             size_t n_rows = this->functions_.size();
             A.resize(n_rows, x.size());
@@ -268,8 +270,8 @@ namespace torc::constraint {
             lower_bound.resize(n_rows);
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_(i) - fn(x);
-                sp_builder.SetMatrix(fn.Gradient(x).transposeInPlace(), i, 0);
+                scalar_t bound = this->bounds_.at(i) - fn(x);
+                sp_builder.SetMatrix(fn.Gradient(x).transpose(), i, 0);
                 switch (this->constraint_types_.at(i)) {
                     case EQ:
                         upper_bound(i) = bound;
@@ -302,19 +304,19 @@ namespace torc::constraint {
             const size_t n_eq = std::count(c_types.cbegin(), c_types.cend(), EQ);
             const size_t n_ineq = n_functions - n_eq;
 
-            A.resize(n_ineq, x.size());
-            G.resize(n_eq, x.size());
-            upper_bound.resize(n_ineq);
-            equality_bound.resize(n_eq);
+            A.resize(n_ineq, x.rows());
+            G.resize(n_eq, x.rows());
+            upper_bound.resize(n_ineq, 1);
+            equality_bound.resize(n_eq, 1);
 
             for (int i=0, ineq_row=0, eq_row=0; i < n_functions; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_(i) - fn(x);
-                rowvecx_t grad = fn.Gradient(x).transposeInPlace();
+                scalar_t bound = this->bounds_.at(i) - fn(x);
+                rowvecx_t grad = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
                     case EQ:
                         G.row(eq_row) = grad;
-                        equality_bound.row(eq_row++) = grad;
+                        equality_bound(eq_row++) = bound;
                         break;
                     case LEQ:
                         A.row(ineq_row) = grad;
@@ -352,8 +354,8 @@ namespace torc::constraint {
 
             for (int i=0, ineq_row=0, eq_row=0; i < n_functions; i++) {
                 auto fn = this->functions_.at(i);
-                scalar_t bound = this->bounds_(i) - fn(x);
-                rowvecx_t grad = fn.Gradient(x).transposeInPlace();
+                scalar_t bound = this->bounds_.at(i) - fn(x);
+                rowvecx_t grad = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
                     case EQ:
                         sp_builderG.SetMatrix(grad, eq_row, 0);

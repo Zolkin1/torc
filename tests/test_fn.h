@@ -3,11 +3,6 @@
 
 #include <eigen3/Eigen/Dense>
 #include <cmath>
-#include "linear_fn.h"
-#include "quadratic_fn.h"
-#include "autodiff_fn.h"
-#include "explicit_fn.h"
-#include "finite_diff_fn.h"
 
 namespace test {
     template <typename scalar_t=double>
