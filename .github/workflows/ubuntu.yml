@@ -37,6 +37,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          /usr/local/lib
+          /usr/local/include
+          ~/.cache
+        key: ${{ runner.os }}-build-cache-${{ hashFiles('**/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-build-cache-
+
     - name: Add Eigen3
       run: sudo apt install libeigen3-dev
 
@@ -52,18 +63,22 @@ jobs:
 
     - name: Add console_bridge
       run: |
-        sudo apt-get update
-        sudo apt-get install libconsole-bridge-dev
+        if [! -d "console_bridge"] then
+          sudo apt-get update
+          sudo apt-get install libconsole-bridge-dev
+        fi
 
     - name: Clone and build urdfdom
       run: |
-        git clone https://github.com/ros/urdfdom.git
-        cd urdfdom
-        mkdir build
-        cd build
-        cmake ..
-        make
-        sudo make install
+        if [! -d "urdfom"] then
+          git clone https://github.com/ros/urdfdom.git
+          cd urdfdom
+          mkdir build
+          cd build
+          cmake ..
+          make
+          sudo make install
+        fi
 
     - name: Add ROS2
       run: |
@@ -79,34 +94,17 @@ jobs:
 
     - name: Add Pinocchio
       run: |
-        git clone --recursive https://github.com/stack-of-tasks/pinocchio
-        cd pinocchio
-        git remote update
-        git fetch
-        git checkout devel
-        mkdir build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_PYTHON_INTERFACE=OFF
-        make -j10
-        make install
-
-
-#    - name: Add robotpkg
-#      run: |
-#        sudo sh -c "echo \"deb [arch=amd64] http://robotpkg.openrobots.org/packages/debian/pub $(lsb_release -cs) robotpkg\" >> /etc/apt/sources.list "
-#        sudo apt-key adv --fetch-keys http://robotpkg.openrobots.org/packages/debian/robotpkg.key
-#
-#    - name: Get dependencies
-#      run: |
-#        export APT_DEPENDENCIES="libeigen3-dev \
-#                                 robotpkg-pinocchio"
-#        echo $APT_DEPENDENCIES
-#        sudo apt-get update -qq
-#        sudo apt-get install -qq ${APT_DEPENDENCIES}
-#        export PATH=/opt/openrobots/bin:$PATH
-#        export PKG_CONFIG_PATH=/opt/openrobots/lib/pkgconfig:$PKG_CONFIG_PATH
-#        export LD_LIBRARY_PATH=/opt/openrobots/lib:$LD_LIBRARY_PATH
-#        export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
-#        echo $CMAKE_PREFIX_PATH
+        if [! -d "pinocchio"] then
+          git clone --recursive https://github.com/stack-of-tasks/pinocchio
+          cd pinocchio
+          git remote update
+          git fetch
+          git checkout devel
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_PYTHON_INTERFACE=OFF
+          make -j10
+          make install
+        fi
 
     - name: Add GoogleTest (Required by CppAD)
       run: |
@@ -117,12 +115,14 @@ jobs:
 
     - name: Add CppAD
       run: |
-        cd ~
-        git clone https://github.com/coin-or/CppAD.git cppad
-        cd cppad
-        mkdir build && cd build
-        cmake ..
-        sudo make install
+        if [! -d "cppad"] then
+          cd ~
+          git clone https://github.com/coin-or/CppAD.git cppad
+          cd cppad
+          mkdir build && cd build
+          cmake ..
+          sudo make install
+        fi
 
     - name: Add CppADCodeGen
       run: |
@@ -155,13 +155,15 @@ jobs:
 
     - name: Add OSQP
       run: |
-        git clone https://github.com/osqp/osqp
-        cd osqp
-        mkdir build
-        cd build
-        cmake -G "Unix Makefiles" ..
-        cmake --build .
-        cmake --build . --target install
+        if [! -d "osqp"] then
+          git clone https://github.com/osqp/osqp
+          cd osqp
+          mkdir build
+          cd build
+          cmake -G "Unix Makefiles" ..
+          cmake --build .
+          cmake --build . --target install
+        fi
 
     - name: Add Rust (Required by Clarabel)
       run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
