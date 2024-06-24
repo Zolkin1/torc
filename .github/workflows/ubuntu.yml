@@ -41,7 +41,14 @@ jobs:
       run: sudo apt install libeigen3-dev
 
     - name: Add Pinocchio
-      run: conda install pinocchio -c conda-forge
+      run: |
+        git clone --recursive https://github.com/stack-of-tasks/pinocchio
+        git checkout master
+        cd pinocchio && mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_PYTHON_INTERFACE=OFF
+        make -j10
+        make install
+
 
 #    - name: Add robotpkg
 #      run: |
@@ -102,7 +109,7 @@ jobs:
         git clone https://github.com/coin-or/Ipopt.git
         cd Ipopt
         mkdir build && cd build
-        configure
+        ../configure
         make
         sudo make install
 
