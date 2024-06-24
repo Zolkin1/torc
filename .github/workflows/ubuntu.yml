@@ -52,6 +52,9 @@ jobs:
         sudo apt install ros-humble-desktop
         source /opt/ros/humble/setup.bash
 
+    - name: Add urdfom_headers
+      run: wget https://raw.github.com/ros-gbp/urdfdom_headers-release/debian/humble/jammy/urdfdom_headers/package.xml
+
     - name: Add Pinocchio
       run: |
         git clone --recursive https://github.com/stack-of-tasks/pinocchio
