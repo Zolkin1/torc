@@ -172,6 +172,15 @@ jobs:
           sudo cmake --build . --target install
         fi
 
+    - name: OSQP-Eigen
+      run: |
+        git clone https://github.com/robotology/osqp-eigen.git
+        cd osqp-eigen
+        mkdir build
+        cd build
+        make
+        make install
+
     - name: Add Rust (Required by Clarabel)
       run: curl -y --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 

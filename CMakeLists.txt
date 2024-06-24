@@ -7,7 +7,6 @@ project(torc
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)  # this ensures -std=c++11 not -std=gnu++11
-add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
 
 message(STATUS "Building TORC Project")
 
