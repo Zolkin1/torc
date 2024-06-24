@@ -2,7 +2,7 @@ name: Ubuntu builds
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main" "fix/pinocchio-install"]
   pull_request:
     branches: [ "main" ]
 
