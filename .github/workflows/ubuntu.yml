@@ -86,6 +86,48 @@ jobs:
         cmake ..
         sudo make install
 
+    - name: Add MUMPS
+      run: |
+        git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
+        cd ThirdParty-Mumps
+        ./get.Mumps
+        ./configure
+        make
+        sudo make install
+
+    - name: Add IPOPT
+      run: |
+        sudo apt-get install gcc g++ gfortran git patch wget pkg-config liblapack-dev libmetis-dev
+        sudo apt install liblapack-dev
+        git clone https://github.com/coin-or/Ipopt.git
+        cd Ipopt
+        mkdir build && cd build
+        configure
+        make
+        sudo make install
+
+    - name: Add OSQP
+      run: |
+        git clone https://github.com/osqp/osqp
+        cd osqp
+        mkdir build
+        cd build
+        cmake -G "Unix Makefiles" ..
+        cmake --build .
+        cmake --build . --target install
+
+    - name: Add Rust (Required by Clarabel)
+      run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+    - name: Add Clarabel
+      run: |
+        git clone --recurse-submodules https://github.com/oxfordcontrol/Clarabel.cpp.git
+        cd Clarabel.cpp
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build .
+
     - name: Set reusable strings
       id: strings
       shell: bash
