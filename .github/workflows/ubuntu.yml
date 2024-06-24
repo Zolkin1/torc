@@ -35,23 +35,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Add robotpkg
-      run: |
-        sudo sh -c "echo \"deb [arch=amd64] http://robotpkg.openrobots.org/packages/debian/pub $(lsb_release -cs) robotpkg\" >> /etc/apt/sources.list "
-        sudo apt-key adv --fetch-keys http://robotpkg.openrobots.org/packages/debian/robotpkg.key
+    - name: Add Eigen3
+      run: sudo apt install libeigen3-dev
 
-    - name: Get dependencies
-      run: |
-        export APT_DEPENDENCIES="libeigen3-dev \
-                                 robotpkg-pinocchio"
-        echo $APT_DEPENDENCIES
-        sudo apt-get update -qq
-        sudo apt-get install -qq ${APT_DEPENDENCIES}
-        export PATH=/opt/openrobots/bin:$PATH
-        export PKG_CONFIG_PATH=/opt/openrobots/lib/pkgconfig:$PKG_CONFIG_PATH
-        export LD_LIBRARY_PATH=/opt/openrobots/lib:$LD_LIBRARY_PATH
-        export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
-        echo $CMAKE_PREFIX_PATH
+    - name: Add Pinocchio
+      run: conda install pinocchio -c conda-forge
+
+#    - name: Add robotpkg
+#      run: |
+#        sudo sh -c "echo \"deb [arch=amd64] http://robotpkg.openrobots.org/packages/debian/pub $(lsb_release -cs) robotpkg\" >> /etc/apt/sources.list "
+#        sudo apt-key adv --fetch-keys http://robotpkg.openrobots.org/packages/debian/robotpkg.key
+#
+#    - name: Get dependencies
+#      run: |
+#        export APT_DEPENDENCIES="libeigen3-dev \
+#                                 robotpkg-pinocchio"
+#        echo $APT_DEPENDENCIES
+#        sudo apt-get update -qq
+#        sudo apt-get install -qq ${APT_DEPENDENCIES}
+#        export PATH=/opt/openrobots/bin:$PATH
+#        export PKG_CONFIG_PATH=/opt/openrobots/lib/pkgconfig:$PKG_CONFIG_PATH
+#        export LD_LIBRARY_PATH=/opt/openrobots/lib:$LD_LIBRARY_PATH
+#        export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
+#        echo $CMAKE_PREFIX_PATH
 
     - name: Add GoogleTest (Required by CppAD)
       run: |
