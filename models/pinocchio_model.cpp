@@ -6,11 +6,13 @@
 
 #include "pinocchio_model.h"
 
+#include <utility>
+
 namespace torc::models {
     const std::string PinocchioModel::ROOT_JOINT = "root_joint";
 
-    PinocchioModel::PinocchioModel(const std::string& name, const std::filesystem::path& urdf)
-        : BaseModel(name), urdf_(urdf), num_inputs_(-1) {
+    PinocchioModel::PinocchioModel(const std::string& name, std::filesystem::path urdf)
+        : BaseModel(name), urdf_(std::move(urdf)), num_inputs_(-1) {
 
         // Create the pinocchio model
         CreatePinModel();
@@ -106,7 +108,7 @@ namespace torc::models {
         return x;
     }
 
-    std::string PinocchioModel::GetFrameType(int j) const {
+    std::string PinocchioModel::GetFrameType(const int j) const {
         switch (pin_model_.frames.at(j).type) {
             case pinocchio::OP_FRAME:
                 return "operational_frame";

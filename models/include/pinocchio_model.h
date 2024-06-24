@@ -26,9 +26,9 @@ namespace torc::models {
          * @param name Name of the model
          * @param urdf path to the urdf
          */
-        PinocchioModel(const std::string& name, const std::filesystem::path& urdf);
+        PinocchioModel(const std::string& name, std::filesystem::path  urdf);
 
-        virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
+        [[nodiscard]] virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
 
         [[nodiscard]] long GetNumInputs() const;
 
@@ -54,11 +54,11 @@ namespace torc::models {
 
         void GetNeutralConfig(vectorx_t& q) const;
 
-        vectorx_t GetRandomConfig() const;
+        [[nodiscard]] vectorx_t GetRandomConfig() const;
 
-        vectorx_t GetRandomVel() const;
+        [[nodiscard]] vectorx_t GetRandomVel() const;
 
-        RobotState GetRandomState() const;
+        [[nodiscard]] RobotState GetRandomState() const;
 
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
