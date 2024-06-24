@@ -106,6 +106,7 @@ jobs:
       run: |
         sudo apt-get install gcc g++ gfortran git patch wget pkg-config liblapack-dev libmetis-dev
         sudo apt install liblapack-dev
+        cd ~
         git clone https://github.com/coin-or/Ipopt
         cd Ipopt
         mkdir build && cd build
