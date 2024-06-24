@@ -133,7 +133,6 @@ jobs:
 
     - name: Add CppADCodeGen
       run: |
-        cd ~
         git clone https://github.com/joaoleal/CppADCodeGen.git CppADCodeGen
         cd CppADCodeGen
         mkdir build && cd build
