@@ -97,20 +97,20 @@ jobs:
           source /opt/ros/humble/setup.bash
         fi
 
-    - name: Add Pinocchio
-      run: |
-        if [ ! -d "pinocchio" ]
-        then
-          git clone --recursive https://github.com/stack-of-tasks/pinocchio
-          cd pinocchio
-          git remote update
-          git fetch
-          git checkout devel
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_PYTHON_INTERFACE=OFF
-          make -j10
-          make install
-        fi
+#    - name: Add Pinocchio
+#      run: |
+#        if [ ! -d "pinocchio" ]
+#        then
+#          git clone --recursive https://github.com/stack-of-tasks/pinocchio
+#          cd pinocchio
+#          git remote update
+#          git fetch
+#          git checkout devel
+#          mkdir build && cd build
+#          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_PYTHON_INTERFACE=OFF
+#          make -j10
+#          make install
+#        fi
 
     - name: Add GoogleTest (Required by CppAD)
       run: |
@@ -201,7 +201,7 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} -DBUILD_WITH_PINOCCHIO=OFF
 
     - name: Test
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
