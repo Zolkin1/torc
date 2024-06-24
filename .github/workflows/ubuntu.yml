@@ -50,6 +50,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y liburdfdom-headers-dev liburdfdom-tools
 
+    - name: Add console_bridge
+      run: |
+        sudo apt-get update
+        sudo apt-get install libconsole-bridge-dev
+
     - name: Clone and build urdfdom
       run: |
         git clone https://github.com/ros/urdfdom.git
