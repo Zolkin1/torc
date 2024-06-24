@@ -40,6 +40,9 @@ jobs:
     - name: Add Eigen3
       run: sudo apt install libeigen3-dev
 
+    - name: Add urdfom_headers
+      run: wget https://raw.github.com/ros-gbp/urdfdom_headers-release/debian/hydro/precise/urdfdom_headers/package.xml
+
     - name: Add ROS2
       run: |
         sudo apt install software-properties-common
@@ -51,9 +54,6 @@ jobs:
         sudo apt upgrade
         sudo apt install ros-humble-desktop
         source /opt/ros/humble/setup.bash
-
-    - name: Add urdfom_headers
-      run: wget https://raw.github.com/ros-gbp/urdfdom_headers-release/debian/humble/jammy/urdfdom_headers/package.xml
 
     - name: Add Pinocchio
       run: |
