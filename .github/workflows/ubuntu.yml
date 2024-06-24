@@ -63,7 +63,7 @@ jobs:
 
     - name: Add console_bridge
       run: |
-        if [ ! -d "console_bridge"]
+        if [ ! -d "console_bridge" ]
         then
           sudo apt-get update
           sudo apt-get install libconsole-bridge-dev
@@ -71,7 +71,7 @@ jobs:
 
     - name: Clone and build urdfdom
       run: |
-        if [ ! -d "urdfom"]
+        if [ ! -d "urdfom" ]
         then
           git clone https://github.com/ros/urdfdom.git
           cd urdfdom
@@ -99,7 +99,7 @@ jobs:
 
     - name: Add Pinocchio
       run: |
-        if [ ! -d "pinocchio"]
+        if [ ! -d "pinocchio" ]
         then
           git clone --recursive https://github.com/stack-of-tasks/pinocchio
           cd pinocchio
@@ -121,7 +121,7 @@ jobs:
 
     - name: Add CppAD
       run: |
-        if [ ! -d "cppad"]
+        if [ ! -d "cppad" ]
         then
           cd ~
           git clone https://github.com/coin-or/CppAD.git cppad
@@ -162,7 +162,7 @@ jobs:
 
     - name: Add OSQP
       run: |
-        if [ ! -d "osqp"]
+        if [ ! -d "osqp" ]
         then
           git clone https://github.com/osqp/osqp
           cd osqp
