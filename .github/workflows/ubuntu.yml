@@ -41,7 +41,9 @@ jobs:
       run: sudo apt install libeigen3-dev
 
     - name: Add urdfom_headers
-      run: wget https://raw.github.com/ros-gbp/urdfdom_headers-release/debian/hydro/precise/urdfdom_headers/package.xml
+      run: |
+        cd /usr/local/lib
+        git clone https://github.com/ros/urdfdom_headers
 
     - name: Add ROS2
       run: |
