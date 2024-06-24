@@ -63,7 +63,7 @@ jobs:
 
     - name: Add console_bridge
       run: |
-        if [! -d "console_bridge"]
+        if [ ! -d "console_bridge"]
         then
           sudo apt-get update
           sudo apt-get install libconsole-bridge-dev
@@ -71,7 +71,7 @@ jobs:
 
     - name: Clone and build urdfdom
       run: |
-        if [! -d "urdfom"]
+        if [ ! -d "urdfom"]
         then
           git clone https://github.com/ros/urdfdom.git
           cd urdfdom
@@ -84,19 +84,22 @@ jobs:
 
     - name: Add ROS2
       run: |
-        sudo apt install software-properties-common
-        sudo add-apt-repository universe
-        sudo apt update && sudo apt install curl -y
-        sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-        sudo apt update
-        sudo apt upgrade
-        sudo apt install ros-humble-desktop
-        source /opt/ros/humble/setup.bash
+        if [ ! -d "humble" ]
+        then
+          sudo apt install software-properties-common
+          sudo add-apt-repository universe
+          sudo apt update && sudo apt install curl -y
+          sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+          sudo apt update
+          sudo apt upgrade
+          sudo apt install ros-humble-desktop
+          source /opt/ros/humble/setup.bash
+        fi
 
     - name: Add Pinocchio
       run: |
-        if [! -d "pinocchio"]
+        if [ ! -d "pinocchio"]
         then
           git clone --recursive https://github.com/stack-of-tasks/pinocchio
           cd pinocchio
@@ -118,7 +121,7 @@ jobs:
 
     - name: Add CppAD
       run: |
-        if [! -d "cppad"]
+        if [ ! -d "cppad"]
         then
           cd ~
           git clone https://github.com/coin-or/CppAD.git cppad
@@ -159,7 +162,7 @@ jobs:
 
     - name: Add OSQP
       run: |
-        if [! -d "osqp"]
+        if [ ! -d "osqp"]
         then
           git clone https://github.com/osqp/osqp
           cd osqp
