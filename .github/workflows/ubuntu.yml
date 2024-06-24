@@ -43,10 +43,11 @@ jobs:
     - name: Add Pinocchio
       run: |
         git clone --recursive https://github.com/stack-of-tasks/pinocchio
+        cd pinocchio
         git remote update
         git fetch
         git checkout devel
-        cd pinocchio && mkdir build && cd build
+        mkdir build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_PYTHON_INTERFACE=OFF
         make -j10
         make install
