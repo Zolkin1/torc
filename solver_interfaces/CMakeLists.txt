@@ -92,7 +92,7 @@ endif ()
 
 if (BUILD_WITH_CLARABEL)
     set(CLARABEL_DIR "$ENV{HOME}/Clarabel.cpp" CACHE STRING "Root directory of Clarabel.cpp")
-    set(CLARABEL_LIB_PATH "${CLARABEL_DIR}/rust_wrapper/target/release/libclarabel_c.so" CACHE STRING "Path to the clarabel shared library")
+    set(CLARABEL_LIB_PATH "${CLARABEL_DIR}/rust_wrapper/target/release/libclarabel_c.a" CACHE STRING "Path to the clarabel shared library")
     set(CLARABEL_INC_PATH "${CLARABEL_DIR}/include/" CACHE STRING "Path to Clarabel header files")
 
     add_library(clarabel STATIC IMPORTED)
