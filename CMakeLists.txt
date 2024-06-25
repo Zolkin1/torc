@@ -16,7 +16,7 @@ set(BUILD_TESTING True)
 option(BUILD_WITH_IPOPT "Build with IPOPT interface" ON)
 option(BUILD_WITH_OSQP "Build with OSQP interface" ON)
 option(BUILD_WITH_CLARABEL "Build with Clarabel interface" ON)
-option(BUILD_WITH_PINOCCHIO "Build with Pinocchio" OFF)
+option(BUILD_WITH_PINOCCHIO "Build with Pinocchio" ON)
 
 if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_TESTING)
     include(CTest)

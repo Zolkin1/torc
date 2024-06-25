@@ -193,6 +193,8 @@ jobs:
         cd build
         cmake ..
         cmake --build .
+        cd /home/runner/work/torc/torc/Clarabel.cpp
+        ls
 
     - name: Set reusable strings
       id: strings
