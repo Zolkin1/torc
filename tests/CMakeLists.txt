@@ -53,6 +53,8 @@ if (BUILD_WITH_CLARABEL)
     target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
 endif ()
 
+add_executable(pin_tests pinocchio_tests.cpp)
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
