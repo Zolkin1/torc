@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "_deps/catch2-build/src",
+		"source" : "cmake-build-release-event-trace/_deps/catch2-src/src"
+	}
+}

@@ -91,13 +91,12 @@ if (BUILD_WITH_OSQP)
 endif ()
 
 if (BUILD_WITH_CLARABEL)
-    set(CLARABEL_LIB_PATH "~/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so"
-            CACHE STRING "Path to the clarabel shared library")
-    set(CLARABEL_INC_PATH CACHE STRING "~/Clarabel.cpp/include")
+    set(CLARABEL_PATH "/home/gavin/libraries/Clarabel.cpp")
+    set(CLARABEL_LIB_PATH "${CLARABEL_PATH}/rust_wrapper/target/release/libclarabel_c.so" CACHE STRING "Path to the clarabel shared library")
+    set(CLARABEL_INC_PATH CACHE STRING "${CLARABEL_PATH}/include/")
 
     add_library(clarabel STATIC IMPORTED)
-    set_property(TARGET clarabel PROPERTY
-            IMPORTED_LOCATION "${CLARABEL_LIB_PATH}")
+    set_property(TARGET clarabel PROPERTY IMPORTED_LOCATION "${CLARABEL_LIB_PATH}")
     target_include_directories(SolverInterfaces PUBLIC "${CLARABEL_INC_PATH}")
     target_link_libraries(SolverInterfaces PUBLIC clarabel)
 endif ()
