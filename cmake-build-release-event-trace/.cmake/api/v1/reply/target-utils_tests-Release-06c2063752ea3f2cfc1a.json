@@ -2,7 +2,7 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "tests/function_tests"
+			"path" : "tests/utils_tests"
 		}
 	],
 	"backtrace" : 1,
@@ -26,19 +26,19 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 16,
+				"line" : 47,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 19,
+				"line" : 48,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 20,
+				"line" : 49,
 				"parent" : 0
 			},
 			{
@@ -58,7 +58,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always"
+					"fragment" : "-O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always"
 				}
 			],
 			"includes" : 
@@ -73,7 +73,7 @@
 				},
 				{
 					"backtrace" : 3,
-					"path" : "/home/gavin/caltech/surf2024/torc/functions/include"
+					"path" : "/home/gavin/caltech/surf2024/torc/utils/include"
 				}
 			],
 			"language" : "CXX",
@@ -83,7 +83,7 @@
 				[
 					2
 				],
-				"standard" : "17"
+				"standard" : "20"
 			},
 			"sourceIndexes" : 
 			[
@@ -103,10 +103,10 @@
 		},
 		{
 			"backtrace" : 3,
-			"id" : "Functions::@c98f87eef7ee01bc6340"
+			"id" : "Utils::@c810615cce0f7acb82dc"
 		}
 	],
-	"id" : "function_tests::@a44f0ac069e85531cdee",
+	"id" : "utils_tests::@a44f0ac069e85531cdee",
 	"link" : 
 	{
 		"commandFragments" : 
@@ -120,17 +120,13 @@
 				"role" : "flags"
 			},
 			{
-				"fragment" : "-Wl,-rpath,/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/functions",
-				"role" : "libraries"
-			},
-			{
 				"backtrace" : 2,
 				"fragment" : "_deps/catch2-build/src/libCatch2Main.a",
 				"role" : "libraries"
 			},
 			{
 				"backtrace" : 3,
-				"fragment" : "functions/libFunctions.so",
+				"fragment" : "utils/libUtils.a",
 				"role" : "libraries"
 			},
 			{
@@ -141,8 +137,8 @@
 		],
 		"language" : "CXX"
 	},
-	"name" : "function_tests",
-	"nameOnDisk" : "function_tests",
+	"name" : "utils_tests",
+	"nameOnDisk" : "utils_tests",
 	"paths" : 
 	{
 		"build" : "tests",
@@ -156,13 +152,6 @@
 			[
 				0
 			]
-		},
-		{
-			"name" : "Header Files",
-			"sourceIndexes" : 
-			[
-				1
-			]
 		}
 	],
 	"sources" : 
@@ -170,13 +159,8 @@
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
-			"path" : "tests/function_tests.cpp",
+			"path" : "tests/utils_tests.cpp",
 			"sourceGroupIndex" : 0
-		},
-		{
-			"backtrace" : 1,
-			"path" : "tests/test_fn.h",
-			"sourceGroupIndex" : 1
 		}
 	],
 	"type" : "EXECUTABLE"

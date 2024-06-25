@@ -946,16 +946,28 @@
 			"value" : "ON"
 		},
 		{
+			"name" : "CLARABEL_DIR",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "Root directory of Clarabel.cpp"
+				}
+			],
+			"type" : "STRING",
+			"value" : "/home/gavin/Clarabel.cpp"
+		},
+		{
 			"name" : "CLARABEL_INC_PATH",
 			"properties" : 
 			[
 				{
 					"name" : "HELPSTRING",
-					"value" : "/home/gavin/libraries/Clarabel.cpp/include/"
+					"value" : "Path to Clarabel header files"
 				}
 			],
 			"type" : "STRING",
-			"value" : ""
+			"value" : "/home/gavin/Clarabel.cpp/include/"
 		},
 		{
 			"name" : "CLARABEL_LIB_PATH",
@@ -967,7 +979,7 @@
 				}
 			],
 			"type" : "STRING",
-			"value" : "/home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so"
+			"value" : "/home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so"
 		},
 		{
 			"name" : "CMAKE_ADDR2LINE",

@@ -483,12 +483,10 @@ build cmake_object_order_depends_target_function_tests: phony || cmake_object_or
 
 build tests/CMakeFiles/function_tests.dir/function_tests.cpp.o: CXX_COMPILER__function_tests_unscanned_Release /home/gavin/caltech/surf2024/torc/tests/function_tests.cpp || cmake_object_order_depends_target_function_tests
   DEP_FILE = tests/CMakeFiles/function_tests.dir/function_tests.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/functions/include
   OBJECT_DIR = tests/CMakeFiles/function_tests.dir
   OBJECT_FILE_DIR = tests/CMakeFiles/function_tests.dir
-  TARGET_COMPILE_PDB = tests/CMakeFiles/function_tests.dir/
-  TARGET_PDB = tests/function_tests.pdb
 
 
 # =============================================================================
@@ -504,9 +502,8 @@ build tests/function_tests: CXX_EXECUTABLE_LINKER__function_tests_Release tests/
   OBJECT_DIR = tests/CMakeFiles/function_tests.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = tests/CMakeFiles/function_tests.dir/
   TARGET_FILE = tests/function_tests
-  TARGET_PDB = tests/function_tests.pdb
+  TARGET_PDB = function_tests.dbg
 
 # =============================================================================
 # Object build statements for EXECUTABLE target ipopt_tests
@@ -520,12 +517,10 @@ build cmake_object_order_depends_target_ipopt_tests: phony || cmake_object_order
 build tests/CMakeFiles/ipopt_tests.dir/ipopt_tests.cpp.o: CXX_COMPILER__ipopt_tests_unscanned_Release /home/gavin/caltech/surf2024/torc/tests/ipopt_tests.cpp || cmake_object_order_depends_target_ipopt_tests
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = tests/CMakeFiles/ipopt_tests.dir/ipopt_tests.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = tests/CMakeFiles/ipopt_tests.dir
   OBJECT_FILE_DIR = tests/CMakeFiles/ipopt_tests.dir
-  TARGET_COMPILE_PDB = tests/CMakeFiles/ipopt_tests.dir/
-  TARGET_PDB = tests/ipopt_tests.pdb
 
 
 # =============================================================================
@@ -535,15 +530,14 @@ build tests/CMakeFiles/ipopt_tests.dir/ipopt_tests.cpp.o: CXX_COMPILER__ipopt_te
 #############################################
 # Link the executable tests/ipopt_tests
 
-build tests/ipopt_tests: CXX_EXECUTABLE_LINKER__ipopt_tests_Release tests/CMakeFiles/ipopt_tests.dir/ipopt_tests.cpp.o | _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a _deps/catch2-build/src/libCatch2.a /usr/local/lib/libipopt.so.3 /usr/local/lib/libcoinmumps.so.3 /usr/local/lib/libOsqpEigen.so.0.8.1 /usr/local/lib/libosqp.so /home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so || _deps/catch2-build/src/libCatch2.a _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a
+build tests/ipopt_tests: CXX_EXECUTABLE_LINKER__ipopt_tests_Release tests/CMakeFiles/ipopt_tests.dir/ipopt_tests.cpp.o | _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a _deps/catch2-build/src/libCatch2.a /usr/local/lib/libipopt.so.3 /usr/local/lib/libcoinmumps.so.3 /usr/local/lib/libOsqpEigen.so.0.8.1 /usr/local/lib/libosqp.so /home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so || _deps/catch2-build/src/libCatch2.a _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a
   FLAGS = -O3 -DNDEBUG
-  LINK_LIBRARIES = -Wl,-rpath,/usr/local/lib  _deps/catch2-build/src/libCatch2Main.a  solver_interfaces/libSolverInterfaces.a  _deps/catch2-build/src/libCatch2.a  /usr/local/lib/libipopt.so.3  /usr/local/lib/libcoinmumps.so.3  /usr/local/lib/libOsqpEigen.so.0.8.1  /usr/local/lib/libosqp.so  /home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
+  LINK_LIBRARIES = -Wl,-rpath,/usr/local/lib  _deps/catch2-build/src/libCatch2Main.a  solver_interfaces/libSolverInterfaces.a  _deps/catch2-build/src/libCatch2.a  /usr/local/lib/libipopt.so.3  /usr/local/lib/libcoinmumps.so.3  /usr/local/lib/libOsqpEigen.so.0.8.1  /usr/local/lib/libosqp.so  /home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
   OBJECT_DIR = tests/CMakeFiles/ipopt_tests.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = tests/CMakeFiles/ipopt_tests.dir/
   TARGET_FILE = tests/ipopt_tests
-  TARGET_PDB = tests/ipopt_tests.pdb
+  TARGET_PDB = ipopt_tests.dbg
 
 # =============================================================================
 # Object build statements for EXECUTABLE target osqp_tests
@@ -557,12 +551,10 @@ build cmake_object_order_depends_target_osqp_tests: phony || cmake_object_order_
 build tests/CMakeFiles/osqp_tests.dir/osqp_tests.cpp.o: CXX_COMPILER__osqp_tests_unscanned_Release /home/gavin/caltech/surf2024/torc/tests/osqp_tests.cpp || cmake_object_order_depends_target_osqp_tests
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = tests/CMakeFiles/osqp_tests.dir/osqp_tests.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = tests/CMakeFiles/osqp_tests.dir
   OBJECT_FILE_DIR = tests/CMakeFiles/osqp_tests.dir
-  TARGET_COMPILE_PDB = tests/CMakeFiles/osqp_tests.dir/
-  TARGET_PDB = tests/osqp_tests.pdb
 
 
 # =============================================================================
@@ -572,15 +564,14 @@ build tests/CMakeFiles/osqp_tests.dir/osqp_tests.cpp.o: CXX_COMPILER__osqp_tests
 #############################################
 # Link the executable tests/osqp_tests
 
-build tests/osqp_tests: CXX_EXECUTABLE_LINKER__osqp_tests_Release tests/CMakeFiles/osqp_tests.dir/osqp_tests.cpp.o | _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a _deps/catch2-build/src/libCatch2.a /usr/local/lib/libipopt.so.3 /usr/local/lib/libcoinmumps.so.3 /usr/local/lib/libOsqpEigen.so.0.8.1 /usr/local/lib/libosqp.so /home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so || _deps/catch2-build/src/libCatch2.a _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a
+build tests/osqp_tests: CXX_EXECUTABLE_LINKER__osqp_tests_Release tests/CMakeFiles/osqp_tests.dir/osqp_tests.cpp.o | _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a _deps/catch2-build/src/libCatch2.a /usr/local/lib/libipopt.so.3 /usr/local/lib/libcoinmumps.so.3 /usr/local/lib/libOsqpEigen.so.0.8.1 /usr/local/lib/libosqp.so /home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so || _deps/catch2-build/src/libCatch2.a _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a
   FLAGS = -O3 -DNDEBUG
-  LINK_LIBRARIES = -Wl,-rpath,/usr/local/lib  _deps/catch2-build/src/libCatch2Main.a  solver_interfaces/libSolverInterfaces.a  _deps/catch2-build/src/libCatch2.a  /usr/local/lib/libipopt.so.3  /usr/local/lib/libcoinmumps.so.3  /usr/local/lib/libOsqpEigen.so.0.8.1  /usr/local/lib/libosqp.so  /home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
+  LINK_LIBRARIES = -Wl,-rpath,/usr/local/lib  _deps/catch2-build/src/libCatch2Main.a  solver_interfaces/libSolverInterfaces.a  _deps/catch2-build/src/libCatch2.a  /usr/local/lib/libipopt.so.3  /usr/local/lib/libcoinmumps.so.3  /usr/local/lib/libOsqpEigen.so.0.8.1  /usr/local/lib/libosqp.so  /home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
   OBJECT_DIR = tests/CMakeFiles/osqp_tests.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = tests/CMakeFiles/osqp_tests.dir/
   TARGET_FILE = tests/osqp_tests
-  TARGET_PDB = tests/osqp_tests.pdb
+  TARGET_PDB = osqp_tests.dbg
 
 # =============================================================================
 # Object build statements for EXECUTABLE target utils_tests
@@ -593,12 +584,10 @@ build cmake_object_order_depends_target_utils_tests: phony || cmake_object_order
 
 build tests/CMakeFiles/utils_tests.dir/utils_tests.cpp.o: CXX_COMPILER__utils_tests_unscanned_Release /home/gavin/caltech/surf2024/torc/tests/utils_tests.cpp || cmake_object_order_depends_target_utils_tests
   DEP_FILE = tests/CMakeFiles/utils_tests.dir/utils_tests.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/utils/include
   OBJECT_DIR = tests/CMakeFiles/utils_tests.dir
   OBJECT_FILE_DIR = tests/CMakeFiles/utils_tests.dir
-  TARGET_COMPILE_PDB = tests/CMakeFiles/utils_tests.dir/
-  TARGET_PDB = tests/utils_tests.pdb
 
 
 # =============================================================================
@@ -614,9 +603,8 @@ build tests/utils_tests: CXX_EXECUTABLE_LINKER__utils_tests_Release tests/CMakeF
   OBJECT_DIR = tests/CMakeFiles/utils_tests.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = tests/CMakeFiles/utils_tests.dir/
   TARGET_FILE = tests/utils_tests
-  TARGET_PDB = tests/utils_tests.pdb
+  TARGET_PDB = utils_tests.dbg
 
 # =============================================================================
 # Object build statements for EXECUTABLE target clarabel_tests
@@ -630,12 +618,10 @@ build cmake_object_order_depends_target_clarabel_tests: phony || cmake_object_or
 build tests/CMakeFiles/clarabel_tests.dir/clarabel_tests.cpp.o: CXX_COMPILER__clarabel_tests_unscanned_Release /home/gavin/caltech/surf2024/torc/tests/clarabel_tests.cpp || cmake_object_order_depends_target_clarabel_tests
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = tests/CMakeFiles/clarabel_tests.dir/clarabel_tests.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = tests/CMakeFiles/clarabel_tests.dir
   OBJECT_FILE_DIR = tests/CMakeFiles/clarabel_tests.dir
-  TARGET_COMPILE_PDB = tests/CMakeFiles/clarabel_tests.dir/
-  TARGET_PDB = tests/clarabel_tests.pdb
 
 
 # =============================================================================
@@ -645,15 +631,14 @@ build tests/CMakeFiles/clarabel_tests.dir/clarabel_tests.cpp.o: CXX_COMPILER__cl
 #############################################
 # Link the executable tests/clarabel_tests
 
-build tests/clarabel_tests: CXX_EXECUTABLE_LINKER__clarabel_tests_Release tests/CMakeFiles/clarabel_tests.dir/clarabel_tests.cpp.o | _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a _deps/catch2-build/src/libCatch2.a /usr/local/lib/libipopt.so.3 /usr/local/lib/libcoinmumps.so.3 /usr/local/lib/libOsqpEigen.so.0.8.1 /usr/local/lib/libosqp.so /home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so || _deps/catch2-build/src/libCatch2.a _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a
+build tests/clarabel_tests: CXX_EXECUTABLE_LINKER__clarabel_tests_Release tests/CMakeFiles/clarabel_tests.dir/clarabel_tests.cpp.o | _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a _deps/catch2-build/src/libCatch2.a /usr/local/lib/libipopt.so.3 /usr/local/lib/libcoinmumps.so.3 /usr/local/lib/libOsqpEigen.so.0.8.1 /usr/local/lib/libosqp.so /home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so || _deps/catch2-build/src/libCatch2.a _deps/catch2-build/src/libCatch2Main.a solver_interfaces/libSolverInterfaces.a
   FLAGS = -O3 -DNDEBUG
-  LINK_LIBRARIES = -Wl,-rpath,/usr/local/lib  _deps/catch2-build/src/libCatch2Main.a  solver_interfaces/libSolverInterfaces.a  _deps/catch2-build/src/libCatch2.a  /usr/local/lib/libipopt.so.3  /usr/local/lib/libcoinmumps.so.3  /usr/local/lib/libOsqpEigen.so.0.8.1  /usr/local/lib/libosqp.so  /home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
+  LINK_LIBRARIES = -Wl,-rpath,/usr/local/lib  _deps/catch2-build/src/libCatch2Main.a  solver_interfaces/libSolverInterfaces.a  _deps/catch2-build/src/libCatch2.a  /usr/local/lib/libipopt.so.3  /usr/local/lib/libcoinmumps.so.3  /usr/local/lib/libOsqpEigen.so.0.8.1  /usr/local/lib/libosqp.so  /home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
   OBJECT_DIR = tests/CMakeFiles/clarabel_tests.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = tests/CMakeFiles/clarabel_tests.dir/
   TARGET_FILE = tests/clarabel_tests
-  TARGET_PDB = tests/clarabel_tests.pdb
+  TARGET_PDB = clarabel_tests.dbg
 
 
 #############################################
@@ -746,957 +731,745 @@ build cmake_object_order_depends_target_Catch2: phony || _deps/catch2-build/src/
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/catch_chronometer.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/benchmark/catch_chronometer.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/catch_chronometer.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_analyse.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/benchmark/detail/catch_analyse.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_analyse.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_benchmark_function.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/benchmark/detail/catch_benchmark_function.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_benchmark_function.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_run_for_at_least.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/benchmark/detail/catch_run_for_at_least.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_run_for_at_least.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_stats.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/benchmark/detail/catch_stats.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail/catch_stats.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/benchmark/detail
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators/catch_generator_exception.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/generators/catch_generator_exception.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators/catch_generator_exception.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators/catch_generators.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/generators/catch_generators.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators/catch_generators.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators/catch_generators_random.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/generators/catch_generators_random.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators/catch_generators_random.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/generators
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_automake.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_automake.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_automake.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_common_base.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_common_base.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_common_base.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_compact.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_compact.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_compact.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_console.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_console.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_console.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_cumulative_base.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_cumulative_base.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_cumulative_base.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_event_listener.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_event_listener.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_event_listener.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_helpers.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_helpers.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_helpers.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_json.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_json.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_json.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_junit.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_junit.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_junit.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_multi.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_multi.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_multi.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_registrars.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_registrars.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_registrars.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_sonarqube.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_sonarqube.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_sonarqube.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_streaming_base.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_streaming_base.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_streaming_base.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_tap.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_tap.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_tap.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_teamcity.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_teamcity.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_teamcity.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_xml.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/reporters/catch_reporter_xml.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters/catch_reporter_xml.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/reporters
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_capture.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_capture.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_capture.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_config.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_config.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_config.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_exception.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_exception.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_exception.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_generatortracker.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_generatortracker.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_generatortracker.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_registry_hub.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_registry_hub.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_registry_hub.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_reporter.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_reporter.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_reporter.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_reporter_factory.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_reporter_factory.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_reporter_factory.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_testcase.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/interfaces/catch_interfaces_testcase.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces/catch_interfaces_testcase.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/interfaces
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_approx.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_approx.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_approx.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_assertion_result.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_assertion_result.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_assertion_result.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_config.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_config.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_config.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_get_random_seed.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_get_random_seed.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_get_random_seed.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_message.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_message.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_message.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_registry_hub.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_registry_hub.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_registry_hub.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_session.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_session.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_session.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_tag_alias_autoregistrar.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_tag_alias_autoregistrar.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_tag_alias_autoregistrar.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_test_case_info.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_test_case_info.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_test_case_info.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_test_spec.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_test_spec.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_test_spec.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_timer.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_timer.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_timer.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_tostring.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_tostring.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_tostring.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_totals.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_totals.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_totals.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_translate_exception.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_translate_exception.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_translate_exception.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_version.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/catch_version.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/catch_version.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_assertion_handler.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_assertion_handler.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_assertion_handler.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_case_insensitive_comparisons.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_case_insensitive_comparisons.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_case_insensitive_comparisons.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_clara.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_clara.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_clara.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_commandline.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_commandline.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_commandline.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_console_colour.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_console_colour.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_console_colour.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_context.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_context.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_context.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_debug_console.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_debug_console.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_debug_console.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_debugger.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_debugger.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_debugger.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_decomposer.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_decomposer.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_decomposer.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_enforce.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_enforce.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_enforce.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_enum_values_registry.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_enum_values_registry.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_enum_values_registry.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_errno_guard.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_errno_guard.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_errno_guard.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_exception_translator_registry.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_exception_translator_registry.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_exception_translator_registry.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_fatal_condition_handler.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_fatal_condition_handler.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_fatal_condition_handler.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_floating_point_helpers.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_floating_point_helpers.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_floating_point_helpers.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_getenv.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_getenv.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_getenv.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_istream.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_istream.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_istream.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_jsonwriter.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_jsonwriter.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_jsonwriter.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_lazy_expr.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_lazy_expr.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_lazy_expr.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_leak_detector.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_leak_detector.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_leak_detector.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_list.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_list.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_list.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_message_info.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_message_info.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_message_info.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_output_redirect.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_output_redirect.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_output_redirect.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_parse_numbers.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_parse_numbers.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_parse_numbers.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_polyfills.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_polyfills.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_polyfills.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_random_number_generator.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_random_number_generator.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_random_number_generator.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_random_seed_generation.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_random_seed_generation.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_random_seed_generation.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_reporter_registry.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_reporter_registry.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_reporter_registry.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_reporter_spec_parser.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_reporter_spec_parser.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_reporter_spec_parser.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_result_type.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_result_type.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_result_type.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_reusable_string_stream.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_reusable_string_stream.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_reusable_string_stream.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_run_context.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_run_context.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_run_context.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_section.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_section.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_section.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_singletons.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_singletons.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_singletons.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_source_line_info.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_source_line_info.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_source_line_info.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_startup_exception_registry.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_startup_exception_registry.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_startup_exception_registry.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_stdstreams.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_stdstreams.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_stdstreams.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_string_manip.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_string_manip.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_string_manip.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_stringref.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_stringref.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_stringref.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_tag_alias_registry.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_tag_alias_registry.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_tag_alias_registry.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_case_info_hasher.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_test_case_info_hasher.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_case_info_hasher.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_case_registry_impl.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_test_case_registry_impl.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_case_registry_impl.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_case_tracker.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_test_case_tracker.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_case_tracker.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_failure_exception.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_test_failure_exception.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_failure_exception.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_registry.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_test_registry.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_registry.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_spec_parser.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_test_spec_parser.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_test_spec_parser.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_textflow.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_textflow.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_textflow.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_uncaught_exceptions.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_uncaught_exceptions.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_uncaught_exceptions.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_wildcard_pattern.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_wildcard_pattern.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_wildcard_pattern.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_xmlwriter.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_xmlwriter.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal/catch_xmlwriter.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_container_properties.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers_container_properties.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_container_properties.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_exception.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers_exception.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_exception.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_floating_point.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers_floating_point.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_floating_point.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_predicate.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers_predicate.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_predicate.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_quantifiers.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers_quantifiers.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_quantifiers.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_string.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers_string.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_string.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_templated.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/catch_matchers_templated.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/catch_matchers_templated.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 build _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/internal/catch_matchers_impl.cpp.o: CXX_COMPILER__Catch2_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/matchers/internal/catch_matchers_impl.cpp || cmake_object_order_depends_target_Catch2
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/internal/catch_matchers_impl.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir/catch2/matchers/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
 
 
 # =============================================================================
@@ -1711,9 +1484,8 @@ build _deps/catch2-build/src/libCatch2.a: CXX_STATIC_LIBRARY_LINKER__Catch2_Rele
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2.dir/Catch2.pdb
   TARGET_FILE = _deps/catch2-build/src/libCatch2.a
-  TARGET_PDB = _deps/catch2-build/src/libCatch2.pdb
+  TARGET_PDB = Catch2.a.dbg
 
 # =============================================================================
 # Object build statements for STATIC_LIBRARY target Catch2WithMain
@@ -1726,12 +1498,10 @@ build cmake_object_order_depends_target_Catch2WithMain: phony || cmake_object_or
 
 build _deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir/catch2/internal/catch_main.cpp.o: CXX_COMPILER__Catch2WithMain_unscanned_Release /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/internal/catch_main.cpp || cmake_object_order_depends_target_Catch2WithMain
   DEP_FILE = _deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir/catch2/internal/catch_main.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always -ffile-prefix-map=/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/=
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-src/src/catch2/.. -I/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-build/generated-includes
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir
   OBJECT_FILE_DIR = _deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir/catch2/internal
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir/Catch2WithMain.pdb
-  TARGET_PDB = _deps/catch2-build/src/libCatch2Main.pdb
 
 
 # =============================================================================
@@ -1746,9 +1516,8 @@ build _deps/catch2-build/src/libCatch2Main.a: CXX_STATIC_LIBRARY_LINKER__Catch2W
   OBJECT_DIR = _deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = _deps/catch2-build/src/CMakeFiles/Catch2WithMain.dir/Catch2WithMain.pdb
   TARGET_FILE = _deps/catch2-build/src/libCatch2Main.a
-  TARGET_PDB = _deps/catch2-build/src/libCatch2Main.pdb
+  TARGET_PDB = Catch2Main.a.dbg
 
 
 #############################################
@@ -1801,12 +1570,10 @@ build cmake_object_order_depends_target_Models: phony || models/CMakeFiles/Model
 
 build models/CMakeFiles/Models.dir/base_model.cpp.o: CXX_COMPILER__Models_unscanned_Release /home/gavin/caltech/surf2024/torc/models/base_model.cpp || cmake_object_order_depends_target_Models
   DEP_FILE = models/CMakeFiles/Models.dir/base_model.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/models/include -isystem /usr/local/include/eigen3
   OBJECT_DIR = models/CMakeFiles/Models.dir
   OBJECT_FILE_DIR = models/CMakeFiles/Models.dir
-  TARGET_COMPILE_PDB = models/CMakeFiles/Models.dir/Models.pdb
-  TARGET_PDB = models/libModels.pdb
 
 
 # =============================================================================
@@ -1821,9 +1588,8 @@ build models/libModels.a: CXX_STATIC_LIBRARY_LINKER__Models_Release models/CMake
   OBJECT_DIR = models/CMakeFiles/Models.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = models/CMakeFiles/Models.dir/Models.pdb
   TARGET_FILE = models/libModels.a
-  TARGET_PDB = models/libModels.pdb
+  TARGET_PDB = Models.a.dbg
 
 
 #############################################
@@ -1929,9 +1695,8 @@ build functions/libFunctions.so: CXX_SHARED_LIBRARY_LINKER__Functions_Release
   PRE_LINK = :
   SONAME = libFunctions.so
   SONAME_FLAG = -Wl,-soname,
-  TARGET_COMPILE_PDB = functions/CMakeFiles/Functions.dir/
   TARGET_FILE = functions/libFunctions.so
-  TARGET_PDB = functions/libFunctions.pdb
+  TARGET_PDB = Functions.so.dbg
 
 
 #############################################
@@ -2025,52 +1790,42 @@ build cmake_object_order_depends_target_SolverInterfaces: phony || solver_interf
 build solver_interfaces/CMakeFiles/SolverInterfaces.dir/solver_status.cpp.o: CXX_COMPILER__SolverInterfaces_unscanned_Release /home/gavin/caltech/surf2024/torc/solver_interfaces/solver_status.cpp || cmake_object_order_depends_target_SolverInterfaces
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = solver_interfaces/CMakeFiles/SolverInterfaces.dir/solver_status.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
   OBJECT_FILE_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
-  TARGET_COMPILE_PDB = solver_interfaces/CMakeFiles/SolverInterfaces.dir/SolverInterfaces.pdb
-  TARGET_PDB = solver_interfaces/libSolverInterfaces.pdb
 
 build solver_interfaces/CMakeFiles/SolverInterfaces.dir/ipopt_interface.cpp.o: CXX_COMPILER__SolverInterfaces_unscanned_Release /home/gavin/caltech/surf2024/torc/solver_interfaces/ipopt_interface.cpp || cmake_object_order_depends_target_SolverInterfaces
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = solver_interfaces/CMakeFiles/SolverInterfaces.dir/ipopt_interface.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
   OBJECT_FILE_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
-  TARGET_COMPILE_PDB = solver_interfaces/CMakeFiles/SolverInterfaces.dir/SolverInterfaces.pdb
-  TARGET_PDB = solver_interfaces/libSolverInterfaces.pdb
 
 build solver_interfaces/CMakeFiles/SolverInterfaces.dir/ipopt.cpp.o: CXX_COMPILER__SolverInterfaces_unscanned_Release /home/gavin/caltech/surf2024/torc/solver_interfaces/ipopt.cpp || cmake_object_order_depends_target_SolverInterfaces
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = solver_interfaces/CMakeFiles/SolverInterfaces.dir/ipopt.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
   OBJECT_FILE_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
-  TARGET_COMPILE_PDB = solver_interfaces/CMakeFiles/SolverInterfaces.dir/SolverInterfaces.pdb
-  TARGET_PDB = solver_interfaces/libSolverInterfaces.pdb
 
 build solver_interfaces/CMakeFiles/SolverInterfaces.dir/osqp_interface.cpp.o: CXX_COMPILER__SolverInterfaces_unscanned_Release /home/gavin/caltech/surf2024/torc/solver_interfaces/osqp_interface.cpp || cmake_object_order_depends_target_SolverInterfaces
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = solver_interfaces/CMakeFiles/SolverInterfaces.dir/osqp_interface.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
   OBJECT_FILE_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
-  TARGET_COMPILE_PDB = solver_interfaces/CMakeFiles/SolverInterfaces.dir/SolverInterfaces.pdb
-  TARGET_PDB = solver_interfaces/libSolverInterfaces.pdb
 
 build solver_interfaces/CMakeFiles/SolverInterfaces.dir/clarabel_interface.cpp.o: CXX_COMPILER__SolverInterfaces_unscanned_Release /home/gavin/caltech/surf2024/torc/solver_interfaces/clarabel_interface.cpp || cmake_object_order_depends_target_SolverInterfaces
   DEFINES = -DOSQP_EIGEN_OSQP_IS_V1 -DOSQP_SHARED_LIB
   DEP_FILE = solver_interfaces/CMakeFiles/SolverInterfaces.dir/clarabel_interface.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
-  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/caltech/surf2024/torc/solver_interfaces -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
+  INCLUDES = -I/home/gavin/caltech/surf2024/torc/solver_interfaces/include -I/usr/local/include/coin-or -I/home/gavin/Clarabel.cpp/include -isystem /usr/local/include/eigen3 -isystem /usr/local/include/osqp
   OBJECT_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
   OBJECT_FILE_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
-  TARGET_COMPILE_PDB = solver_interfaces/CMakeFiles/SolverInterfaces.dir/SolverInterfaces.pdb
-  TARGET_PDB = solver_interfaces/libSolverInterfaces.pdb
 
 
 # =============================================================================
@@ -2085,9 +1840,8 @@ build solver_interfaces/libSolverInterfaces.a: CXX_STATIC_LIBRARY_LINKER__Solver
   OBJECT_DIR = solver_interfaces/CMakeFiles/SolverInterfaces.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = solver_interfaces/CMakeFiles/SolverInterfaces.dir/SolverInterfaces.pdb
   TARGET_FILE = solver_interfaces/libSolverInterfaces.a
-  TARGET_PDB = solver_interfaces/libSolverInterfaces.pdb
+  TARGET_PDB = SolverInterfaces.a.dbg
 
 
 #############################################
@@ -2140,12 +1894,10 @@ build cmake_object_order_depends_target_Utils: phony || utils/CMakeFiles/Utils.d
 
 build utils/CMakeFiles/Utils.dir/torc_timer.cpp.o: CXX_COMPILER__Utils_unscanned_Release /home/gavin/caltech/surf2024/torc/utils/torc_timer.cpp || cmake_object_order_depends_target_Utils
   DEP_FILE = utils/CMakeFiles/Utils.dir/torc_timer.cpp.o.d
-  FLAGS = -O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always
+  FLAGS = -O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always
   INCLUDES = -I/home/gavin/caltech/surf2024/torc/utils/include
   OBJECT_DIR = utils/CMakeFiles/Utils.dir
   OBJECT_FILE_DIR = utils/CMakeFiles/Utils.dir
-  TARGET_COMPILE_PDB = utils/CMakeFiles/Utils.dir/Utils.pdb
-  TARGET_PDB = utils/libUtils.pdb
 
 
 # =============================================================================
@@ -2160,9 +1912,8 @@ build utils/libUtils.a: CXX_STATIC_LIBRARY_LINKER__Utils_Release utils/CMakeFile
   OBJECT_DIR = utils/CMakeFiles/Utils.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = utils/CMakeFiles/Utils.dir/Utils.pdb
   TARGET_FILE = utils/libUtils.a
-  TARGET_PDB = utils/libUtils.pdb
+  TARGET_PDB = Utils.a.dbg
 
 
 #############################################
@@ -2316,14 +2067,14 @@ build utils/all: phony utils/libUtils.a
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja: RERUN_CMAKE | /home/gavin/caltech/surf2024/torc/CMakeLists.txt /home/gavin/caltech/surf2024/torc/constraints/CMakeLists.txt /home/gavin/caltech/surf2024/torc/costs/CMakeLists.txt /home/gavin/caltech/surf2024/torc/functions/CMakeLists.txt /home/gavin/caltech/surf2024/torc/models/CMakeLists.txt /home/gavin/caltech/surf2024/torc/solver_interfaces/CMakeLists.txt /home/gavin/caltech/surf2024/torc/tests/CMakeLists.txt /home/gavin/caltech/surf2024/torc/utils/CMakeLists.txt /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXCompiler.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCompilerIdDetection.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDependentOption.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCXXCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompileFeatures.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineSystem.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeFindBinUtils.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeFindDependencyMacro.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakePackageConfigHelpers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeParseImplicitIncludeInfo.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeParseImplicitLinkInfo.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeParseLibraryArchitecture.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystem.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeTestCXXCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeTestCompilerCommon.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTest.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestTargets.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestUseLaunchers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/ADSP-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/ARMCC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/ARMClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/AppleClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Borland-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompilerInternal.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Comeau-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Cray-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/CrayClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Embarcadero-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Fujitsu-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/FujitsuClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GHS-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-FindBinUtils.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/HP-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IAR-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IBMCPP-CXX-DetermineVersionInternal.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IBMClang-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Intel-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IntelLLVM-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/LCC-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/MSVC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/NVHPC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/NVIDIA-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/OpenWatcom-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/OrangeC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/PGI-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/PathScale-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/SCO-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/SunPro-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/TI-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Tasking-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/VisualAge-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Watcom-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/XL-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/DartConfiguration.tcl.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/ExternalProject/shared_internal_commands.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent/CMakeLists.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindGit.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageMessage.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/GNUInstallDirs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckFlagCommonConfig.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/FeatureTesting.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-Determine-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/WriteBasicConfigVersionFile.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfig.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfigVersion.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets-release.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets.cmake /usr/local/lib/cmake/osqp/osqp-config-version.cmake /usr/local/lib/cmake/osqp/osqp-config.cmake /usr/local/lib/cmake/osqp/osqp-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqp-targets.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets.cmake /usr/local/share/eigen3/cmake/Eigen3Config.cmake /usr/local/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/local/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/3.28.1/CMakeCXXCompiler.cmake CMakeFiles/3.28.1/CMakeSystem.cmake _deps/catch2-src/CMake/CatchConfigOptions.cmake _deps/catch2-src/CMake/CatchMiscFunctions.cmake _deps/catch2-src/CMakeLists.txt _deps/catch2-src/extras/Catch.cmake _deps/catch2-src/src/CMakeLists.txt _deps/catch2-src/src/catch2/catch_user_config.hpp.in
+build build.ninja: RERUN_CMAKE | /home/gavin/caltech/surf2024/torc/CMakeLists.txt /home/gavin/caltech/surf2024/torc/constraints/CMakeLists.txt /home/gavin/caltech/surf2024/torc/costs/CMakeLists.txt /home/gavin/caltech/surf2024/torc/functions/CMakeLists.txt /home/gavin/caltech/surf2024/torc/models/CMakeLists.txt /home/gavin/caltech/surf2024/torc/solver_interfaces/CMakeLists.txt /home/gavin/caltech/surf2024/torc/tests/CMakeLists.txt /home/gavin/caltech/surf2024/torc/utils/CMakeLists.txt /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDependentOption.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeFindDependencyMacro.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakePackageConfigHelpers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTest.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestTargets.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestUseLaunchers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/DartConfiguration.tcl.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/ExternalProject/shared_internal_commands.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent/CMakeLists.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindGit.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageMessage.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/GNUInstallDirs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckFlagCommonConfig.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/WriteBasicConfigVersionFile.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfig.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfigVersion.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets-release.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets.cmake /usr/local/lib/cmake/osqp/osqp-config-version.cmake /usr/local/lib/cmake/osqp/osqp-config.cmake /usr/local/lib/cmake/osqp/osqp-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqp-targets.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets.cmake /usr/local/share/eigen3/cmake/Eigen3Config.cmake /usr/local/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/local/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/3.28.1/CMakeCXXCompiler.cmake CMakeFiles/3.28.1/CMakeSystem.cmake _deps/catch2-src/CMake/CatchConfigOptions.cmake _deps/catch2-src/CMake/CatchMiscFunctions.cmake _deps/catch2-src/CMakeLists.txt _deps/catch2-src/extras/Catch.cmake _deps/catch2-src/src/CMakeLists.txt _deps/catch2-src/src/catch2/catch_user_config.hpp.in
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build /home/gavin/caltech/surf2024/torc/CMakeLists.txt /home/gavin/caltech/surf2024/torc/constraints/CMakeLists.txt /home/gavin/caltech/surf2024/torc/costs/CMakeLists.txt /home/gavin/caltech/surf2024/torc/functions/CMakeLists.txt /home/gavin/caltech/surf2024/torc/models/CMakeLists.txt /home/gavin/caltech/surf2024/torc/solver_interfaces/CMakeLists.txt /home/gavin/caltech/surf2024/torc/tests/CMakeLists.txt /home/gavin/caltech/surf2024/torc/utils/CMakeLists.txt /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXCompiler.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCompilerIdDetection.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDependentOption.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCXXCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompileFeatures.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDetermineSystem.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeFindBinUtils.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeFindDependencyMacro.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakePackageConfigHelpers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeParseImplicitIncludeInfo.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeParseImplicitLinkInfo.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeParseLibraryArchitecture.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystem.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeTestCXXCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeTestCompilerCommon.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTest.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestTargets.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestUseLaunchers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/ADSP-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/ARMCC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/ARMClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/AppleClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Borland-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompilerInternal.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Comeau-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Cray-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/CrayClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Embarcadero-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Fujitsu-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/FujitsuClang-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GHS-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-FindBinUtils.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/HP-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IAR-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IBMCPP-CXX-DetermineVersionInternal.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IBMClang-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Intel-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/IntelLLVM-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/LCC-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/MSVC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/NVHPC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/NVIDIA-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/OpenWatcom-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/OrangeC-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/PGI-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/PathScale-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/SCO-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/SunPro-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/TI-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Tasking-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/VisualAge-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/Watcom-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/XL-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/DartConfiguration.tcl.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/ExternalProject/shared_internal_commands.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent/CMakeLists.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindGit.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageMessage.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/GNUInstallDirs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckFlagCommonConfig.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/FeatureTesting.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-Determine-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/WriteBasicConfigVersionFile.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfig.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfigVersion.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets-release.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets.cmake /usr/local/lib/cmake/osqp/osqp-config-version.cmake /usr/local/lib/cmake/osqp/osqp-config.cmake /usr/local/lib/cmake/osqp/osqp-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqp-targets.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets.cmake /usr/local/share/eigen3/cmake/Eigen3Config.cmake /usr/local/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/local/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/3.28.1/CMakeCXXCompiler.cmake CMakeFiles/3.28.1/CMakeSystem.cmake _deps/catch2-src/CMake/CatchConfigOptions.cmake _deps/catch2-src/CMake/CatchMiscFunctions.cmake _deps/catch2-src/CMakeLists.txt _deps/catch2-src/extras/Catch.cmake _deps/catch2-src/src/CMakeLists.txt _deps/catch2-src/src/catch2/catch_user_config.hpp.in: phony
+build /home/gavin/caltech/surf2024/torc/CMakeLists.txt /home/gavin/caltech/surf2024/torc/constraints/CMakeLists.txt /home/gavin/caltech/surf2024/torc/costs/CMakeLists.txt /home/gavin/caltech/surf2024/torc/functions/CMakeLists.txt /home/gavin/caltech/surf2024/torc/models/CMakeLists.txt /home/gavin/caltech/surf2024/torc/solver_interfaces/CMakeLists.txt /home/gavin/caltech/surf2024/torc/tests/CMakeLists.txt /home/gavin/caltech/surf2024/torc/utils/CMakeLists.txt /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCheckCompilerFlagCommonPatterns.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeDependentOption.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeFindDependencyMacro.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakePackageConfigHelpers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTest.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestTargets.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CTestUseLaunchers.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Compiler/GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/DartConfiguration.tcl.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/ExternalProject/shared_internal_commands.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FetchContent/CMakeLists.cmake.in /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindGit.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/FindPackageMessage.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/GNUInstallDirs.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckCompilerFlag.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckFlagCommonConfig.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/Linux.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /snap/clion/284/bin/cmake/linux/x64/share/cmake-3.28/Modules/WriteBasicConfigVersionFile.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfig.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenConfigVersion.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets-release.cmake /usr/local/lib/cmake/OsqpEigen/OsqpEigenTargets.cmake /usr/local/lib/cmake/osqp/osqp-config-version.cmake /usr/local/lib/cmake/osqp/osqp-config.cmake /usr/local/lib/cmake/osqp/osqp-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqp-targets.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets-noconfig.cmake /usr/local/lib/cmake/osqp/osqpstatic-targets.cmake /usr/local/share/eigen3/cmake/Eigen3Config.cmake /usr/local/share/eigen3/cmake/Eigen3ConfigVersion.cmake /usr/local/share/eigen3/cmake/Eigen3Targets.cmake CMakeCache.txt CMakeFiles/3.28.1/CMakeCXXCompiler.cmake CMakeFiles/3.28.1/CMakeSystem.cmake _deps/catch2-src/CMake/CatchConfigOptions.cmake _deps/catch2-src/CMake/CatchMiscFunctions.cmake _deps/catch2-src/CMakeLists.txt _deps/catch2-src/extras/Catch.cmake _deps/catch2-src/src/CMakeLists.txt _deps/catch2-src/src/catch2/catch_user_config.hpp.in: phony
 
 
 #############################################

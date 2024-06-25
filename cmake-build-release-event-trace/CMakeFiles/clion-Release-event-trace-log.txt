@@ -1,14 +1,6 @@
 /snap/clion/284/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/snap/clion/284/bin/ninja/linux/x64/ninja --profiling-format=google-trace --profiling-output=CMakeFiles/clion-event-trace.json -G Ninja -S /home/gavin/caltech/surf2024/torc -B /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace
--- The CXX compiler identification is GNU 11.4.0
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/c++ - skipped
--- Detecting CXX compile features
--- Detecting CXX compile features - done
 -- Building TORC Project
 -- Building tests
--- Performing Test HAVE_FLAG__ffile_prefix_map__home_gavin_caltech_surf2024_torc_cmake_build_release_event_trace__deps_catch2_src__
--- Performing Test HAVE_FLAG__ffile_prefix_map__home_gavin_caltech_surf2024_torc_cmake_build_release_event_trace__deps_catch2_src__ - Success
 -- Building models
 -- Building costs
 -- Building costs
@@ -19,7 +11,8 @@
 -- Building with Clarabel
 -- IPOPT include directory found as /usr/local/include/coin-or.
 -- IPOPT library directory found as /usr/local/lib.
+clarabel directory = /home/gavin/Clarabel.cpp
 -- Building Utils
--- Configuring done (0.2s)
+-- Configuring done (0.1s)
 -- Generating done (0.0s)
 -- Build files have been written to: /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace

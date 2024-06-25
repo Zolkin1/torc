@@ -193,11 +193,14 @@ CATCH_INSTALL_DOCS:BOOL=ON
 //Install extras (CMake scripts, debugger helpers) alongside library
 CATCH_INSTALL_EXTRAS:BOOL=ON
 
-///home/gavin/libraries/Clarabel.cpp/include/
-CLARABEL_INC_PATH:STRING=
+//Root directory of Clarabel.cpp
+CLARABEL_DIR:STRING=/home/gavin/Clarabel.cpp
+
+//Path to Clarabel header files
+CLARABEL_INC_PATH:STRING=/home/gavin/Clarabel.cpp/include/
 
 //Path to the clarabel shared library
-CLARABEL_LIB_PATH:STRING=/home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
+CLARABEL_LIB_PATH:STRING=/home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so
 
 //Path to a program.
 CMAKE_ADDR2LINE:FILEPATH=/usr/bin/addr2line

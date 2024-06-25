@@ -43,7 +43,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always"
+					"fragment" : "-O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always"
 				}
 			],
 			"includes" : 
@@ -60,7 +60,7 @@
 				[
 					1
 				],
-				"standard" : "17"
+				"standard" : "20"
 			},
 			"sourceIndexes" : 
 			[

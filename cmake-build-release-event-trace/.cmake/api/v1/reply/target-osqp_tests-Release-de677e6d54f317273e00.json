@@ -2,7 +2,7 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "tests/ipopt_tests"
+			"path" : "tests/osqp_tests"
 		}
 	],
 	"backtrace" : 1,
@@ -27,19 +27,19 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 35,
+				"line" : 42,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 36,
+				"line" : 43,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 37,
+				"line" : 44,
 				"parent" : 0
 			},
 			{
@@ -69,7 +69,7 @@
 			{
 				"command" : 1,
 				"file" : 2,
-				"line" : 101,
+				"line" : 102,
 				"parent" : 6
 			}
 		]
@@ -80,7 +80,7 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-O3 -DNDEBUG -std=c++17 -fdiagnostics-color=always"
+					"fragment" : "-O3 -DNDEBUG -std=c++20 -fdiagnostics-color=always"
 				}
 			],
 			"defines" : 
@@ -114,7 +114,7 @@
 				},
 				{
 					"backtrace" : 3,
-					"path" : "/home/gavin/caltech/surf2024/torc/solver_interfaces"
+					"path" : "/home/gavin/Clarabel.cpp/include"
 				},
 				{
 					"backtrace" : 3,
@@ -134,7 +134,7 @@
 				[
 					2
 				],
-				"standard" : "17"
+				"standard" : "20"
 			},
 			"sourceIndexes" : 
 			[
@@ -157,7 +157,7 @@
 			"id" : "SolverInterfaces::@bcb4debec5f6b17d08cf"
 		}
 	],
-	"id" : "ipopt_tests::@a44f0ac069e85531cdee",
+	"id" : "osqp_tests::@a44f0ac069e85531cdee",
 	"link" : 
 	{
 		"commandFragments" : 
@@ -211,14 +211,14 @@
 			},
 			{
 				"backtrace" : 9,
-				"fragment" : "/home/gavin/libraries/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so",
+				"fragment" : "/home/gavin/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so",
 				"role" : "libraries"
 			}
 		],
 		"language" : "CXX"
 	},
-	"name" : "ipopt_tests",
-	"nameOnDisk" : "ipopt_tests",
+	"name" : "osqp_tests",
+	"nameOnDisk" : "osqp_tests",
 	"paths" : 
 	{
 		"build" : "tests",
@@ -239,7 +239,7 @@
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
-			"path" : "tests/ipopt_tests.cpp",
+			"path" : "tests/osqp_tests.cpp",
 			"sourceGroupIndex" : 0
 		}
 	],
