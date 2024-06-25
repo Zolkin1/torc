@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - fix/pinocchio-install
+      - fix/github-workflow
   pull_request:
     branches: [ "main" ]
 
