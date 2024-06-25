@@ -1,0 +1,18 @@
+/snap/clion/284/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/snap/clion/284/bin/ninja/linux/x64/ninja --profiling-format=google-trace --profiling-output=CMakeFiles/clion-event-trace.json -G Ninja -S /home/gavin/caltech/surf2024/torc -B /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace
+-- Building TORC Project
+-- Building tests
+-- Building models
+-- Building costs
+-- Building costs
+-- Building constraints
+-- Building solver interfaces
+-- Building with IPOPT
+-- Building with OSQP
+-- Building with Clarabel
+-- IPOPT include directory found as /usr/local/include/coin-or.
+-- IPOPT library directory found as /usr/local/lib.
+clarabel directory = /home/gavin/Clarabel.cpp
+-- Building Utils
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace

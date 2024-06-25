@@ -1,5 +1,7 @@
 message(STATUS "Building tests")
 
+enable_testing()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -58,10 +60,16 @@ if (BUILD_WITH_CLARABEL)
     target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
 endif ()
 
-add_executable(pin_tests pinocchio_tests.cpp)
-
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 include(Catch)
+#include(CTest)
+#catch_discover_tests(function_tests)
+#catch_discover_tests(utils_tests)
+#catch_discover_tests(clarabel_tests)
+#catch_discover_tests(osqp_tests)
+##catch_discover_tests(rigid_body_tests)
+##catch_discover_tests(srb_tests)
+
 catch_discover_tests(function_tests)
