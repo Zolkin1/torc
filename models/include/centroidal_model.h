@@ -13,9 +13,10 @@ namespace torc::models {
         using vectorx_t = Eigen::VectorXd;
         using matrixx_t = Eigen::MatrixXd;
 
-        CentroidalModel(const std::string& name,
-                        const std::filesystem::path& urdf,
-                        const std::vector<std::string>& contact_frames);
+        CentroidalModel::CentroidalModel(const std::string &name,
+                                         const std::filesystem::path &urdf,
+                                         const std::vector<std::string>& contact_frames,
+                                         const std::vector<std::string>& underactuated_joints);
 
         /**
          * Compute the robot state derivative given a state and contact forces and set velocities
@@ -32,8 +33,12 @@ namespace torc::models {
         RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
                           const RobotContactInfo& contact_info);
 
+        void CentroidalModel::RegisterUnactuatedJoints(const std::vector<std::string>& underactuated_joints);
+        vectorx_t CentroidalModel::InputsToTau(const vectorx_t& input) const;
+
     private:
         std::vector<pinocchio::FrameIndex> contact_frames_idxs_;
+        std::vector<int> unactuated_joint_idxs_;
     };
 }
 
