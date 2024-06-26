@@ -7,11 +7,33 @@
 
 #include "pinocchio_model.h"
 
-namespace torc::model {
-    class CentroidalModel: public models::PinocchioModel {
-        public:
-            using vectorx_t = Eigen::VectorXd;
-            using matrixx_t = Eigen::MatrixXd;
+namespace torc::models {
+    class CentroidalModel: public PinocchioModel {
+    public:
+        using vectorx_t = Eigen::VectorXd;
+        using matrixx_t = Eigen::MatrixXd;
+
+        CentroidalModel(const std::string& name,
+                        const std::filesystem::path& urdf,
+                        const std::vector<std::string>& contact_frames);
+
+        /**
+         * Compute the robot state derivative given a state and contact forces and set velocities
+         * @param state The state of the robot (q and v)
+         * @param input The set velocities of the joints and the contact forces. Dimension njoints*3 + ncontacts*3
+         * @return The derivative of the robot state (v and q)
+         */
+        RobotStateDerivative GetDynamics(const RobotState& state,
+                                         const vectorx_t& input) override;
+
+        void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
+                                        matrixx_t& A, matrixx_t& b) override;
+
+        RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
+                          const RobotContactInfo& contact_info);
+
+    private:
+        std::vector<pinocchio::FrameIndex> contact_frames_idxs_;
     };
 }
 

@@ -50,7 +50,7 @@ namespace torc::models {
         vectorx_t q;
         vectorx_t v;
 
-        RobotState(int q_dim, int v_dim) {
+        RobotState(const int q_dim, const int v_dim) {
             q = vectorx_t::Zero(q_dim);
             v = vectorx_t::Zero(v_dim);
         }
@@ -78,17 +78,27 @@ namespace torc::models {
             return static_cast<Eigen::Quaterniond>(q.segment<4>(3));
         }
 
-        static bool IndexIsQuaternion(int idx) {
-            if (idx >= 3 && idx <= 6) {
-                return true;
-            }
-
-            return false;
+        static bool IndexIsQuaternion(const int idx) {
+            return (idx >= 3 && idx <= 6);
         }
 
         void ToVector(vectorx_t& vec) const {
             vec.resize(q.size() + v.size());
             vec << q, v;
+        }
+
+        [[nodiscard]] size_t q_dim() const {
+            return q.rows();
+        }
+
+        [[nodiscard]] size_t v_dim() const {
+            return v.rows();
+        }
+
+        void AssertConsistentDimension() const {
+            if (q_dim() != v_dim() + 1) {
+                throw std::exception("Incorrect dimensions in RobotState.");
+            }
         }
     };
 } // torc::models
