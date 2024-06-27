@@ -33,10 +33,5 @@
 
 # IDE Specific Files
 .idea/
-cmake-build-debug/
-cmake-build-debug-wsl/
-cmake-build-debug_simulation/
-cmake-build-release/
-cmake-build-test/
-cmake-build-relwithdebinfo/
+cmake-*
 functions/adcg_sources/

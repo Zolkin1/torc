@@ -1,3 +1,0 @@
-/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-subbuild/CMakeFiles/catch2-populate.dir
-/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-subbuild/CMakeFiles/edit_cache.dir
-/home/gavin/caltech/surf2024/torc/cmake-build-release-event-trace/_deps/catch2-subbuild/CMakeFiles/rebuild_cache.dir
