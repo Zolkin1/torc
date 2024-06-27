@@ -15,6 +15,10 @@ namespace torc::constraint {
         GreaterThan     // greater than or equal to constraint
     };
 
+    /**
+     * Holds the matrices that the Constraint class will use to return values.
+     * @tparam scalar_t type of scalar to use in the constraint
+     */
     template <class scalar_t>
     struct ConstraintData {
         Eigen::MatrixX<scalar_t> ineq_grad;
