@@ -21,14 +21,31 @@ namespace torc::models {
         /**
          * @brief Compute the robot state derivative given a state and contact forces and set velocities
          * @param state The state of the robot (q and v, assumes q contains joint positions and v the current velocities)
-         * @param input The set velocities of the joints and the contact forces. Dimension njoints + ncontacts*3
-         * @return The derivative of the robot state (v and a, v contains CoM and joint velocities, a contains CoM accels)
+         * @param input The set velocities of the joints and the contact forces. Dimension ncontacts*3 + nactuated, layout
+         * is [fc_1, \ldots, fc_nc, v_1, \ldots, v_a]
+         * @return The derivative of the state wrt time, v=joint position velocities, a=center of mass momentum change
          */
         RobotStateDerivative GetDynamics(const RobotState& state,
                                          const vectorx_t& input) override;
 
-        void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                        matrixx_t& A, matrixx_t& b) override;
+        /**
+         * @brief Linearizes the dynamics into the form $\partial_x xdot = A, \partial_u xdot = B$
+         *
+         * Strategy: we consider the velocity and acceleration separately.
+         *
+         * dv (joints): if the joint is unactuated, $dv_i=dx_i$. Otherwise, $dv_i=du_i$
+         * dv (CoM):
+         * da (CoM): a =
+         *
+         * @param state The state of the robot (q and v, assumes q contains joint positions and v the current velocities)
+         * @param input The set velocities of the joints and the contact forces
+         * @param A
+         * @param B
+         */
+        void DynamicsDerivative(const RobotState& state,
+                                const vectorx_t& input,
+                                matrixx_t& A,
+                                matrixx_t& B) override;
 
         void CentroidalModel::RegisterUnactuatedJoints(const std::vector<std::string>& underactuated_joints);
 
