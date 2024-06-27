@@ -11,13 +11,13 @@
 
 namespace torc::constraint {
     enum CONSTRAINT_T {
-        EQ,     // equality constraint
-        LEQ,    // lesser than or equal to constraint
-        GEQ     // greater than or equal to constraint
+        Equals,         // equality constraint
+        LesserThan,     // lesser than or equal to constraint
+        GreaterThan     // greater than or equal to constraint
     };
 
     /**
-     * Represents a group of constraints, given in the form f(x) - constraint type - bound, and contains methods to
+     * @brief Represents a group of constraints, given in the form f(x) - constraint type - bound, and contains methods to
      * linearize the constraints in various forms.
      * @tparam scalar_t the scalar type for the constraint
      */
@@ -30,7 +30,7 @@ namespace torc::constraint {
 
     public:
         /**
-         * Default constructor.
+         * @brief Default constructor.
          */
         explicit Constraint() {
             this->functions_ = std::vector<fn::ExplicitFn<scalar_t>>();
@@ -40,7 +40,7 @@ namespace torc::constraint {
         }
 
         /**
-         * Constructor for the constraint class.
+         * @brief Constructor for the constraint class.
          * @param functions functions to be evaluated in the constraint
          * @param bounds the corresponding bounds of the functions
          * @param constraint_types relations that the functions must hold to the bounds (i.e. GEQ, LEQ, EQ)
@@ -49,15 +49,17 @@ namespace torc::constraint {
         explicit Constraint(const std::vector<fn::ExplicitFn<scalar_t>>& functions,
                             const std::vector<scalar_t>& bounds,
                             const std::vector<CONSTRAINT_T>& constraint_types,
+                            const scalar_t eps=1e-10,
                             const std::string& name="ConstraintInstance") {
             this->functions_ = functions;
             this->bounds_ = bounds;
             this->constraint_types_ = constraint_types;
             this->name_ = name;
+            this->eps_ = eps;
         }
 
         /**
-         * Checks whether the constraint is satisfied at a given point
+         * @brief Checks whether the constraint is satisfied at a given point
          * @param x the point to check the constraint
          * @return whether the constraint is satisfied
          */
@@ -67,9 +69,9 @@ namespace torc::constraint {
                 const fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
                 const scalar_t bound = this->bounds_.at(i);
                 const CONSTRAINT_T type = this->constraint_types_.at(i);
-                if (((type == GEQ) && (fn(x) < bound))
-                    || ((type == LEQ) && (fn(x) > bound))
-                    || ((type == EQ) && (fn(x) != bound))) {
+                if (((type == GreaterThan) && (fn(x) < bound))
+                    || ((type == LesserThan) && (fn(x) > bound))
+                    || ((type == Equals) && (std::abs(fn(x)-bound) > eps_))) {
                     return false;
                 }
             }
@@ -78,7 +80,7 @@ namespace torc::constraint {
 
 
         /**
-         * Adds a single constraint to the constraint collection.
+         * @brief Adds a single constraint to the constraint collection.
          * @param fn the function to be evaluated in the constraint
          * @param bound the bound of the function
          * @param constraint_type LEQ, GEQ, EQ
@@ -92,13 +94,14 @@ namespace torc::constraint {
         }
 
         /**
-         * Computes the linearzation of all the constraints, and returns them in the form Ax <=/=/>= b
+         * @brief Computes the linearzation of all the constraints, and returns them in the form Ax <=/=/>= b, in the
+         * order that the user passed them in.
          * @param x the point to linearize the constraint functions
          * @param A the matrix comprised to be loaded from the transposed gradients of the function
          * @param bounds the vector to be loaded from the constraint bounds
          * @param constraint_types the std vector to be loaded from the constriant types
          */
-        void RawForm(const vectorx_t& x,
+        void OriginalForm(const vectorx_t& x,
                      matrixx_t& A,
                      vectorx_t& bounds,
                      std::vector<CONSTRAINT_T>& constraint_types) {
@@ -118,21 +121,24 @@ namespace torc::constraint {
 
 
         /**
-         *
-         * @param x the point to lienarize the constraint functions
+         * @brief Computes the linearization of all the constraints, and returns them in the form Ax <=/=/>= b, in the
+         * order that the user passed them in. The constraints vector is slightly modified, where if a number of
+         * neighboring types are identical, they are represented with one entry in the constraints vector and an entry
+         * in the annotations vector, which describes the number of repetitions of that constraint.
+         * @param x the point to linearize the constraint functions
          * @param A the matrix to be loaded from the transposed gradients of the function
          * @param bounds the vector to be loaded from the constraint bounds
          * @param constraints the std vector to be loaded from the constraint types
          * @param annotations the number of repetitions that each constraint type appears in sequence
          */
-        void CompactRawForm(const vectorx_t& x,
+        void CompactOriginalForm(const vectorx_t& x,
                             matrixx_t& A,
                             vectorx_t& bounds,
                             std::vector<CONSTRAINT_T>& constraints,
                             std::vector<size_t>& annotations) {
             CONSTRAINT_CHECK_EMPTY
 
-            this->RawForm(x, A, bounds, constraints);
+            this->OriginalForm(x, A, bounds, constraints);
 
             CONSTRAINT_T prev_type = constraints.at(0);
             constraints.clear();
@@ -150,7 +156,7 @@ namespace torc::constraint {
         }
 
         /**
-         * Linearizes the constraints at the point x, into the form Ax <= b
+         * @brief Linearizes the constraints at the point x, into the form Ax <= b
          * @param x the point at which to linearize
          * @param A a matrix to hold the transposed gradients of the functions
          * @param upper_bound a vector to hold the upper bounds
@@ -167,17 +173,17 @@ namespace torc::constraint {
                 scalar_t bound = this->bounds_.at(i) - fn(x);
                 rowvecx_t grad_t = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
-                    case EQ:
+                    case Equals:
                         A.row(i_row) = grad_t;
                         upper_bound(i_row++) = bound;
                         A.row(i_row) = grad_t * -1.;
                         upper_bound(i_row) = bound * -1.;
                         break;
-                    case LEQ:
+                    case LesserThan:
                         A.row(i_row) = grad_t;
                         upper_bound(i_row) = bound;
                         break;
-                    case GEQ:
+                    case GreaterThan:
                         A.row(i_row) = grad_t * -1.;
                         upper_bound(i_row) = bound * -1.;
                         break;
@@ -189,7 +195,7 @@ namespace torc::constraint {
 
 
         /**
-         * Linearizes the constraints at the point x, into the form Ax <= b, where A is sparse
+         * @brief Linearizes the constraints at the point x, into the form Ax <= b, where A is sparse
          * @param x the point at which to linearize
          * @param A a sparse matrix to hold the transposed gradients of the functions
          * @param upper_bound a vector to hold the upper bounds
@@ -203,7 +209,7 @@ namespace torc::constraint {
 
 
         /**
-         * Linearizes the constraints at the point x, into the form lb <= Ax <= ub
+         * @brief Linearizes the constraints at the point x, into the form lb <= Ax <= ub
          * @param x the point at which to linearize
          * @param A a matrix to hold the transposed gradients of the functions
          * @param lower_bound a vector to hold the lower bounds
@@ -225,15 +231,15 @@ namespace torc::constraint {
                 scalar_t bound = this->bounds_.at(i) - fn(x);
                 A.row(i) = fn.Gradient(x).transpose();
                 switch (this->constraint_types_.at(i)) {
-                    case EQ:
+                    case Equals:
                         upper_bound(i) = bound;
                         lower_bound(i) = bound;
                         break;
-                    case LEQ:
+                    case LesserThan:
                         upper_bound(i) = bound;
                         lower_bound(i) = min;
                         break;
-                    case GEQ:
+                    case GreaterThan:
                         upper_bound(i) = max;
                         lower_bound(i) = bound;
                         break;
@@ -245,7 +251,7 @@ namespace torc::constraint {
 
 
         /**
-         * Linearizes the constraints at the point x, into the form lb <= Ax <= ub, where A is sparse
+         * @brief Linearizes the constraints at the point x, into the form lb <= Ax <= ub, where A is sparse
          * @param x the point at which to linearize
          * @param A a sparse matrix to hold the transposed gradients of the functions
          * @param lower_bound a vector to hold the lower bounds
@@ -263,7 +269,7 @@ namespace torc::constraint {
 
 
         /**
-         * Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb
+         * @brief Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb
          * @param x the point at which to linearizes
          * @param A a matrix to hold the transposed gradients of the functions in inequality constraints
          * @param upper_bound a vector to hold the upper bounds of the inequality constraints
@@ -291,15 +297,15 @@ namespace torc::constraint {
                 scalar_t bound = this->bounds_.at(i) - fn(x);
                 rowvecx_t grad = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
-                    case EQ:
+                    case Equals:
                         G.row(eq_row) = grad;
                         equality_bound(eq_row++) = bound;
                         break;
-                    case LEQ:
+                    case LesserThan:
                         A.row(ineq_row) = grad;
                         upper_bound(ineq_row++) = bound;
                         break;
-                    case GEQ:
+                    case GreaterThan:
                         A.row(ineq_row) = grad * -1.;
                         upper_bound(ineq_row++) = bound * -1.;
                         break;
@@ -311,7 +317,7 @@ namespace torc::constraint {
 
 
         /**
-         * Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb, where A and G are sparse
+         * @brief Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb, where A and G are sparse
          * @param x the point at which to linearizes
          * @param A a sparse matrix to hold the transposed gradients of the functions in inequality constraints
          * @param upper_bound a vector to hold the upper bounds of the inequality constraints
@@ -335,10 +341,11 @@ namespace torc::constraint {
         std::vector<fn::ExplicitFn<scalar_t>> functions_;   // the functions to evaluate in the constraint
         std::vector<scalar_t> bounds_;      // the bounds of the functions in the constraint
         std::vector<CONSTRAINT_T> constraint_types_;    // the constraint types (i.e., LEQ, GEQ, EQ)
+        scalar_t eps_;
         std::string name_;  // string identifier
 
         [[nodiscard]] size_t CountEq() const {
-            return std::count(constraint_types_.cbegin(), constraint_types_.cend(), EQ);
+            return std::count(constraint_types_.cbegin(), constraint_types_.cend(), Equals);
         }
     };
 }

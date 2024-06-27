@@ -5,7 +5,7 @@
 
 namespace torc::fn {
     /**
-     * Class implementation of an explicit function, where the differentials are provided by the user.
+     * @brief Class implementation of an explicit function, where the differentials are provided by the user.
      * @tparam scalar_t the type of scalar used for the fn
      */
     template <class scalar_t>
@@ -22,7 +22,7 @@ namespace torc::fn {
         };
 
         /**
-         * Constructor for the ExplicitFn class
+         * @brief Constructor for the ExplicitFn class
          * @param func the func function
          * @param grad the gradient of the function
          * @param hess the hessian of the function
@@ -45,7 +45,7 @@ namespace torc::fn {
         }
 
         /**
-         * Evaluates the function at a point
+         * @brief Evaluates the function at a point
          * @param x the input
          * @return f(x)
          */
@@ -53,22 +53,22 @@ namespace torc::fn {
 
 
         /**
-         * Evaluates the function at a point
+         * @brief Evaluates the function at a point
          * @param x the input
          * @return f(x)
          */
         scalar_t operator() (const vectorx_t& x) const { return this->func_(x); }
 
         /**
-         * Adds two functions. Taking derivatives is a linear operation, so the gradients and the hessians are added.
+         * @brief Adds two functions. Derivatives are linear, so the gradients and the hessians are added.
          * @param other the other function
          * @return the sum of the two functions
          */
-        ExplicitFn<scalar_t> operator+ (const ExplicitFn<scalar_t>& other) const {
+        ExplicitFn operator+ (const ExplicitFn& other) const {
             if (this->dim_ != other.dim_) {
                 throw std::runtime_error("Two functions must have the same dimension.");
             }
-            ExplicitFn<scalar_t> fn {};
+            ExplicitFn fn {};
             fn.func_ = [this, other](const vectorx_t& x) { return this->func_(x) + other.func_(x); };
             fn.grad_ = [this, other](const vectorx_t& x) {
                 const size_t dim = this->dim_;
@@ -97,9 +97,13 @@ namespace torc::fn {
             return fn;
         }
 
-
-        ExplicitFn<scalar_t> operator* (const scalar_t& c) const {
-            ExplicitFn<scalar_t> fn (
+        /**
+         * @brief Multiplies the function by a scalar.
+         * @param c the scalar to multiply by
+         * @return c*f(x)
+         */
+        ExplicitFn operator* (const scalar_t& c) const {
+            ExplicitFn fn (
                 [this, c](const vectorx_t& x) { return this->func_(x) * c; },
                 [this, c](const vectorx_t& x) { return this->grad_(x) * c; },
                 [this, c](const vectorx_t& x) { return this->hess_(x) * c; },
@@ -110,23 +114,23 @@ namespace torc::fn {
         }
 
         /**
-         * Subtracts two functions. Differentiation is linear, so the derivatives are subtracted.
+         * @brief Subtracts two functions. Differentiation is linear, so the derivatives are subtracted.
          * @param other the other function
          * @return the difference of the two functions
          */
-        ExplicitFn<scalar_t> operator- (const ExplicitFn<scalar_t>& other) const {
+        ExplicitFn operator- (const ExplicitFn<scalar_t>& other) const {
             return (*this) + (other * (-1));
         }
 
         /**
-         * Evaluates the gradient of the function at a point
+         * @brief Evaluates the gradient of the function at a point
          * @param x the input
          * @return grad f(x)
          */
         vectorx_t Gradient(const vectorx_t& x) const { return this->grad_(x); }
 
         /**
-         * Evaluates the Hessian of the function at a point
+         * @brief Evaluates the Hessian of the function at a point
          * @param x the input
          * @return H_f(x)
          */
@@ -135,13 +139,13 @@ namespace torc::fn {
         }
 
         /**
-         * Returns the identifier_ of the function
+         * @brief Returns the identifier_ of the function
          * @return the function's name
          */
         [[nodiscard]] std::string GetName() const { return this->name_; }
 
         /**
-         * Returns the domain's dimension of the function
+         * @brief Returns the domain's dimension of the function
          * @return the domain's dimension
          */
         [[nodiscard]] size_t GetDim() const { return this->dim_; }
@@ -155,7 +159,7 @@ namespace torc::fn {
         std::string name_ = "ExplicitFnInstance";
 
         /**
-         * Setter for the identifier attribute. Checks whether the string given is a valid variable name. This function
+         *@ brief Setter for the identifier attribute. Checks whether the string given is a valid variable name. This function
          * is intended for internal use in subclasses only, since changing the name of a function after it has been
          * loaded into dynamic libraries cause complications for later loading.
          * @param str the identifier
@@ -168,7 +172,7 @@ namespace torc::fn {
         }
 
         /**
-         * Checks whether a string is a valid identifier (i.e., starts with a alphabetical character and contains only
+         * @brief Checks whether a string is a valid identifier (i.e., starts with a alphabetical character and contains only
          * alpha-numerical characters and underscores).
          * @param str the string to check
          * @return true if the string is a valid identifier, false otherwise

@@ -5,7 +5,7 @@
 
 namespace torc::utils {
     /**
-     * Converts a std vector to an Eigen column vector.
+     * @brief Converts a std vector to an Eigen column vector.
      * @tparam scalar_t the data type in the vectors
      * @param vec the std vector
      * @return the Eigen column vector
@@ -16,7 +16,7 @@ namespace torc::utils {
     }
 
     /**
-     * Converts an Eigen column vector to a std vector
+     * @brief Converts an Eigen column vector to a std vector
      * @tparam scalar_t the data type in the vectors
      * @param vec the Eigen column vector
      * @return the std vector
@@ -27,7 +27,7 @@ namespace torc::utils {
     }
 
     /**
-     * Converts an Eigen row vector to a std vector
+     * @brief Converts an Eigen row vector to a std vector
      * @tparam scalar_t the data type in the vectors
      * @param vec the Eigen row vector
      * @return the std vector

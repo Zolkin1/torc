@@ -19,7 +19,7 @@ TEST_CASE("Constraint Initialization and Check", "[constraint]") {
                            grad_d.at(i),
                            hess_d.at(i)),
             0.5,
-            constraint::GEQ
+            constraint::GreaterThan
         );
     }
     const Eigen::Vector3d vec0 = {1, 2, 3};
@@ -33,7 +33,7 @@ TEST_CASE("Constraint Initialization and Check", "[constraint]") {
                         hess_d.front()
             ),
             1,
-            constraint::EQ
+            constraint::Equals
     );
     REQUIRE_FALSE(constraint1.Check(vec0));
     const Eigen::Vector2d vec1 = {1, 0};
@@ -53,28 +53,28 @@ TEST_CASE("Constraint Forms", "[constraint]") {
                    grad_d.at(0),
                    hess_d.at(0)),
         -1,
-        GEQ
+        GreaterThan
     );
     constraint0.AddConstraint(
         ExplicitFn(func_d.at(1),
                    grad_d.at(1),
                    hess_d.at(1)),
         1,
-        GEQ
+        GreaterThan
     );
     constraint0.AddConstraint(
         ExplicitFn(func_d.at(2),
                    grad_d.at(2),
                    hess_d.at(2)),
         0,
-        LEQ
+        LesserThan
     );
     constraint0.AddConstraint(
         ExplicitFn(func_d.at(3),
                    grad_d.at(3),
                    hess_d.at(3)),
         1,
-        EQ
+        Equals
     );
 
     const Eigen::Vector3d vec = {1, 2, 3};      // vector to test
@@ -85,7 +85,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
     std::vector<size_t> annotations;
 
     SECTION("Raw Form") {
-        constraint0.RawForm(vec, A, bounds0, types);
+        constraint0.OriginalForm(vec, A, bounds0, types);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
                   2, 4, 6,
@@ -95,12 +95,12 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         Eigen::VectorXd bounds_true(4);
         bounds_true << -7, -13, -216, -5;
         REQUIRE(bounds0 == bounds_true);
-        std::vector types_true = {GEQ, GEQ, LEQ, EQ};
+        std::vector types_true = {GreaterThan, GreaterThan, LesserThan, Equals};
         REQUIRE(types == types_true);
     }
 
     SECTION("Compact Raw Form") {
-        constraint0.CompactRawForm(vec, A, bounds0, types, annotations);
+        constraint0.CompactOriginalForm(vec, A, bounds0, types, annotations);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
                   2, 4, 6,
@@ -110,7 +110,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         Eigen::VectorXd bounds_true(4);
         bounds_true << -7, -13, -216, -5;
         REQUIRE(bounds0 == bounds_true);
-        std::vector types_true = {GEQ, LEQ, EQ};
+        std::vector types_true = {GreaterThan, LesserThan, Equals};
         REQUIRE(types == types_true);
         std::vector<size_t> annotations_true {2, 1, 1};
         REQUIRE(annotations == annotations_true);
