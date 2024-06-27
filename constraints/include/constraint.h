@@ -6,15 +6,11 @@
 #include <string>
 #include <iostream>
 #include "explicit_fn.h"
+#include "constraint_data.h"
 
 #define CONSTRAINT_CHECK_EMPTY if (this->constraint_types_.empty()) { return; }
 
 namespace torc::constraint {
-    enum CONSTRAINT_T {
-        Equals,         // equality constraint
-        LesserThan,     // lesser than or equal to constraint
-        GreaterThan     // greater than or equal to constraint
-    };
 
     /**
      * @brief Represents a group of constraints, given in the form f(x) - constraint type - bound, and contains methods to
@@ -70,7 +66,7 @@ namespace torc::constraint {
                 const scalar_t bound = this->bounds_.at(i);
                 const CONSTRAINT_T type = this->constraint_types_.at(i);
                 if (((type == GreaterThan) && (fn(x) < bound))
-                    || ((type == LesserThan) && (fn(x) > bound))
+                    || ((type == LessThan) && (fn(x) > bound))
                     || ((type == Equals) && (std::abs(fn(x)-bound) > eps_))) {
                     return false;
                 }
@@ -106,7 +102,6 @@ namespace torc::constraint {
                      vectorx_t& bounds,
                      std::vector<CONSTRAINT_T>& constraint_types) {
             CONSTRAINT_CHECK_EMPTY
-
             std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             size_t n_rows = this->functions_.size();
             A.resize(n_rows, x.size());
@@ -132,12 +127,11 @@ namespace torc::constraint {
          * @param annotations the number of repetitions that each constraint type appears in sequence
          */
         void CompactOriginalForm(const vectorx_t& x,
-                            matrixx_t& A,
-                            vectorx_t& bounds,
-                            std::vector<CONSTRAINT_T>& constraints,
-                            std::vector<size_t>& annotations) {
+                                 matrixx_t& A,
+                                 vectorx_t& bounds,
+                                 std::vector<CONSTRAINT_T>& constraints,
+                                 std::vector<size_t>& annotations) {
             CONSTRAINT_CHECK_EMPTY
-
             this->OriginalForm(x, A, bounds, constraints);
 
             CONSTRAINT_T prev_type = constraints.at(0);
@@ -179,7 +173,7 @@ namespace torc::constraint {
                         A.row(i_row) = grad_t * -1.;
                         upper_bound(i_row) = bound * -1.;
                         break;
-                    case LesserThan:
+                    case LessThan:
                         A.row(i_row) = grad_t;
                         upper_bound(i_row) = bound;
                         break;
@@ -235,7 +229,7 @@ namespace torc::constraint {
                         upper_bound(i) = bound;
                         lower_bound(i) = bound;
                         break;
-                    case LesserThan:
+                    case LessThan:
                         upper_bound(i) = bound;
                         lower_bound(i) = min;
                         break;
@@ -301,7 +295,7 @@ namespace torc::constraint {
                         G.row(eq_row) = grad;
                         equality_bound(eq_row++) = bound;
                         break;
-                    case LesserThan:
+                    case LessThan:
                         A.row(ineq_row) = grad;
                         upper_bound(ineq_row++) = bound;
                         break;

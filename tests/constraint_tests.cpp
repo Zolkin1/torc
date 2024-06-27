@@ -67,7 +67,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
                    grad_d.at(2),
                    hess_d.at(2)),
         0,
-        LesserThan
+        LessThan
     );
     constraint0.AddConstraint(
         ExplicitFn(func_d.at(3),
@@ -95,7 +95,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         Eigen::VectorXd bounds_true(4);
         bounds_true << -7, -13, -216, -5;
         REQUIRE(bounds0 == bounds_true);
-        std::vector types_true = {GreaterThan, GreaterThan, LesserThan, Equals};
+        std::vector types_true = {GreaterThan, GreaterThan, LessThan, Equals};
         REQUIRE(types == types_true);
     }
 
@@ -110,7 +110,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         Eigen::VectorXd bounds_true(4);
         bounds_true << -7, -13, -216, -5;
         REQUIRE(bounds0 == bounds_true);
-        std::vector types_true = {GreaterThan, LesserThan, Equals};
+        std::vector types_true = {GreaterThan, LessThan, Equals};
         REQUIRE(types == types_true);
         std::vector<size_t> annotations_true {2, 1, 1};
         REQUIRE(annotations == annotations_true);
