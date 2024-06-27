@@ -93,24 +93,19 @@ namespace torc::constraint {
          * @brief Computes the linearzation of all the constraints, and returns them in the form Ax <=/=/>= b, in the
          * order that the user passed them in.
          * @param x the point to linearize the constraint functions
-         * @param A the matrix comprised to be loaded from the transposed gradients of the function
-         * @param bounds the vector to be loaded from the constraint bounds
-         * @param constraint_types the std vector to be loaded from the constriant types
+         * @param constraint_data ineq_grad, types, bound_all changed
          */
-        void OriginalForm(const vectorx_t& x,
-                     matrixx_t& A,
-                     vectorx_t& bounds,
-                     std::vector<CONSTRAINT_T>& constraint_types) {
+        void OriginalForm(const vectorx_t& x, ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
             std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             size_t n_rows = this->functions_.size();
-            A.resize(n_rows, x.size());
-            constraint_types = this->constraint_types_;
-            bounds.resize(n_rows);
+            constraint_data.ineq_grad.resize(n_rows, x.size());
+            constraint_data.types = this->constraint_types_;
+            constraint_data.bound_all.resize(n_rows);
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
-                A.row(i) = fn.Gradient(x).transpose();
-                bounds(i)= this->bounds_.at(i) - fn(x);
+                constraint_data.ineq_grad.row(i) = fn.Gradient(x).transpose();
+                constraint_data.bound_all(i)= this->bounds_.at(i) - fn(x);
             }
         }
 
@@ -121,29 +116,22 @@ namespace torc::constraint {
          * neighboring types are identical, they are represented with one entry in the constraints vector and an entry
          * in the annotations vector, which describes the number of repetitions of that constraint.
          * @param x the point to linearize the constraint functions
-         * @param A the matrix to be loaded from the transposed gradients of the function
-         * @param bounds the vector to be loaded from the constraint bounds
-         * @param constraints the std vector to be loaded from the constraint types
-         * @param annotations the number of repetitions that each constraint type appears in sequence
+         * @param constraint_data types, reps, ineq_grad, bound_all changed
          */
-        void CompactOriginalForm(const vectorx_t& x,
-                                 matrixx_t& A,
-                                 vectorx_t& bounds,
-                                 std::vector<CONSTRAINT_T>& constraints,
-                                 std::vector<size_t>& annotations) {
+        void CompactOriginalForm(const vectorx_t& x, ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
-            this->OriginalForm(x, A, bounds, constraints);
+            this->OriginalForm(x, constraint_data);
 
-            CONSTRAINT_T prev_type = constraints.at(0);
-            constraints.clear();
-            annotations.clear();
+            CONSTRAINT_T prev_type = constraint_data.types.at(0);
+            constraint_data.types.clear();
+            constraint_data.reps.clear();
 
             for (auto type : this->constraint_types_) {
-                if ((type != prev_type) || annotations.empty()) {
-                    constraints.push_back(type);
-                    annotations.push_back(1);
+                if ((type != prev_type) || constraint_data.reps.empty()) {
+                    constraint_data.types.push_back(type);
+                    constraint_data.reps.push_back(1);
                 } else {
-                    annotations.back()++;
+                    ++constraint_data.reps.back();
                 }
                 prev_type = type;
             }
@@ -152,34 +140,33 @@ namespace torc::constraint {
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= b
          * @param x the point at which to linearize
-         * @param A a matrix to hold the transposed gradients of the functions
-         * @param upper_bound a vector to hold the upper bounds
+         * @param constraint_data ineq_grad, bound_high changed
          */
-        void UnilateralForm(const vectorx_t& x, matrixx_t& A, vectorx_t& upper_bound) {
+        void UnilateralForm(const vectorx_t& x, ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
             const std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             const size_t n_rows = this->functions_.size() + this->CountEq();
 
-            A.resize(n_rows, x.size());
-            upper_bound.resize(n_rows);
+            constraint_data.ineq_grad.resize(n_rows, x.size());
+            constraint_data.bound_high.resize(n_rows);
             for (int i=0, i_row=0; i < this->functions_.size(); i++, i_row++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
                 scalar_t bound = this->bounds_.at(i) - fn(x);
                 rowvecx_t grad_t = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
                     case Equals:
-                        A.row(i_row) = grad_t;
-                        upper_bound(i_row++) = bound;
-                        A.row(i_row) = grad_t * -1.;
-                        upper_bound(i_row) = bound * -1.;
+                        constraint_data.ineq_grad.row(i_row) = grad_t;
+                        constraint_data.bound_high(i_row++) = bound;
+                        constraint_data.ineq_grad.row(i_row) = grad_t * -1.;
+                        constraint_data.bound_high(i_row) = bound * -1.;
                         break;
                     case LessThan:
-                        A.row(i_row) = grad_t;
-                        upper_bound(i_row) = bound;
+                        constraint_data.ineq_grad.row(i_row) = grad_t;
+                        constraint_data.bound_high(i_row) = bound;
                         break;
                     case GreaterThan:
-                        A.row(i_row) = grad_t * -1.;
-                        upper_bound(i_row) = bound * -1.;
+                        constraint_data.ineq_grad.row(i_row) = grad_t * -1.;
+                        constraint_data.bound_high(i_row) = bound * -1.;
                         break;
                     default:
                         break;
@@ -191,51 +178,46 @@ namespace torc::constraint {
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= b, where A is sparse
          * @param x the point at which to linearize
-         * @param A a sparse matrix to hold the transposed gradients of the functions
-         * @param upper_bound a vector to hold the upper bounds
+         * @param constraint_data ineq_grad, bound_high, ineq_grad_sparse changed
          */
-        void SparseUnilateralForm(const vectorx_t& x, sp_matrix_t& A, vectorx_t& upper_bound) {
+        void SparseUnilateralForm(const vectorx_t& x,
+                                  ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
-            matrixx_t A_dense;
-            this->UnilateralForm(x, A_dense, upper_bound);
-            A = A_dense.sparseView();
+            this->UnilateralForm(x, constraint_data);
+            constraint_data.ineq_grad_sparse = constraint_data.ineq_grad.sparseView();
         }
 
 
         /**
          * @brief Linearizes the constraints at the point x, into the form lb <= Ax <= ub
          * @param x the point at which to linearize
-         * @param A a matrix to hold the transposed gradients of the functions
-         * @param lower_bound a vector to hold the lower bounds
-         * @param upper_bound a vector to hold the upper bounds
+         * @param constraint_data ineq_grad, bound_high, bound_low changed
          */
         void BoxForm(const vectorx_t& x,
-                     matrixx_t& A,
-                     vectorx_t& lower_bound,
-                     vectorx_t& upper_bound) {
+                     ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
             scalar_t max = std::numeric_limits<scalar_t>::max();
             scalar_t min = -max;
             size_t n_rows = this->functions_.size();
-            A.resize(n_rows, x.size());
-            upper_bound.resize(n_rows);
-            lower_bound.resize(n_rows);
+            constraint_data.ineq_grad.resize(n_rows, x.size());
+            constraint_data.bound_high.resize(n_rows);
+            constraint_data.bound_low.resize(n_rows);
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
                 scalar_t bound = this->bounds_.at(i) - fn(x);
-                A.row(i) = fn.Gradient(x).transpose();
+                constraint_data.ineq_grad.row(i) = fn.Gradient(x).transpose();
                 switch (this->constraint_types_.at(i)) {
                     case Equals:
-                        upper_bound(i) = bound;
-                        lower_bound(i) = bound;
+                        constraint_data.bound_high(i) = bound;
+                        constraint_data.bound_low(i) = bound;
                         break;
                     case LessThan:
-                        upper_bound(i) = bound;
-                        lower_bound(i) = min;
+                        constraint_data.bound_high(i) = bound;
+                        constraint_data.bound_low(i) = min;
                         break;
                     case GreaterThan:
-                        upper_bound(i) = max;
-                        lower_bound(i) = bound;
+                        constraint_data.bound_high(i) = max;
+                        constraint_data.bound_low(i) = bound;
                         break;
                     default:
                         break;
@@ -247,44 +229,33 @@ namespace torc::constraint {
         /**
          * @brief Linearizes the constraints at the point x, into the form lb <= Ax <= ub, where A is sparse
          * @param x the point at which to linearize
-         * @param A a sparse matrix to hold the transposed gradients of the functions
-         * @param lower_bound a vector to hold the lower bounds
-         * @param upper_bound a vector to hold the upper bounds
+         * @param constraint_data ineq_grad_sparse, ineq_grad, bound_high, bound_low changed
          */
         void SparseBoxForm(const vectorx_t& x,
-                           sp_matrix_t& A,
-                           vectorx_t& lower_bound,
-                           vectorx_t& upper_bound) {
+                           ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
-            matrixx_t A_dense;
-            this->BoxForm(x, A_dense, lower_bound, upper_bound);
-            A = A_dense.sparseView();
+            this->BoxForm(x, constraint_data);
+            constraint_data.ineq_grad_sparse = constraint_data.ineq_grad.sparseView();
         }
 
 
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb
          * @param x the point at which to linearizes
-         * @param A a matrix to hold the transposed gradients of the functions in inequality constraints
-         * @param upper_bound a vector to hold the upper bounds of the inequality constraints
-         * @param G a matrix to hold the transposed gradients of the functions in equality constraints
-         * @param equality_bound a vector to hold the lower bounds of the equality constraints
+         * @param constraint_data ineq_grad, eq_grad, bound_high, bound_eq changed
          */
         void InequalityEqualityForm(const vectorx_t& x,
-                                    matrixx_t& A,
-                                    vectorx_t& upper_bound,
-                                    matrixx_t& G,
-                                    vectorx_t& equality_bound) {
+                                    ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
             const std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             const size_t n_functions = c_types.size();
             const size_t n_eq = this->CountEq();
             const size_t n_ineq = n_functions - n_eq;
 
-            A.resize(n_ineq, x.rows());
-            G.resize(n_eq, x.rows());
-            upper_bound.resize(n_ineq, 1);
-            equality_bound.resize(n_eq, 1);
+            constraint_data.ineq_grad.resize(n_ineq, x.rows());
+            constraint_data.eq_grad.resize(n_eq, x.rows());
+            constraint_data.bound_high.resize(n_ineq, 1);
+            constraint_data.bound_eq.resize(n_eq, 1);
 
             for (int i=0, ineq_row=0, eq_row=0; i < n_functions; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
@@ -292,16 +263,16 @@ namespace torc::constraint {
                 rowvecx_t grad = fn.Gradient(x).transpose();
                 switch (c_types.at(i)) {
                     case Equals:
-                        G.row(eq_row) = grad;
-                        equality_bound(eq_row++) = bound;
+                        constraint_data.eq_grad.row(eq_row) = grad;
+                        constraint_data.bound_eq(eq_row++) = bound;
                         break;
                     case LessThan:
-                        A.row(ineq_row) = grad;
-                        upper_bound(ineq_row++) = bound;
+                        constraint_data.ineq_grad.row(ineq_row) = grad;
+                        constraint_data.bound_high(ineq_row++) = bound;
                         break;
                     case GreaterThan:
-                        A.row(ineq_row) = grad * -1.;
-                        upper_bound(ineq_row++) = bound * -1.;
+                        constraint_data.ineq_grad.row(ineq_row) = grad * -1.;
+                        constraint_data.bound_high(ineq_row++) = bound * -1.;
                         break;
                     default:
                         break;
@@ -313,21 +284,15 @@ namespace torc::constraint {
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb, where A and G are sparse
          * @param x the point at which to linearizes
-         * @param A a sparse matrix to hold the transposed gradients of the functions in inequality constraints
-         * @param upper_bound a vector to hold the upper bounds of the inequality constraints
-         * @param G a sparse matrix to hold the transposed gradients of the functions in equality constraints
-         * @param equality_bound a vector to hold the lower bounds of the equality constraints
+         * @param constraint_data ineq_grad_sparse, eq_grad_sparse, ineq_grad, eq_grad, bound_high, bound_eq changed
          */
         void SparseInequalityEqualityForm(const vectorx_t& x,
-                                          sp_matrix_t& A,
-                                          vectorx_t& upper_bound,
-                                          sp_matrix_t& G,
-                                          vectorx_t& equality_bound) {
+                                          ConstraintData<scalar_t>& constraint_data) {
             CONSTRAINT_CHECK_EMPTY
             matrixx_t A_dense, G_dense;
-            this->InequalityEqualityForm(x, A_dense, upper_bound, G_dense, equality_bound);
-            A = A_dense.sparseView();
-            G = G_dense.sparseView();
+            this->InequalityEqualityForm(x, constraint_data);
+            constraint_data.ineq_grad_sparse = constraint_data.ineq_grad.sparseView();
+            constraint_data.eq_grad_sparse = constraint_data.eq_grad.sparseView();
         }
 
 

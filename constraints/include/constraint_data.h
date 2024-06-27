@@ -6,6 +6,7 @@
 #define CONSTRAINT_DATA_H
 
 #include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/Sparse>
 
 namespace torc::constraint {
     enum CONSTRAINT_T {
@@ -16,11 +17,14 @@ namespace torc::constraint {
 
     template <class scalar_t>
     struct ConstraintData {
-        Eigen::MatrixX<scalar_t> inequality_gradients;
-        Eigen::MatrixX<scalar_t> equality_gradients;
-        Eigen::VectorX<scalar_t> inequality_bound_low;
-        Eigen::VectorX<scalar_t> inequality_bound_high;
-        Eigen::VectorX<scalar_t> equality_bound;
+        Eigen::MatrixX<scalar_t> ineq_grad;
+        Eigen::SparseMatrix<scalar_t> ineq_grad_sparse;
+        Eigen::MatrixX<scalar_t> eq_grad;
+        Eigen::SparseMatrix<scalar_t> eq_grad_sparse;
+        Eigen::VectorX<scalar_t> bound_low;
+        Eigen::VectorX<scalar_t> bound_high;
+        Eigen::VectorX<scalar_t> bound_all;
+        Eigen::VectorX<scalar_t> bound_eq;
         std::vector<CONSTRAINT_T> types;
         std::vector<size_t> reps;
     };
