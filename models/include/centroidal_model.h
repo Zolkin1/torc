@@ -30,11 +30,7 @@ namespace torc::models {
         void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
                                         matrixx_t& A, matrixx_t& b) override;
 
-        RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
-                          const RobotContactInfo& contact_info);
-
         void CentroidalModel::RegisterUnactuatedJoints(const std::vector<std::string>& underactuated_joints);
-        vectorx_t CentroidalModel::InputsToTau(const vectorx_t& input) const;
 
     private:
         std::vector<pinocchio::FrameIndex> contact_frames_idxs_;

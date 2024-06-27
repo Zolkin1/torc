@@ -78,6 +78,13 @@ namespace torc::models {
         return {state_v_new, cmm.inverse() * dh_CoM};
     }
 
+    void CentroidalModel::DynamicsDerivative(const RobotState &state,
+                                             const vectorx_t &input,
+                                             matrixx_t &A,
+                                             matrixx_t &b) {
+
+    }
+
 
     void CentroidalModel::RegisterUnactuatedJoints(const std::vector<std::string>& underactuated_joints) {
         assert(pin_model_.idx_vs.at(1) == 0);
