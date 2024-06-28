@@ -78,100 +78,108 @@ TEST_CASE("Constraint Forms", "[constraint]") {
     );
 
     const Eigen::Vector3d vec = {1, 2, 3};      // vector to test
-    ConstraintData<double> constraint_data;
 
     SECTION("Raw Form") {
-        constraint0.OriginalForm(vec, constraint_data);
+        Constraint<double>::OriginalFormData data;
+        constraint0.OriginalForm(vec, data);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
                   2, 4, 6,
                   108, 108, 108,
                   6, 3, 2;
-        REQUIRE(constraint_data.ineq_grad == A_true);
+        REQUIRE(data.grads == A_true);
         Eigen::VectorXd bounds_true(4);
         bounds_true << -7, -13, -216, -5;
-        REQUIRE(constraint_data.bound_all == bounds_true);
+        REQUIRE(data.bounds == bounds_true);
         std::vector types_true = {GreaterThan, GreaterThan, LessThan, Equals};
-        REQUIRE(constraint_data.types == types_true);
+        REQUIRE(data.types == types_true);
     }
 
     SECTION("Compact Raw Form") {
-        constraint0.CompactOriginalForm(vec, constraint_data);
+        Constraint<double>::CompactOriginalFormData data;
+        constraint0.CompactOriginalForm(vec, data);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
                   2, 4, 6,
                   108, 108, 108,
                   6, 3, 2;
-        REQUIRE(constraint_data.ineq_grad == A_true);
+        REQUIRE(data.grads == A_true);
         Eigen::VectorXd bounds_true(4);
         bounds_true << -7, -13, -216, -5;
-        REQUIRE(constraint_data.bound_all == bounds_true);
+        REQUIRE(data.bounds == bounds_true);
         std::vector types_true = {GreaterThan, LessThan, Equals};
-        REQUIRE(constraint_data.types == types_true);
+        REQUIRE(data.types == types_true);
         std::vector<size_t> annotations_true {2, 1, 1};
-        REQUIRE(constraint_data.reps == annotations_true);
+        REQUIRE(data.reps == annotations_true);
     }
 
     SECTION("Unilateral Form") {
-        constraint0.UnilateralForm(vec, constraint_data);
+        Constraint<double>::UnilateralFormData data;
+        constraint0.UnilateralForm(vec, data);
         Eigen::MatrixXd A_true(5, 3);
         A_true << -1, -1, -1,
                   -2, -4, -6,
                   108, 108, 108,
                   6, 3, 2,
                   -6, -3, -2;
-        REQUIRE(constraint_data.ineq_grad == A_true);
+        REQUIRE(data.grads == A_true);
         Eigen::VectorXd bounds_true(5);
         bounds_true << 7, 13, -216, -5, 5;
-        REQUIRE(constraint_data.bound_high == bounds_true);
+        REQUIRE(data.bounds == bounds_true);
 
-        constraint0.SparseUnilateralForm(vec, constraint_data);
-        REQUIRE(A_true == constraint_data.ineq_grad_sparse.toDense());
-        REQUIRE(constraint_data.bound_high == bounds_true);
+        Constraint<double>::SparseUnilateralFormData sp_data;
+        constraint0.SparseUnilateralForm(vec, sp_data);
+        REQUIRE(A_true == sp_data.grads.toDense());
+        REQUIRE(sp_data.bounds == bounds_true);
     }
 
     SECTION("Box Form") {
-        constraint0.BoxForm(vec, constraint_data);
+        Constraint<double>::BoxFormData data;
+        constraint0.BoxForm(vec, data);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
                   2, 4, 6,
                   108, 108, 108,
                   6, 3, 2;
-        REQUIRE(constraint_data.ineq_grad == A_true);
+        REQUIRE(data.grads == A_true);
         Eigen::VectorXd lbounds_true(4), ubounds_true(4);
         constexpr double max = std::numeric_limits<double>::max();
         constexpr double min = -max;
         lbounds_true << -7, -13, min, -5;
         ubounds_true << max, max, -216, -5;
-        REQUIRE(constraint_data.bound_low == lbounds_true);
-        REQUIRE(constraint_data.bound_high == ubounds_true);
+        REQUIRE(data.bounds_low == lbounds_true);
+        REQUIRE(data.bounds_high == ubounds_true);
 
-        constraint0.SparseBoxForm(vec, constraint_data);
-        REQUIRE(A_true == constraint_data.ineq_grad_sparse.toDense());
-        REQUIRE(constraint_data.bound_low == lbounds_true);
-        REQUIRE(constraint_data.bound_high == ubounds_true);
+        Constraint<double>::SparseBoxFormData sp_data;
+        constraint0.SparseBoxForm(vec, sp_data);
+        REQUIRE(A_true == sp_data.grads.toDense());
+        REQUIRE(sp_data.bounds_low == lbounds_true);
+        REQUIRE(sp_data.bounds_high == ubounds_true);
     }
 
     SECTION("Inequality Equality Form") {
-        constraint0.InequalityEqualityForm(vec, constraint_data);
+        Constraint<double>::InequalityEqualityFormData data;
+        constraint0.InequalityEqualityForm(vec, data);
         Eigen::MatrixXd A_true(3, 3);
         Eigen::MatrixXd G_true(1, 3);
         A_true << -1, -1, -1,
                   -2, -4, -6,
                   108, 108, 108;
         G_true << 6, 3, 2;
-        REQUIRE(constraint_data.ineq_grad== A_true);
-        REQUIRE(constraint_data.eq_grad== G_true);
+        REQUIRE(data.ineq_grad== A_true);
+        REQUIRE(data.eq_grad== G_true);
         Eigen::VectorXd bounds0_true(3), bounds1_true(1);
         bounds0_true << 7, 13, -216;
         bounds1_true << -5;
-        REQUIRE(constraint_data.bound_high == bounds0_true);
-        REQUIRE(constraint_data.bound_eq == bounds1_true);
+        REQUIRE(data.ineq_bounds == bounds0_true);
+        REQUIRE(data.eq_bounds == bounds1_true);
 
-        constraint0.SparseInequalityEqualityForm(vec, constraint_data);
-        REQUIRE(A_true == constraint_data.ineq_grad_sparse.toDense());
-        REQUIRE(G_true == constraint_data.eq_grad_sparse.toDense());
-        REQUIRE(constraint_data.bound_high == bounds0_true);
-        REQUIRE(constraint_data.bound_eq == bounds1_true);
+        Constraint<double>::SparseInequalityEqualityFormData sp_data;
+
+        constraint0.SparseInequalityEqualityForm(vec, sp_data);
+        REQUIRE(A_true == sp_data.ineq_grad.toDense());
+        REQUIRE(G_true == sp_data.eq_grad.toDense());
+        REQUIRE(sp_data.ineq_bounds == bounds0_true);
+        REQUIRE(sp_data.eq_bounds == bounds1_true);
     }
 }

@@ -3,8 +3,7 @@ message(STATUS "Building constraints")
 set(CONSTRAINT_INC_DIR "${torc_SOURCE_DIR}/constraints/include")
 
 set(CONSTRAINT_HEADER_LIST
-        "${CONSTRAINT_INC_DIR}/constraint.h"
-        "${CONSTRAINT_INC_DIR}/constraint_data.h")
+        "${CONSTRAINT_INC_DIR}/constraint.h")
 
 add_library(Constraints SHARED ${CONSTRAINT_HEADER_LIST})
 target_link_libraries(Constraints Functions)
