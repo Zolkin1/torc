@@ -97,7 +97,7 @@ namespace torc::models {
 
         void AssertConsistentDimension() const {
             if (q_dim() != v_dim() + 1) {
-                throw std::exception("Incorrect dimensions in RobotState.");
+                throw std::runtime_error("Incorrect dimensions in RobotState.");
             }
         }
     };
