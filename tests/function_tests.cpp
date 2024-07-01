@@ -1,4 +1,4 @@
-#define CATCH_CONFIG_MAIN
+// #define CATCH_CONFIG_MAIN
 
 #include <random>
 #include <iostream>
@@ -17,7 +17,7 @@
 #include "test_fn.h"
 
 
-TEST_CASE("Linear Function Test", "[linear]") {
+TEST_CASE("Linear Function Test", "[function]") {
     Eigen::Vector3d q1, x1, x2;
     q1 << 1, 2, 3;
     x1 << 0.1, 1, 10;
@@ -41,7 +41,7 @@ TEST_CASE("Linear Function Test", "[linear]") {
 }
 
 
-TEST_CASE("Quadratic Function Test", "[quadratic]") {
+TEST_CASE("Quadratic Function Test", "[function]") {
     using namespace torc::fn;
     const int n_tests = 10;
     const std::vector<int> test_dims = {1, 50};
@@ -103,14 +103,14 @@ TEST_CASE("Quadratic Function Test", "[quadratic]") {
 }
 
 
-TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
+TEST_CASE("Autodiff Benchmarks", "[function]") {
     using namespace torc::fn;
     using namespace test;
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
 
     auto fn_ad = functions<adcg_t>;
-    const auto tst_dim = 20;
-    const auto tst_fn = 6;
+    constexpr auto tst_dim = 20;
+    constexpr auto tst_fn = 6;
 
     auto fn = fn_ad.at(tst_fn);
 
@@ -140,7 +140,7 @@ TEST_CASE("Autodiff Benchmarks", "[autodiff]") {
 }
 
 
-TEST_CASE("Differential Consistency Tests", "[explicit][autodiff][finite]") {
+TEST_CASE("Differential Consistency Tests", "[function]") {
     using namespace torc::fn;
     using namespace test;
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;
@@ -197,7 +197,7 @@ TEST_CASE("Differential Consistency Tests", "[explicit][autodiff][finite]") {
 }
 
 
-TEST_CASE("Function Addition", "[explicit]") {
+TEST_CASE("Function Addition", "[function]") {
     using namespace torc::fn;
     using namespace test;
     using adcg_t = CppAD::AD<CppAD::cg::CG<double>>;

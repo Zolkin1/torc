@@ -1,5 +1,7 @@
 message(STATUS "Building tests")
 
+enable_testing()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -10,12 +12,17 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-# ---------- Cost Tests ---------- #
-add_executable(cost_tests
+# ---------- Function Tests ------- #
+add_executable(function_tests
                 function_tests.cpp
                 test_fn.h)
-target_link_libraries(cost_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(cost_tests PUBLIC Functions)
+target_link_libraries(function_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(function_tests PUBLIC Functions)
+
+# ---------- Constraint Tests ---------- #
+add_executable(constraint_tests constraint_tests.cpp)
+target_link_libraries(constraint_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(constraint_tests PUBLIC Constraints)
 
 # ---------- Model Tests ---------- #
 if (BUILD_WITH_PINOCCHIO)
@@ -57,4 +64,12 @@ endif ()
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 include(Catch)
-catch_discover_tests(cost_tests)
+#include(CTest)
+#catch_discover_tests(function_tests)
+#catch_discover_tests(utils_tests)
+#catch_discover_tests(clarabel_tests)
+#catch_discover_tests(osqp_tests)
+##catch_discover_tests(rigid_body_tests)
+##catch_discover_tests(srb_tests)
+
+catch_discover_tests(function_tests)

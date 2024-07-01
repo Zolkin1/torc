@@ -5,7 +5,7 @@
 
 namespace torc::fn {
     /**
-     * Class implementation of a quadratic fn function, f(x) = (1/2) x^T A x + q^T x, where A is a symmetric matrix.
+     * @brief Class implementation of a quadratic fn function, f(x) = (1/2) x^T A x + q^T x, where A is a symmetric matrix.
      * @tparam scalar_t the type of scalar used for the fn
      */
     template <class scalar_t>
@@ -15,7 +15,7 @@ namespace torc::fn {
 
     public:
         /**
-         * Overloaded constructor for the QuadraticFn class.
+         * @brief Overloaded constructor for the QuadraticFn class.
          * @param quad_coefficients matrix coefficients (A) for f(x) = (1/2) x^T A x + q^T x, must be symmetric
          * @param lin_coefficients linear coefficients (q) for f(x)
          * @param name string name
@@ -38,7 +38,7 @@ namespace torc::fn {
 
 
         /**
-         * Overloaded constructor for the QuadraticFn class. The linear component defaults to 0.
+         * @brief Overloaded constructor for the QuadraticFn class. The linear component defaults to 0.
          * @param coefficients matrix coefficients for f(x) = (1/2) x^T A x, must be symmetric
          * @param name string name
          */
@@ -50,7 +50,7 @@ namespace torc::fn {
 
 
         /**
-         * Overloaded constructor for the QuadraticFn class.
+         * @brief Overloaded constructor for the QuadraticFn class.
          * @tparam dim input dimension
          * @param coefficients an upper triangular view (A) of the coefficients. The full matrix is constructed by
          *                     A^T + A, while the diagonal remains unchanged
@@ -67,14 +67,14 @@ namespace torc::fn {
 
 
         /**
-         * Get the full coefficient matrix of the function.
+         * @brief Get the full coefficient matrix of the function.
          * @return the A in f(x) = (1/2) x^T A x + q^T x
          */
         matrixx_t GetQuadCoefficients() const { return this->A_; }
 
 
         /**
-         * Get the linear coefficients of the function
+         * @brief Get the linear coefficients of the function
          * @return the q in (1/2) x^T A x + q^T x
          */
         vectorx_t GetLinCoefficients() const { return this->q_; }
