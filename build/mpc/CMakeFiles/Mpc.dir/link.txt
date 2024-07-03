@@ -1,0 +1,2 @@
+/usr/bin/ar qc libMpc.a CMakeFiles/Mpc.dir/mpc_base.cpp.o CMakeFiles/Mpc.dir/mpc_contact.cpp.o
+/usr/bin/ranlib libMpc.a

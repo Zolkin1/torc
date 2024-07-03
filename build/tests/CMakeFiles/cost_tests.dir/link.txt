@@ -1,0 +1,1 @@
+/usr/bin/g++ -g CMakeFiles/cost_tests.dir/function_tests.cpp.o -o cost_tests  -Wl,-rpath,/home/gavin/caltech/surf2024/torc/build/functions ../_deps/catch2-build/src/libCatch2Maind.a ../functions/libFunctions.so ../_deps/catch2-build/src/libCatch2d.a 

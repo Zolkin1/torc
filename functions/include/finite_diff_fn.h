@@ -5,7 +5,7 @@
 
 namespace torc::fn {
     /**
-     * Class implementation of a function whose differentials are evaluated using the finite difference method.
+     * @brief Class implementation of a function whose differentials are evaluated using the finite difference method.
      * @tparam scalar_t the type of scalar used for the fn
      */
     template <class scalar_t>
@@ -15,7 +15,7 @@ namespace torc::fn {
 
     public:
         /**
-         * Constructor for the Finite Difference class
+         * @brief Constructor for the Finite Difference class
          * @param func the function
          * @param dim the dimensions of the input of the func function
          * @param grad_step the step used for the gradient, defaults to sqrt(ulp)

@@ -1,0 +1,5 @@
+if(EXISTS "/home/gavin/caltech/surf2024/torc/build/tests/osqp_tests-b12d07c_tests.cmake")
+  include("/home/gavin/caltech/surf2024/torc/build/tests/osqp_tests-b12d07c_tests.cmake")
+else()
+  add_test(osqp_tests_NOT_BUILT-b12d07c osqp_tests_NOT_BUILT-b12d07c)
+endif()

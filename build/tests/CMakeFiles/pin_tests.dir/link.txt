@@ -1,0 +1,1 @@
+/usr/bin/g++ -g CMakeFiles/pin_tests.dir/pinocchio_tests.cpp.o -o pin_tests 
