@@ -24,6 +24,12 @@ namespace torc::models {
         using matrixx_t = Eigen::MatrixXd;
         using vec3 = Eigen::Vector3d;
 
+     static constexpr int FORCE_DIM = 3;
+     static constexpr int LINEAR_DIM = 3;
+     static constexpr int ANGULAR_DIM = 3;
+     static constexpr int BASE_DOF = LINEAR_DIM + ANGULAR_DIM;
+     static constexpr int COM_DOF = LINEAR_DIM + ANGULAR_DIM;
+
         Centroid(const std::string &name,
                         const std::filesystem::path &urdf,
                         const std::vector<std::string>& contact_frames,
@@ -51,6 +57,9 @@ namespace torc::models {
                                 matrixx_t& A,
                                 matrixx_t& B) override;
 
+        static vectorx_t StateToVector(const RobotState& state);
+        static vectorx_t StateDerivativeToVector(const RobotStateDerivative& state);
+
         RobotState GetRandomState() const;
         vectorx_t GetRandomInput() const;
 
@@ -59,12 +68,6 @@ namespace torc::models {
 
 
     private:
-        static constexpr int FORCE_DIM = 3;
-        static constexpr int LINEAR_DIM = 3;
-        static constexpr int ANGULAR_DIM = 3;
-        static constexpr int BASE_DOF = LINEAR_DIM + ANGULAR_DIM;
-        static constexpr int COM_DOF = LINEAR_DIM + ANGULAR_DIM;
-
         std::vector<pinocchio::FrameIndex> contact_frames_idxs_; // indicies of contact frames
         std::unordered_set<int> unactuated_joint_idxs_;          // indicies of unactuated joints
         const int n_contacts_;                                // number of contacts

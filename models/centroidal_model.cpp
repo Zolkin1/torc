@@ -78,6 +78,7 @@ namespace torc::models {
         return {dq, dh_com};
     }
 
+
     void Centroid::DynamicsDerivative(const RobotState &state,
                                              const vectorx_t &input,
                                              matrixx_t &A,
@@ -101,23 +102,23 @@ namespace torc::models {
         computeCentroidalMomentum(pin_model_, *pin_data_, state.q, dq);
 
         // calculate ddx_dx (A)
-        A = matrixx_t::Zero(COM_DOF + pin_model_.nv, COM_DOF + pin_model_.nv);
+        A = matrixx_t::Zero(COM_DOF + pin_model_.nv, COM_DOF + pin_model_.nq);
         A.block(COM_DOF, 0, COM_DOF, BASE_DOF) = A_b_inv;
 
-        matrixx_t dhtau_dq(ANGULAR_DIM, pin_model_.nv);
+        matrixx_t dhtau_dq(ANGULAR_DIM, pin_model_.nq);
         pinocchio::impl::computeJointJacobians(pin_model_, *pin_data_, state.q);
         // allocate outside of the loop to prevent reinitialization
-        matrixx_t J_frame = matrixx_t::Zero(COM_DOF, pin_model_.nv);
+        matrixx_t J_frame = matrixx_t::Zero(COM_DOF, pin_model_.nq);
         // iterate through all the contact forces so we don't have to recalculate frame jacobians every time
         for (int i=0; i<n_contacts_; i++) {
             const vectorx_t& force = contact_forces.at(i);
             J_frame = getFrameJacobian(pin_model_, *pin_data_, contact_frames_idxs_.at(i), pinocchio::WORLD);
             const matrixx_t dr_dq = J_frame - Jcom;
             // calculate the partial derivatives' effect on the angular momentum
-            for (int j=0; j<pin_model_.nv; j++) {
+            for (int j=0; j<pin_model_.nq; j++) {
                 dhtau_dq.col(j) += vec3(dr_dq.col(j)).cross(vec3(force));
             }
-            A.block(LINEAR_DIM, COM_DOF, ANGULAR_DIM, pin_model_.nv) = dhtau_dq;
+            A.block(LINEAR_DIM, COM_DOF, ANGULAR_DIM, pin_model_.nq) = dhtau_dq;
         }
 
         // calculate ddx_du (B)
@@ -135,6 +136,18 @@ namespace torc::models {
             }
             B.block(LINEAR_DIM, i*FORCE_DIM, ANGULAR_DIM, FORCE_DIM) = dhtau_dfi;
         }
+    }
+
+    vectorx_t Centroid::StateToVector(const RobotState &state) {
+        vectorx_t x(state.v.rows() + state.q.rows());
+        x << state.v, state.q;
+        return x;
+    }
+
+    vectorx_t Centroid::StateDerivativeToVector(const RobotStateDerivative &state) {
+        vectorx_t dx(state.a.size() + state.v.size());
+        dx << state.a, state.v;
+        return dx;
     }
 
     RobotState Centroid::GetRandomState() const {
@@ -159,7 +172,7 @@ namespace torc::models {
 
     std::vector<Centroid::vec3> Centroid::GetForcesFromInput(const vectorx_t &input) const {
         const vectorx_t contact_forces = input.topRows(n_contacts_ * FORCE_DIM); // assuming no contact torques
-        std::vector<vec3> forces = {};
+        std::vector<vec3> forces;
         for (int i=0; i<n_contacts_; i++) {
             forces.emplace_back(input.segment(i*FORCE_DIM, FORCE_DIM));
         }
