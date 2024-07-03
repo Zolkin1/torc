@@ -26,7 +26,7 @@ namespace torc::models {
          * @param name Name of the model
          * @param urdf path to the urdf
          */
-        PinocchioModel(const std::string& name, const std::filesystem::path& urdf);
+        PinocchioModel(const std::string& name, std::filesystem::path  urdf);
 
         PinocchioModel(const PinocchioModel& other);
 

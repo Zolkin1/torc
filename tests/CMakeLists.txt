@@ -67,8 +67,6 @@ if (BUILD_WITH_CLARABEL)
     catch_discover_tests(clarabel_tests)
 endif ()
 
-add_executable(pin_tests pinocchio_tests.cpp)
-
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 

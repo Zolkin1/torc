@@ -17,14 +17,14 @@ namespace torc::models {
      * q = [q_base, q_joints], v = [h_CoM], a = [dh_CoM]
      */
     
-    class CentroidalModel: public PinocchioModel {
+    class Centroid: public PinocchioModel {
 
     public:
         using vectorx_t = Eigen::VectorXd;
         using matrixx_t = Eigen::MatrixXd;
         using vec3 = Eigen::Vector3d;
 
-        CentroidalModel(const std::string &name,
+        Centroid(const std::string &name,
                         const std::filesystem::path &urdf,
                         const std::vector<std::string>& contact_frames,
                         const std::vector<std::string>& unactuated_joints);
@@ -51,27 +51,39 @@ namespace torc::models {
                                 matrixx_t& A,
                                 matrixx_t& B) override;
 
+        RobotState GetRandomState() const;
+        vectorx_t GetRandomInput() const;
+
+        int GetDerivativeDim() const;
+        int GetInputDim() const;
+
 
     private:
+        static constexpr int FORCE_DIM = 3;
+        static constexpr int LINEAR_DIM = 3;
+        static constexpr int ANGULAR_DIM = 3;
+        static constexpr int BASE_DOF = LINEAR_DIM + ANGULAR_DIM;
+        static constexpr int COM_DOF = LINEAR_DIM + ANGULAR_DIM;
+
         std::vector<pinocchio::FrameIndex> contact_frames_idxs_; // indicies of contact frames
         std::unordered_set<int> unactuated_joint_idxs_;          // indicies of unactuated joints
-        const size_t n_contacts_;                                // number of contacts
-        const size_t n_actuated_;                                // number of actuated joints
+        const int n_contacts_;                                // number of contacts
+        const int n_actuated_;                                // number of actuated joints
 
         /**
          * @brief Extracts the contact forces in the input into a vector of 3-vectors.
          * @param input The input, in the form [f_c1, ..., f_cn, v_j]
          * @return The contact forces in the input
          */
-        [[nodiscard]] std::vector<vectorx_t> GetForcesFromInput(const vectorx_t& input) const;
+        [[nodiscard]] std::vector<vec3> GetForcesFromInput(const vectorx_t& input) const;
 
-        /**
-         * @brief Computes the actuation map, which maps the set velocities to the joint velocities, with unactauated joints
-         * set to 0 velocity. It is effectively an identity matric with zero rows inserted at the indicies of the
-         * unactuated joints.
-         * @return The actuation map
-         */
-        [[nodiscard]] matrixx_t GetActuationMap() const;
+        // /**
+        //  * @brief Computes the actuation map, which maps the set velocities to the joint velocities, with unactauated joints
+        //  * set to 0 velocity. It is effectively an identity matric with zero rows inserted at the indicies of the
+        //  * unactuated joints.
+        //  * @return The actuation map
+        //  */
+        // [[nodiscard]] matrixx_t GetActuationMap() const;
 
         /**
          * @brief Updates the joint velocities of the robot using an input, assuming that all joints can be infinitely
@@ -82,6 +94,9 @@ namespace torc::models {
          * @return The new joint velocities
          */
         [[nodiscard]] vectorx_t UpdateJointVelocities(const RobotState& state, const vectorx_t& input) const;
+
+        vectorx_t InputsToTau(const vectorx_t &input) const override {return vectorx_t::Zero(0);}
+
     };
 }
 
