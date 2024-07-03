@@ -43,7 +43,7 @@ namespace torc::models {
     {
         // update all joint velocities, except base joint, compute dq_joints
         const vectorx_t dqj = UpdateJointVelocities(state, input);
-        const std::vector<vec3> forces = GetForcesFromInput(input);    // TODO change to vec3
+        const std::vector<vec3> forces = GetForcesFromInput(input);
 
         pinocchio::crba(pin_model_, *pin_data_, state.q);
         pinocchio::computeCentroidalMap(pin_model_, *pin_data_, state.q);
