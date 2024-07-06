@@ -21,10 +21,10 @@ namespace torc::models {
         system_type_ = HybridSystemImpulse;
 
         // Assuming all joints (not "root_joint") are actuated
-        std::vector<std::string> underactuated_joints;
-        underactuated_joints.emplace_back("root_joint");
+        std::vector<std::string> unactuated_joints;
+        unactuated_joints.emplace_back("root_joint");
 
-        CreateActuationMatrix(underactuated_joints);
+        CreateActuationMatrix(unactuated_joints);
 
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
@@ -41,28 +41,25 @@ namespace torc::models {
 
     RigidBody::RigidBody(const torc::models::RigidBody& other)
         : PinocchioModel(other.name_, other.urdf_) {
-        num_inputs_ = other.num_inputs_;
+        n_input_ = other.n_input_;
 
         act_mat_ = other.act_mat_;
         contact_data_ = std::make_unique<pinocchio::Data>(*other.contact_data_);
     }
 
-    RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input) {
-        assert(state.q.size() - 1 == state.v.size());
-
+    vectorx_t RigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
         const vectorx_t& tau = InputsToTau(input);
-
-        pinocchio::aba(pin_model_, *pin_data_, state.q, state.v, tau);
-
-        RobotStateDerivative xdot(state.v, pin_data_->ddq);
-
-        return xdot;
+        pinocchio::aba(pin_model_, *pin_data_, q, v, tau);
+        return BuildState(v, pin_data_->ddq);
     }
 
-    RobotStateDerivative RigidBody::GetDynamics(const RobotState& state, const vectorx_t& input,
-                                             const RobotContactInfo& contact_info) const {
-        assert(state.q.size() - 1 == state.v.size());
-
+    vectorx_t RigidBody::GetDynamics(const vectorx_t& state,
+                                     const vectorx_t& input,
+                                     const RobotContactInfo& contact_info) const {
+        vectorx_t q, v;
+        ParseState(state, q, v);
         const vectorx_t& tau = InputsToTau(input);
 
         // Create contact data
@@ -76,16 +73,16 @@ namespace torc::models {
         // Call initConstraintDynamics
         pinocchio::initConstraintDynamics(pin_model_, *contact_data_, contact_model);
 
-        pinocchio::constraintDynamics(pin_model_, *contact_data_, state.q, state.v, tau,
+        pinocchio::constraintDynamics(pin_model_, *contact_data_, q, v, tau,
                                       contact_model, contact_data);
-
-        RobotStateDerivative xdot(state.v, contact_data_->ddq);
-
-        return xdot;
+        return BuildState(v, contact_data_->ddq);
     }
 
-    RobotState RigidBody::GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
-                                                  const RobotContactInfo& contact_info) {
+    vectorx_t RigidBody::GetImpulseDynamics(const vectorx_t& state,
+                                             const vectorx_t& input,
+                                             const RobotContactInfo& contact_info) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
         // Create contact data
         std::vector<pinocchio::RigidConstraintModel> contact_model;
         std::vector<pinocchio::RigidConstraintData> contact_data;
@@ -97,18 +94,17 @@ namespace torc::models {
 
         // impulseDynamics
         const pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
-        const double eps = 0;                           // Coefficient of restitution
-        pinocchio::impulseDynamics(pin_model_, *contact_data_, state.q, state.v, contact_model,
+        constexpr double eps = 0;                           // Coefficient of restitution
+        pinocchio::impulseDynamics(pin_model_, *contact_data_, q, v, contact_model,
                                    contact_data, eps, settings);
 
-        const RobotState x(state.q, contact_data_->dq_after);
-        return x;
-
+        return BuildState(q, contact_data_->dq_after);
     }
 
-    void RigidBody::DynamicsDerivative(const RobotState& state, const vectorx_t& input,
+    void RigidBody::DynamicsDerivative(const vectorx_t& state, const vectorx_t& input,
                             matrixx_t& A, matrixx_t& B) {
-        assert(state.q.size() - 1 == state.v.size());
+        vectorx_t q, v;
+        ParseState(state, q, v);
         assert(A.rows() == GetDerivativeDim());
         assert(A.cols() == GetDerivativeDim());
         assert(B.rows() == GetDerivativeDim());
@@ -116,7 +112,7 @@ namespace torc::models {
 
         const vectorx_t& tau = InputsToTau(input);
 
-        pinocchio::computeABADerivatives(pin_model_, *pin_data_, state.q, state.v, tau);
+        pinocchio::computeABADerivatives(pin_model_, *pin_data_, q, v, tau);
 
         A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv),
                 matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
@@ -129,10 +125,11 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_mat_;
     }
 
-    void RigidBody::DynamicsDerivative(const RobotState& state, const vectorx_t& input,
+    void RigidBody::DynamicsDerivative(const vectorx_t& state, const vectorx_t& input,
                                        const RobotContactInfo& contacts,
                                        matrixx_t& A, matrixx_t& B) {
-        assert(state.q.size() - 1 == state.v.size());
+        vectorx_t q, v;
+        ParseState(state, q, v);
         assert(A.rows() == GetDerivativeDim());
         assert(A.cols() == GetDerivativeDim());
         assert(B.rows() == GetDerivativeDim());
@@ -149,7 +146,7 @@ namespace torc::models {
         // Call initConstraintDynamics
         pinocchio::initConstraintDynamics(pin_model_, *contact_data_, contact_model);
 
-        pinocchio::constraintDynamics(pin_model_, *contact_data_, state.q, state.v, tau,
+        pinocchio::constraintDynamics(pin_model_, *contact_data_, q, v, tau,
                                       contact_model, contact_data);
 
         pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
@@ -168,9 +165,11 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), contact_data_->ddq_dtau * act_mat_; //contact_data_->Minv * act_mat_;
     }
 
-    void RigidBody::ImpulseDerivative(const RobotState& state, const vectorx_t& input,
+    void RigidBody::ImpulseDerivative(const vectorx_t& state, const vectorx_t& input,
                                       const RobotContactInfo& contact_info,
                                       matrixx_t& A, matrixx_t& B) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
         assert(A.rows() == GetDerivativeDim());
         assert(A.cols() == GetDerivativeDim());
         assert(B.rows() == GetDerivativeDim());
@@ -188,8 +187,8 @@ namespace torc::models {
         pinocchio::initConstraintDynamics(pin_model_, *contact_data_, contact_model);
 
         const pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
-        const double eps = 0;                           // Coefficient of restitution
-        pinocchio::impulseDynamics(pin_model_, *contact_data_, state.q, state.v,
+        constexpr double eps = 0;                           // Coefficient of restitution
+        pinocchio::impulseDynamics(pin_model_, *contact_data_, q, v,
                                    contact_model, contact_data, eps, settings);
 
         // impulseDynamicsDerivatives
@@ -203,49 +202,72 @@ namespace torc::models {
         B.setZero();
     }
 
-    void RigidBody::CreateActuationMatrix(const std::vector<std::string>& underactuated_joints) {
-        assert(pin_model_.idx_vs.at(1) == 0);
-        assert(pin_model_.nvs.at(1) == FLOATING_VEL);
+    void RigidBody::CreateActuationMatrix(
+        const std::vector<std::string> &underactuated_joints) {
+      assert(pin_model_.idx_vs.at(1) == 0);
+      assert(pin_model_.nvs.at(1) == FLOATING_VEL);
 
-        int num_actuators = pin_model_.nv;
-        const int num_joints = pin_model_.njoints;
+      int num_actuators = pin_model_.nv;
+      const int num_joints = pin_model_.njoints;
 
-        std::vector<int> unact_joint_idx;
+      std::vector<int> unact_joint_idx;
 
-        unact_joint_idx.push_back(0);   // Universe joint is never actuated
+      unact_joint_idx.push_back(0); // Universe joint is never actuated
 
-        // Get the number of actuators
-        for (std::string joint_name : underactuated_joints) {
-            for (int i = 0; i < num_joints; i++) {
-                if (joint_name == pin_model_.names.at(i)) {
-                    num_actuators -= pin_model_.joints.at(i).nv();
-                    unact_joint_idx.push_back(i);
-                    break;
-                }
-            }
+      // Get the number of actuators
+      for (std::string joint_name : underactuated_joints) {
+        for (int i = 0; i < num_joints; i++) {
+          if (joint_name == pin_model_.names.at(i)) {
+            num_actuators -= pin_model_.joints.at(i).nv();
+            unact_joint_idx.push_back(i);
+            break;
+          }
+        }
+      }
+
+      act_mat_ = matrixx_t::Zero(pin_model_.nv, num_actuators);
+      int act_idx = 0;
+
+      for (int joint_idx = 0; joint_idx < num_joints; joint_idx++) {
+        bool act = true;
+        for (int idx : unact_joint_idx) {
+          if (joint_idx == idx) {
+            act = false;
+            break;
+          }
         }
 
-        act_mat_ = matrixx_t::Zero(pin_model_.nv, num_actuators);
-        int act_idx = 0;
-
-        for (int joint_idx = 0; joint_idx < num_joints; joint_idx++) {
-            bool act = true;
-            for (int idx : unact_joint_idx) {
-                if (joint_idx == idx) {
-                    act = false;
-                    break;
-                }
-            }
-
-            if (act) {
-                const int nv = pin_model_.joints.at(joint_idx).nv();
-                act_mat_.block(pin_model_.joints.at(joint_idx).idx_v(), act_idx, nv, nv) =
-                        matrixx_t::Identity(nv, nv);
-                act_idx += nv;
-            }
+        if (act) {
+          const int nv = pin_model_.joints.at(joint_idx).nv();
+          act_mat_.block(pin_model_.joints.at(joint_idx).idx_v(), act_idx, nv,
+                         nv) = matrixx_t::Identity(nv, nv);
+          act_idx += nv;
         }
+      }
 
-        num_inputs_ = act_mat_.cols();
+      n_input_ = act_mat_.cols();
+    }
+
+    void RigidBody::ParseState(const vectorx_t &state,  // parse State Derivative
+                               vectorx_t &q,
+                               vectorx_t &v,
+                               bool deriv) const {
+      if (deriv) {
+        q = state.topRows(pin_model_.nv);
+      } else {
+        q = state.topRows(pin_model_.nq);
+      }
+      v = state.bottomRows(pin_model_.nv);
+    }
+
+    vectorx_t RigidBody::BuildState(const vectorx_t &q, const vectorx_t &v) {
+        vectorx_t x(q.size() + v.size());
+        x << q, v;
+        return x;
+    }
+
+    void RigidBody::ParseInput(const vectorx_t &input, vectorx_t &tau) const {
+      tau = act_mat_ * input;
     }
 
     vectorx_t RigidBody::InputsToTau(const vectorx_t& input) const {

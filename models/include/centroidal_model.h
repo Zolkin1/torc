@@ -14,23 +14,23 @@ namespace torc::models {
      * consists purely of the joint positions and the generalized CoM momenta. It is also assumed that the actuated
      * joints can be given any speed at any time without acceleration.
      *
-     * q = [q_base, q_joints], v = [h_CoM], a = [dh_CoM]
+     * state = [qb, qj, hcom]
+     * dstate = [dqb, dqj, dhcom]
+     * inputs = [fc1, ..., fcn, vj]
      */
     
     class Centroid: public PinocchioModel {
 
     public:
-        using vectorx_t = Eigen::VectorXd;
-        using matrixx_t = Eigen::MatrixXd;
-        using vec3 = Eigen::Vector3d;
 
-     static constexpr int FORCE_DIM = 3;
-     static constexpr int LINEAR_DIM = 3;
-     static constexpr int ANGULAR_DIM = 3;
-     static constexpr int BASE_DOF = LINEAR_DIM + ANGULAR_DIM;
-     static constexpr int COM_DOF = LINEAR_DIM + ANGULAR_DIM;
+        static constexpr int FORCE_DIM = 3;
+        static constexpr int LINEAR_DIM = 3;
+        static constexpr int ANGULAR_DIM = 3;
+        static constexpr int VBASE_DOF = 6;
+        static constexpr int BASE_DOF = LINEAR_DIM + ANGULAR_DIM;
+        static constexpr int COM_DOF = LINEAR_DIM + ANGULAR_DIM;
 
-        Centroid(const std::string &name,
+        Centroid(const std::string& name,
                         const std::filesystem::path &urdf,
                         const std::vector<std::string>& contact_frames,
                         const std::vector<std::string>& unactuated_joints);
@@ -42,8 +42,8 @@ namespace torc::models {
          * is [fc_1, \ldots, fc_nc, v_1, \ldots, v_a]
          * @return The derivative of the state wrt time, v=joint position velocities, a=center of mass momentum change
          */
-        RobotStateDerivative GetDynamics(const RobotState& state,
-                                         const vectorx_t& input) override;
+        vectorx_t GetDynamics(const vectorx_t& state,
+                              const vectorx_t& input) override;
 
         /**
          * @brief Linearizes the dynamics into the form $\partial_x xdot = A, \partial_u xdot = B$
@@ -52,15 +52,17 @@ namespace torc::models {
          * @param A Derivative of robot state's time derivative with respect to the robot state
          * @param B Derivative of the robot state's time derivative with respect to the contact forces and set speeds.
          */
-        void DynamicsDerivative(const RobotState& state,
+        void DynamicsDerivative(const vectorx_t& state,
                                 const vectorx_t& input,
                                 matrixx_t& A,
                                 matrixx_t& B) override;
 
-        static vectorx_t StateToVector(const RobotState& state);
-        static vectorx_t StateDerivativeToVector(const RobotStateDerivative& state);
 
-        RobotState GetRandomState() const;
+        void ParseState(const vectorx_t& state, vectorx_t& hcom, vectorx_t& q) const;
+        static vectorx_t BuildState(const vectorx_t& hcom, const vectorx_t& q);
+        void ParseInput(const vectorx_t& input, std::vector<vector3_t>& forces, vectorx_t& vj) const;
+
+        vectorx_t GetRandomState() const;
         vectorx_t GetRandomInput() const;
 
         int GetDerivativeDim() const;
@@ -73,12 +75,6 @@ namespace torc::models {
         const int n_contacts_;                                // number of contacts
         const int n_actuated_;                                // number of actuated joints
 
-        /**
-         * @brief Extracts the contact forces in the input into a vector of 3-vectors.
-         * @param input The input, in the form [f_c1, ..., f_cn, v_j]
-         * @return The contact forces in the input
-         */
-        [[nodiscard]] std::vector<vec3> GetForcesFromInput(const vectorx_t& input) const;
 
         // /**
         //  * @brief Computes the actuation map, which maps the set velocities to the joint velocities, with unactauated joints
@@ -96,7 +92,7 @@ namespace torc::models {
          * @param input The input to the robot [F, v_j]
          * @return The new joint velocities
          */
-        [[nodiscard]] vectorx_t UpdateJointVelocities(const RobotState& state, const vectorx_t& input) const;
+        [[nodiscard]] vectorx_t UpdateJointVelocities(const vectorx_t& state, const vectorx_t& input) const;
 
         vectorx_t InputsToTau(const vectorx_t &input) const override {return vectorx_t::Zero(0);}
 

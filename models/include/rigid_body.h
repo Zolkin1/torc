@@ -6,8 +6,9 @@
 #define TORC_RIGID_BODY_H
 
 #include "pinocchio_model.h"
-#include "robot_state_types.h"
 #include "robot_contact_info.h"
+
+#include <cppad/utility/vector.hpp>
 
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
@@ -24,27 +25,47 @@ namespace torc::models {
         RigidBody(const RigidBody& other);
 
         // @note These are not actually const functions as we modify the pin_data struct
-        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) override;
+        [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
+                                            const vectorx_t& input) override;
 
-        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input,
-                                                    const RobotContactInfo& contact_info) const;
+        [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
+                                            const vectorx_t& input,
+                                            const RobotContactInfo& contact_info) const;
 
-        RobotState GetImpulseDynamics(const RobotState& state, const vectorx_t& input,
-                                      const RobotContactInfo& contact_info);
+        vectorx_t GetImpulseDynamics(const vectorx_t& state,
+                                     const vectorx_t& input,
+                                     const RobotContactInfo& contact_info);
 
         // TODO: Linearization function that calculates the FD and derivatives so we don't have redundant calls
 
-        void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                matrixx_t& A, matrixx_t& B) override;
+        void DynamicsDerivative(const vectorx_t& state,
+                                const vectorx_t& input,
+                                matrixx_t& A,
+                                matrixx_t& B) override;
 
 
-        void DynamicsDerivative(const RobotState& state, const vectorx_t& input, const RobotContactInfo& contacts,
-                                matrixx_t& A, matrixx_t& B);
+        void DynamicsDerivative(const vectorx_t& state,
+                                const vectorx_t& input,
+                                const RobotContactInfo& contacts,
+                                matrixx_t& A,
+                                matrixx_t& B);
 
 
-        void ImpulseDerivative(const RobotState& state, const vectorx_t& input,
+        void ImpulseDerivative(const vectorx_t& state,
+                               const vectorx_t& input,
                                const RobotContactInfo& contact_info,
-                               matrixx_t& A, matrixx_t& B);
+                               matrixx_t& A,
+                               matrixx_t& B);
+
+        void ParseState(const vectorx_t& state,
+                        vectorx_t& q,
+                        vectorx_t& v,
+                        bool deriv=false) const;
+
+        static vectorx_t BuildState(const vectorx_t& q, const vectorx_t& v);
+
+        void ParseInput(const vectorx_t& input,
+                        vectorx_t& tau) const;
 
         /**
          * Takes the torques on the actuated coordinates and maps to a vector of
@@ -53,6 +74,10 @@ namespace torc::models {
          * @return full input vector
          */
         [[nodiscard]] vectorx_t InputsToTau(const vectorx_t& input) const override;
+
+        constexpr static size_t STATE_Q_IDX = 0;
+        constexpr static size_t STATE_V_IDX = 1;
+
     protected:
         void CreateActuationMatrix(const std::vector<std::string>& underactuated_joints);
 

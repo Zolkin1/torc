@@ -14,7 +14,7 @@ namespace torc::models {
     SingleRigidBody::SingleRigidBody(const std::string& name, const std::filesystem::path& urdf, int max_contacts)
             : PinocchioModel(name, urdf), max_contacts_(max_contacts) {
         system_type_ = HybridSystemNoImpulse;
-        num_inputs_ = max_contacts_*6;
+        n_input_ = max_contacts_*6;
 
         // Make the SRB model
         ref_config_ = pinocchio::neutral(pin_model_);    // Create neutral ref configuration
@@ -26,10 +26,9 @@ namespace torc::models {
                                      const vectorx_t& ref_config, int max_contacts)
             : PinocchioModel(name, urdf), ref_config_(ref_config), max_contacts_(max_contacts) {
         system_type_ = HybridSystemNoImpulse;
-        num_inputs_ = max_contacts_*6;
+        n_input_ = max_contacts_*6;
 
         MakeSingleRigidBody(ref_config);
-
     }
 
     void SingleRigidBody::MakeSingleRigidBody(const vectorx_t& ref_config, bool reassign_full_model) {
@@ -66,45 +65,55 @@ namespace torc::models {
         return ref_config_;
     }
 
-    RobotStateDerivative SingleRigidBody::GetDynamics(const torc::models::RobotState& state,
-                                                      const torc::models::PinocchioModel::vectorx_t& input) {
-        assert(state.q.size() == SRB_CONFIG_DIM);
-        assert(state.v.size() == SRB_VEL_DIM);
+    vectorx_t SingleRigidBody::GetDynamics(const vectorx_t& state,
+                                           const vectorx_t& input) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
+        assert(q.size() == SRB_CONFIG_DIM);
+        assert(v.size() == SRB_VEL_DIM);
 
         const vectorx_t& tau = InputsToTau(input);
 
-        pinocchio::aba(pin_model_, *pin_data_, state.q, state.v, tau);
-
-        RobotStateDerivative xdot(state.v, pin_data_->ddq);
+        pinocchio::aba(pin_model_, *pin_data_, q, v, tau);
+        vectorx_t xdot (v.size() + pin_data_->ddq.size());
+        // RobotStateDerivative xdot(state.v, pin_data_->ddq);
 
         return xdot;
     }
 
-    void SingleRigidBody::DynamicsDerivative(const RobotState& state,
-                                             const vectorx_t& input,
-                                             matrixx_t& A,
-                                             matrixx_t& B) {
-        assert(state.q.size() == SRB_CONFIG_DIM);
-        assert(state.v.size() == SRB_VEL_DIM);
+    void SingleRigidBody::DynamicsDerivative(const vectorx_t &state,
+                                             const vectorx_t &input,
+                                             matrixx_t &A, matrixx_t &B) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
         assert(A.rows() == GetDerivativeDim());
         assert(A.cols() == GetDerivativeDim());
         assert(B.rows() == GetDerivativeDim());
         assert(B.cols() == GetNumInputs());
 
-        const vectorx_t& tau = InputsToTau(input);
+        const vectorx_t &tau = InputsToTau(input);
 
-        pinocchio::computeABADerivatives(pin_model_, *pin_data_, state.q, state.v, tau);
+        pinocchio::computeABADerivatives(pin_model_, *pin_data_, q, v, tau);
 
-        A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv), matrixx_t::Identity(pin_model_.nv, pin_model_.nv),
-                pin_data_->ddq_dq, pin_data_->ddq_dv;
+        A << matrixx_t::Zero(pin_model_.nv, pin_model_.nv),
+            matrixx_t::Identity(pin_model_.nv, pin_model_.nv), pin_data_->ddq_dq,
+            pin_data_->ddq_dv;
 
         // Make into a full matrix
         pin_data_->Minv.triangularView<Eigen::StrictlyLower>() =
-                pin_data_->Minv.transpose().triangularView<Eigen::StrictlyLower>();
+            pin_data_->Minv.transpose().triangularView<Eigen::StrictlyLower>();
 
         matrixx_t act_map_deriv = ActuationMapDerivative(input);
 
-        B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_map_deriv;
+        B << matrixx_t::Zero(pin_model_.nv, input.size()),
+            pin_data_->Minv * act_map_deriv;
+    }
+
+
+    void SingleRigidBody::ParseState(const vectorx_t &state, vectorx_t &q,
+                                     vectorx_t &v) {
+        q = state.topRows(SRB_CONFIG_DIM);
+        v = state.bottomRows(SRB_VEL_DIM);
     }
 
     vectorx_t SingleRigidBody::InputsToTau(const vectorx_t& input) const {

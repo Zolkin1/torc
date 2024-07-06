@@ -31,42 +31,49 @@ namespace torc::models {
      * Forces are trivial and moments can be computed via cross products.
      */
     class SingleRigidBody : public PinocchioModel {
-        using srb_config_t = Eigen::Vector<double, 7>;
-        using srb_vel_t = Eigen::Vector<double, 6>;
 
     public:
-        SingleRigidBody(const std::string& name, const std::filesystem::path& urdf, int max_contacts);
+        SingleRigidBody(const std::string& name,
+                        const std::filesystem::path& urdf,
+                        int max_contacts);
 
-        SingleRigidBody(const std::string& name, const std::filesystem::path& urdf,
-                        const vectorx_t& ref_config, int max_contacts);
+        SingleRigidBody(const std::string& name,
+                        const std::filesystem::path& urdf,
+                        const vectorx_t& ref_config,
+                        int max_contacts);
 
         void SetRefConfig(const vectorx_t& ref_config);
 
+        vectorx_t GetDynamics(const vectorx_t& state,
+                              const vectorx_t& input) override;
+
+        void DynamicsDerivative(const vectorx_t& state,
+                                const vectorx_t& input,
+                                matrixx_t& A,
+                                matrixx_t& B) override;
+
+        static void ParseState(const vectorx_t& state, vectorx_t& q, vectorx_t& v);
+
         [[nodiscard]] vectorx_t GetRefConfig() const;
-
-        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) override;
-
-        void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                matrixx_t& A, matrixx_t& B) override;
 
         static constexpr int SRB_CONFIG_DIM = 7;
         static constexpr int SRB_VEL_DIM = 6;
+
     protected:
 
         [[nodiscard]] vectorx_t InputsToTau(const vectorx_t& input) const override;
 
-        matrixx_t ActuationMapDerivative(const vectorx_t& input, bool force_and_pos = true) const;
+        matrixx_t ActuationMapDerivative(const vectorx_t& input,
+                                         bool force_and_pos = true) const;
 
         pinocchio::Model full_pin_model_;
         std::unique_ptr<pinocchio::Data> full_pin_data_;
-
-
 
         vectorx_t ref_config_;
         int max_contacts_;
 
     private:
-        void MakeSingleRigidBody(const torc::models::PinocchioModel::vectorx_t& ref_config,
+        void MakeSingleRigidBody(const vectorx_t& ref_config,
                                  bool reassign_full_model = true);
     };
 } // torc::models

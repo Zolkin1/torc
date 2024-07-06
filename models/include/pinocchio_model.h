@@ -15,8 +15,6 @@ namespace torc::models {
 
     class PinocchioModel : public BaseModel {
     public:
-        using vectorx_t = Eigen::VectorXd;
-        using matrixx_t = Eigen::MatrixXd;
 
         static constexpr int FLOATING_CONFIG = 7;
         static constexpr int FLOATING_VEL = 6;
@@ -26,11 +24,12 @@ namespace torc::models {
          * @param name Name of the model
          * @param urdf path to the urdf
          */
-        PinocchioModel(const std::string& name, std::filesystem::path  urdf);
+        PinocchioModel(const std::string& name,
+                       const std::filesystem::path& urdf);
 
         PinocchioModel(const PinocchioModel& other);
 
-        virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
+        [[nodiscard]] virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
 
         [[nodiscard]] long GetNumInputs() const;
 
@@ -54,22 +53,20 @@ namespace torc::models {
 
         [[nodiscard]] unsigned long GetFrameIdx(const std::string& frame) const;
 
-        void GetNeutralConfig(vectorx_t& q) const;
+        [[nodiscard]] vectorx_t GetNeutralConfig() const;
 
-        vectorx_t GetRandomConfig() const;
+        [[nodiscard]] vectorx_t GetRandomConfig() const;
 
-        vectorx_t GetRandomVel() const;
+        [[nodiscard]] vectorx_t GetRandomVel() const;
 
-        RobotState GetRandomState() const;
+        [[nodiscard]] vectorx_t GetRandomState() const;
 
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
         // -------------------------------------- //
-        void ForwardKinematics(const vectorx_t& q);
-
-        void ForwardKinematics(const RobotState& state);
-
-        void ForwardKinematics(const RobotState& state, const RobotStateDerivative& deriv);
+        void ForwardKinematics(const vectorx_t& state);
+        //
+        // void ForwardKinematics(const vectorx_t& state, const vectorx_t& deriv);
 
         // TODO: Should these functions accept frame ID instead?
         /**
@@ -77,7 +74,7 @@ namespace torc::models {
          * @param frame name
          * @return frame placement (in world frame) and velocity (in local frame).
          */
-        FrameState GetFrameState(const std::string& frame);
+        FrameState GetFrameState(const std::string& frame) const;
 
         /**
          * Calculate the frame state after calling the forward kinematics.
@@ -85,9 +82,9 @@ namespace torc::models {
          * @param state of the robot
          * @return frame placement (in world frame) and velocity (in local frame).
          */
-        FrameState GetFrameState(const std::string& frame, const RobotState& state);
+        FrameState GetFrameState(const std::string& frame, const vectorx_t& state);
 
-        void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J);
+        void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const;
 
     protected:
 
@@ -102,7 +99,7 @@ namespace torc::models {
 
         double mass_;
 
-        long num_inputs_;
+        long n_input_;
 
         static const std::string ROOT_JOINT;
 

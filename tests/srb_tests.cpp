@@ -53,8 +53,10 @@ TEST_CASE("SRB Quadruped", "[model][pinocchio][srb][benchmarks]") {
 
     SECTION("Updated Reference Config") {
         RigidBody full_a1_model("a1_full", a1_urdf);
-        RobotState x = full_a1_model.GetRandomState();
-        a1_model.SetRefConfig(x.q);
+        vectorx_t x_rand = full_a1_model.GetRandomState();
+        vectorx_t q, v;
+        full_a1_model.ParseState(x_rand, q, v);
+        a1_model.SetRefConfig(q);
 
         REQUIRE(a1_model.GetNumInputs() == INPUT_SIZE);
         REQUIRE(a1_model.GetConfigDim() == CONFIG_SIZE);
@@ -64,14 +66,14 @@ TEST_CASE("SRB Quadruped", "[model][pinocchio][srb][benchmarks]") {
         REQUIRE(a1_model.GetNumJoints() == JOINT_SIZE);
         REQUIRE(a1_model.GetSystemType() == HybridSystemNoImpulse);
 
-        VectorEqualWithMargin(x.q, a1_model.GetRefConfig(), 1e-8);
+        REQUIRE(VectorEqualWithMargin(q, a1_model.GetRefConfig(), 1e-8));
     }
 
     matrixx_t A, B;
     A = matrixx_t::Zero(a1_model.GetDerivativeDim(), a1_model.GetDerivativeDim());
     B = matrixx_t::Zero(a1_model.GetDerivativeDim(), a1_model.GetNumInputs());
 
-    RobotState x_rand = a1_model.GetRandomState();
+    vectorx_t x_rand = a1_model.GetRandomState();
     vectorx_t input_rand;
     input_rand.setRandom(a1_model.GetNumInputs());
 
