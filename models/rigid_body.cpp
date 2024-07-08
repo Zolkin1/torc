@@ -248,22 +248,28 @@ namespace torc::models {
       n_input_ = act_mat_.cols();
     }
 
-    void RigidBody::ParseState(const vectorx_t &state,  // parse State Derivative
-                               vectorx_t &q,
-                               vectorx_t &v,
-                               bool deriv) const {
-      if (deriv) {
-        q = state.topRows(pin_model_.nv);
-      } else {
+    void RigidBody::ParseState(const vectorx_t &state,
+                               vectorx_t &q, vectorx_t &v) const {
         q = state.topRows(pin_model_.nq);
-      }
-      v = state.bottomRows(pin_model_.nv);
+        v = state.bottomRows(pin_model_.nv);
+    }
+
+    void RigidBody::ParseStateDerivative(const vectorx_t &dstate,
+                                         vectorx_t &v,
+                                         vectorx_t &a) const {
+        v = dstate.topRows(pin_model_.nv);
+        a = dstate.bottomRows(pin_model_.nv);
     }
 
     vectorx_t RigidBody::BuildState(const vectorx_t &q, const vectorx_t &v) {
-        vectorx_t x(q.size() + v.size());
-        x << q, v;
-        return x;
+      vectorx_t x(q.size() + v.size());
+      x << q, v;
+      return x;
+    }
+
+    vectorx_t RigidBody::BuildStateDerivative(const vectorx_t &v,
+                                              const vectorx_t &a) {
+      return BuildState(v, a);
     }
 
     void RigidBody::ParseInput(const vectorx_t &input, vectorx_t &tau) const {

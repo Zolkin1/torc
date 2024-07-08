@@ -53,6 +53,7 @@ namespace torc::models {
                                 matrixx_t& B) override;
 
         static void ParseState(const vectorx_t& state, vectorx_t& q, vectorx_t& v);
+        static void ParseStateDerivative(const vectorx_t& dstate, vectorx_t& v, vectorx_t& a);
 
         [[nodiscard]] vectorx_t GetRefConfig() const;
 

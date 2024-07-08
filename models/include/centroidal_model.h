@@ -59,7 +59,12 @@ namespace torc::models {
 
 
         void ParseState(const vectorx_t& state, vectorx_t& hcom, vectorx_t& q) const;
-        static vectorx_t BuildState(const vectorx_t& hcom, const vectorx_t& q);
+        void ParseStateDerivative(const vectorx_t& dstate, vectorx_t& dhcom, vectorx_t& v) const;
+        static quat_t ParseBaseOrientation(const vectorx_t& q);
+
+        static vectorx_t BuildState(const vectorx_t& q, const vectorx_t& hcom);
+        static vectorx_t BuildStateDerivative(const vectorx_t& v, const vectorx_t& dhcom);
+
         void ParseInput(const vectorx_t& input, std::vector<vector3_t>& forces, vectorx_t& vj) const;
 
         vectorx_t GetRandomState() const;

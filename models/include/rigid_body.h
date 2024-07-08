@@ -59,10 +59,15 @@ namespace torc::models {
 
         void ParseState(const vectorx_t& state,
                         vectorx_t& q,
-                        vectorx_t& v,
-                        bool deriv=false) const;
+                        vectorx_t& v) const;
+
+        void ParseStateDerivative(const vectorx_t& dstate,
+                                  vectorx_t& v,
+                                  vectorx_t& a) const;
 
         static vectorx_t BuildState(const vectorx_t& q, const vectorx_t& v);
+
+        static vectorx_t BuildStateDerivative(const vectorx_t& v, const vectorx_t& a);
 
         void ParseInput(const vectorx_t& input,
                         vectorx_t& tau) const;

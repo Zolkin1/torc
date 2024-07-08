@@ -390,7 +390,7 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     vectorx_t xdot = a1_model.GetDynamics(x, input);
     vectorx_t true_deriv = vectorx_t::Zero(DERIV_SIZE);
     vectorx_t a, v;
-    a1_model.ParseState(true_deriv, v, a, true);
+    a1_model.ParseStateDerivative(true_deriv, v, a);
     a(2) = -9.81;
     true_deriv = RigidBody::BuildState(v, a);
 

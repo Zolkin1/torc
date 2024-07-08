@@ -112,8 +112,13 @@ namespace torc::models {
 
     void SingleRigidBody::ParseState(const vectorx_t &state, vectorx_t &q,
                                      vectorx_t &v) {
-        q = state.topRows(SRB_CONFIG_DIM);
-        v = state.bottomRows(SRB_VEL_DIM);
+      q = state.topRows(SRB_CONFIG_DIM);
+      v = state.bottomRows(SRB_VEL_DIM);
+    }
+    void SingleRigidBody::ParseStateDerivative(const vectorx_t &dstate,
+                                               vectorx_t &v, vectorx_t &a) {
+        v = dstate.topRows(SRB_VEL_DIM);
+        a = dstate.bottomRows(SRB_VEL_DIM);
     }
 
     vectorx_t SingleRigidBody::InputsToTau(const vectorx_t& input) const {
