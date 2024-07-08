@@ -42,29 +42,52 @@ namespace torc::models {
                                     const vectorx_t& input)
     {
         vectorx_t q, hcom, dqj;
-        ParseState(state, hcom, q);
+        ParseState(state, q, hcom);
         std::vector<vector3_t> forces;
         ParseInput(input, forces, dqj);
         // update all joint velocities, except base joint, compute dq_joints
 
-        pinocchio::crba(pin_model_, *pin_data_, q);
-        pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q);
+        std::cout << "q\n";
+        std::cout << q << std::endl;
+        std::cout << "----\n";
+
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+        pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q); // Ag, centroidal momentum matrix
+        /////// TESTING ZONE ///////
+        // vectorx_t dqb_test = vectorx_t::Random(6);
+        // vectorx_t dq_test(dqb_test.size() + dqj.size());
+        // dq_test << dqb_test, dqj;
+        // pinocchio::computeCentroidalMomentum(pin_model_, *pin_data_, q, dq_test);
+        // std::cout << "testing!!!\n";
+        // std::cout << pin_data_->hg;
+        // std::cout << "------";
+        // std::cout << pin_data_->Ag * dq_test;
+        // std::cout << "\\testing!!!\n";
+        //
+        // pinocchio::computeCentroidalMomentumTimeVariation(pin_model_, *pin_data_, q, dq_test, vectorx_t::Zero(dq_test.size()));
+        // std::cout << "dhg\n" << pin_data_->dhg;
+        /////// TESTING ZONE ///////
         const matrixx_t &cmm = pin_data_->Ag;
         const matrixx_t A_b = cmm.leftCols(BASE_DOF);
         const matrixx_t A_j = cmm.rightCols(cmm.cols() - BASE_DOF);
         const vectorx_t dqb = A_b.inverse() * (hcom - A_j * dqj);
+        // std::cout << "Ab\n" << A_b << std::endl;
+        // std::cout << "Aj\n" << A_j << std::endl;
 
         // Join together dqb and dqj
         vectorx_t dq(dqb.size() + dqj.size());
+        // std::cout << "dqb\n";
+        // std::cout << dqb << std::endl;
+        // std::cout << "---\n";
         dq << dqb, dqj;
 
         // compute CoM position, CMM, all frame positions, rotational inertia
-        pinocchio::computeCentroidalMomentum(pin_model_, *pin_data_, q, dq); // need to add dqb
+        pinocchio::computeCentroidalMomentum(pin_model_, *pin_data_, q, dq); // hcom position and velocity
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
 
         // determine dh_com by aggregating all the forces
         const vectorx_t com_pos = pin_data_->com[0];
-        vector3_t force_sum = {0, 0, -9.81*mass_};        // gravity is always present
+        vector3_t force_sum = pinocchio::Model::gravity981;        // gravity is always present
         vector3_t torque_sum = vector3_t::Zero();                     // gravity provides no torque
         // iterate through the forces
         for (int i=0; i<n_contacts_; i++) {
@@ -74,10 +97,10 @@ namespace torc::models {
             vector3_t r = pin_data_->oMi[contact_frames_idxs_.at(i)].translation() - com_pos;
             torque_sum += r.cross(force);
         }
-        vectorx_t dh_com(force_sum.size() + torque_sum.size());
+        vectorx_t dh_com(COM_DOF);
         dh_com << force_sum, torque_sum;
 
-        return BuildState(dq, dh_com);
+        return BuildStateDerivative(dq, dh_com);
     }
 
 
@@ -87,7 +110,7 @@ namespace torc::models {
         const matrixx_t iden3 = matrixx_t::Identity(LINEAR_DIM, FORCE_DIM);
 
         vectorx_t q, hcom, dqj;
-        ParseState(state, hcom, q);
+        ParseState(state, q, hcom);
         std::vector<vector3_t> forces;
         ParseInput(input, forces, dqj);
 
@@ -96,37 +119,41 @@ namespace torc::models {
 
         const matrixx_t A_g = computeCentroidalMap(pin_model_, *pin_data_, q);
         const matrixx_t A_b_inv = A_g.leftCols(BASE_DOF).inverse();
-        const matrixx_t A_j = A_g.rightCols(pin_data_->Ag.cols() - BASE_DOF);
+        const matrixx_t A_j = A_g.rightCols(n_actuated_);
         const vectorx_t dqb = A_b_inv * (hcom - A_j * dqj);
-        const matrixx_t &Jcom = pin_data_->Jcom;
-        const vectorx_t com_pos = pin_data_->com[0];
 
-        vectorx_t dq(dqj.size() + dqb.size());
+
+        vectorx_t dq(dqb.size() + dqj.size());
         dq << dqb, dqj;
 
-        computeCentroidalMomentum(pin_model_, *pin_data_, q, dq);
+        pinocchio::jacobianCenterOfMass(pin_model_, *pin_data_, q, true);
+        const matrixx_t &Jcom = pin_data_->Jcom;
+        const vectorx_t com_pos = pin_data_->com[0];
 
         // calculate ddx_dx (A)
         A = matrixx_t::Zero(COM_DOF + pin_model_.nv, COM_DOF + pin_model_.nv);
         A.topRightCorner(COM_DOF, COM_DOF) = A_b_inv;
 
         matrixx_t dhtau_dq(ANGULAR_DIM, pin_model_.nv);
-        pinocchio::impl::computeJointJacobians(pin_model_, *pin_data_, q);
+        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q);
         // allocate outside of the loop to prevent reinitialization
-        matrixx_t J_frame = matrixx_t::Zero(COM_DOF, pin_model_.nv);
+        matrixx_t J_frame;
+        std::cout << "Jcom \n" << Jcom << "\n----\n";
         // iterate through all the contact forces so we don't have to recalculate
         // frame jacobians every time
         for (int i = 0; i < n_contacts_; i++) {
-          const vector3_t &force = forces.at(i);
-          J_frame =
-              getFrameJacobian(pin_model_, *pin_data_, contact_frames_idxs_.at(i),
-                               pinocchio::WORLD);
-          const matrixx_t dr_dq = J_frame.topRows(LINEAR_DIM) - Jcom;
-          // calculate the partial derivatives' effect on the angular momentum
-          for (int j = 0; j < pin_model_.nv; j++) {
-            dhtau_dq.col(j) += vectorx_t(vector3_t(dr_dq.col(j)).cross(force));
-          }
-          A.bottomLeftCorner(ANGULAR_DIM, pin_model_.nv) = dhtau_dq;
+            const vector3_t &force = forces.at(i);
+            J_frame = getFrameJacobian(pin_model_, *pin_data_, contact_frames_idxs_.at(i), pinocchio::WORLD);
+            std::cout << "J_frame \n" << J_frame << "\n----\n";
+            const matrixx_t dr_dq = J_frame.topRows(LINEAR_DIM) - Jcom;
+            std::cout << "dr_com / dq \n" << dr_dq << "\n----\n";
+            // calculate the partial derivatives' effect on the angular momentum
+            for (int j = 0; j < pin_model_.nv; j++) {
+                std::cout << "j=" << j << std::endl;
+                std::cout << dr_dq.col(j) << std::endl;
+                dhtau_dq.col(j) = vectorx_t(vector3_t(dr_dq.col(j)).cross(force));
+            }
+            A.bottomLeftCorner(ANGULAR_DIM, pin_model_.nv) = dhtau_dq;
         }
 
         // calculate ddx_du (B)
@@ -156,15 +183,16 @@ namespace torc::models {
         return BuildState(v, dhcom);
     }
 
-    void Centroid::ParseState(const vectorx_t &state, vectorx_t &hcom,
-                              vectorx_t &q) const {
+    void Centroid::ParseState(const vectorx_t &state,
+                                vectorx_t &q,
+                              vectorx_t &hcom) const {
       q = state.topRows(pin_model_.nq);
       hcom = state.bottomRows(COM_DOF);
     }
 
     void Centroid::ParseStateDerivative(const vectorx_t &dstate,
                                         vectorx_t &dhcom, vectorx_t &v) const {
-      v = dstate.topRows(pin_model_.nq);
+      v = dstate.topRows(pin_model_.nv);
       dhcom = dstate.bottomRows(COM_DOF);
     }
 

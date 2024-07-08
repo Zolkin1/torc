@@ -58,7 +58,7 @@ namespace torc::models {
                                 matrixx_t& B) override;
 
 
-        void ParseState(const vectorx_t& state, vectorx_t& hcom, vectorx_t& q) const;
+        void ParseState(const vectorx_t& state, vectorx_t& q, vectorx_t& hcom) const;
         void ParseStateDerivative(const vectorx_t& dstate, vectorx_t& dhcom, vectorx_t& v) const;
         static quat_t ParseBaseOrientation(const vectorx_t& q);
 
