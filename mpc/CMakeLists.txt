@@ -8,7 +8,8 @@ set(MPC_HEADER_LIST
 
 set(MPC_SOURCE_LIST
         mpc_base.cpp
-        mpc_contact.cpp)
+        mpc_contact.cpp
+        trajectory.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}

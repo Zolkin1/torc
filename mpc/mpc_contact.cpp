@@ -72,6 +72,9 @@ namespace torc::mpc {
                 GetLinearization(traj, node, A, B, c);
             }
 
+            // TODO: We will just use the dense matrices from the costs and constraints
+            //  pass these into a sparse matrix builder that will build the large sparse matrix
+
             // Get linearization of the constraints
 
             // Get quadratic approx of the cost function

@@ -62,6 +62,12 @@ if (BUILD_WITH_CLARABEL)
     catch_discover_tests(clarabel_tests)
 endif ()
 
+# --------- MPC Tests --------- #
+add_executable(mpc_tests mpc_tests.cpp)
+target_link_libraries(mpc_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(mpc_tests PUBLIC Mpc)
+catch_discover_tests(mpc_tests)
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 

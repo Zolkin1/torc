@@ -14,11 +14,16 @@ namespace torc::mpc {
         std::vector<models::RobotState> states;
         std::vector<models::vectorx_t> inputs;
         double dt;  // Time difference between each node
+
+        virtual void Reset(int nodes, int q_dim, int v_dim);
     };
 
+    // TODO: consider making this encapsulation rather than inheritence
     struct ContactTrajectory : public Trajectory {
         std::vector<models::RobotContactInfo> contacts;
         std::vector<double> impulse_times;
+
+        void Reset(int nodes, int q_dim, int v_dim) override;
     };
 }
 

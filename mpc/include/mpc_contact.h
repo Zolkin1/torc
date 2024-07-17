@@ -44,6 +44,8 @@ namespace torc::mpc {
 
         // constraints
 
+        // sparse matrix builder
+
     private:
     };
 } // torc::mpc
