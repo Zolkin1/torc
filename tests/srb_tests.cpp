@@ -8,7 +8,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
-#include "rigid_body.h"
+#include "full_order_rigid_body.h"
 #include "single_rigid_body.h"
 
 bool VectorEqualWithMargin(const torc::models::vectorx_t& v1, const torc::models::vectorx_t& v2, const double MARGIN) {
@@ -52,7 +52,7 @@ TEST_CASE("SRB Quadruped", "[model][pinocchio][srb][benchmarks]") {
     REQUIRE(a1_model.GetSystemType() == HybridSystemNoImpulse);
 
     SECTION("Updated Reference Config") {
-        RigidBody full_a1_model("a1_full", a1_urdf);
+        FullOrderRigidBody full_a1_model("a1_full", a1_urdf);
         vectorx_t x_rand = full_a1_model.GetRandomState();
         vectorx_t q, v;
         full_a1_model.ParseState(x_rand, q, v);

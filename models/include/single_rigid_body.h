@@ -21,7 +21,7 @@ namespace torc::models {
      * The SRB model is created by fixing all the joints in a reference configuration to get the single body.
      * Inputs are external forces applied at locations outside of the body.
      * SingleRigidBody does not expose any functions accessing the full rigid body dynamics. To access those,
-     * a seperated RigidBody object needs to be made.
+     * a seperated FullOrderRigidBody object needs to be made.
      *
      * The inputs are:
      * [f0, ... , fl, r0, ... , rl]

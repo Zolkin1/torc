@@ -10,12 +10,12 @@
 #include "pinocchio/algorithm/impulse-dynamics-derivatives.hpp"
 #include "pinocchio/algorithm/proximal.hpp"
 
-#include "rigid_body.h"
+#include "full_order_rigid_body.h"
 
 #include <utility>
 
 namespace torc::models {
-    RigidBody::RigidBody(const std::string& name, const std::filesystem::path& urdf)
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf)
         : PinocchioModel(name, urdf) {
 
         system_type_ = HybridSystemImpulse;
@@ -29,8 +29,8 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
-    RigidBody::RigidBody(const std::string& name, const std::filesystem::path& urdf,
-                         const std::vector<std::string>& underactuated_joints)
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf,
+                                           const std::vector<std::string>& underactuated_joints)
         : PinocchioModel(name, urdf) {
         system_type_ = HybridSystemImpulse;
 
@@ -39,7 +39,7 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
-    RigidBody::RigidBody(const torc::models::RigidBody& other)
+    FullOrderRigidBody::FullOrderRigidBody(const torc::models::FullOrderRigidBody& other)
         : PinocchioModel(other.name_, other.urdf_) {
         n_input_ = other.n_input_;
 
@@ -47,7 +47,7 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(*other.contact_data_);
     }
 
-    vectorx_t RigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
+    vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
         vectorx_t q, v;
         ParseState(state, q, v);
         const vectorx_t& tau = InputsToTau(input);
@@ -55,9 +55,9 @@ namespace torc::models {
         return BuildState(v, pin_data_->ddq);
     }
 
-    vectorx_t RigidBody::GetDynamics(const vectorx_t& state,
-                                     const vectorx_t& input,
-                                     const RobotContactInfo& contact_info) const {
+    vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state,
+                                              const vectorx_t& input,
+                                              const RobotContactInfo& contact_info) const {
         vectorx_t q, v;
         ParseState(state, q, v);
         const vectorx_t& tau = InputsToTau(input);
@@ -78,9 +78,9 @@ namespace torc::models {
         return BuildState(v, contact_data_->ddq);
     }
 
-    vectorx_t RigidBody::GetImpulseDynamics(const vectorx_t& state,
-                                             const vectorx_t& input,
-                                             const RobotContactInfo& contact_info) {
+    vectorx_t FullOrderRigidBody::GetImpulseDynamics(const vectorx_t& state,
+                                                     const vectorx_t& input,
+                                                     const RobotContactInfo& contact_info) {
         vectorx_t q, v;
         ParseState(state, q, v);
         // Create contact data
@@ -101,8 +101,8 @@ namespace torc::models {
         return BuildState(q, contact_data_->dq_after);
     }
 
-    void RigidBody::DynamicsDerivative(const vectorx_t& state, const vectorx_t& input,
-                            matrixx_t& A, matrixx_t& B) {
+    void FullOrderRigidBody::DynamicsDerivative(const vectorx_t& state, const vectorx_t& input,
+                                                matrixx_t& A, matrixx_t& B) {
         vectorx_t q, v;
         ParseState(state, q, v);
         assert(A.rows() == GetDerivativeDim());
@@ -125,9 +125,9 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), pin_data_->Minv * act_mat_;
     }
 
-    void RigidBody::DynamicsDerivative(const vectorx_t& state, const vectorx_t& input,
-                                       const RobotContactInfo& contacts,
-                                       matrixx_t& A, matrixx_t& B) {
+    void FullOrderRigidBody::DynamicsDerivative(const vectorx_t& state, const vectorx_t& input,
+                                                const RobotContactInfo& contacts,
+                                                matrixx_t& A, matrixx_t& B) {
         vectorx_t q, v;
         ParseState(state, q, v);
         assert(A.rows() == GetDerivativeDim());
@@ -165,9 +165,9 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), contact_data_->ddq_dtau * act_mat_; //contact_data_->Minv * act_mat_;
     }
 
-    void RigidBody::ImpulseDerivative(const vectorx_t& state, const vectorx_t& input,
-                                      const RobotContactInfo& contact_info,
-                                      matrixx_t& A, matrixx_t& B) {
+    void FullOrderRigidBody::ImpulseDerivative(const vectorx_t& state, const vectorx_t& input,
+                                               const RobotContactInfo& contact_info,
+                                               matrixx_t& A, matrixx_t& B) {
         vectorx_t q, v;
         ParseState(state, q, v);
         assert(A.rows() == GetDerivativeDim());
@@ -202,7 +202,7 @@ namespace torc::models {
         B.setZero();
     }
 
-    void RigidBody::CreateActuationMatrix(
+    void FullOrderRigidBody::CreateActuationMatrix(
         const std::vector<std::string> &underactuated_joints) {
       assert(pin_model_.idx_vs.at(1) == 0);
       assert(pin_model_.nvs.at(1) == FLOATING_VEL);
@@ -248,35 +248,35 @@ namespace torc::models {
       n_input_ = act_mat_.cols();
     }
 
-    void RigidBody::ParseState(const vectorx_t &state,
-                               vectorx_t &q, vectorx_t &v) const {
+    void FullOrderRigidBody::ParseState(const vectorx_t &state,
+                                        vectorx_t &q, vectorx_t &v) const {
         q = state.topRows(pin_model_.nq);
         v = state.bottomRows(pin_model_.nv);
     }
 
-    void RigidBody::ParseStateDerivative(const vectorx_t &dstate,
-                                         vectorx_t &v,
-                                         vectorx_t &a) const {
+    void FullOrderRigidBody::ParseStateDerivative(const vectorx_t &dstate,
+                                                  vectorx_t &v,
+                                                  vectorx_t &a) const {
         v = dstate.topRows(pin_model_.nv);
         a = dstate.bottomRows(pin_model_.nv);
     }
 
-    vectorx_t RigidBody::BuildState(const vectorx_t &q, const vectorx_t &v) {
+    vectorx_t FullOrderRigidBody::BuildState(const vectorx_t &q, const vectorx_t &v) {
       vectorx_t x(q.size() + v.size());
       x << q, v;
       return x;
     }
 
-    vectorx_t RigidBody::BuildStateDerivative(const vectorx_t &v,
-                                              const vectorx_t &a) {
+    vectorx_t FullOrderRigidBody::BuildStateDerivative(const vectorx_t &v,
+                                                       const vectorx_t &a) {
       return BuildState(v, a);
     }
 
-    void RigidBody::ParseInput(const vectorx_t &input, vectorx_t &tau) const {
+    void FullOrderRigidBody::ParseInput(const vectorx_t &input, vectorx_t &tau) const {
       tau = act_mat_ * input;
     }
 
-    vectorx_t RigidBody::InputsToTau(const vectorx_t& input) const {
+    vectorx_t FullOrderRigidBody::InputsToTau(const vectorx_t& input) const {
         assert(input.size() == act_mat_.cols());
         return act_mat_*input;
     }

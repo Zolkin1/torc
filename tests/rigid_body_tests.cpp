@@ -5,7 +5,7 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include "../cmake-build-release/_deps/catch2-src/src/catch2/catch_config.hpp"
-#include "rigid_body.h"
+#include "full_order_rigid_body.h"
 
 bool VectorEqualWithMargin(const torc::models::vectorx_t& v1, const torc::models::vectorx_t& v2, const double MARGIN) {
     using namespace torc::models;
@@ -22,7 +22,7 @@ bool VectorEqualWithMargin(const torc::models::vectorx_t& v1, const torc::models
     return true;
 }
 
-void CheckDerivatives(torc::models::RigidBody& model) {
+void CheckDerivatives(torc::models::FullOrderRigidBody& model) {
     using namespace torc::models;
     constexpr double FD_MARGIN = 9e-4;
     constexpr double DELTA = 1e-8;
@@ -60,7 +60,7 @@ void CheckDerivatives(torc::models::RigidBody& model) {
                 Eigen::Vector3d dquat = Eigen::Vector3d::Zero();
                 dquat(i - 3) += DELTA;
 
-                q_xd.array().segment<4>(3) = (RigidBody::GetBaseQuat(q_xd) * pinocchio::quaternion::exp3(dquat)).coeffs();
+                q_xd.array().segment<4>(3) = (FullOrderRigidBody::GetBaseQuat(q_xd) * pinocchio::quaternion::exp3(dquat)).coeffs();
             } else {
                 if (i >= 6) {
                     q_xd(i + 1) += DELTA;
@@ -106,7 +106,7 @@ void CheckDerivatives(torc::models::RigidBody& model) {
     }
 }
 
-void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models::RobotContactInfo& contact_info) {
+void CheckContactDerivatives(torc::models::FullOrderRigidBody& model, const torc::models::RobotContactInfo& contact_info) {
     using namespace torc::models;
     constexpr double FD_MARGIN = 1e-2;
     constexpr double DELTA = 1e-8;
@@ -145,7 +145,7 @@ void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models:
                 Eigen::Vector3d v = Eigen::Vector3d::Zero();
                 v(i - 3) += DELTA;
 
-                q_rand.array().segment<4>(3) =(RigidBody::GetBaseQuat(q_rand) * pinocchio::quaternion::exp3(v)).coeffs();
+                q_rand.array().segment<4>(3) =(FullOrderRigidBody::GetBaseQuat(q_rand) * pinocchio::quaternion::exp3(v)).coeffs();
             } else {
                 if (i >= 6) {
                     q_rand(i + 1) += DELTA;
@@ -154,7 +154,7 @@ void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models:
                 }
             }
 
-            vectorx_t x_d = RigidBody::BuildState(q_rand, v_rand);
+            vectorx_t x_d = FullOrderRigidBody::BuildState(q_rand, v_rand);
             vectorx_t deriv_d = model.GetDynamics(x_d, input_rand, contact_info);
 
             for (int j = 0; j < deriv_d.size(); j++) {
@@ -169,7 +169,7 @@ void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models:
             model.ParseState(x_rand, q_rand, v_rand);
             v_rand(i) += DELTA;
 
-            vectorx_t x_d = RigidBody::BuildState(q_rand, v_rand);
+            vectorx_t x_d = FullOrderRigidBody::BuildState(q_rand, v_rand);
 
             vectorx_t deriv_d = model.GetDynamics(x_d, input_rand, contact_info);
 
@@ -201,7 +201,7 @@ void CheckContactDerivatives(torc::models::RigidBody& model, const torc::models:
     }
 }
 
-void CheckImpulseDerivatives(torc::models::RigidBody& model, const torc::models::RobotContactInfo& contact_info) {
+void CheckImpulseDerivatives(torc::models::FullOrderRigidBody& model, const torc::models::RobotContactInfo& contact_info) {
     using namespace torc::models;
     constexpr double FD_MARGIN = 9e-4;
     constexpr double DELTA = 1e-8;
@@ -245,7 +245,7 @@ void CheckImpulseDerivatives(torc::models::RigidBody& model, const torc::models:
                 Eigen::Vector3d v = Eigen::Vector3d::Zero();
                 v(i - 3) += DELTA;
 
-                qd.array().segment<4>(3) = (RigidBody::GetBaseQuat(qd) * pinocchio::quaternion::exp3(v)).coeffs();
+                qd.array().segment<4>(3) = (FullOrderRigidBody::GetBaseQuat(qd) * pinocchio::quaternion::exp3(v)).coeffs();
             } else {
                 if (i >= 6) {
                     qd(i + 1) += DELTA;
@@ -253,7 +253,7 @@ void CheckImpulseDerivatives(torc::models::RigidBody& model, const torc::models:
                     qd(i) += DELTA;
                 }
             }
-            vectorx_t x_d = RigidBody::BuildState(qd, vd);
+            vectorx_t x_d = FullOrderRigidBody::BuildState(qd, vd);
 
             vectorx_t imp_d = model.GetImpulseDynamics(x_d, input_rand, contact_info);
             vectorx_t q_imp, v_imp;
@@ -286,7 +286,7 @@ void CheckImpulseDerivatives(torc::models::RigidBody& model, const torc::models:
              vectorx_t qd = q_rand;
              vectorx_t vd = v_rand;
              vd(i) += DELTA;
-             vectorx_t x_d = RigidBody::BuildState(qd, vd);
+             vectorx_t x_d = FullOrderRigidBody::BuildState(qd, vd);
 
              vectorx_t imp_d = model.GetImpulseDynamics(x_d, input_rand, contact_info);
              vectorx_t q_imp, v_imp;
@@ -348,7 +348,7 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     constexpr double MARGIN = 1e-6;
 
     // Check that a bad urdf throws an error
-    REQUIRE_THROWS_AS(RigidBody(pin_model_name, bad_urdf), std::runtime_error);
+    REQUIRE_THROWS_AS(FullOrderRigidBody(pin_model_name, bad_urdf), std::runtime_error);
 
     RobotContactInfo contact_info;
     contact_info.contacts.emplace("FR_foot", Contact(ContactType::PointContact));
@@ -359,7 +359,7 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     std::filesystem::path a1_urdf = std::filesystem::current_path();
     a1_urdf += "/test_data/test_a1.urdf";
 
-    RigidBody a1_model(pin_model_name, a1_urdf);
+    FullOrderRigidBody a1_model(pin_model_name, a1_urdf);
     REQUIRE(a1_model.GetName() == pin_model_name);
 
     constexpr int INPUT_SIZE = 12;
@@ -392,7 +392,7 @@ TEST_CASE("Quadruped", "[model][pinocchio]") {
     vectorx_t a, v;
     a1_model.ParseStateDerivative(true_deriv, v, a);
     a(2) = -9.81;
-    true_deriv = RigidBody::BuildState(v, a);
+    true_deriv = FullOrderRigidBody::BuildState(v, a);
 
     REQUIRE(VectorEqualWithMargin(xdot, true_deriv, MARGIN));
 
@@ -458,7 +458,7 @@ TEST_CASE("Quadruped Benchmarks", "[model][pinocchio][benchmarks]") {
     std::filesystem::path a1_urdf = std::filesystem::current_path();
     a1_urdf += "/test_data/test_a1.urdf";
 
-    RigidBody a1_model("a1", a1_urdf);
+    FullOrderRigidBody a1_model("a1", a1_urdf);
 
     matrixx_t A, B, Aimp, Bimp;
     A = matrixx_t::Zero(a1_model.GetDerivativeDim(), a1_model.GetDerivativeDim());
@@ -508,7 +508,7 @@ TEST_CASE("Double Integrator", "[model][pinocchio]") {
     // No contact_info
     RobotContactInfo contact_info;
 
-    RigidBody int_model(pin_model_name, integrator_urdf);
+    FullOrderRigidBody int_model(pin_model_name, integrator_urdf);
 
     REQUIRE(int_model.GetMass() == 1);
 }
@@ -523,7 +523,7 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
     RobotContactInfo contact_info;
     contact_info.contacts.emplace("foot", Contact(PointContact, true));
 
-    RigidBody hopper_model(pin_model_name, hopper_urdf);
+    FullOrderRigidBody hopper_model(pin_model_name, hopper_urdf);
 
     int constexpr INPUT_SIZE = 4;
     constexpr int CONFIG_SIZE = 11;
@@ -532,7 +532,7 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
     constexpr int DERIV_SIZE = 20;
     constexpr int JOINT_SIZE = 6;
 
-    vectorx_t x = RigidBody::BuildState(hopper_model.GetRandomConfig(), hopper_model.GetRandomVel());
+    vectorx_t x = FullOrderRigidBody::BuildState(hopper_model.GetRandomConfig(), hopper_model.GetRandomVel());
     const vectorx_t input = vectorx_t::Zero(INPUT_SIZE);
     vectorx_t xdot = hopper_model.GetDynamics(x, input, contact_info);
 

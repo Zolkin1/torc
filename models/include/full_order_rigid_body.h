@@ -2,8 +2,8 @@
 // Created by zolkin on 5/23/24.
 //
 
-#ifndef TORC_RIGID_BODY_H
-#define TORC_RIGID_BODY_H
+#ifndef TORC_FULL_ORDER_RIGID_BODY_H
+#define TORC_FULL_ORDER_RIGID_BODY_H
 
 #include "pinocchio_model.h"
 #include "robot_contact_info.h"
@@ -14,15 +14,15 @@ namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
 
-    class RigidBody : public PinocchioModel {
+    class FullOrderRigidBody : public PinocchioModel {
     public:
 
-        RigidBody(const std::string& name, const std::filesystem::path& urdf);
+        FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf);
 
-        RigidBody(const std::string& name, const std::filesystem::path& urdf,
-                  const std::vector<std::string>& underactuated_joints);
+        FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf,
+                           const std::vector<std::string>& underactuated_joints);
 
-        RigidBody(const RigidBody& other);
+        FullOrderRigidBody(const FullOrderRigidBody& other);
 
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
@@ -95,4 +95,4 @@ namespace torc::models {
 } // torc::models
 
 
-#endif //TORC_RIGID_BODY_H
+#endif //TORC_FULL_ORDER_RIGID_BODY_H
