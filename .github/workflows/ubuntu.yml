@@ -37,24 +37,43 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          /usr/local/lib
-          /usr/local/include
-          ~/.cache
-        key: ${{ runner.os }}-build-cache-${{ hashFiles('**/CMakeLists.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-build-cache-
+#    - name: Cache dependencies
+#      uses: actions/cache@v3
+#      with:
+#        path: |
+#          /usr/local/lib
+#          /usr/local/include
+#          ~/.cache
+#        key: ${{ runner.os }}-build-cache-${{ hashFiles('**/CMakeLists.txt') }}
+#        restore-keys: |
+#          ${{ runner.os }}-build-cache-
 
     - name: Add Eigen3
-      run: sudo apt install libeigen3-dev
+      run: |
+        sudo apt update
+        sudo apt install libeigen3-dev
+        
+    - name: Add Rust (Required by Clarabel)
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
+        source ~/.bashrc
+        echo "::add-path::$HOME/.cargo/bin"
+
+    - name: Add Clarabel
+      run: |
+        sudo apt install cmake -y
+        git clone --recurse-submodules https://github.com/oxfordcontrol/Clarabel.cpp.git
+        cd Clarabel.cpp
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build .
 
     - name: Add TinyXML2
       run: |
         sudo apt-get update
-        sudo apt-get install libtinyxml2-dev
+        sudo apt-get install libtinyxml2-dev -y
 #
 #    - name: Add urdfom_headers
 #      run: |
@@ -105,7 +124,7 @@ jobs:
 
     - name: Add GoogleTest (Required by CppAD)
       run: |
-        sudo apt install libgtest-dev build-essential cmake
+        sudo apt install libgtest-dev build-essential cmake -y
         cd /usr/src/googletest
         sudo cmake .
         sudo cmake --build . --target install
@@ -129,6 +148,9 @@ jobs:
 
     - name: Add MUMPS
       run: |
+        sudo apt install gfortran -y
+        sudo apt install liblapack-dev -y
+        export FC=gfortran
         git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
         cd ThirdParty-Mumps
         ./get.Mumps
@@ -138,8 +160,7 @@ jobs:
 
     - name: Add IPOPT
       run: |
-        sudo apt-get install gcc g++ gfortran git patch wget pkg-config liblapack-dev libmetis-dev
-        sudo apt install liblapack-dev
+        sudo apt-get install gcc g++ gfortran git patch wget pkg-config liblapack-dev libmetis-dev -y
         git clone https://github.com/coin-or/Ipopt.git
         cd Ipopt
         mkdir build && cd build
@@ -166,18 +187,6 @@ jobs:
         cmake ..
         sudo make
         sudo make install
-
-    - name: Add Rust (Required by Clarabel)
-      run: curl -y --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-    - name: Add Clarabel
-      run: |
-        git clone --recurse-submodules https://github.com/oxfordcontrol/Clarabel.cpp.git
-        cd Clarabel.cpp
-        mkdir build
-        cd build
-        cmake ..
-        cmake --build .
 
     - name: Set reusable strings
       id: strings
