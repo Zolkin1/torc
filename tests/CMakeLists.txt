@@ -35,13 +35,8 @@ if (BUILD_WITH_PINOCCHIO)
     target_link_libraries(srb_tests PRIVATE Catch2::Catch2WithMain)
     target_link_libraries(srb_tests PUBLIC Models)
 
-    add_executable(centroidal_tests centroidal_tests.cpp)
-    target_link_libraries(centroidal_tests PRIVATE Catch2::Catch2WithMain)
-    target_link_libraries(centroidal_tests PUBLIC Models)
-
     catch_discover_tests(rigid_body_tests)
     catch_discover_tests(srb_tests)
-    catch_discover_tests(centroidal_tests)
 endif ()
 
 # ---------- IPOPT Tests ---------- #

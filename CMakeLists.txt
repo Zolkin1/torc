@@ -32,7 +32,6 @@ add_subdirectory(functions)
 add_subdirectory(constraints)
 add_subdirectory(solver_interfaces)
 add_subdirectory(utils)
-add_subdirectory(mpc)
 
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library

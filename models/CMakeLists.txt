@@ -16,13 +16,11 @@ if (BUILD_WITH_PINOCCHIO)
 
     list(APPEND MODELS_SOURCES_LIST
                 pinocchio_model.cpp
-                centroidal_model.cpp
                 rigid_body.cpp
                 single_rigid_body.cpp)
 
     list(APPEND MODELS_HEADER_LIST
             "${MODELS_INC}/pinocchio_model.h"
-            "${MODELS_INC}/centroidal_model.h"
             "${MODELS_INC}/rigid_body.h"
             "${MODELS_INC}/frame_state_types.h"
             "${MODELS_INC}/single_rigid_body.h")
