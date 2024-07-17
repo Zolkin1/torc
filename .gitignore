@@ -40,3 +40,6 @@ cmake-build-release/
 cmake-build-test/
 cmake-build-relwithdebinfo/
 functions/adcg_sources/
+
+# run workflow locally
+bin/act
