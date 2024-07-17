@@ -1,2 +1,0 @@
-/usr/bin/ar qc libModels.a CMakeFiles/Models.dir/base_model.cpp.o CMakeFiles/Models.dir/pinocchio_model.cpp.o CMakeFiles/Models.dir/centroidal_model.cpp.o CMakeFiles/Models.dir/rigid_body.cpp.o CMakeFiles/Models.dir/single_rigid_body.cpp.o
-/usr/bin/ranlib libModels.a

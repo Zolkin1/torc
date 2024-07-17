@@ -35,3 +35,5 @@
 .idea/
 cmake-*
 functions/adcg_sources/
+
+build/
