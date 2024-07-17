@@ -31,6 +31,7 @@ add_subdirectory(models)
 add_subdirectory(functions)
 add_subdirectory(constraints)
 add_subdirectory(solver_interfaces)
+add_subdirectory(controllers)
 add_subdirectory(utils)
 
 # TODO: Figure out the install structure for the library
