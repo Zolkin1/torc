@@ -63,7 +63,7 @@ namespace torc::models {
     vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
         vectorx_t q, v;
         ParseState(state, q, v);
-        const vectorx_t& tau = InputsToTau(input);
+        const vectorx_t tau = InputsToTau(input);
         pinocchio::aba(pin_model_, *pin_data_, q, v, tau);
         return BuildStateDerivative(v, pin_data_->ddq);
     }
@@ -73,7 +73,7 @@ namespace torc::models {
                                               const RobotContactInfo& contact_info) const {
         vectorx_t q, v;
         ParseState(state, q, v);
-        const vectorx_t& tau = InputsToTau(input);
+        const vectorx_t tau = InputsToTau(input);
 
         // Create contact data
         // @Note that the RigidConstraint* classes are likely to change to just be generic constraint classes
@@ -123,7 +123,7 @@ namespace torc::models {
         assert(B.rows() == GetDerivativeDim());
         assert(B.cols() == act_mat_.cols());
 
-        const vectorx_t& tau = InputsToTau(input);
+        const vectorx_t tau = InputsToTau(input);
 
         pinocchio::computeABADerivatives(pin_model_, *pin_data_, q, v, tau);
 
@@ -148,7 +148,7 @@ namespace torc::models {
         assert(B.rows() == GetDerivativeDim());
         assert(B.cols() == act_mat_.cols());
 
-        const vectorx_t& tau = InputsToTau(input);
+        const vectorx_t tau = InputsToTau(input);
 
         // Create contact data
         std::vector<pinocchio::RigidConstraintModel> contact_model;

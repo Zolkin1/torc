@@ -87,11 +87,10 @@ namespace torc::models {
         assert(q.size() == SRB_CONFIG_DIM);
         assert(v.size() == SRB_VEL_DIM);
 
-        const vectorx_t& tau = InputsToTau(input);
+        const vectorx_t tau = InputsToTau(input);
 
         pinocchio::aba(pin_model_, *pin_data_, q, v, tau);
         vectorx_t xdot (v.size() + pin_data_->ddq.size());
-        // RobotStateDerivative xdot(state.v, pin_data_->ddq);
 
         return xdot;
     }
@@ -106,7 +105,7 @@ namespace torc::models {
         assert(B.rows() == GetDerivativeDim());
         assert(B.cols() == GetNumInputs());
 
-        const vectorx_t &tau = InputsToTau(input);
+        const vectorx_t tau = InputsToTau(input);
 
         pinocchio::computeABADerivatives(pin_model_, *pin_data_, q, v, tau);
 
