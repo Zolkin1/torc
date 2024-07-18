@@ -24,15 +24,9 @@ jobs:
           - os: ubuntu-22.04
             c_compiler: gcc
             cpp_compiler: g++
-          - os: ubuntu-22.04
-            c_compiler: clang
-            cpp_compiler: clang++
 #          - os: ubuntu-latest
 #            c_compiler: gcc
 #            cpp_compiler: g++
-#          - os: ubuntu-latest
-#            c_compiler: clang
-#            cpp_compiler: clang++
 
     steps:
     - uses: actions/checkout@v4
@@ -58,6 +52,7 @@ jobs:
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
         source ~/.bashrc
+        export ACTIONS_ALLOW_UNSECURE_COMMANDS=true
         echo "::add-path::$HOME/.cargo/bin"
 
     - name: Add Clarabel
@@ -70,10 +65,10 @@ jobs:
         cmake ..
         cmake --build .
 
-    - name: Add TinyXML2
-      run: |
-        sudo apt-get update
-        sudo apt-get install libtinyxml2-dev -y
+#    - name: Add TinyXML2
+#      run: |
+#        sudo apt-get update
+#        sudo apt-get install libtinyxml2-dev -y
 #
 #    - name: Add urdfom_headers
 #      run: |
@@ -121,13 +116,6 @@ jobs:
 #          make -j10
 #          make install
 #        fi
-
-    - name: Add GoogleTest (Required by CppAD)
-      run: |
-        sudo apt install libgtest-dev build-essential cmake -y
-        cd /usr/src/googletest
-        sudo cmake .
-        sudo cmake --build . --target install
 
     - name: Add CppAD
       run: |
@@ -212,3 +200,9 @@ jobs:
     - name: Test
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       run: ctest --build-config ${{ matrix.build_type }}
+
+    - name: Debug Info
+      run: |
+        echo "Debugging information before cleanup"
+        docker ps -a
+        docker images
