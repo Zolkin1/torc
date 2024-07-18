@@ -12,12 +12,17 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
+include(CTest)
+include(Catch)
+
 # ---------- Cost Tests ---------- #
 add_executable(function_tests
                 function_tests.cpp
                 test_fn.h)
 target_link_libraries(function_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(function_tests PUBLIC Functions)
+catch_discover_tests(function_tests)
+
 
 # ---------- Model Tests ---------- #
 if (BUILD_WITH_PINOCCHIO)
@@ -42,27 +47,23 @@ if (BUILD_WITH_OSQP)
     add_executable(osqp_tests osqp_tests.cpp)
     target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
     target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
+    catch_discover_tests(osqp_tests)
 endif ()
 # ----------- Utils Tests ---------- #
 add_executable(utils_tests utils_tests.cpp)
 target_link_libraries(utils_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(utils_tests PUBLIC Utils)
+catch_discover_tests(utils_tests)
+
 
 # --------- Clarabel Tests --------- #
 if (BUILD_WITH_CLARABEL)
     add_executable(clarabel_tests clarabel_tests.cpp)
     target_link_libraries(clarabel_tests PRIVATE Catch2::Catch2WithMain)
     target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
+    catch_discover_tests(clarabel_tests)
 endif ()
 
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-include(Catch)
-#include(CTest)
-#catch_discover_tests(function_tests)
-#catch_discover_tests(utils_tests)
-#catch_discover_tests(clarabel_tests)
-#catch_discover_tests(osqp_tests)
-##catch_discover_tests(rigid_body_tests)
-##catch_discover_tests(srb_tests)
