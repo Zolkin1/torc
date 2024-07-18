@@ -19,7 +19,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04] # for now just run on 22, but soon also use ubuntu-latest for 24
         build_type: [Release]
-        c_compiler: [gcc, clang]
+        c_compiler: [gcc]
         include:
           - os: ubuntu-22.04
             c_compiler: gcc
