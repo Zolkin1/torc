@@ -1,5 +1,0 @@
-if(EXISTS "/home/gavin/caltech/surf2024/torc/build/tests/function_tests-b12d07c_tests.cmake")
-  include("/home/gavin/caltech/surf2024/torc/build/tests/function_tests-b12d07c_tests.cmake")
-else()
-  add_test(function_tests_NOT_BUILT-b12d07c function_tests_NOT_BUILT-b12d07c)
-endif()

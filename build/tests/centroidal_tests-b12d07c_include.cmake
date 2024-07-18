@@ -1,5 +1,0 @@
-if(EXISTS "/home/gavin/caltech/surf2024/torc/build/tests/centroidal_tests-b12d07c_tests.cmake")
-  include("/home/gavin/caltech/surf2024/torc/build/tests/centroidal_tests-b12d07c_tests.cmake")
-else()
-  add_test(centroidal_tests_NOT_BUILT-b12d07c centroidal_tests_NOT_BUILT-b12d07c)
-endif()

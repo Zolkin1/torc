@@ -1,1 +1,0 @@
-/usr/bin/g++ -g CMakeFiles/constraint_tests.dir/constraint_tests.cpp.o -o constraint_tests  -Wl,-rpath,/home/gavin/caltech/surf2024/torc/build/constraints:/home/gavin/caltech/surf2024/torc/build/functions ../_deps/catch2-build/src/libCatch2Maind.a ../constraints/libConstraints.so ../_deps/catch2-build/src/libCatch2d.a ../functions/libFunctions.so ../utils/libUtils.a 
