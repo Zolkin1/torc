@@ -21,8 +21,8 @@ namespace torc::models {
     class BaseModel {
 
     public:
-      explicit BaseModel(std::string name,
-                         const SystemType &system_type = HybridSystemImpulse);
+      explicit BaseModel(const std::string& name,
+                         const SystemType &system_type);
 
       BaseModel(const BaseModel &other);
 

@@ -12,8 +12,8 @@ namespace torc::models {
     const std::string PinocchioModel::ROOT_JOINT = "root_joint";
 
     PinocchioModel::PinocchioModel(const std::string& name,
-                                   const std::filesystem::path& urdf)
-        : BaseModel(name), urdf_(urdf), n_input_(-1) {
+                                   const std::filesystem::path& urdf, const SystemType& system_type)
+        : BaseModel(name, system_type), urdf_(urdf), n_input_(-1) {
 
         // Create the pinocchio model
         CreatePinModel();

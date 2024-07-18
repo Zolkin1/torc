@@ -4,9 +4,9 @@
 
 namespace torc::models {
 
-    BaseModel::BaseModel(std::string name,
+    BaseModel::BaseModel(const std::string& name,
                          const SystemType& system_type)
-        : name_(std::move(name)), system_type_(system_type) {}
+        : name_(name), system_type_(system_type) {}
 
     BaseModel::BaseModel(const BaseModel& other) {
         name_ = other.name_;
