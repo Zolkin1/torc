@@ -21,7 +21,7 @@ namespace torc::models {
      * The SRB model is created by fixing all the joints in a reference configuration to get the single body.
      * Inputs are external forces applied at locations outside of the body.
      * SingleRigidBody does not expose any functions accessing the full rigid body dynamics. To access those,
-     * a seperated RigidBody object needs to be made.
+     * a seperated FullOrderRigidBody object needs to be made.
      *
      * The inputs are:
      * [f0, ... , fl, r0, ... , rl]
@@ -31,42 +31,59 @@ namespace torc::models {
      * Forces are trivial and moments can be computed via cross products.
      */
     class SingleRigidBody : public PinocchioModel {
-        using srb_config_t = Eigen::Vector<double, 7>;
-        using srb_vel_t = Eigen::Vector<double, 6>;
 
     public:
-        SingleRigidBody(const std::string& name, const std::filesystem::path& urdf, int max_contacts);
+        SingleRigidBody(const std::string& name,
+                        const std::filesystem::path& urdf,
+                        int max_contacts);
 
-        SingleRigidBody(const std::string& name, const std::filesystem::path& urdf,
-                        const vectorx_t& ref_config, int max_contacts);
+        SingleRigidBody(const std::string& name,
+                        const std::filesystem::path& urdf,
+                        const vectorx_t& ref_config,
+                        int max_contacts);
+
+        [[nodiscard]] int GetStateDim() const override;
+
+        [[nodiscard]] int GetDerivativeDim() const override;
+
+        [[nodiscard]] vectorx_t GetRandomState() const override;
+
+        [[nodiscard]] quat_t GetBaseOrientation(const vectorx_t& q) const override;
 
         void SetRefConfig(const vectorx_t& ref_config);
 
+        vectorx_t GetDynamics(const vectorx_t& state,
+                              const vectorx_t& input) override;
+
+        void DynamicsDerivative(const vectorx_t& state,
+                                const vectorx_t& input,
+                                matrixx_t& A,
+                                matrixx_t& B) override;
+
+        static void ParseState(const vectorx_t& state, vectorx_t& q, vectorx_t& v);
+
+        static void ParseStateDerivative(const vectorx_t& dstate, vectorx_t& v, vectorx_t& a);
+
         [[nodiscard]] vectorx_t GetRefConfig() const;
-
-        [[nodiscard]] RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) override;
-
-        void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                matrixx_t& A, matrixx_t& B) override;
 
         static constexpr int SRB_CONFIG_DIM = 7;
         static constexpr int SRB_VEL_DIM = 6;
+
     protected:
 
         [[nodiscard]] vectorx_t InputsToTau(const vectorx_t& input) const override;
 
-        matrixx_t ActuationMapDerivative(const vectorx_t& input, bool force_and_pos = true) const;
+        [[nodiscard]] matrixx_t ActuationMapDerivative(const vectorx_t& input,
+                                         bool force_and_pos = true) const;
 
         pinocchio::Model full_pin_model_;
         std::unique_ptr<pinocchio::Data> full_pin_data_;
-
-
 
         vectorx_t ref_config_;
         int max_contacts_;
 
     private:
-        void MakeSingleRigidBody(const torc::models::PinocchioModel::vectorx_t& ref_config,
+        void MakeSingleRigidBody(const vectorx_t& ref_config,
                                  bool reassign_full_model = true);
     };
 } // torc::models

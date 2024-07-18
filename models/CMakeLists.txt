@@ -3,26 +3,26 @@ message(STATUS "Building models")
 set(MODELS_INC "${torc_SOURCE_DIR}/models/include")
 set(MODELS_HEADER_LIST
         "${MODELS_INC}/base_model.h"
-        "${MODELS_INC}/robot_state_types.h"
         "${MODELS_INC}/robot_contact_info.h")
 
 set(MODELS_SOURCES_LIST
-    base_model.cpp)
+    base_model.cpp
+)
 
 #----------- Pinocchio -----------#
 if (BUILD_WITH_PINOCCHIO)
     message(STATUS "Building with Pinocchio")
 
     list(APPEND MODELS_SOURCES_LIST
-        pinocchio_model.cpp
-        rigid_body.cpp
-        single_rigid_body.cpp)
+                pinocchio_model.cpp
+                full_order_rigid_body.cpp
+                single_rigid_body.cpp)
 
     list(APPEND MODELS_HEADER_LIST
-        "${MODELS_INC}/pinocchio_model.h"
-        "${MODELS_INC}/rigid_body.h"
-        "${MODELS_INC}/frame_state_types.h"
-        "${MODELS_INC}/single_rigid_body.h")
+            "${MODELS_INC}/pinocchio_model.h"
+            "${MODELS_INC}/full_order_rigid_body.h"
+            "${MODELS_INC}/frame_state_types.h"
+            "${MODELS_INC}/single_rigid_body.h")
 endif ()
 
 # -------  Create Library -------- #
