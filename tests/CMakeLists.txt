@@ -68,6 +68,11 @@ if (BUILD_WITH_CLARABEL)
     catch_discover_tests(clarabel_tests)
 endif ()
 
+# --------- Clarabel Tests --------- #
+add_executable(controller_tests controller_tests.cpp)
+target_link_libraries(controller_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(controller_tests PUBLIC Controllers)
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
