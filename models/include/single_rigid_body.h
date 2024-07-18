@@ -48,6 +48,8 @@ namespace torc::models {
 
         [[nodiscard]] vectorx_t GetRandomState() const override;
 
+        [[nodiscard]] quat_t GetBaseOrientation(const vectorx_t& q) const override;
+
         void SetRefConfig(const vectorx_t& ref_config);
 
         vectorx_t GetDynamics(const vectorx_t& state,

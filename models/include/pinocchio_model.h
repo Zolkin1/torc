@@ -61,6 +61,8 @@ namespace torc::models {
 
         [[nodiscard]] virtual vectorx_t GetRandomState() const = 0;
 
+        [[nodiscard]] virtual quat_t GetBaseOrientation(const vectorx_t &q) const = 0;
+
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
         // -------------------------------------- //

@@ -59,6 +59,10 @@ namespace torc::models {
         return x;
     }
 
+    quat_t FullOrderRigidBody::GetBaseOrientation(const vectorx_t& q) const {
+        return static_cast<quat_t>(q.segment<4>(3));
+    }
+
     vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
         vectorx_t q, v;
         ParseState(state, q, v);

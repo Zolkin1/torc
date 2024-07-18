@@ -43,6 +43,10 @@ namespace torc::models {
         return vectorx_t::Random(GetStateDim());
     }
 
+    quat_t SingleRigidBody::GetBaseOrientation(const vectorx_t& q) const {
+        return static_cast<quat_t>(q.segment<4>(3));
+    }
+
     void SingleRigidBody::MakeSingleRigidBody(const vectorx_t& ref_config, bool reassign_full_model) {
         // Move the full pinocchio model
         if (reassign_full_model) {

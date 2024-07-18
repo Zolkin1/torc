@@ -4,7 +4,6 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
-#include "../cmake-build-release/_deps/catch2-src/src/catch2/catch_config.hpp"
 #include "full_order_rigid_body.h"
 
 bool VectorEqualWithMargin(const torc::models::vectorx_t& v1, const torc::models::vectorx_t& v2, const double MARGIN) {
@@ -60,7 +59,7 @@ void CheckDerivatives(torc::models::FullOrderRigidBody& model) {
                 Eigen::Vector3d dquat = Eigen::Vector3d::Zero();
                 dquat(i - 3) += DELTA;
 
-                q_xd.array().segment<4>(3) = (FullOrderRigidBody::GetBaseQuat(q_xd) * pinocchio::quaternion::exp3(dquat)).coeffs();
+                q_xd.array().segment<4>(3) = (model.GetBaseOrientation(q_xd) * pinocchio::quaternion::exp3(dquat)).coeffs();
             } else {
                 if (i >= 6) {
                     q_xd(i + 1) += DELTA;
@@ -145,7 +144,7 @@ void CheckContactDerivatives(torc::models::FullOrderRigidBody& model, const torc
                 Eigen::Vector3d v = Eigen::Vector3d::Zero();
                 v(i - 3) += DELTA;
 
-                q_rand.array().segment<4>(3) =(FullOrderRigidBody::GetBaseQuat(q_rand) * pinocchio::quaternion::exp3(v)).coeffs();
+                q_rand.array().segment<4>(3) =(model.GetBaseOrientation(q_rand) * pinocchio::quaternion::exp3(v)).coeffs();
             } else {
                 if (i >= 6) {
                     q_rand(i + 1) += DELTA;
@@ -245,7 +244,7 @@ void CheckImpulseDerivatives(torc::models::FullOrderRigidBody& model, const torc
                 Eigen::Vector3d v = Eigen::Vector3d::Zero();
                 v(i - 3) += DELTA;
 
-                qd.array().segment<4>(3) = (FullOrderRigidBody::GetBaseQuat(qd) * pinocchio::quaternion::exp3(v)).coeffs();
+                qd.array().segment<4>(3) = (model.GetBaseOrientation(qd) * pinocchio::quaternion::exp3(v)).coeffs();
             } else {
                 if (i >= 6) {
                     qd(i + 1) += DELTA;

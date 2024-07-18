@@ -33,13 +33,6 @@ namespace torc::models {
                                       const vectorx_t &input, matrixx_t &A,
                                       matrixx_t &b) = 0;
 
-      template <class... Args>
-      static void ParseState(const vectorx_t &state, Args... args);
-
-      static quat_t GetBaseQuat(const vectorx_t &q) {
-        return static_cast<quat_t>(q.segment<4>(3));
-      }
-
       [[nodiscard]] SystemType GetSystemType() const;
 
       [[nodiscard]] std::string GetName() const;

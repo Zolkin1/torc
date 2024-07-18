@@ -30,6 +30,8 @@ namespace torc::models {
 
         [[nodiscard]] vectorx_t GetRandomState() const override;
 
+        [[nodiscard]] quat_t GetBaseOrientation(const vectorx_t& q) const override;
+
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input) override;
