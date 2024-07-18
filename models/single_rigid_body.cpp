@@ -23,7 +23,7 @@ namespace torc::models {
 
     SingleRigidBody::SingleRigidBody(const std::string& name, const std::filesystem::path& urdf,
                                      const vectorx_t& ref_config, int max_contacts)
-            : PinocchioModel(name, urdf), ref_config_(ref_config), max_contacts_(max_contacts) {
+            : PinocchioModel(name, urdf, HybridSystemNoImpulse), ref_config_(ref_config), max_contacts_(max_contacts) {
         system_type_ = HybridSystemNoImpulse;
         n_input_ = max_contacts_*6;
 
