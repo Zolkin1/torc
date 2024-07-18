@@ -43,3 +43,4 @@ functions/adcg_sources/
 
 # run workflow locally
 bin/act
+build/
