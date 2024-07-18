@@ -22,9 +22,7 @@ namespace torc::models {
     }
 
     PinocchioModel::PinocchioModel(const torc::models::PinocchioModel& other)
-        : BaseModel(other.name_) {
-        this->system_type_ = other.system_type_;
-
+        : BaseModel(other.name_, other.system_type_) {
         urdf_ = other.urdf_;
         pin_model_ = other.pin_model_;
         pin_data_ = std::make_unique<pinocchio::Data>(*other.pin_data_); // TODO: Check that this works as expected
