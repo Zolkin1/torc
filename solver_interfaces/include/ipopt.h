@@ -39,11 +39,11 @@ namespace torc::solvers {
         IPOPT(const std::filesystem::path& settings_file);
 
         // TODO: What should this interface look like?
-        //  Want to allow an MPC object and generic optimization problems be solved
+        //  Want to allow an MPCbase object and generic optimization problems be solved
         //  Should have one interface that takes in a cost function and a vector of constraints
         //  The cost function will be of one type and can be templated. The vector of constraints can in theory
         //  be of different types, but they will need to all be able to provide a derivative.
-        //  Then there can be a second interface that will take in some MPC type object and just solve that.
+        //  Then there can be a second interface that will take in some MPCbase type object and just solve that.
         //  In both cases and initial guess can be provided, and if one is not provided, then we will guess all zeros
         SolverStatus SolveNLP();
 

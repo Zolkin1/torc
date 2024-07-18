@@ -11,6 +11,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(Catch2)
+include(Catch)
 
 # ---------- Function Tests ------- #
 add_executable(function_tests
@@ -33,6 +34,9 @@ if (BUILD_WITH_PINOCCHIO)
     add_executable(srb_tests srb_tests.cpp)
     target_link_libraries(srb_tests PRIVATE Catch2::Catch2WithMain)
     target_link_libraries(srb_tests PUBLIC Models)
+
+    catch_discover_tests(rigid_body_tests)
+    catch_discover_tests(srb_tests)
 endif ()
 
 # ---------- IPOPT Tests ---------- #
@@ -40,6 +44,7 @@ if (BUILD_WITH_IPOPT)
     add_executable(ipopt_tests ipopt_tests.cpp)
     target_link_libraries(ipopt_tests PRIVATE Catch2::Catch2WithMain)
     target_link_libraries(ipopt_tests PUBLIC SolverInterfaces)
+    catch_discover_tests(ipopt_tests)
 endif ()
 
 # ---------- OSQPInterface Tests ---------- #
@@ -47,29 +52,25 @@ if (BUILD_WITH_OSQP)
     add_executable(osqp_tests osqp_tests.cpp)
     target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
     target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
+    catch_discover_tests(osqp_tests)
 endif ()
 # ----------- Utils Tests ---------- #
 add_executable(utils_tests utils_tests.cpp)
 target_link_libraries(utils_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(utils_tests PUBLIC Utils)
+catch_discover_tests(utils_tests)
 
 # --------- Clarabel Tests --------- #
 if (BUILD_WITH_CLARABEL)
     add_executable(clarabel_tests clarabel_tests.cpp)
     target_link_libraries(clarabel_tests PRIVATE Catch2::Catch2WithMain)
     target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
+    catch_discover_tests(clarabel_tests)
 endif ()
 
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-include(Catch)
-#include(CTest)
-#catch_discover_tests(function_tests)
-#catch_discover_tests(utils_tests)
-#catch_discover_tests(clarabel_tests)
-#catch_discover_tests(osqp_tests)
-##catch_discover_tests(rigid_body_tests)
-##catch_discover_tests(srb_tests)
 
+include(Catch)
 catch_discover_tests(function_tests)

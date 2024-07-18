@@ -5,7 +5,6 @@
 #ifndef TORC_FRAME_STATE_TYPES_H
 #define TORC_FRAME_STATE_TYPES_H
 
-#include "pinocchio/multibody/liegroup/liegroup.hpp"
 namespace torc::models {
     struct FrameState {
         pinocchio::SE3 placement;
