@@ -31,6 +31,18 @@ namespace torc::models {
         MakeSingleRigidBody(ref_config);
     }
 
+    int SingleRigidBody::GetStateDim() const {
+        return SRB_CONFIG_DIM + SRB_VEL_DIM;
+    }
+
+    int SingleRigidBody::GetDerivativeDim() const {
+        return 2*SRB_VEL_DIM;
+    }
+
+    vectorx_t SingleRigidBody::GetRandomState() const {
+        return vectorx_t::Random(GetStateDim());
+    }
+
     void SingleRigidBody::MakeSingleRigidBody(const vectorx_t& ref_config, bool reassign_full_model) {
         // Move the full pinocchio model
         if (reassign_full_model) {
@@ -109,12 +121,12 @@ namespace torc::models {
             pin_data_->Minv * act_map_deriv;
     }
 
-
     void SingleRigidBody::ParseState(const vectorx_t &state, vectorx_t &q,
                                      vectorx_t &v) {
       q = state.topRows(SRB_CONFIG_DIM);
       v = state.bottomRows(SRB_VEL_DIM);
     }
+
     void SingleRigidBody::ParseStateDerivative(const vectorx_t &dstate,
                                                vectorx_t &v, vectorx_t &a) {
         v = dstate.topRows(SRB_VEL_DIM);

@@ -15,16 +15,6 @@ namespace torc::models {
 
     std::string BaseModel::GetName() const { return name_; }
 
-    template <class... Args>
-    void BaseModel::ParseState(const vectorx_t &state, Args... args) {
-        // HandleParseState(state, {args...});
-    }
-
-    // void BaseModel::HandleParseState(const vectorx_t &state,
-                                     // std::initializer_list<vectorx_t> args) {
-        // assert(false && "BaseModel cannot parse states");
-    // }
-
     SystemType BaseModel::GetSystemType() const { return system_type_; }
 
 } // torc::models

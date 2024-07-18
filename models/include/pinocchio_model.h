@@ -37,9 +37,9 @@ namespace torc::models {
 
         [[nodiscard]] int GetVelDim() const;
 
-        [[nodiscard]] int GetStateDim() const;
+        [[nodiscard]] virtual int GetStateDim() const = 0;
 
-        [[nodiscard]] int GetDerivativeDim() const;
+        [[nodiscard]] virtual int GetDerivativeDim() const = 0;
 
         [[nodiscard]] double GetMass() const;
 
@@ -59,14 +59,16 @@ namespace torc::models {
 
         [[nodiscard]] vectorx_t GetRandomVel() const;
 
-        [[nodiscard]] vectorx_t GetRandomState() const;
+        [[nodiscard]] virtual vectorx_t GetRandomState() const = 0;
 
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
         // -------------------------------------- //
-        void ForwardKinematics(const vectorx_t& state);
-        //
-        // void ForwardKinematics(const vectorx_t& state, const vectorx_t& deriv);
+        void FirstOrderFK(const vectorx_t& q);
+
+        void SecondOrderFK(const vectorx_t& q, const vectorx_t& v);
+
+        void ThirdOrderFK(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a);
 
         // TODO: Should these functions accept frame ID instead?
         /**
@@ -74,7 +76,7 @@ namespace torc::models {
          * @param frame name
          * @return frame placement (in world frame) and velocity (in local frame).
          */
-        FrameState GetFrameState(const std::string& frame) const;
+        [[nodiscard]] FrameState GetFrameState(const std::string& frame) const;
 
         /**
          * Calculate the frame state after calling the forward kinematics.
@@ -82,7 +84,7 @@ namespace torc::models {
          * @param state of the robot
          * @return frame placement (in world frame) and velocity (in local frame).
          */
-        FrameState GetFrameState(const std::string& frame, const vectorx_t& state);
+        FrameState GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v);
 
         void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const;
 

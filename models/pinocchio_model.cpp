@@ -13,7 +13,7 @@ namespace torc::models {
 
     PinocchioModel::PinocchioModel(const std::string& name,
                                    const std::filesystem::path& urdf)
-        : BaseModel(name), urdf_(std::move(urdf)), n_input_(-1) {
+        : BaseModel(name), urdf_(urdf), n_input_(-1) {
 
         // Create the pinocchio model
         CreatePinModel();
@@ -63,14 +63,6 @@ namespace torc::models {
         return pin_model_.nv;
     }
 
-    int PinocchioModel::GetStateDim() const {
-        return GetConfigDim() + GetVelDim();
-    }
-
-    int PinocchioModel::GetDerivativeDim() const {
-        return 2*GetVelDim();
-    }
-
     double PinocchioModel::GetMass() const {
         return mass_;
     }
@@ -104,12 +96,6 @@ namespace torc::models {
 
     vectorx_t PinocchioModel::GetRandomVel() const {
         return vectorx_t::Random(GetVelDim());
-    }
-
-    vectorx_t PinocchioModel::GetRandomState() const {
-        vectorx_t x(GetConfigDim() + GetVelDim());
-        x << GetRandomConfig(), GetRandomVel();
-        return x;
     }
 
     std::string PinocchioModel::GetFrameType(const int j) const {
@@ -190,19 +176,23 @@ namespace torc::models {
         }
     }
 
-    // void PinocchioModel::ForwardKinematics(const vectorx_t& q) {
-    //     pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
-    // }
-    //
-    // void PinocchioModel::ForwardKinematics(const vectorx_t& state) {
-    //     vectorx_t q, v;
-    //     ParseState(state, q, v);
-    //     pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v);
-    // }
-    //
-    // void PinocchioModel::ForwardKinematics(const vectorx_t& state, const vectorx_t& deriv) {
-    //     pinocchio::forwardKinematics(pin_model_, *pin_data_, state.q, state.v, deriv.a);
-    // }
+     void PinocchioModel::FirstOrderFK(const vectorx_t& q) {
+         assert(q.size() == this->GetConfigDim());
+         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+     }
+
+    void PinocchioModel::SecondOrderFK(const vectorx_t& q, const vectorx_t& v) {
+        assert(q.size() == this->GetConfigDim());
+        assert(v.size() == this->GetVelDim());
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v);
+    }
+
+     void PinocchioModel::ThirdOrderFK(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a) {
+         assert(q.size() == this->GetConfigDim());
+         assert(v.size() == this->GetVelDim());
+         assert(a.size() == this->GetVelDim());
+         pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
+    }
 
     FrameState PinocchioModel::GetFrameState(const std::string& frame) const {
         const unsigned long idx = GetFrameIdx(frame);
@@ -215,10 +205,10 @@ namespace torc::models {
         }
     }
 
-    // FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& state) {
-    //     ForwardKinematics(state);
-    //     return GetFrameState(frame);
-    // }
+     FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v) {
+         SecondOrderFK(q, v);
+         return GetFrameState(frame);
+     }
 
     void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const {
         const unsigned long idx = GetFrameIdx(frame);

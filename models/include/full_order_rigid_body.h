@@ -24,6 +24,12 @@ namespace torc::models {
 
         FullOrderRigidBody(const FullOrderRigidBody& other);
 
+        [[nodiscard]] int GetStateDim() const override;
+
+        [[nodiscard]] int GetDerivativeDim() const override;
+
+        [[nodiscard]] vectorx_t GetRandomState() const override;
+
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input) override;
@@ -69,8 +75,7 @@ namespace torc::models {
 
         static vectorx_t BuildStateDerivative(const vectorx_t& v, const vectorx_t& a);
 
-        void ParseInput(const vectorx_t& input,
-                        vectorx_t& tau) const;
+        void ParseInput(const vectorx_t& input, vectorx_t& tau) const;
 
         /**
          * Takes the torques on the actuated coordinates and maps to a vector of

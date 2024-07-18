@@ -12,8 +12,6 @@
 
 #include "full_order_rigid_body.h"
 
-#include <utility>
-
 namespace torc::models {
     FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf)
         : PinocchioModel(name, urdf) {
@@ -47,12 +45,26 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(*other.contact_data_);
     }
 
+    int FullOrderRigidBody::GetStateDim() const {
+        return this->GetConfigDim() + this->GetVelDim();
+    }
+
+    int FullOrderRigidBody::GetDerivativeDim() const {
+        return 2*this->GetVelDim();
+    }
+
+    vectorx_t FullOrderRigidBody::GetRandomState() const {
+        vectorx_t x(GetStateDim());
+        x << GetRandomConfig(), GetRandomVel();
+        return x;
+    }
+
     vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
         vectorx_t q, v;
         ParseState(state, q, v);
         const vectorx_t& tau = InputsToTau(input);
         pinocchio::aba(pin_model_, *pin_data_, q, v, tau);
-        return BuildState(v, pin_data_->ddq);
+        return BuildStateDerivative(v, pin_data_->ddq);
     }
 
     vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state,
@@ -75,7 +87,7 @@ namespace torc::models {
 
         pinocchio::constraintDynamics(pin_model_, *contact_data_, q, v, tau,
                                       contact_model, contact_data);
-        return BuildState(v, contact_data_->ddq);
+        return BuildStateDerivative(v, contact_data_->ddq);
     }
 
     vectorx_t FullOrderRigidBody::GetImpulseDynamics(const vectorx_t& state,
@@ -93,7 +105,7 @@ namespace torc::models {
         pinocchio::initConstraintDynamics(pin_model_, *contact_data_, contact_model);
 
         // impulseDynamics
-        const pinocchio::ProximalSettings settings;     // Proximal solver settings. Set to default
+        const pinocchio::ProximalSettings settings;         // Proximal solver settings. Set to default
         constexpr double eps = 0;                           // Coefficient of restitution
         pinocchio::impulseDynamics(pin_model_, *contact_data_, q, v, contact_model,
                                    contact_data, eps, settings);
@@ -215,7 +227,7 @@ namespace torc::models {
       unact_joint_idx.push_back(0); // Universe joint is never actuated
 
       // Get the number of actuators
-      for (std::string joint_name : underactuated_joints) {
+      for (const std::string& joint_name : underactuated_joints) {
         for (int i = 0; i < num_joints; i++) {
           if (joint_name == pin_model_.names.at(i)) {
             num_actuators -= pin_model_.joints.at(i).nv();
@@ -269,7 +281,9 @@ namespace torc::models {
 
     vectorx_t FullOrderRigidBody::BuildStateDerivative(const vectorx_t &v,
                                                        const vectorx_t &a) {
-      return BuildState(v, a);
+        vectorx_t x(v.size() + a.size());
+        x << v, a;
+        return x;
     }
 
     void FullOrderRigidBody::ParseInput(const vectorx_t &input, vectorx_t &tau) const {
