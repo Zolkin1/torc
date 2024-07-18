@@ -1,0 +1,2 @@
+/usr/bin/ar qc libSolverInterfaces.a CMakeFiles/SolverInterfaces.dir/solver_status.cpp.o CMakeFiles/SolverInterfaces.dir/ipopt_interface.cpp.o CMakeFiles/SolverInterfaces.dir/ipopt.cpp.o CMakeFiles/SolverInterfaces.dir/osqp_interface.cpp.o
+/usr/bin/ranlib libSolverInterfaces.a

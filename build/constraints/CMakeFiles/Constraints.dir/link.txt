@@ -1,0 +1,1 @@
+/usr/bin/g++ -fPIC -g -shared -Wl,-soname,libConstraints.so -o libConstraints.so  -Wl,-rpath,/home/gavin/caltech/surf2024/torc/build/functions ../functions/libFunctions.so ../utils/libUtils.a 

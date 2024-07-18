@@ -1,0 +1,1 @@
+/usr/bin/g++ -g CMakeFiles/utils_tests.dir/utils_tests.cpp.o -o utils_tests  ../_deps/catch2-build/src/libCatch2Maind.a ../utils/libUtils.a ../_deps/catch2-build/src/libCatch2d.a 

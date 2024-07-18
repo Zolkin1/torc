@@ -46,14 +46,8 @@ jobs:
       run: |
         sudo apt update
         sudo apt install libeigen3-dev
-        
-    - name: Add Rust (Required by Clarabel)
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-        source ~/.bashrc
-        export ACTIONS_ALLOW_UNSECURE_COMMANDS=true
-        echo "::add-path::$HOME/.cargo/bin"
+
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
 
     - name: Add Clarabel
       run: |

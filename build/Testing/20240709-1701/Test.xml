@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Site BuildName="Linux-g++"
+	BuildStamp="20240709-1701-Experimental"
+	Name="gavin-legion-y9000p"
+	Generator="ctest-3.22.1"
+	CompilerName="/usr/bin/g++"
+	CompilerVersion="11.4.0"
+	OSName="Linux"
+	Hostname="gavin-legion-y9000p"
+	OSRelease="6.5.0-41-generic"
+	OSVersion="#41~22.04.2-Ubuntu SMP PREEMPT_DYNAMIC Mon Jun  3 11:32:55 UTC 2"
+	OSPlatform="x86_64"
+	Is64Bits="1"
+	VendorString="GenuineIntel"
+	VendorID="Intel Corporation"
+	FamilyID="6"
+	ModelID="183"
+	ProcessorCacheSize="36864"
+	NumberOfLogicalCPU="32"
+	NumberOfPhysicalCPU="24"
+	TotalVirtualMemory="2047"
+	TotalPhysicalMemory="31822"
+	LogicalProcessorsPerPhysical="1"
+	ProcessorClockFrequency="3800.02"
+	>
+	<Testing>
+		<StartDateTime>Jul 09 11:09 PDT</StartDateTime>
+		<StartTestTime>1720548556</StartTestTime>
+		<TestList/>
+		<EndDateTime>Jul 09 11:09 PDT</EndDateTime>
+		<EndTestTime>1720548556</EndTestTime>
+		<ElapsedMinutes>0</ElapsedMinutes>
+	</Testing>
+</Site>
