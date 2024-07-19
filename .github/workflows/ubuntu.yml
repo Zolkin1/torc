@@ -53,63 +53,32 @@ jobs:
       run: |
         sudo apt install cmake -y
         git clone --recurse-submodules https://github.com/oxfordcontrol/Clarabel.cpp.git
+        pwd   #!!
         cd Clarabel.cpp
         mkdir build
         cd build
         cmake ..
         cmake --build .
 
-#    - name: Add TinyXML2
-#      run: |
-#        sudo apt-get update
-#        sudo apt-get install libtinyxml2-dev -y
-#
-#    - name: Add urdfom_headers
-#      run: |
-#        sudo apt-get update
-#        sudo apt-get install -y liburdfdom-headers-dev liburdfdom-tools
-#
-#    - name: Add console_bridge
-#      run: |
-#        sudo apt-get update
-#        sudo apt-get install libconsole-bridge-dev
-#
-#    - name: Clone and build urdfdom
-#      run: |
-#        git clone https://github.com/ros/urdfdom.git
-#        cd urdfdom
-#        mkdir build
-#        cd build
-#        cmake ..
-#        make
-#        sudo make install
+    - name: Clarabel Debug Info
+      run: |
+        ls /home/runner/work/torc/torc/Clarabel.cpp/rust_wrapper/target/release
+        
 
-#    - name: Add ROS2
-#      run: |
-#        sudo apt install software-properties-common
-#        sudo add-apt-repository universe
-#        sudo apt update && sudo apt install curl -y
-#        sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-#        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
-#        sudo apt update
-#        sudo apt upgrade
-#        sudo apt install ros-humble-desktop
-#        source /opt/ros/humble/setup.bash
-
-#    - name: Add Pinocchio
-#      run: |
-#        if [ ! -d "pinocchio" ]
-#        then
-#          git clone --recursive https://github.com/stack-of-tasks/pinocchio
-#          cd pinocchio
-#          git remote update
-#          git fetch
-#          git checkout devel
-#          mkdir build && cd build
-#          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_PYTHON_INTERFACE=OFF
-#          make -j10
-#          make install
-#        fi
+    - name: Add Pinocchio
+      run: |
+        sudo apt install -qqy lsb-release curl
+        sudo mkdir -p /etc/apt/keyrings
+        curl http://robotpkg.openrobots.org/packages/debian/robotpkg.asc \
+          | sudo tee /etc/apt/keyrings/robotpkg.asccd
+        echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/robotpkg.asc] http://robotpkg.openrobots.org/packages/debian/pub $(lsb_release -cs) robotpkg" \
+          | sudo tee /etc/apt/sources.list.d/robotpkg.list
+         sudo apt update
+         sudo apt install -qqy robotpkg-py3*-pinocchio
+        export PATH=/opt/openrobots/bin:$PATH
+        export PKG_CONFIG_PATH=/opt/openrobots/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LD_LIBRARY_PATH=/opt/openrobots/lib:$LD_LIBRARY_PATH
+        export CMAKE_PREFIX_PATH=/opt/openrobots:$CMAKE_PREFIX_PATH
 
     - name: Add CppAD
       run: |
