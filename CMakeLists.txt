@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.14)
 
 project(torc
         VERSION 0.1
@@ -8,7 +8,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)  # this ensures -std=c++11 not -std=gnu++11
 
-message(STATUS "Building TORC Project")
+message(STATUS "Configuring TORC Project")
+message(STATUS "CMake Version: " ${CMAKE_VERSION})
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
 set(BUILD_TESTING True)

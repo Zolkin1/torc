@@ -33,7 +33,7 @@ namespace torc::solvers {
     public:
         OSQPInterface();
 
-        OSQPInterface(const OSQPInterfaceSettings& settings);
+        explicit OSQPInterface(const OSQPInterfaceSettings& settings);
 
         // TODO: Change this to take in a generic upper bound/lower bound QP data struct
         // TODO: Figure out how to make the vectors const (issues with OSQPEigen I think)

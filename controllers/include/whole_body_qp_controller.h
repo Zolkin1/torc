@@ -9,6 +9,7 @@
 #include <Eigen/Core>
 
 #include "full_order_rigid_body.h"
+#include "osqp_interface.h"
 
 namespace torc::controllers {
     using vectorx_t = Eigen::VectorXd;
@@ -16,8 +17,14 @@ namespace torc::controllers {
     namespace fs = std::filesystem;
     class WholeBodyQPController {
     public:
-        WholeBodyQPController();
-        WholeBodyQPController(const fs::path& config_file_path);
+        WholeBodyQPController(const std::string& name);
+
+        WholeBodyQPController(const std::string& name, const models::FullOrderRigidBody& model);
+
+        WholeBodyQPController(const std::string& name, const std::filesystem::path& urdf);
+
+        WholeBodyQPController(const std::string& name, const std::filesystem::path& urdf,
+                              const fs::path& config_file_path);
 
         void UpdateConfigFile(const fs::path& config_file_path);
 
@@ -38,10 +45,28 @@ namespace torc::controllers {
          */
         void ParseUpdateSettings();
 
-    // -------- Member Variables -------- //
+        // ---------------------------------------- //
+        // --------- Constraint Functions --------- //
+        // ---------------------------------------- //
+        void AddDynamicsConstraints(const vectorx_t& v, const models::Contact& contact);
+
+        void AddHolonomicConstraints(const vectorx_t& state, const models::Contact& contact);
+
+        void AddTorqueConstraints(const vectorx_t& v, const models::Contact& contact);
+
+        void AddFrictionConeConstraints(const models::Contact& contact);
+
+        void AddPositiveGRFConstraints(const models::Contact& contact);
+
+        // -------- Member Variables -------- //
         fs::path config_file_path_;
+        std::string name_;
 
         vectorx_t target_state_;
+
+        solvers::OSQPInterface qp_solver_;
+
+        std::unique_ptr<models::FullOrderRigidBody> model_;
     private:
     };
 }

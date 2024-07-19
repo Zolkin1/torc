@@ -1,0 +1,10 @@
+solver_settings:
+  rel_tol: 1e-6
+  abs_tol: 1e-6
+  verbose: True
+  polish: True
+  #rho:
+  #alpha:
+  #adaptive_rho:
+  max_iter: 1000
+

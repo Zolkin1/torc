@@ -17,6 +17,60 @@ namespace torc::constraint {
         GreaterThan     // greater than or equal to constraint
     };
 
+    using matrixx_t = Eigen::MatrixXd;
+    using vectorx_t = Eigen::VectorXd;
+    using rowvecx_t = Eigen::RowVectorXd;
+    using sp_matrix_t = Eigen::SparseMatrix<double>;
+
+    struct OriginalFormData {
+        matrixx_t grads;
+        vectorx_t bounds;
+        std::vector<CONSTRAINT_T> types;
+    };
+
+    struct CompactOriginalFormData {
+        matrixx_t grads;
+        vectorx_t bounds;
+        std::vector<CONSTRAINT_T> types;
+        std::vector<size_t> reps;
+    };
+
+    struct UnilateralConstraints {
+        matrixx_t grads;
+        vectorx_t bounds;
+    };
+
+    struct SparseUnilateralConstraints {
+        sp_matrix_t grads;
+        vectorx_t bounds;
+    };
+
+    struct BoxConstraints {
+        matrixx_t grads;
+        vectorx_t bounds_high;
+        vectorx_t bounds_low;
+    };
+
+    struct SparseBoxConstraints {
+        sp_matrix_t grads;
+        vectorx_t bounds_high;
+        vectorx_t bounds_low;
+    };
+
+    struct InequalityEqualityConstraints {
+        matrixx_t ineq_grad;
+        matrixx_t eq_grad;
+        vectorx_t ineq_bounds;
+        vectorx_t eq_bounds;
+    };
+
+    struct SparseInequalityEqualityConstraints {
+        sp_matrix_t ineq_grad;
+        sp_matrix_t eq_grad;
+        vectorx_t ineq_bounds;
+        vectorx_t eq_bounds;
+    };
+
     /**
      * @brief Represents a group of constraints, given in the form f(x) - constraint type - bound, and contains methods to
      * linearize the constraints in various forms.
@@ -24,11 +78,6 @@ namespace torc::constraint {
      */
     template <class scalar_t>
     class Constraint {
-        using matrixx_t = Eigen::MatrixX<scalar_t>;
-        using vectorx_t = Eigen::VectorX<scalar_t>;
-        using rowvecx_t = Eigen::RowVectorX<scalar_t>;
-        using sp_matrix_t = Eigen::SparseMatrix<scalar_t>;
-
     public:
         /**
          * @brief Default constructor.
@@ -95,13 +144,6 @@ namespace torc::constraint {
             this->constraint_types_.push_back(constraint_type);
         }
 
-
-        struct OriginalFormData {
-            matrixx_t grads;
-            vectorx_t bounds;
-            std::vector<CONSTRAINT_T> types;
-        };
-
         /**
          * @brief Computes the linearzation of all the constraints, and returns them in the form Ax <=/=/>= b, in the
          * order that the user passed them in.
@@ -121,14 +163,6 @@ namespace torc::constraint {
                 data.bounds(i)= this->bounds_.at(i) - fn(x);
             }
         }
-
-
-        struct CompactOriginalFormData {
-            matrixx_t grads;
-            vectorx_t bounds;
-            std::vector<CONSTRAINT_T> types;
-            std::vector<size_t> reps;
-        };
 
         /**
          * @brief Computes the linearization of all the constraints, and returns them in the form Ax <=/=/>= b, in the
@@ -160,17 +194,12 @@ namespace torc::constraint {
             }
         }
 
-        struct UnilateralFormData {
-            matrixx_t grads;
-            vectorx_t bounds;
-        };
-
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= b
          * @param x the point at which to linearize
          * @param data struct to hold return values
          */
-        void UnilateralForm(const vectorx_t& x, UnilateralFormData& data) {
+        void UnilateralForm(const vectorx_t& x, UnilateralConstraints& data) {
             CONSTRAINT_CHECK_EMPTY
             const std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             const size_t n_rows = this->functions_.size() + this->CountEq();
@@ -202,19 +231,14 @@ namespace torc::constraint {
             }
         }
 
-        struct SparseUnilateralFormData {
-            sp_matrix_t grads;
-            vectorx_t bounds;
-        };
-
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= b, where A is sparse
          * @param x the point at which to linearize
          * @param data struct to hold return values
          */
         void SparseUnilateralForm(const vectorx_t& x,
-                                  SparseUnilateralFormData& data) {
-            UnilateralFormData dense_data;
+                                  SparseUnilateralConstraints& data) {
+            UnilateralConstraints dense_data;
             CONSTRAINT_CHECK_EMPTY
 
             this->UnilateralForm(x, dense_data);
@@ -222,19 +246,13 @@ namespace torc::constraint {
             data.bounds = dense_data.bounds;
         }
 
-        struct BoxFormData {
-            matrixx_t grads;
-            vectorx_t bounds_high;
-            vectorx_t bounds_low;
-        };
-
         /**
          * @brief Linearizes the constraints at the point x, into the form lb <= Ax <= ub
          * @param x the point at which to linearize
          * @param data struct to hold return values
          */
         void BoxForm(const vectorx_t& x,
-                     BoxFormData& data) {
+                     BoxConstraints& data) {
             CONSTRAINT_CHECK_EMPTY
             scalar_t max = std::numeric_limits<scalar_t>::max();
             scalar_t min = -max;
@@ -265,34 +283,20 @@ namespace torc::constraint {
             }
         }
 
-
-        struct SparseBoxFormData {
-            sp_matrix_t grads;
-            vectorx_t bounds_high;
-            vectorx_t bounds_low;
-        };
-
         /**
          * @brief Linearizes the constraints at the point x, into the form lb <= Ax <= ub, where A is sparse
          * @param x the point at which to linearize
          * @param data struct to hold return values
          */
         void SparseBoxForm(const vectorx_t& x,
-                           SparseBoxFormData& data) {
+                           SparseBoxConstraints& data) {
             CONSTRAINT_CHECK_EMPTY
-            BoxFormData dense_data;
+            BoxConstraints dense_data;
             this->BoxForm(x, dense_data);
             data.grads = dense_data.grads.sparseView();
             data.bounds_high = dense_data.bounds_high;
             data.bounds_low = dense_data.bounds_low;
         }
-
-        struct InequalityEqualityFormData {
-            matrixx_t ineq_grad;
-            matrixx_t eq_grad;
-            vectorx_t ineq_bounds;
-            vectorx_t eq_bounds;
-        };
 
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb
@@ -300,7 +304,7 @@ namespace torc::constraint {
          * @param data struct to hold return values
          */
         void InequalityEqualityForm(const vectorx_t& x,
-                                    InequalityEqualityFormData& data) {
+                                    InequalityEqualityConstraints& data) {
             CONSTRAINT_CHECK_EMPTY
             const std::vector<CONSTRAINT_T> c_types = this->constraint_types_;
             const size_t n_functions = c_types.size();
@@ -335,23 +339,15 @@ namespace torc::constraint {
             }
         }
 
-
-        struct SparseInequalityEqualityFormData {
-            sp_matrix_t ineq_grad;
-            sp_matrix_t eq_grad;
-            vectorx_t ineq_bounds;
-            vectorx_t eq_bounds;
-        };
-
         /**
          * @brief Linearizes the constraints at the point x, into the form Ax <= ub, Gx = eb, where A and G are sparse
          * @param x the point at which to linearizes
          * @param data struct to hold return values
          */
         void SparseInequalityEqualityForm(const vectorx_t& x,
-                                          SparseInequalityEqualityFormData& data) {
+                                          SparseInequalityEqualityConstraints& data) {
             CONSTRAINT_CHECK_EMPTY
-            InequalityEqualityFormData dense_data;
+            InequalityEqualityConstraints dense_data;
             this->InequalityEqualityForm(x, dense_data);
             data.ineq_grad = dense_data.ineq_grad.sparseView();
             data.eq_grad = dense_data.eq_grad.sparseView();

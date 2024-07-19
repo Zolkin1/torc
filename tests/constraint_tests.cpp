@@ -80,7 +80,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
     const Eigen::Vector3d vec = {1, 2, 3};      // vector to test
 
     SECTION("Raw Form") {
-        Constraint<double>::OriginalFormData data;
+       OriginalFormData data;
         constraint0.OriginalForm(vec, data);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
@@ -96,7 +96,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
     }
 
     SECTION("Compact Raw Form") {
-        Constraint<double>::CompactOriginalFormData data;
+        CompactOriginalFormData data;
         constraint0.CompactOriginalForm(vec, data);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
@@ -114,7 +114,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
     }
 
     SECTION("Unilateral Form") {
-        Constraint<double>::UnilateralFormData data;
+        UnilateralConstraints data;
         constraint0.UnilateralForm(vec, data);
         Eigen::MatrixXd A_true(5, 3);
         A_true << -1, -1, -1,
@@ -127,14 +127,14 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         bounds_true << 7, 13, -216, -5, 5;
         REQUIRE(data.bounds == bounds_true);
 
-        Constraint<double>::SparseUnilateralFormData sp_data;
+        SparseUnilateralConstraints sp_data;
         constraint0.SparseUnilateralForm(vec, sp_data);
         REQUIRE(A_true == sp_data.grads.toDense());
         REQUIRE(sp_data.bounds == bounds_true);
     }
 
     SECTION("Box Form") {
-        Constraint<double>::BoxFormData data;
+        BoxConstraints data;
         constraint0.BoxForm(vec, data);
         Eigen::MatrixXd A_true(4, 3);
         A_true << 1, 1, 1,
@@ -150,7 +150,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         REQUIRE(data.bounds_low == lbounds_true);
         REQUIRE(data.bounds_high == ubounds_true);
 
-        Constraint<double>::SparseBoxFormData sp_data;
+        SparseBoxConstraints sp_data;
         constraint0.SparseBoxForm(vec, sp_data);
         REQUIRE(A_true == sp_data.grads.toDense());
         REQUIRE(sp_data.bounds_low == lbounds_true);
@@ -158,7 +158,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
     }
 
     SECTION("Inequality Equality Form") {
-        Constraint<double>::InequalityEqualityFormData data;
+        InequalityEqualityConstraints data;
         constraint0.InequalityEqualityForm(vec, data);
         Eigen::MatrixXd A_true(3, 3);
         Eigen::MatrixXd G_true(1, 3);
@@ -174,7 +174,7 @@ TEST_CASE("Constraint Forms", "[constraint]") {
         REQUIRE(data.ineq_bounds == bounds0_true);
         REQUIRE(data.eq_bounds == bounds1_true);
 
-        Constraint<double>::SparseInequalityEqualityFormData sp_data;
+        SparseInequalityEqualityConstraints sp_data;
 
         constraint0.SparseInequalityEqualityForm(vec, sp_data);
         REQUIRE(A_true == sp_data.ineq_grad.toDense());

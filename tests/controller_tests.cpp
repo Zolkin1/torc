@@ -7,5 +7,9 @@
 
 TEST_CASE("Basic WBC Tests", "[contollers][wbc]") {
     using namespace torc::controllers;
-    WholeBodyQPController();
+    WholeBodyQPController controller("test_controller");
+
+    std::filesystem::path config_file = std::filesystem::current_path();
+    config_file += "/test_data/wbc_controller_config.yaml";
+    controller.UpdateConfigFile(config_file);
 }
