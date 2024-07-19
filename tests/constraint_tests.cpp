@@ -141,20 +141,20 @@ TEST_CASE("Constraint Forms", "[constraint]") {
                   2, 4, 6,
                   108, 108, 108,
                   6, 3, 2;
-        REQUIRE(data.grads == A_true);
+        REQUIRE(data.A == A_true);
         Eigen::VectorXd lbounds_true(4), ubounds_true(4);
         constexpr double max = std::numeric_limits<double>::max();
         constexpr double min = -max;
         lbounds_true << -7, -13, min, -5;
         ubounds_true << max, max, -216, -5;
-        REQUIRE(data.bounds_low == lbounds_true);
-        REQUIRE(data.bounds_high == ubounds_true);
+        REQUIRE(data.lb == lbounds_true);
+        REQUIRE(data.ub == ubounds_true);
 
         SparseBoxConstraints sp_data;
         constraint0.SparseBoxForm(vec, sp_data);
-        REQUIRE(A_true == sp_data.grads.toDense());
-        REQUIRE(sp_data.bounds_low == lbounds_true);
-        REQUIRE(sp_data.bounds_high == ubounds_true);
+        REQUIRE(A_true == sp_data.A.toDense());
+        REQUIRE(sp_data.lb == lbounds_true);
+        REQUIRE(sp_data.ub == ubounds_true);
     }
 
     SECTION("Inequality Equality Form") {

@@ -46,15 +46,15 @@ namespace torc::constraint {
     };
 
     struct BoxConstraints {
-        matrixx_t grads;
-        vectorx_t bounds_high;
-        vectorx_t bounds_low;
+        matrixx_t A;
+        vectorx_t ub;
+        vectorx_t lb;
     };
 
     struct SparseBoxConstraints {
-        sp_matrix_t grads;
-        vectorx_t bounds_high;
-        vectorx_t bounds_low;
+        sp_matrix_t A;
+        vectorx_t ub;
+        vectorx_t lb;
     };
 
     struct InequalityEqualityConstraints {
@@ -257,25 +257,25 @@ namespace torc::constraint {
             scalar_t max = std::numeric_limits<scalar_t>::max();
             scalar_t min = -max;
             size_t n_rows = this->functions_.size();
-            data.grads.resize(n_rows, x.size());
-            data.bounds_high.resize(n_rows);
-            data.bounds_low.resize(n_rows);
+            data.A.resize(n_rows, x.size());
+            data.ub.resize(n_rows);
+            data.lb.resize(n_rows);
             for (int i=0; i < n_rows; i++) {
                 fn::ExplicitFn<scalar_t> fn = this->functions_.at(i);
                 scalar_t bound = this->bounds_.at(i) - fn(x);
-                data.grads.row(i) = fn.Gradient(x).transpose();
+                data.A.row(i) = fn.Gradient(x).transpose();
                 switch (this->constraint_types_.at(i)) {
                     case Equals:
-                        data.bounds_high(i) = bound;
-                        data.bounds_low(i) = bound;
+                        data.ub(i) = bound;
+                        data.lb(i) = bound;
                         break;
                     case LessThan:
-                        data.bounds_high(i) = bound;
-                        data.bounds_low(i) = min;
+                        data.ub(i) = bound;
+                        data.lb(i) = min;
                         break;
                     case GreaterThan:
-                        data.bounds_high(i) = max;
-                        data.bounds_low(i) = bound;
+                        data.ub(i) = max;
+                        data.lb(i) = bound;
                         break;
                     default:
                         break;
@@ -293,9 +293,9 @@ namespace torc::constraint {
             CONSTRAINT_CHECK_EMPTY
             BoxConstraints dense_data;
             this->BoxForm(x, dense_data);
-            data.grads = dense_data.grads.sparseView();
-            data.bounds_high = dense_data.bounds_high;
-            data.bounds_low = dense_data.bounds_low;
+            data.A = dense_data.A.sparseView();
+            data.ub = dense_data.ub;
+            data.lb = dense_data.lb;
         }
 
         /**
