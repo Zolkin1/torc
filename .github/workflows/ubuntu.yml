@@ -62,7 +62,11 @@ jobs:
 
     - name: Clarabel Debug Info
       run: |
-        ls /home/runner/work/torc/torc/Clarabel.cpp/rust_wrapper/target/release
+        cd /home/runner/work/torc/torc/Clarabel.cpp
+        cd rust_wrapper
+        cd target
+        cd release
+        ls
         
 
     - name: Add Pinocchio
