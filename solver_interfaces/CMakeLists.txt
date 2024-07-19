@@ -52,9 +52,12 @@ target_include_directories(SolverInterfaces PUBLIC
         $<BUILD_INTERFACE:${SOLVERS_INC}>
         $<INSTALL_INTERFACE:solver_interfaces/include>)
 
+# -------- Eigen -------- #
 find_package(Eigen3 REQUIRED)
 target_link_libraries(SolverInterfaces PUBLIC Eigen3::Eigen)
 
+# -------- Constraints -------- #
+target_link_libraries(SolverInterfaces PUBLIC Constraints)
 
 # -------- Link the necessary files from the dependencies -------- #
 if(BUILD_WITH_IPOPT)

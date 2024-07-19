@@ -36,6 +36,11 @@ TEST_CASE("Basic OSQPInterface Test", "[optimization][osqp]") {
     vectorx_t ub(2);
     ub << 3.1, 13.3;
 
+    torc::constraints::SparseBoxConstraints constraints;
+    constraints.A = Asparse;
+    constraints.lb = lb;
+    constraints.ub = ub;
+
     matrixx_t P(3,3);
     P << 3.001, 0, 0, 0, 4, 0, 0, 0, 0.5;
     sp_matrixx_t Psparse = P.sparseView();
@@ -51,7 +56,7 @@ TEST_CASE("Basic OSQPInterface Test", "[optimization][osqp]") {
     SECTION("Default settings") {
         OSQPInterface qp;
 
-        qp.ResetData(Psparse, w, Asparse, lb, ub);
+        qp.ResetData(Psparse, w, constraints);
 
         SolverStatus status = qp.Solve(sol);
         REQUIRE(status == Solved);
@@ -63,7 +68,7 @@ TEST_CASE("Basic OSQPInterface Test", "[optimization][osqp]") {
     SECTION("Changing Settings") {
         OSQPInterface qp;
 
-        qp.ResetData(Psparse, w, Asparse, lb, ub);
+        qp.ResetData(Psparse, w, constraints);
 
         OSQPInterfaceSettings settings;
         settings.verbose = false;
@@ -81,7 +86,7 @@ TEST_CASE("Basic OSQPInterface Test", "[optimization][osqp]") {
         settings.max_iter = 1000;
         OSQPInterface qp(settings);
 
-        qp.ResetData(Psparse, w, Asparse, lb, ub);
+        qp.ResetData(Psparse, w, constraints);
 
         SolverStatus status = qp.Solve(sol);
         REQUIRE(status == Solved);
@@ -96,19 +101,19 @@ TEST_CASE("Basic OSQPInterface Test", "[optimization][osqp]") {
         settings.max_iter = 1000;
         OSQPInterface qp(settings);
 
-        qp.ResetData(Psparse, w, Asparse, lb, ub);
+        qp.ResetData(Psparse, w, constraints);
 
         A << 1, 4, 0, 1.3, 0, 0.3;
-        Asparse = A.sparseView();
+        constraints.A = A.sparseView();
 
-        lb << -2, -7;
+        constraints.lb << -2, -7;
 
         w << 0.1, 4.6, 4;
 
         P << 6, 0, 0, 0, 2, 0, 0, 0, 0.5;
         Psparse = P.sparseView();
 
-        qp.UpdateData(Psparse, w, Asparse, lb, ub);
+        qp.UpdateData(Psparse, w, constraints);
 
         true_sol << 0.1306, -0.5327, -8.0;
 

@@ -7,33 +7,33 @@
 #include "test_fn.h"
 #include "catch2/benchmark/catch_benchmark.hpp"
 
-TEST_CASE("Constraint Initialization and Check", "[constraint]") {
+TEST_CASE("Constraint Initialization and Check", "[constraints]") {
     using namespace torc;
-    auto constraint0 = constraint::Constraint<double>();
+    auto constraint0 = constraints::Constraint<double>();
     const auto func_d = test::functions<double>;
     const auto grad_d = test::gradients<double>;
     const auto hess_d = test::hessians<double>;
     for (int i=0; i<func_d.size(); i++) {
         constraint0.AddConstraint(
-            fn::ExplicitFn(func_d.at(i),
+                fn::ExplicitFn(func_d.at(i),
                            grad_d.at(i),
                            hess_d.at(i)),
-            0.5,
-            constraint::GreaterThan
+                0.5,
+                constraints::GreaterThan
         );
     }
     const Eigen::Vector3d vec0 = {1, 2, 3};
     REQUIRE_FALSE(constraint0.Check(vec0));
     REQUIRE_FALSE(constraint0.Check(Eigen::Vector3d::Zero()));
 
-    auto constraint1 = constraint::Constraint<double>();
+    auto constraint1 = constraints::Constraint<double>();
     constraint1.AddConstraint(
-        fn::ExplicitFn(func_d.front(),
+            fn::ExplicitFn(func_d.front(),
                         grad_d.front(),
                         hess_d.front()
             ),
             1,
-            constraint::Equals
+            constraints::Equals
     );
     REQUIRE_FALSE(constraint1.Check(vec0));
     const Eigen::Vector2d vec1 = {1, 0};
@@ -41,8 +41,8 @@ TEST_CASE("Constraint Initialization and Check", "[constraint]") {
 }
 
 
-TEST_CASE("Constraint Forms", "[constraint]") {
-    using namespace torc::constraint;
+TEST_CASE("Constraint Forms", "[constraints]") {
+    using namespace torc::constraints;
     using namespace torc::fn;
     auto constraint0 = Constraint<double>();
     const auto func_d = test::functions<double>;    // prepare to instantiate functions

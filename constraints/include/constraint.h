@@ -9,12 +9,12 @@
 
 #define CONSTRAINT_CHECK_EMPTY if (this->constraint_types_.empty()) { return; }
 
-namespace torc::constraint {
+namespace torc::constraints {
 
     enum CONSTRAINT_T {
-        Equals,         // equality constraint
-        LessThan,       // less than or equal to constraint
-        GreaterThan     // greater than or equal to constraint
+        Equals,         // equality constraints
+        LessThan,       // less than or equal to constraints
+        GreaterThan     // greater than or equal to constraints
     };
 
     using matrixx_t = Eigen::MatrixXd;
@@ -72,9 +72,9 @@ namespace torc::constraint {
     };
 
     /**
-     * @brief Represents a group of constraints, given in the form f(x) - constraint type - bound, and contains methods to
+     * @brief Represents a group of constraints, given in the form f(x) - constraints type - bound, and contains methods to
      * linearize the constraints in various forms.
-     * @tparam scalar_t the scalar type for the constraint
+     * @tparam scalar_t the scalar type for the constraints
      */
     template <class scalar_t>
     class Constraint {
@@ -90,12 +90,12 @@ namespace torc::constraint {
         }
 
         /**
-         * @brief Constructor for the constraint class.
-         * @param functions functions to be evaluated in the constraint
+         * @brief Constructor for the constraints class.
+         * @param functions functions to be evaluated in the constraints
          * @param bounds the corresponding bounds of the functions
          * @param constraint_types relations that the functions must hold to the bounds (i.e. GEQ, LEQ, EQ)
          * @param eps floating point comparison limit
-         * @param name string identifier of the constraint
+         * @param name string identifier of the constraints
          */
         explicit Constraint(const std::vector<fn::ExplicitFn<scalar_t>>& functions,
                             const std::vector<scalar_t>& bounds,
@@ -110,9 +110,9 @@ namespace torc::constraint {
         }
 
         /**
-         * @brief Checks whether the constraint is satisfied at a given point
-         * @param x the point to check the constraint
-         * @return whether the constraint is satisfied
+         * @brief Checks whether the constraints is satisfied at a given point
+         * @param x the point to check the constraints
+         * @return whether the constraints is satisfied
          */
         bool Check(const vectorx_t& x) {
             // iterate through all the constraints and check
@@ -131,8 +131,8 @@ namespace torc::constraint {
 
 
         /**
-         * @brief Adds a single constraint to the constraint collection.
-         * @param fn the function to be evaluated in the constraint
+         * @brief Adds a single constraints to the constraints collection.
+         * @param fn the function to be evaluated in the constraints
          * @param bound the bound of the function
          * @param constraint_type LEQ, GEQ, EQ
          */
@@ -147,7 +147,7 @@ namespace torc::constraint {
         /**
          * @brief Computes the linearzation of all the constraints, and returns them in the form Ax <=/=/>= b, in the
          * order that the user passed them in.
-         * @param x the point to linearize the constraint functions
+         * @param x the point to linearize the constraints functions
          * @param data struct to hold return values
          */
         void OriginalForm(const vectorx_t& x, OriginalFormData& data) {
@@ -168,8 +168,8 @@ namespace torc::constraint {
          * @brief Computes the linearization of all the constraints, and returns them in the form Ax <=/=/>= b, in the
          * order that the user passed them in. The constraints vector is slightly modified, where if a number of
          * neighboring types are identical, they are represented with one entry in the constraints vector and an entry
-         * in the annotations vector, which describes the number of repetitions of that constraint.
-         * @param x the point to linearize the constraint functions
+         * in the annotations vector, which describes the number of repetitions of that constraints.
+         * @param x the point to linearize the constraints functions
          * @param data struct to hold return values
          */
         void CompactOriginalForm(const vectorx_t& x, CompactOriginalFormData& data) {
@@ -357,9 +357,9 @@ namespace torc::constraint {
 
 
     private:
-        std::vector<fn::ExplicitFn<scalar_t>> functions_;   // the functions to evaluate in the constraint
-        std::vector<scalar_t> bounds_;                      // the bounds of the functions in the constraint
-        std::vector<CONSTRAINT_T> constraint_types_;        // the constraint types (i.e., LEQ, GEQ, EQ)
+        std::vector<fn::ExplicitFn<scalar_t>> functions_;   // the functions to evaluate in the constraints
+        std::vector<scalar_t> bounds_;                      // the bounds of the functions in the constraints
+        std::vector<CONSTRAINT_T> constraint_types_;        // the constraints types (i.e., LEQ, GEQ, EQ)
         scalar_t eps_;                                      // floating point comparison accuracy
         std::string name_;                                  // string identifier
 

@@ -76,7 +76,7 @@ namespace torc::models {
         const vectorx_t tau = InputsToTau(input);
 
         // Create contact data
-        // @Note that the RigidConstraint* classes are likely to change to just be generic constraint classes
+        // @Note that the RigidConstraint* classes are likely to change to just be generic constraints classes
         //  when the pinocchio 3 api is more stabilized. For now this is what we have.
         std::vector<pinocchio::RigidConstraintModel> contact_model;
         std::vector<pinocchio::RigidConstraintData> contact_data;

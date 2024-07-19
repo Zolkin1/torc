@@ -22,7 +22,7 @@ namespace torc::solvers {
         //  Whatever we pass needs to also hold derivative information
         void AddConstraints();
 
-        // TODO: see constraint notes
+        // TODO: see constraints notes
         void AddCosts();
 
         // ------------------------------------------------- //
