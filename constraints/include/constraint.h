@@ -49,6 +49,18 @@ namespace torc::constraints {
         matrixx_t A;
         vectorx_t ub;
         vectorx_t lb;
+
+        void Zero() {
+            A.setZero();
+            ub.setZero();
+            lb.setZero();
+        }
+
+        void SetSizes(long constraints, long decision_vars) {
+            A.resize(constraints, decision_vars);
+            ub.resize(constraints);
+            lb.resize(constraints);
+        }
     };
 
     struct SparseBoxConstraints {

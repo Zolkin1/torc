@@ -215,6 +215,32 @@ namespace torc::models {
         B.setZero();
     }
 
+    void FullOrderRigidBody::GetDynamicsTerms(const vectorx_t& state, matrixx_t& M, matrixx_t& C, vectorx_t& g) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
+
+        this->SecondOrderFK(q, v);
+
+        pinocchio::crba(pin_model_, *pin_data_, q);
+
+        // Get M and make it symmetric
+        M = pin_data_->M;
+        M.triangularView<Eigen::StrictlyLower>() =
+                M.transpose().triangularView<Eigen::StrictlyLower>();
+
+        // Get C
+        pinocchio::computeCoriolisMatrix(pin_model_, *pin_data_, q, v);
+        C = pin_data_->C;
+
+        // Get g
+        pinocchio::computeGeneralizedGravity(pin_model_, *pin_data_, q);
+        g = pin_data_->g;
+    }
+
+    pinocchio::Motion FullOrderRigidBody::GetFrameAcceleration(const std::string& frame) {
+        return pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_, this->GetFrameIdx(frame), pinocchio::LOCAL_WORLD_ALIGNED);
+    }
+
     void FullOrderRigidBody::CreateActuationMatrix(
         const std::vector<std::string> &underactuated_joints) {
       assert(pin_model_.idx_vs.at(1) == 0);

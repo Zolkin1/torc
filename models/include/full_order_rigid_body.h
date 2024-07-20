@@ -5,10 +5,11 @@
 #ifndef TORC_FULL_ORDER_RIGID_BODY_H
 #define TORC_FULL_ORDER_RIGID_BODY_H
 
+#include "pinocchio/algorithm/crba.hpp"
+#include "pinocchio/algorithm/rnea.hpp"
+
 #include "pinocchio_model.h"
 #include "robot_contact_info.h"
-
-#include <cppad/utility/vector.hpp>
 
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
@@ -64,6 +65,10 @@ namespace torc::models {
                                const RobotContactInfo& contact_info,
                                matrixx_t& A,
                                matrixx_t& B);
+
+        void GetDynamicsTerms(const vectorx_t& state, matrixx_t& M, matrixx_t& C, vectorx_t& g);
+
+        pinocchio::Motion GetFrameAcceleration(const std::string& frame);
 
         void ParseState(const vectorx_t& state,
                         vectorx_t& q,
