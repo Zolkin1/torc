@@ -31,6 +31,8 @@ namespace torc::controllers {
 
         void UpdateConfigFile(const fs::path& config_file_path);
 
+        void UpdateModelPath(const fs::path& model_path);
+
         /**
          * @brief Computes the control action given the current state and contacts.
          *

@@ -18,10 +18,10 @@ namespace torc::models {
     class FullOrderRigidBody : public PinocchioModel {
     public:
 
-        FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf);
+        FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path, bool urdf_model=true);
 
-        FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf,
-                           const std::vector<std::string>& underactuated_joints);
+        FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+                           const std::vector<std::string>& underactuated_joints, bool urdf_model=true);
 
         FullOrderRigidBody(const FullOrderRigidBody& other);
 

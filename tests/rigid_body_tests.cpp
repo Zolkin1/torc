@@ -328,7 +328,7 @@ void CheckImpulseDerivatives(torc::models::FullOrderRigidBody& model, const torc
 
             for (int j = 0; j < q_rand.size(); j++) {
                 double fd = (q_imp(j) - q_xdot_test(j)) / DELTA;
-                REQUIRE_THAT(q_imp(j) - q_xdot_test(j),
+                REQUIRE_THAT(fd,
                              Catch::Matchers::WithinAbs(0, FD_MARGIN));
             }
 
@@ -561,3 +561,35 @@ TEST_CASE("Hopper", "[model][pinocchio]") {
         CheckImpulseDerivatives(hopper_model, contact_info);
     }
 }
+
+//TEST_CASE("Achilles XML", "[model][pinocchio][xml]") {
+//    using namespace torc::models;
+//    const std::string pin_model_name = "test_pin_model";
+//
+//    std::filesystem::path achilles_mjcf = std::filesystem::current_path();
+//    achilles_mjcf += "/test_data/achilles.xml";
+//
+//    RobotContactInfo contact_info;
+//    contact_info.contacts.emplace("foot", Contact(PointContact, true));
+//
+//    FullOrderRigidBody achilles_model(pin_model_name, achilles_mjcf, false);
+//
+//    int constexpr INPUT_SIZE = 4;
+//    constexpr int CONFIG_SIZE = 11;
+//    constexpr int VEL_SIZE = 10;
+//    constexpr int STATE_SIZE = 21;
+//    constexpr int DERIV_SIZE = 27;
+//    constexpr int JOINT_SIZE = 28;
+//
+//    vectorx_t x = FullOrderRigidBody::BuildState(achilles_model.GetRandomConfig(), achilles_model.GetRandomVel());
+//    const vectorx_t input = vectorx_t::Zero(INPUT_SIZE);
+//    vectorx_t xdot = achilles_model.GetDynamics(x, input, contact_info);
+//
+//    REQUIRE(achilles_model.GetNumInputs() == INPUT_SIZE);
+//    REQUIRE(achilles_model.GetConfigDim() == CONFIG_SIZE);
+//    REQUIRE(achilles_model.GetVelDim() == VEL_SIZE);
+//    REQUIRE(achilles_model.GetStateDim() == STATE_SIZE);
+//    REQUIRE(achilles_model.GetDerivativeDim() == DERIV_SIZE);
+//    REQUIRE(achilles_model.GetNumJoints() == JOINT_SIZE);
+//    REQUIRE(achilles_model.GetSystemType() == HybridSystemImpulse);
+//}

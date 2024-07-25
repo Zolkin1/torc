@@ -5,7 +5,7 @@
 #ifndef SPARSE_MATRIX_BUILDER_H
 #define SPARSE_MATRIX_BUILDER_H
 
-#include <eigen3/Eigen/SparseCore>
+#include <Eigen/SparseCore>
 
 namespace torc::utils {
     class SparseMatrixBuilder {

@@ -13,8 +13,8 @@
 #include "full_order_rigid_body.h"
 
 namespace torc::models {
-    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf)
-        : PinocchioModel(name, urdf, HybridSystemImpulse) {
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path, bool urdf_model)
+        : PinocchioModel(name, model_path, HybridSystemImpulse, urdf_model) {
 
         // Assuming all joints (not "root_joint") are actuated
         std::vector<std::string> unactuated_joints;
@@ -25,9 +25,9 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
-    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf,
-                                           const std::vector<std::string>& underactuated_joints)
-        : PinocchioModel(name, urdf, HybridSystemImpulse) {
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+                                           const std::vector<std::string>& underactuated_joints, bool urdf_model)
+        : PinocchioModel(name, model_path, HybridSystemImpulse, urdf_model) {
 
         CreateActuationMatrix(underactuated_joints);
 
@@ -35,7 +35,7 @@ namespace torc::models {
     }
 
     FullOrderRigidBody::FullOrderRigidBody(const torc::models::FullOrderRigidBody& other)
-        : PinocchioModel(other.name_, other.urdf_, HybridSystemImpulse) {
+        : PinocchioModel(other.name_, other.model_path_, HybridSystemImpulse) {
         n_input_ = other.n_input_;
 
         act_mat_ = other.act_mat_;

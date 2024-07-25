@@ -36,6 +36,11 @@ namespace torc::controllers {
         ParseUpdateSettings();
     }
 
+    void WholeBodyQPController::UpdateModelPath(const fs::path& model_path) {
+        std::string model_name = name_ + "_model";
+        model_ = std::make_unique<models::FullOrderRigidBody>(model_name, model_path);
+    }
+
     void WholeBodyQPController::ParseUpdateSettings() {
         // Read in the file from the config file
         if (!fs::exists(config_file_path_)) {
@@ -98,6 +103,9 @@ namespace torc::controllers {
 
     vectorx_t WholeBodyQPController::ComputeControl(const vectorx_t& target_state, const vectorx_t& force_target,
                                                     const vectorx_t& state, const models::RobotContactInfo& contact) {
+        assert(target_state.size() == model_->GetStateDim());
+        assert(state.size() == model_->GetStateDim());
+
         model_->ParseState(target_state, q_target_, v_target_);
         force_target_ = force_target;
 
@@ -132,38 +140,39 @@ namespace torc::controllers {
         AddHolonomicConstraints(q, v, contact);
 
         // Torque constraints
-        AddTorqueConstraints(q, v, contact);
+//        AddTorqueConstraints(q, v, contact); // TODO: Fix eigen error here!
 
         // Friction cone constraints
-        AddFrictionConeConstraints(contact);
+//        AddFrictionConeConstraints(contact);
 
         // Positive GRF constraints
-        AddPositiveGRFConstraints(contact);
+//        AddPositiveGRFConstraints(contact);
 
-        std::cout << "A: " << constraints_.A << std::endl;
+//        std::cout << "A: " << constraints_.A << std::endl;
         std::cout << "ub: " << constraints_.ub << std::endl;
-        std::cout << "lb: " << constraints_.lb << std::endl;
+//        std::cout << "lb: " << constraints_.lb << std::endl;
 
-        // --------- Costs --------- //
-        P_.resize(num_decision_vars, num_decision_vars);
-        P_.setZero();
-        w_.resize(num_decision_vars);
-        w_.setZero();
-
-        // Leg tracking costs
-        AddLegTrackingCost(q, v);
-
-        // Torso tracking costs
-        AddTorsoTrackingCost(q, v);
-
-        // Force tracking costs
-        AddForceTrackingCost(q, v);
-
-        std::cout << "P: " << P_ << std::endl;
-        std::cout << "w: " << w_ << std::endl;
+//        // --------- Costs --------- //
+//        P_.resize(num_decision_vars, num_decision_vars);
+//        P_.setZero();
+//        w_.resize(num_decision_vars);
+//        w_.setZero();
+//
+//        // Leg tracking costs
+////        AddLegTrackingCost(q, v);
+////
+////        // Torso tracking costs
+////        AddTorsoTrackingCost(q, v);
+////
+////        // Force tracking costs
+////        AddForceTrackingCost(q, v);
+//
+//        std::cout << "P: " << P_ << std::endl;
+//        std::cout << "w: " << w_ << std::endl;
 
         // --------- Update QP & Solve --------- //
 
+        // TODO: Solve the QP
         return vectorx_t::Zero(1);
     }
 

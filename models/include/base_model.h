@@ -1,7 +1,7 @@
 #ifndef TORC_BASE_MODEL_H
 #define TORC_BASE_MODEL_H
 
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Dense>
 #include <initializer_list>
 
 namespace torc::models {

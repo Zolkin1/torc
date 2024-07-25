@@ -19,3 +19,4 @@ target_include_directories(Utils PUBLIC
 
 #----------- Eigen ----------- #
 find_package(Eigen3 REQUIRED)
+target_link_libraries(Utils Eigen3::Eigen)
