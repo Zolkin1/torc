@@ -25,8 +25,9 @@ namespace torc::models {
          * @param urdf path to the urdf
          */
         PinocchioModel(const std::string& name,
-                       const std::filesystem::path& urdf,
-                       const SystemType& system_type);
+                       const std::filesystem::path& model_path,
+                       const SystemType& system_type,
+                       bool urdf_model = true);
 
         PinocchioModel(const PinocchioModel& other);
 
@@ -52,7 +53,7 @@ namespace torc::models {
 
         [[nodiscard]] std::string GetFrameType(int j) const;
 
-        [[nodiscard]] unsigned long GetFrameIdx(const std::string& frame) const;
+        [[nodiscard]] long GetFrameIdx(const std::string& frame) const;
 
         [[nodiscard]] vectorx_t GetNeutralConfig() const;
 
@@ -97,7 +98,7 @@ namespace torc::models {
                                    std::vector<pinocchio::RigidConstraintModel>& contact_models,
                                    std::vector<pinocchio::RigidConstraintData>& contact_datas) const;
 
-        std::filesystem::path urdf_;
+        std::filesystem::path model_path_;
 
         pinocchio::Model pin_model_;
         std::unique_ptr<pinocchio::Data> pin_data_;
@@ -109,7 +110,7 @@ namespace torc::models {
         static const std::string ROOT_JOINT;
 
     private:
-        void CreatePinModel();
+        void CreatePinModel(bool urdf_model);
     };
 } // torc::models
 

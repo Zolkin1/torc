@@ -13,8 +13,8 @@
 #include "full_order_rigid_body.h"
 
 namespace torc::models {
-    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf)
-        : PinocchioModel(name, urdf, HybridSystemImpulse) {
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path, bool urdf_model)
+        : PinocchioModel(name, model_path, HybridSystemImpulse, urdf_model) {
 
         // Assuming all joints (not "root_joint") are actuated
         std::vector<std::string> unactuated_joints;
@@ -25,9 +25,9 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
-    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& urdf,
-                                           const std::vector<std::string>& underactuated_joints)
-        : PinocchioModel(name, urdf, HybridSystemImpulse) {
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+                                           const std::vector<std::string>& underactuated_joints, bool urdf_model)
+        : PinocchioModel(name, model_path, HybridSystemImpulse, urdf_model) {
 
         CreateActuationMatrix(underactuated_joints);
 
@@ -35,7 +35,7 @@ namespace torc::models {
     }
 
     FullOrderRigidBody::FullOrderRigidBody(const torc::models::FullOrderRigidBody& other)
-        : PinocchioModel(other.name_, other.urdf_, HybridSystemImpulse) {
+        : PinocchioModel(other.name_, other.model_path_, HybridSystemImpulse) {
         n_input_ = other.n_input_;
 
         act_mat_ = other.act_mat_;
@@ -76,7 +76,7 @@ namespace torc::models {
         const vectorx_t tau = InputsToTau(input);
 
         // Create contact data
-        // @Note that the RigidConstraint* classes are likely to change to just be generic constraint classes
+        // @Note that the RigidConstraint* classes are likely to change to just be generic constraints classes
         //  when the pinocchio 3 api is more stabilized. For now this is what we have.
         std::vector<pinocchio::RigidConstraintModel> contact_model;
         std::vector<pinocchio::RigidConstraintData> contact_data;
@@ -213,6 +213,32 @@ namespace torc::models {
                 contact_data_->ddq_dq, contact_data_->ddq_dv + matrixx_t::Identity(pin_model_.nv, pin_model_.nv);
 
         B.setZero();
+    }
+
+    void FullOrderRigidBody::GetDynamicsTerms(const vectorx_t& state, matrixx_t& M, matrixx_t& C, vectorx_t& g) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
+
+        this->SecondOrderFK(q, v);
+
+        pinocchio::crba(pin_model_, *pin_data_, q);
+
+        // Get M and make it symmetric
+        M = pin_data_->M;
+        M.triangularView<Eigen::StrictlyLower>() =
+                M.transpose().triangularView<Eigen::StrictlyLower>();
+
+        // Get C
+        pinocchio::computeCoriolisMatrix(pin_model_, *pin_data_, q, v);
+        C = pin_data_->C;
+
+        // Get g
+        pinocchio::computeGeneralizedGravity(pin_model_, *pin_data_, q);
+        g = pin_data_->g;
+    }
+
+    pinocchio::Motion FullOrderRigidBody::GetFrameAcceleration(const std::string& frame) {
+        return pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_, this->GetFrameIdx(frame), pinocchio::LOCAL_WORLD_ALIGNED);
     }
 
     void FullOrderRigidBody::CreateActuationMatrix(

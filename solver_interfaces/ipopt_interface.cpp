@@ -18,7 +18,7 @@ namespace torc::solvers {
         // The problem described in HS071_NLP.hpp has 4 variables, x[0] through x[3]
         n = 4;
 
-        // one equality constraint and one inequality constraint
+        // one equality constraints and one inequality constraints
         m = 2;
 
         // in this example the jacobian is dense and contains 8 nonzeros
@@ -53,15 +53,15 @@ namespace torc::solvers {
             x_u[i] = 5.0;
         }
 
-        // the first constraint g1 has a lower bound of 25
+        // the first constraints g1 has a lower bound of 25
         g_l[0] = 25;
-        // the first constraint g1 has NO upper bound, here we set it to 2e19.
+        // the first constraints g1 has NO upper bound, here we set it to 2e19.
         // Ipopt interprets any number greater than nlp_upper_bound_inf as
         // infinity. The default value of nlp_upper_bound_inf and nlp_lower_bound_inf
         // is 1e19 and can be changed through ipopt options.
         g_u[0] = 2e19;
 
-        // the second constraint g2 is an equality constraint, so we set the
+        // the second constraints g2 is an equality constraints, so we set the
         // upper and lower bound to the same value
         g_l[1] = g_u[1] = 40.0;
 
@@ -207,7 +207,7 @@ namespace torc::solvers {
             values[8] = obj_factor * (x[0]);                   // 3,2
             values[9] = 0.;                                    // 3,3
 
-            // add the portion for the first constraint
+            // add the portion for the first constraints
             values[1] += lambda[0] * (x[2] * x[3]); // 1,0
 
             values[3] += lambda[0] * (x[1] * x[3]); // 2,0
@@ -217,7 +217,7 @@ namespace torc::solvers {
             values[7] += lambda[0] * (x[0] * x[2]); // 3,1
             values[8] += lambda[0] * (x[0] * x[1]); // 3,2
 
-            // add the portion for the second constraint
+            // add the portion for the second constraints
             values[0] += lambda[1] * 2; // 0,0
 
             values[2] += lambda[1] * 2; // 1,1

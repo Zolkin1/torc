@@ -1,5 +1,7 @@
 
 #include "pinocchio/parsers/urdf.hpp"
+#include "pinocchio/parsers/mjcf.hpp"
+
 #include "pinocchio/algorithm/center-of-mass.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 #include "pinocchio/algorithm/model.hpp"
@@ -12,39 +14,47 @@ namespace torc::models {
     const std::string PinocchioModel::ROOT_JOINT = "root_joint";
 
     PinocchioModel::PinocchioModel(const std::string& name,
-                                   const std::filesystem::path& urdf, const SystemType& system_type)
-        : BaseModel(name, system_type), urdf_(urdf), n_input_(-1) {
+                                   const std::filesystem::path& model_path, const SystemType& system_type, bool urdf_model)
+        : BaseModel(name, system_type), model_path_(model_path), n_input_(-1) {
 
         // Create the pinocchio model
-        CreatePinModel();
+        CreatePinModel(urdf_model);
 
         mass_ = pinocchio::computeTotalMass(pin_model_);
     }
 
     PinocchioModel::PinocchioModel(const torc::models::PinocchioModel& other)
         : BaseModel(other.name_, other.system_type_) {
-        urdf_ = other.urdf_;
+        model_path_ = other.model_path_;
         pin_model_ = other.pin_model_;
         pin_data_ = std::make_unique<pinocchio::Data>(*other.pin_data_); // TODO: Check that this works as expected
         mass_ = other.mass_;
         n_input_ = other.n_input_;
     }
 
-    void PinocchioModel::CreatePinModel() {
+    void PinocchioModel::CreatePinModel(bool urdf_model) {
         // Verify that the given file exists
-        if (!std::filesystem::exists(urdf_)) {
-            throw std::runtime_error("Provided urdf file does not exist.");
+        if (!std::filesystem::exists(model_path_)) {
+            throw std::runtime_error("Provided model file does not exist.");
         }
 
-        // TODO: Provide support for mujoco format too
-        // Verify that we are given a .urdf
-        if (urdf_.extension() != ".urdf") {
-            throw std::runtime_error("Provided urdf does not end in a .urdf");
-        }
-
-        // Create the pinocchio model from the urdf
+        // Create the pinocchio model from the file
         pin_model_ = pinocchio::Model();
-        pinocchio::urdf::buildModel(urdf_, pinocchio::JointModelFreeFlyer(), pin_model_);
+
+        if (urdf_model) {
+            // Verify that we are given a .urdf
+            if (model_path_.extension() != ".urdf") {
+                throw std::runtime_error("Provided urdf does not end in a .urdf");
+            }
+            pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+        } else {
+            // Verify that we are given a .xml
+            if (model_path_.extension() != ".xml") {
+                throw std::runtime_error("Provided urdf does not end in a .xml");
+            }
+            throw std::runtime_error("MJCF files not fully supported yet.");
+            pinocchio::mjcf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+        }
 
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
@@ -113,7 +123,7 @@ namespace torc::models {
         throw std::runtime_error("Invalid return type from pinocchio.");
     }
 
-    unsigned long PinocchioModel::GetFrameIdx(const std::string& frame) const {
+    long PinocchioModel::GetFrameIdx(const std::string& frame) const {
         unsigned long idx = pin_model_.getFrameId(frame);
         if (idx == pin_model_.frames.size()) {
             return -1;
@@ -193,7 +203,7 @@ namespace torc::models {
     }
 
     FrameState PinocchioModel::GetFrameState(const std::string& frame) const {
-        const unsigned long idx = GetFrameIdx(frame);
+        const long idx = GetFrameIdx(frame);
         if (idx != -1) {
             FrameState state(pin_data_->oMf.at(idx),
                              pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx));
@@ -209,7 +219,7 @@ namespace torc::models {
      }
 
     void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const {
-        const unsigned long idx = GetFrameIdx(frame);
+        const long idx = GetFrameIdx(frame);
         if (idx == -1) {
             throw std::runtime_error("Provided frame does not exist.");
         }

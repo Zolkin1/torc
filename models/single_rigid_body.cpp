@@ -153,7 +153,7 @@ namespace torc::models {
                                                       bool force_and_pos) const {
         assert(input.size() % 6 == 0);
         const long pos_start = input.size()/2;
-        const long num_pairs = input.size()/6;
+//        const long num_pairs = input.size()/6;
 
         long input_vars = input.size();
         if (!force_and_pos) {

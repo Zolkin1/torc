@@ -8,6 +8,7 @@
 #include "OsqpEigen/OsqpEigen.h"
 
 #include "solver_status.h"
+#include "constraint.h"
 
 namespace torc::solvers {
     using vectorx_t = Eigen::VectorXd;
@@ -33,15 +34,13 @@ namespace torc::solvers {
     public:
         OSQPInterface();
 
-        OSQPInterface(const OSQPInterfaceSettings& settings);
+        explicit OSQPInterface(const OSQPInterfaceSettings& settings);
 
-        // TODO: Change this to take in a generic upper bound/lower bound QP data struct
         // TODO: Figure out how to make the vectors const (issues with OSQPEigen I think)
-        SolverStatus ResetData(const sp_matrixx_t& P, vectorx_t& w,
-                               const sp_matrixx_t& A, vectorx_t& lb, vectorx_t& ub);
+        SolverStatus ResetData(const sp_matrixx_t& P, vectorx_t& w, constraints::SparseBoxConstraints& constraints);
 
         SolverStatus UpdateData(const sp_matrixx_t& P, const vectorx_t& w,
-                        const sp_matrixx_t& A, const vectorx_t& lb, const vectorx_t& ub);
+                                const constraints::SparseBoxConstraints& constraints);
 
         void UpdateSettings(const OSQPInterfaceSettings& settings);
 

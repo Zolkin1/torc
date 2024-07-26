@@ -28,18 +28,17 @@ namespace torc::solvers {
     }
 
     SolverStatus OSQPInterface::ResetData(const torc::solvers::sp_matrixx_t& P, vectorx_t& w,
-                                          const torc::solvers::sp_matrixx_t& A, torc::solvers::vectorx_t& lb,
-                                          torc::solvers::vectorx_t& ub) {
+                                          constraints::SparseBoxConstraints& constraints) {
         qp_solver_.data()->clearLinearConstraintsMatrix();
         qp_solver_.data()->clearHessianMatrix();
         qp_solver_.clearSolver();
 
         qp_solver_.data()->setNumberOfVariables(w.size());
-        qp_solver_.data()->setNumberOfConstraints(A.rows());
+        qp_solver_.data()->setNumberOfConstraints(constraints.A.rows());
 
         // Set constraints
-        if (!(qp_solver_.data()->setLinearConstraintsMatrix(A) &&
-              qp_solver_.data()->setBounds(lb, ub))) {
+        if (!(qp_solver_.data()->setLinearConstraintsMatrix(constraints.A) &&
+              qp_solver_.data()->setBounds(constraints.lb, constraints.ub))) {
             return InvalidData;
         }
 
@@ -58,11 +57,10 @@ namespace torc::solvers {
 
     // Note: this one will only work if sparsity pattern did not change.
     SolverStatus OSQPInterface::UpdateData(const torc::solvers::sp_matrixx_t& P, const torc::solvers::vectorx_t& w,
-                                           const torc::solvers::sp_matrixx_t& A, const torc::solvers::vectorx_t& lb,
-                                           const torc::solvers::vectorx_t& ub) {
+                                           const constraints::SparseBoxConstraints& constraints) {
         // Constraints
-        if (!(qp_solver_.updateLinearConstraintsMatrix(A) &&
-              qp_solver_.updateBounds(lb, ub))) {
+        if (!(qp_solver_.updateLinearConstraintsMatrix(constraints.A) &&
+              qp_solver_.updateBounds(constraints.lb, constraints.ub))) {
             return InvalidData;
         }
 
