@@ -1,11 +1,17 @@
 #ifndef TORC_BASE_MODEL_H
 #define TORC_BASE_MODEL_H
 
-#include <eigen3/Eigen/Dense>
-#include <utility>
-#include "robot_state_types.h"
+#include <Eigen/Dense>
+#include <initializer_list>
 
 namespace torc::models {
+
+    // typedefs
+    using vectorx_t = Eigen::VectorXd;
+    using matrixx_t = Eigen::MatrixXd;
+    using vector3_t = Eigen::Vector3d;
+    using quat_t = Eigen::Quaterniond;
+
     enum SystemType {
         HybridSystemNoImpulse,
         HybridSystemImpulse,
@@ -13,29 +19,32 @@ namespace torc::models {
     };
 
     class BaseModel {
+
     public:
-        using vectorx_t = Eigen::VectorXd;
-        using matrixx_t = Eigen::MatrixXd;
+      explicit BaseModel(const std::string& name,
+                         const SystemType &system_type);
 
-        BaseModel(std::string name);
+      BaseModel(const BaseModel &other);
 
-        BaseModel(const BaseModel& other);
+      virtual vectorx_t GetDynamics(const vectorx_t &state,
+                                    const vectorx_t &input) = 0;
 
-        std::string GetName() const;
+      virtual void DynamicsDerivative(const vectorx_t &state,
+                                      const vectorx_t &input, matrixx_t &A,
+                                      matrixx_t &b) = 0;
 
-        virtual RobotStateDerivative GetDynamics(const RobotState& state, const vectorx_t& input) = 0;
+      [[nodiscard]] SystemType GetSystemType() const;
 
-        virtual void DynamicsDerivative(const RobotState& state, const vectorx_t& input,
-                                        matrixx_t& A, matrixx_t& b) = 0;
+      [[nodiscard]] std::string GetName() const;
 
-        SystemType GetSystemType() const;
     protected:
-        std::string name_;
+      // static void HandleParseState(const vectorx_t &state,
+                                   // std::initializer_list<vectorx_t> args);
 
-        SystemType system_type_;
-
-    private:
+      std::string name_;
+      SystemType system_type_;
     };
+
 } // torc::models
 
 #endif //TORC_BASE_MODEL_H

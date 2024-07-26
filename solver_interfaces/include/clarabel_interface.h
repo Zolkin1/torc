@@ -28,7 +28,7 @@ namespace torc::solvers {
         bool operator!=(const ClarabelInterfaceSettings& other) const;
     };
 
-    // TODO: Remove when we have this defined with the constraint manager
+    // TODO: Remove when we have this defined with the constraints manager
     enum Constraints {
         Equality,
         UpperBound,

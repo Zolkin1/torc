@@ -1,55 +1,66 @@
 
 #include "pinocchio/parsers/urdf.hpp"
+#include "pinocchio/parsers/mjcf.hpp"
+
 #include "pinocchio/algorithm/center-of-mass.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 #include "pinocchio/algorithm/model.hpp"
 
 #include "pinocchio_model.h"
 
+#include <utility>
+
 namespace torc::models {
     const std::string PinocchioModel::ROOT_JOINT = "root_joint";
 
-    PinocchioModel::PinocchioModel(const std::string& name, const std::filesystem::path& urdf)
-        : BaseModel(name), urdf_(urdf), num_inputs_(-1) {
+    PinocchioModel::PinocchioModel(const std::string& name,
+                                   const std::filesystem::path& model_path, const SystemType& system_type, bool urdf_model)
+        : BaseModel(name, system_type), model_path_(model_path), n_input_(-1) {
 
         // Create the pinocchio model
-        CreatePinModel();
+        CreatePinModel(urdf_model);
 
         mass_ = pinocchio::computeTotalMass(pin_model_);
     }
 
     PinocchioModel::PinocchioModel(const torc::models::PinocchioModel& other)
-        : BaseModel(other.name_) {
-        this->system_type_ = other.system_type_;
-
-        urdf_ = other.urdf_;
+        : BaseModel(other.name_, other.system_type_) {
+        model_path_ = other.model_path_;
         pin_model_ = other.pin_model_;
         pin_data_ = std::make_unique<pinocchio::Data>(*other.pin_data_); // TODO: Check that this works as expected
         mass_ = other.mass_;
-        num_inputs_ = other.num_inputs_;
+        n_input_ = other.n_input_;
     }
 
-    void PinocchioModel::CreatePinModel() {
+    void PinocchioModel::CreatePinModel(bool urdf_model) {
         // Verify that the given file exists
-        if (!std::filesystem::exists(urdf_)) {
-            throw std::runtime_error("Provided urdf file does not exist.");
+        if (!std::filesystem::exists(model_path_)) {
+            throw std::runtime_error("Provided model file does not exist.");
         }
 
-        // TODO: Provide support for mujoco format too
-        // Verify that we are given a .urdf
-        if (urdf_.extension() != ".urdf") {
-            throw std::runtime_error("Provided urdf does not end in a .urdf");
-        }
-
-        // Create the pinocchio model from the urdf
+        // Create the pinocchio model from the file
         pin_model_ = pinocchio::Model();
-        pinocchio::urdf::buildModel(urdf_, pinocchio::JointModelFreeFlyer(), pin_model_);
+
+        if (urdf_model) {
+            // Verify that we are given a .urdf
+            if (model_path_.extension() != ".urdf") {
+                throw std::runtime_error("Provided urdf does not end in a .urdf");
+            }
+            pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+        } else {
+            // Verify that we are given a .xml
+            if (model_path_.extension() != ".xml") {
+                throw std::runtime_error("Provided urdf does not end in a .xml");
+            }
+            throw std::runtime_error("MJCF files not fully supported yet.");
+            pinocchio::mjcf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+        }
 
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
     long PinocchioModel::GetNumInputs() const {
-        return num_inputs_;
+        return n_input_;
     }
 
     int PinocchioModel::GetConfigDim() const {
@@ -58,14 +69,6 @@ namespace torc::models {
 
     int PinocchioModel::GetVelDim() const {
         return pin_model_.nv;
-    }
-
-    int PinocchioModel::GetStateDim() const {
-        return GetConfigDim() + GetVelDim();
-    }
-
-    int PinocchioModel::GetDerivativeDim() const {
-        return 2*GetVelDim();
     }
 
     double PinocchioModel::GetMass() const {
@@ -84,8 +87,8 @@ namespace torc::models {
         return pin_model_.frames.at(j).name;
     }
 
-    void PinocchioModel::GetNeutralConfig(vectorx_t& q) const {
-        q = pinocchio::neutral(pin_model_);
+    vectorx_t PinocchioModel::GetNeutralConfig() const {
+        return pinocchio::neutral(pin_model_);
     }
 
     vectorx_t PinocchioModel::GetRandomConfig() const {
@@ -93,31 +96,17 @@ namespace torc::models {
         const vectorx_t ub = vectorx_t::Constant(GetConfigDim(), 10);
         const vectorx_t lb = vectorx_t::Constant(GetConfigDim(), -10);
 
-        vectorx_t q;
-        q.resize(GetConfigDim());
-
+        vectorx_t q(GetConfigDim());
         pinocchio::randomConfiguration(pin_model_, lb, ub, q);
 
         return q;
     }
 
     vectorx_t PinocchioModel::GetRandomVel() const {
-        vectorx_t v;
-        v.setRandom(GetVelDim());
-        v = v*5;
-
-        return v;
+        return vectorx_t::Random(GetVelDim());
     }
 
-    RobotState PinocchioModel::GetRandomState() const {
-        RobotState x(GetConfigDim(), GetVelDim());
-        x.q = GetRandomConfig();
-        x.v = GetRandomVel();
-
-        return x;
-    }
-
-    std::string PinocchioModel::GetFrameType(int j) const {
+    std::string PinocchioModel::GetFrameType(const int j) const {
         switch (pin_model_.frames.at(j).type) {
             case pinocchio::OP_FRAME:
                 return "operational_frame";
@@ -134,7 +123,7 @@ namespace torc::models {
         throw std::runtime_error("Invalid return type from pinocchio.");
     }
 
-    unsigned long PinocchioModel::GetFrameIdx(const std::string& frame) const {
+    long PinocchioModel::GetFrameIdx(const std::string& frame) const {
         unsigned long idx = pin_model_.getFrameId(frame);
         if (idx == pin_model_.frames.size()) {
             return -1;
@@ -195,20 +184,26 @@ namespace torc::models {
         }
     }
 
-    void PinocchioModel::ForwardKinematics(const vectorx_t& q) {
-        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+     void PinocchioModel::FirstOrderFK(const vectorx_t& q) {
+         assert(q.size() == this->GetConfigDim());
+         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+     }
+
+    void PinocchioModel::SecondOrderFK(const vectorx_t& q, const vectorx_t& v) {
+        assert(q.size() == this->GetConfigDim());
+        assert(v.size() == this->GetVelDim());
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v);
     }
 
-    void PinocchioModel::ForwardKinematics(const RobotState& state) {
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, state.q, state.v);
+     void PinocchioModel::ThirdOrderFK(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a) {
+         assert(q.size() == this->GetConfigDim());
+         assert(v.size() == this->GetVelDim());
+         assert(a.size() == this->GetVelDim());
+         pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
     }
 
-    void PinocchioModel::ForwardKinematics(const RobotState& state, const RobotStateDerivative& deriv) {
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, state.q, state.v, deriv.a);
-    }
-
-    FrameState PinocchioModel::GetFrameState(const std::string& frame) {
-        const unsigned long idx = GetFrameIdx(frame);
+    FrameState PinocchioModel::GetFrameState(const std::string& frame) const {
+        const long idx = GetFrameIdx(frame);
         if (idx != -1) {
             FrameState state(pin_data_->oMf.at(idx),
                              pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx));
@@ -218,13 +213,13 @@ namespace torc::models {
         }
     }
 
-    FrameState PinocchioModel::GetFrameState(const std::string& frame, const torc::models::RobotState& state) {
-        ForwardKinematics(state);
-        return GetFrameState(frame);
-    }
+     FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v) {
+         SecondOrderFK(q, v);
+         return GetFrameState(frame);
+     }
 
-    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) {
-        const unsigned long idx = GetFrameIdx(frame);
+    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const {
+        const long idx = GetFrameIdx(frame);
         if (idx == -1) {
             throw std::runtime_error("Provided frame does not exist.");
         }

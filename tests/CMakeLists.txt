@@ -1,5 +1,7 @@
 message(STATUS "Building tests")
 
+enable_testing()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -11,14 +13,18 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 include(Catch)
 
-# ---------- Cost Tests ---------- #
-add_executable(cost_tests
+# ---------- Function Tests ------- #
+add_executable(function_tests
                 function_tests.cpp
                 test_fn.h)
-target_link_libraries(cost_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(cost_tests PUBLIC Functions)
+target_link_libraries(function_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(function_tests PUBLIC Functions)
 
-catch_discover_tests(cost_tests)
+# ---------- Constraint Tests ---------- #
+add_executable(constraint_tests constraint_tests.cpp)
+target_link_libraries(constraint_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(constraint_tests PUBLIC Constraints)
+
 # ---------- Model Tests ---------- #
 if (BUILD_WITH_PINOCCHIO)
     add_executable(rigid_body_tests rigid_body_tests.cpp)
@@ -62,6 +68,11 @@ if (BUILD_WITH_CLARABEL)
     catch_discover_tests(clarabel_tests)
 endif ()
 
+# --------- Clarabel Tests --------- #
+add_executable(controller_tests controller_tests.cpp)
+target_link_libraries(controller_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(controller_tests PUBLIC Controllers)
+
 # --------- MPC Tests --------- #
 add_executable(mpc_tests mpc_tests.cpp)
 target_link_libraries(mpc_tests PRIVATE Catch2::Catch2WithMain)
@@ -71,3 +82,6 @@ catch_discover_tests(mpc_tests)
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
+
+include(Catch)
+catch_discover_tests(function_tests)

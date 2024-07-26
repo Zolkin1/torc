@@ -76,7 +76,7 @@ namespace torc::solvers {
                     // Only accept constraints in upper bound form
                     return InitializationFailed;
                 default:
-                    throw std::runtime_error("Invalid constraint type.");
+                    throw std::runtime_error("Invalid constraints type.");
             }
         }
 

@@ -5,7 +5,7 @@
 
 namespace torc::fn {
     /**
-     * Class implementation of a linear fn function, f(x) = q^T x
+     * @brief Class implementation of a linear fn function, f(x) = q^T x
      * @tparam scalar_t the type of scalar used for the fn
      */
     template <class scalar_t>
@@ -15,7 +15,7 @@ namespace torc::fn {
 
     public:
         /**
-         * Overloaded constructor for the LinearFn class.
+         * @brief Overloaded constructor for the LinearFn class.
          * @param coefficients the linear coefficients
          * @param identifier string identifier
          */
