@@ -14,6 +14,17 @@
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
+    using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
+
+    struct ExternalForce {
+        std::string frame_name;
+        vector3_t force_linear;
+
+        ExternalForce(const std::string& frame, const vector3_t& force) {
+            frame_name = frame;
+            force_linear = force;
+        }
+    };
 
     class FullOrderRigidBody : public PinocchioModel {
     public:
@@ -41,6 +52,10 @@ namespace torc::models {
                                             const vectorx_t& input,
                                             const RobotContactInfo& contact_info) const;
 
+        [[nodiscard]] vectorx_t InverseDynamics(const vectorx_t& state, const vectorx_t& a,
+                                                const std::vector<ExternalForce>& f_ext);
+//                                                const pinocchio::container::aligned_vector<pinocchio::Force>& forces);
+
         vectorx_t GetImpulseDynamics(const vectorx_t& state,
                                      const vectorx_t& input,
                                      const RobotContactInfo& contact_info);
@@ -59,6 +74,13 @@ namespace torc::models {
                                 matrixx_t& A,
                                 matrixx_t& B);
 
+        void InverseDynamicsDerivative(const vectorx_t& state,
+                                       const vectorx_t& a,
+//                                       const pinocchio::container::aligned_vector<pinocchio::Force>& forces,
+                                       const std::vector<ExternalForce>& f_ext,
+                                       matrixx_t& dtau_dq,
+                                       matrixx_t& dtau_dv,
+                                       matrixx_t& dtau_da);
 
         void ImpulseDerivative(const vectorx_t& state,
                                const vectorx_t& input,
@@ -91,6 +113,13 @@ namespace torc::models {
          * @return full input vector
          */
         [[nodiscard]] vectorx_t InputsToTau(const vectorx_t& input) const override;
+
+//        [[nodiscard]] vectorx_t TauToInputs(const vectorx_t& tau) const;
+
+        [[nodiscard]] pinocchio::container::aligned_vector<pinocchio::Force> ConvertExternalForcesToPin(const vectorx_t& q,
+                                                                                                        const std::vector<ExternalForce>& f_ext) const;
+
+        matrixx_t ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce>& f_ext);
 
         constexpr static size_t STATE_Q_IDX = 0;
         constexpr static size_t STATE_V_IDX = 1;

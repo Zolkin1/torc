@@ -91,6 +91,21 @@ namespace torc::models {
         return BuildStateDerivative(v, contact_data_->ddq);
     }
 
+    vectorx_t FullOrderRigidBody::InverseDynamics(const torc::models::vectorx_t& state, const vectorx_t& a,
+                                                  const std::vector<ExternalForce>& f_ext) {
+//                                                  const pinocchio::container::aligned_vector<pinocchio::Force>& forces) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
+
+        // Convert force to a pinocchio force
+        pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
+
+        pinocchio::rnea(this->pin_model_, *this->pin_data_, q, v, a, forces);
+
+        vectorx_t tau = this->pin_data_->tau;
+        return tau;
+    }
+
     vectorx_t FullOrderRigidBody::GetImpulseDynamics(const vectorx_t& state,
                                                      const vectorx_t& input,
                                                      const RobotContactInfo& contact_info) {
@@ -176,6 +191,34 @@ namespace torc::models {
                 contact_data_->Minv.transpose().triangularView<Eigen::StrictlyLower>();
 
         B << matrixx_t::Zero(pin_model_.nv, input.size()), contact_data_->ddq_dtau * act_mat_; //contact_data_->Minv * act_mat_;
+    }
+
+    void FullOrderRigidBody::InverseDynamicsDerivative(const torc::models::vectorx_t& state,
+                                                       const torc::models::vectorx_t& a,
+//                                                       const pinocchio::container::aligned_vector<pinocchio::Force>& forces,
+                                                       const std::vector<ExternalForce>& f_ext,
+                                                       torc::models::matrixx_t& dtau_dq,
+                                                       torc::models::matrixx_t& dtau_dv,
+                                                       torc::models::matrixx_t& dtau_da) {
+        vectorx_t q, v;
+        ParseState(state, q, v);
+        assert(dtau_dq.rows() == GetVelDim());
+        assert(dtau_dq.cols() == GetVelDim());
+        assert(dtau_dv.rows() == GetVelDim());
+        assert(dtau_dv.cols() == GetVelDim());
+        assert(dtau_da.rows() == GetVelDim());
+        assert(dtau_da.cols() == GetVelDim());
+        assert(a.size() == v.size());
+
+        pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
+
+        pinocchio::computeRNEADerivatives(pin_model_, *pin_data_, q, v, a, forces, dtau_dq, dtau_dv, dtau_da);
+
+        matrixx_t df_dq = ExternalForcesDerivativeWrtConfiguration(q, f_ext);
+
+        dtau_dq = dtau_dq + df_dq;
+
+        // I also need to account for how forces varies wrt q, i.e. I should add J(q)*dforces_dq to dtau_dq
     }
 
     void FullOrderRigidBody::ImpulseDerivative(const vectorx_t& state, const vectorx_t& input,
@@ -321,4 +364,83 @@ namespace torc::models {
         assert(input.size() == act_mat_.cols());
         return act_mat_*input;
     }
+
+    pinocchio::container::aligned_vector<pinocchio::Force> FullOrderRigidBody::ConvertExternalForcesToPin(const vectorx_t& q,
+            const std::vector<ExternalForce>& f_ext) const {
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+
+        // Convert force to a pinocchio force
+        pinocchio::container::aligned_vector<pinocchio::Force> forces(this->GetNumJoints(), pinocchio::Force::Zero());
+        for (const auto& f : f_ext) {
+            // *** Note *** for now I only support 3DOF contacts. To support 6DOF contacts just need to add the additional torques in from the contact (similar to how the linear forces are translated)
+            // Get the frame where the contact is
+            const int frame_idx = this->GetFrameIdx(f.frame_name);
+            // Get the parent frame
+            const int jnt_idx = this->pin_model_.frames.at(frame_idx).parentJoint;
+
+            // Get the translation from the joint frame to the contact frame
+            const vector3_t translationContactToJoint = pin_model_.frames.at(frame_idx).placement.translation();
+
+            // Get the rotation from the world frame to the joint frame
+            const Eigen::Matrix3d rotationWorldToJoint = pin_data_->oMi[jnt_idx].rotation().transpose();
+
+            // Get the contact forces in the joint frame
+            const vector3_t contact_force = rotationWorldToJoint * f.force_linear;
+            forces.at(jnt_idx).linear() = contact_force;
+
+            // Calculate the angular (torque) forces
+            forces.at(jnt_idx).angular() = translationContactToJoint.cross(contact_force);
+        }
+        return forces;
+    }
+
+    matrixx_t FullOrderRigidBody::ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce>& f_ext) {
+        // sum of J(q) * df_dq
+        // J(q) are the frame jacobians for the joints
+        // df_dq is the derivative of ConvertExternalForcesToPin
+
+        matrixx_t df_dq = matrixx_t::Zero(this->GetVelDim(), this->GetVelDim());
+        for (const auto& f : f_ext) {
+            // Get the contact frame
+            const int frame_idx = this->GetFrameIdx(f.frame_name);
+            // Get the parent frame
+            const int jnt_idx = this->pin_model_.frames.at(frame_idx).parentJoint;
+            const vector3_t translationContactToJoint = pin_model_.frames.at(frame_idx).placement.translation();
+
+            // Get the contact Jacobian
+//            matrix6x_t J = matrix6x_t::Zero(6, this->GetVelDim());
+//            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, J);
+
+            // Get the derivative of joint frame wrt q (i.e. a frame jacobian)
+            std::cout << "true joint name: " << this->pin_model_.names.at(jnt_idx) << std::endl;
+            int joint_frame_idx = this->GetFrameIdx(this->pin_model_.names.at(jnt_idx));
+            std::cout << "joint frame: " << this->pin_model_.frames.at(joint_frame_idx).name << std::endl;
+
+            matrix6x_t joint_frame_jacobian = matrix6x_t::Zero(6, this->GetVelDim());
+            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, joint_frame_jacobian);
+
+            matrix6x_t joint_frame_jacobian_world = matrix6x_t::Zero(6, this->GetVelDim());
+            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::WORLD, joint_frame_jacobian_world);
+
+
+            std::cout << "Joint frame jacobian: " << joint_frame_jacobian << std::endl;
+            std::cout << "Joint frame jacobian wrt world: " << joint_frame_jacobian_world << std::endl;
+
+            matrix6x_t dFdq = matrix6x_t::Zero(6, this->GetVelDim());
+            dFdq.topRows<3>() = joint_frame_jacobian_world.topRows<3>();
+            for (int i = 0; i < this->GetVelDim(); i++) {
+                dFdq.block<3,1>(3, i) = translationContactToJoint.cross(joint_frame_jacobian_world.block<3,1>(0, i));
+            }
+
+            // TODO: All of the errors are in the top 3 rows.
+            df_dq = df_dq - joint_frame_jacobian.transpose()*dFdq;
+        }
+
+        return df_dq;
+    }
+
+//    vectorx_t FullOrderRigidBody::TauToInputs(const vectorx_t& tau) const {
+//        assert(tau == this->GetNumJoints());
+//        return
+//    }
 } // torc::models
