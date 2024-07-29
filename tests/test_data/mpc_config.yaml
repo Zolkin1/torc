@@ -1,0 +1,28 @@
+general_settings:
+  nodes: 2
+  verbose: True
+solver_settings:
+  rel_tol: 1e-6
+  abs_tol: 1e-6
+  verbose: True
+  polish: True
+  #rho:
+  #alpha:
+  #adaptive_rho:
+  max_iter: 1000
+constraints:
+  friction_coef: 0.5
+  max_grf: 200
+costs:
+  leg_tracking_weight: 10
+  torso_tracking_weight: 100
+  force_tracking_weight: 1
+  kd_joint: [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]
+  kp_joint: [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]
+  kd_base_pos: 1
+  kd_base_orientation: 1
+  kp_base_pos: 1
+  kp_base_orientation: 1
+contacts:
+  num_contact_locations: 4
+  contact_frames: ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]

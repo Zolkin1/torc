@@ -55,6 +55,8 @@ namespace torc::models {
 
         [[nodiscard]] long GetFrameIdx(const std::string& frame) const;
 
+        [[nodiscard]] long GetParentJointIdx(const std::string& frame) const;
+
         [[nodiscard]] vectorx_t GetNeutralConfig() const;
 
         [[nodiscard]] vectorx_t GetRandomConfig() const;

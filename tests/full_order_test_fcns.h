@@ -213,11 +213,15 @@ void CheckInverseDynamicsDerivatives(torc::models::FullOrderRigidBody& model, co
 
     // Checking derivatives with finite differences
 //    srand(Catch::getSeed());        // Set the srand seed manually
+    srand(1);
 
     constexpr int NUM_CONFIGS = 1; // TODO: put back to 10
     for (int k = 0; k < NUM_CONFIGS; k++) {
         // Get random state
         vectorx_t random_state = model.GetRandomState();
+        // set normal config
+//        random_state << 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+        random_state.head(7) << 0, 0, 0, 0.9988, 0, 0, 0.0500;
 
         // Get random acceleration
         vectorx_t random_acc(model.GetVelDim());
@@ -231,6 +235,7 @@ void CheckInverseDynamicsDerivatives(torc::models::FullOrderRigidBody& model, co
             vector3_t force = vector3_t::Zero();
             force.setRandom();
             force = force * 10;
+            std::cout << "force: " << force.transpose() << std::endl;
             f_ext.emplace_back(contact_names.at(i), force);
         }
 
@@ -245,19 +250,17 @@ void CheckInverseDynamicsDerivatives(torc::models::FullOrderRigidBody& model, co
         dtau_da.setZero(model.GetVelDim(), model.GetVelDim());
 
         // Calculate analytic derivatives
-        model.InverseDynamicsDerivative(random_state, random_acc, f_ext, dtau_dq, dtau_dv, dtau_da);
-
-
-
+//        model.InverseDynamicsDerivative(random_state, random_acc, f_ext, dtau_dq, dtau_dv, dtau_da);
 
         // Check wrt Configs
-        vectorx_t tau_1 = model.InverseDynamics(random_state, random_acc, f_ext);
+//        vectorx_t tau_1 = model.InverseDynamics(random_state, random_acc, f_ext);
         vectorx_t q_rand, v_rand;
         model.ParseState(random_state, q_rand, v_rand);
 
+        std::cout << "configuration: " << q_rand << std::endl;
+
         matrixx_t force_deriv;
         force_deriv = model.ExternalForcesDerivativeWrtConfiguration(q_rand, f_ext);
-
         for (int i = 0; i < v_rand.size(); i++) {
             vectorx_t q_xd, v_xd;
             model.ParseState(random_state, q_xd, v_xd);
@@ -280,6 +283,9 @@ void CheckInverseDynamicsDerivatives(torc::models::FullOrderRigidBody& model, co
             pinocchio::container::aligned_vector<pinocchio::Force> original_force = model.ConvertExternalForcesToPin(q_rand, f_ext);
             pinocchio::container::aligned_vector<pinocchio::Force> force_d = model.ConvertExternalForcesToPin(q_xd, f_ext);
 
+//            std::cout << "original force: " << original_force.at(model.GetParentJointIdx(f_ext.at(0).frame_name)) << std::endl;
+//            std::cout << "disturbed force: " << force_d.at(model.GetParentJointIdx(f_ext.at(0).frame_name)) << std::endl;
+
 //            for (int j = 0; j < tau_d.size(); j++) {
 //                // Check entire function
 //                double fd = (tau_d(j) - tau_1(j)) / DELTA;
@@ -290,12 +296,28 @@ void CheckInverseDynamicsDerivatives(torc::models::FullOrderRigidBody& model, co
 ////                CHECK_THAT(fd - dtau_dq(j, i), Catch::Matchers::WithinAbs(0, FD_MARGIN));
 //            }
 
+            std::cout << "linear" << std::endl;
+            // linear
             for (int j = 0; j < 3; j++) {
                 // Check just force derivative
 //                std::cout << "fd force linear" << (original_force.at(0).linear() - force_d.at(0).linear())/DELTA << std::endl;
-                double fd = (original_force.at(0).linear()(j) - force_d.at(0).linear()(j)) / DELTA;
+                double fd = (original_force.at(model.GetParentJointIdx(f_ext.at(0).frame_name)).linear()(j)
+                        - force_d.at(model.GetParentJointIdx(f_ext.at(0).frame_name)).linear()(j)) / DELTA;
                 if (std::abs(fd - force_deriv(j, i)) > FD_MARGIN) {
                     std::cout << "fd: " << fd << ", analytic: " << force_deriv(j, i) << " row: " << j << ", col: " << i
+                              << std::endl;
+                }
+            }
+
+            std::cout << "angular" << std::endl;
+            // angular
+            for (int j = 0; j < 3; j++) {
+                // Check just force derivative
+//                std::cout << "fd force linear" << (original_force.at(0).linear() - force_d.at(0).linear())/DELTA << std::endl;
+                double fd = (original_force.at(model.GetParentJointIdx(f_ext.at(0).frame_name)).angular()(j)
+                        - force_d.at(model.GetParentJointIdx(f_ext.at(0).frame_name)).angular()(j)) / DELTA;
+                if (std::abs(fd - force_deriv(j + 3, i)) > FD_MARGIN) {
+                    std::cout << "fd: " << fd << ", analytic: " << force_deriv(j + 3, i) << " row: " << j + 3 << ", col: " << i
                               << std::endl;
                 }
             }

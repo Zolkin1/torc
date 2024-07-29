@@ -44,6 +44,8 @@ namespace torc::solvers {
 
         void UpdateSettings(const OSQPInterfaceSettings& settings);
 
+        [[nodiscard]] OSQPInterfaceSettings GetSettings() const;
+
         SolverStatus Solve(vectorx_t& sol);
 
     protected:

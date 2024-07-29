@@ -132,6 +132,15 @@ namespace torc::models {
         }
     }
 
+    long PinocchioModel::GetParentJointIdx(const std::string& frame) const {
+        unsigned long idx = this->pin_model_.frames.at(GetFrameIdx(frame)).parentJoint;
+        if (idx == pin_model_.joints.size()) {
+            return -1;
+        } else {
+            return idx;
+        }
+    }
+
     void PinocchioModel::MakePinocchioContacts(const RobotContactInfo& contact_info,
                                                std::vector<pinocchio::RigidConstraintModel>& contact_models,
                                                std::vector<pinocchio::RigidConstraintData>& contact_datas) const {

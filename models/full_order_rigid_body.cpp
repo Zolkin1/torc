@@ -368,6 +368,7 @@ namespace torc::models {
     pinocchio::container::aligned_vector<pinocchio::Force> FullOrderRigidBody::ConvertExternalForcesToPin(const vectorx_t& q,
             const std::vector<ExternalForce>& f_ext) const {
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
 
         // Convert force to a pinocchio force
         pinocchio::container::aligned_vector<pinocchio::Force> forces(this->GetNumJoints(), pinocchio::Force::Zero());
@@ -398,8 +399,11 @@ namespace torc::models {
         // sum of J(q) * df_dq
         // J(q) are the frame jacobians for the joints
         // df_dq is the derivative of ConvertExternalForcesToPin
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
 
-        matrixx_t df_dq = matrixx_t::Zero(this->GetVelDim(), this->GetVelDim());
+//        matrixx_t df_dq = matrixx_t::Zero(this->GetVelDim(), this->GetVelDim());
+        matrix6x_t df_dq = matrixx_t::Zero(6, this->GetVelDim());
         for (const auto& f : f_ext) {
             // Get the contact frame
             const int frame_idx = this->GetFrameIdx(f.frame_name);
@@ -415,6 +419,7 @@ namespace torc::models {
             std::cout << "true joint name: " << this->pin_model_.names.at(jnt_idx) << std::endl;
             int joint_frame_idx = this->GetFrameIdx(this->pin_model_.names.at(jnt_idx));
             std::cout << "joint frame: " << this->pin_model_.frames.at(joint_frame_idx).name << std::endl;
+            std::cout << "torso frame: " << this->pin_model_.frames.at(GetFrameIdx("base")).name << std::endl;
 
             matrix6x_t joint_frame_jacobian = matrix6x_t::Zero(6, this->GetVelDim());
             pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, joint_frame_jacobian);
@@ -422,18 +427,27 @@ namespace torc::models {
             matrix6x_t joint_frame_jacobian_world = matrix6x_t::Zero(6, this->GetVelDim());
             pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::WORLD, joint_frame_jacobian_world);
 
+            matrix6x_t torso_frame_jacobian_world = matrix6x_t::Zero(6, this->GetVelDim());
+            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, GetFrameIdx("base"), pinocchio::LOCAL_WORLD_ALIGNED, torso_frame_jacobian_world);
 
-            std::cout << "Joint frame jacobian: " << joint_frame_jacobian << std::endl;
-            std::cout << "Joint frame jacobian wrt world: " << joint_frame_jacobian_world << std::endl;
+            std::cout << "Joint frame jacobian: \n" << joint_frame_jacobian << std::endl;
+            std::cout << "Joint frame jacobian wrt world: \n" << joint_frame_jacobian_world << std::endl;
+            std::cout << "Torso frame jacobian wrt world: \n" << torso_frame_jacobian_world << std::endl;
+
+            // Get the rotation from the world frame to the joint frame
+            const Eigen::Matrix3d rotationWorldToJoint = pin_data_->oMi[jnt_idx].rotation().transpose();
 
             matrix6x_t dFdq = matrix6x_t::Zero(6, this->GetVelDim());
-            dFdq.topRows<3>() = joint_frame_jacobian_world.topRows<3>();
+            dFdq.topRows<3>() = joint_frame_jacobian_world.bottomRows<3>(); //joint_frame_jacobian_world.bottomRows<3>();
             for (int i = 0; i < this->GetVelDim(); i++) {
-                dFdq.block<3,1>(3, i) = translationContactToJoint.cross(joint_frame_jacobian_world.block<3,1>(0, i));
+                dFdq.block<3,1>(3, i) = translationContactToJoint.cross(joint_frame_jacobian_world.block<3,1>(3, i));
             }
 
-            // TODO: All of the errors are in the top 3 rows.
-            df_dq = df_dq - joint_frame_jacobian.transpose()*dFdq;
+            std::cout << "dFdq: \n" << dFdq << std::endl;
+
+            // TODO: I have the correct sparsity pattern and same general patterns, but the numbers are off
+//            df_dq = df_dq - joint_frame_jacobian.transpose()*dFdq;
+            df_dq = dFdq; // For now we just want to compare it against the function
         }
 
         return df_dq;
