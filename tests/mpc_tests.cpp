@@ -17,6 +17,8 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
 
     FullOrderMpc mpc(mpc_config, a1_urdf);
 
+    mpc.Configure();
+
 //    torc::models::RigidBody a1_model(pin_model_name, a1_urdf);
 //
 //    constexpr int NODES = 10;

@@ -44,7 +44,7 @@ add_subdirectory(mpc)
 add_subdirectory(utils)
 
 
-add_executable(xml_test xml_tests.cpp)
-target_link_libraries(xml_test Models)
+add_executable(mpc_app_test mpc_app_tests.cpp)
+target_link_libraries(mpc_app_test Mpc)
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library

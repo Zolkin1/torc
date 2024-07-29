@@ -17,6 +17,7 @@ namespace torc::mpc {
 
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
+    using matrix3x_t = Eigen::Matrix3Xd;
 
     class FullOrderMpc {
     public:
@@ -28,7 +29,7 @@ namespace torc::mpc {
          * Create the sparse eigen matrix with the correct sparsity pattern.
          * Pass to OSQP to allocate memory and perform KKT factorization.
          */
-        void ConfigureMpc();
+        void Configure();
 
         /**
          * @brief Update the contact schedule. This sets the internal in or out of contact flags.
@@ -72,7 +73,13 @@ namespace torc::mpc {
         struct Workspace {
             matrixx_t int_mat;
             matrixx_t id_state_mat;
+            matrixx_t id_force_mat;
             matrixx_t fric_cone_mat;
+            matrixx_t q_identity;
+            matrixx_t v_identity;
+            matrixx_t tau_identity;
+            vectorx_t swing_vec;
+            matrixx_t holo_mat;
         };
 
     // ----- Sparsity Pattern Creation ----- //
@@ -87,11 +94,11 @@ namespace torc::mpc {
         void AddIntegrationPattern(int node);
         void AddIDPattern(int node);
         void AddFrictionConePattern(int node);
-        void AddConfigurationBoxPattern();
-        void AddVelocityBoxPattern();
-        void AddTorqueBoxPattern();
-        void AddSwingHeightPattern();
-        void AddHolonomicPattern();
+        void AddConfigurationBoxPattern(int node);
+        void AddVelocityBoxPattern(int node);
+        void AddTorqueBoxPattern(int node);
+        void AddSwingHeightPattern(int node);
+        void AddHolonomicPattern(int node);
 
     // ----- Helper Functions ----- //
         [[nodiscard]] int GetNumConstraints() const;
@@ -102,6 +109,7 @@ namespace torc::mpc {
         int GetConstraintRow(int node, const ConstraintType& constraint) const;
 
         void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start);
+        void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start);
         void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
         void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
 

@@ -146,7 +146,7 @@ namespace torc::mpc {
         }
     }
 
-    void FullOrderMpc::ConfigureMpc() {
+    void FullOrderMpc::Configure() {
         // Create the constraint matrix
         constraints_.lb.resize(GetNumConstraints());
         constraints_.ub.resize(GetNumConstraints());
@@ -169,22 +169,41 @@ namespace torc::mpc {
             AddIntegrationPattern(node);
             AddIDPattern(node);
             AddFrictionConePattern(node);
-            AddConfigurationBoxPattern();
-            AddVelocityBoxPattern();
-            AddTorqueBoxPattern();
-            AddSwingHeightPattern();
-            AddHolonomicPattern();
+            AddConfigurationBoxPattern(node);
+            AddVelocityBoxPattern(node);
+            AddTorqueBoxPattern(node);
+            AddSwingHeightPattern(node);
+            AddHolonomicPattern(node);
         }
 
         AddFrictionConePattern(nodes_ - 1);
-        AddConfigurationBoxPattern();
-        AddVelocityBoxPattern();
-        AddTorqueBoxPattern();
-        AddSwingHeightPattern();
-        AddHolonomicPattern();
+        AddConfigurationBoxPattern(nodes_ - 1);
+        AddVelocityBoxPattern(nodes_ - 1);
+        AddTorqueBoxPattern(nodes_ - 1);
+        AddSwingHeightPattern(nodes_ - 1);
+        AddHolonomicPattern(nodes_ - 1);
+
+        int max_row = -1;
+        int max_col = -1;
+        for (const auto& trip : constraint_triplets_) {
+            if (trip.col() > max_col) {
+                max_col = trip.col();
+            }
+            if (trip.row() > max_row) {
+                max_row = trip.row();
+            }
+        }
+
+        std::cout << "max row in triplet: " << max_row << std::endl;
+        std::cout << "max col in triplet: " << max_col << std::endl;
+
+        std::cout << "A rows: " << constraints_.A.rows() << std::endl;
+        std::cout << "A cols: " << constraints_.A.cols() << std::endl;
+
 
         // Make the matrix with the sparsity pattern
         constraints_.A.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
+        std::cout << constraints_.A << std::endl;
     }
 
     void FullOrderMpc::AddIntegrationPattern(int node) {
@@ -211,7 +230,7 @@ namespace torc::mpc {
     void FullOrderMpc::AddIDPattern(int node) {
         assert(node != nodes_ - 1);
 
-        const int row_start = GetConstraintRow(node, Integrator);
+        const int row_start = GetConstraintRow(node, ID);
 
         // dtau_dq
         int col_start = GetDecisionIdx(node, Configuration);
@@ -230,7 +249,8 @@ namespace torc::mpc {
 
         // dtau_df
         col_start = GetDecisionIdx(node, GroundForce);
-        MatrixToNewTriplet(ws_->id_state_mat, row_start, col_start);
+        ws_->id_force_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, num_contact_locations_*CONTACT_3DOF, 1);
+        MatrixToNewTriplet(ws_->id_force_mat, row_start, col_start);
 
         // dtau_dv2
         col_start = GetDecisionIdx(node + 1, Velocity);
@@ -238,16 +258,73 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::AddFrictionConePattern(int node) {
-        const int row_start = GetConstraintRow(node, Integrator);
-
-        // No GRF constraints when in swing
+        int row_start = GetConstraintRow(node, FrictionCone);
         int col_start = GetDecisionIdx(node, GroundForce);
+
         matrixx_t id;
         id.setIdentity(CONTACT_3DOF, CONTACT_3DOF);
-        MatrixToNewTriplet(id, row_start, col_start);
-
         ws_->fric_cone_mat.setConstant(4, 3, 1);
-        MatrixToNewTriplet(id, row_start + CONTACT_3DOF, col_start);
+
+        for (int contact = 0; contact < num_contact_locations_; contact++) {
+            // Setting force to zero when in swing
+            MatrixToNewTriplet(id, row_start, col_start);
+
+            row_start += CONTACT_3DOF;
+
+            // Force in friction cone when in contact
+            MatrixToNewTriplet(ws_->fric_cone_mat, row_start, col_start);
+
+            row_start += FRICTION_CONE_SIZE;
+            col_start += CONTACT_3DOF;
+        }
+    }
+
+    void FullOrderMpc::AddConfigurationBoxPattern(int node) {
+        const int row_start = GetConstraintRow(node, ConfigBox);
+        const int col_start = GetDecisionIdx(node, Configuration);
+
+        ws_->q_identity.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+        MatrixToNewTriplet(ws_->q_identity, row_start, col_start);
+    }
+
+    void FullOrderMpc::AddVelocityBoxPattern(int node) {
+        const int row_start = GetConstraintRow(node, VelBox);
+        const int col_start = GetDecisionIdx(node, Velocity);
+
+        ws_->v_identity.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+        MatrixToNewTriplet(ws_->v_identity, row_start, col_start);
+    }
+
+    void FullOrderMpc::AddTorqueBoxPattern(int node) {
+        const int row_start = GetConstraintRow(node, TorqueBox);
+        const int col_start = GetDecisionIdx(node, Torque);
+
+        ws_->tau_identity.setIdentity(robot_model_->GetNumInputs(), robot_model_->GetNumInputs());
+        MatrixToNewTriplet(ws_->tau_identity, row_start, col_start);
+    }
+
+    void FullOrderMpc::AddSwingHeightPattern(int node) {
+        int row_start = GetConstraintRow(node, SwingHeight);
+        const int col_start = GetDecisionIdx(node, Configuration);
+
+        ws_->swing_vec.setConstant(robot_model_->GetVelDim(), 1);
+
+        for (int contact = 0; contact < num_contact_locations_; contact++) {
+            VectorToNewTriplet(ws_->swing_vec, row_start, col_start);
+            row_start++;
+        }
+    }
+
+    void FullOrderMpc::AddHolonomicPattern(int node) {
+        int row_start = GetConstraintRow(node, Holonomic);
+        const int col_start = GetDecisionIdx(node, Velocity);
+
+        ws_->holo_mat.setConstant(2, robot_model_->GetVelDim(), 1);
+
+        for (int contact = 0; contact < num_contact_locations_; contact++) {
+            MatrixToNewTriplet(ws_->holo_mat, row_start, col_start);
+            row_start += 2;
+        }
     }
 
     // ------------------------------------------------- //
@@ -296,6 +373,9 @@ namespace torc::mpc {
 
     int FullOrderMpc::GetConstraintRow(int node, const ConstraintType& constraint) const {
         int row = GetConstraintsPerNode()*node;
+        if (node == nodes_ - 1) {
+            row -= NumIntegratorConstraintsNode() + NumIDConstraintsNode();
+        }
         switch (constraint) {
             case Holonomic:
                 row += NumSwingHeightConstraintsNode();
@@ -326,6 +406,15 @@ namespace torc::mpc {
                 if (mat(row, col) != 0) {
                     constraint_triplets_.emplace_back(row_start + row, col_start + col, mat(row, col));
                 }
+            }
+        }
+    }
+
+    void FullOrderMpc::VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start) {
+        for (int col = 0; col < vec.size(); col++) {
+            // Only in this function do we want to filter out 0's because if they occur here then they are structural
+            if (vec(col) != 0) {
+                constraint_triplets_.emplace_back(row_start, col_start + col, vec(col));
             }
         }
     }
@@ -363,7 +452,7 @@ namespace torc::mpc {
     }
 
     int FullOrderMpc::NumFrictionConeConstraintsNode() const {
-        return FRICTION_CONE_SIZE;
+        return num_contact_locations_ * (FRICTION_CONE_SIZE + CONTACT_3DOF);
     }
 
     int FullOrderMpc::NumConfigBoxConstraintsNode() const {
