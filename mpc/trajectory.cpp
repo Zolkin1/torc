@@ -5,23 +5,33 @@
 #include "trajectory.h"
 
 namespace torc::mpc {
-//    void Trajectory::Reset(int nodes, int q_dim, int v_dim) {
-//        states.clear();
-//        for (int node = 0; node < nodes; node++) {
-//            states.emplace_back(q_dim, v_dim);
-//        }
-//        inputs.resize(nodes-1);
-//    }
-//
-//    void ContactTrajectory::Reset(int nodes, int q_dim, int v_dim) {
-//        // If we use encapsulation then we don't need to replace this code
-//        states.clear();
-//        for (int node = 0; node < nodes; node++) {
-//            states.emplace_back(q_dim, v_dim);
-//        }
-//        inputs.resize(nodes-1);
-//        contacts.resize(nodes-1);
-//
-//        impulse_times.clear();
-//    }
+    int Trajectory::GetNumNodes() const {
+        return nodes_;
+    }
+
+    void Trajectory::SetNumNodes(int nodes) {
+        nodes_ = nodes;
+        q_.resize(nodes_);
+        v_.resize(nodes_);
+        tau_.resize(nodes_);
+        forces_.resize(nodes_);
+    }
+
+    void Trajectory::SetConfiguration(int node, const vectorx_t& q) {
+        q_[node] = q;
+    }
+
+    void Trajectory::SetVelocity(int node, const torc::mpc::vectorx_t& v) {
+        v_[node] = v;
+    }
+
+    void Trajectory::SetTau(int node, const torc::mpc::vectorx_t& tau) {
+        tau_[node] = tau;
+    }
+
+    void Trajectory::SetForce(int node, const torc::mpc::vectorx_t& f) {
+        forces_[node] = f;
+    }
+
+
 } //torc::mpc

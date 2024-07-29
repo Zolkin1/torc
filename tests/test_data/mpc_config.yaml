@@ -1,11 +1,11 @@
 general_settings:
-  nodes: 2
+  nodes: 20
   verbose: True
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
   verbose: True
-  polish: True
+  polish: False
   #rho:
   #alpha:
   #adaptive_rho:

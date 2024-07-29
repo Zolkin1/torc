@@ -19,6 +19,12 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
 
     mpc.Configure();
 
+
+    torc::models::FullOrderRigidBody a1("a1", a1_urdf);
+
+    vectorx_t random_state = a1.GetRandomState();
+    mpc.Compute(random_state);
+
 //    torc::models::RigidBody a1_model(pin_model_name, a1_urdf);
 //
 //    constexpr int NODES = 10;

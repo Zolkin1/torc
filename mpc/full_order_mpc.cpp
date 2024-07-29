@@ -7,6 +7,7 @@
 
 #include "full_order_mpc.h"
 #include "eigen_utils.h"
+#include "torc_timer.h"
 
 // TODO: Figure out how I want to handle the geometry stuff
 
@@ -60,17 +61,20 @@ namespace torc::mpc {
             }
         } else {
             YAML::Node solver_settings = config["solver_settings"];
-            solvers::OSQPInterfaceSettings qp_settings_;
-            qp_settings_.rel_tol = (solver_settings["rel_tol"]) ? solver_settings["rel_tol"].as<double>() : -1.0;
-            qp_settings_.abs_tol = (solver_settings["abs_tol"]) ? solver_settings["abs_tol"].as<double>() : -1.0;
-            qp_settings_.verbose = (solver_settings["verbose"]) && solver_settings["verbose"].as<bool>();
-            qp_settings_.polish = (solver_settings["polish"]) && solver_settings["polish"].as<bool>();
-            qp_settings_.rho = (solver_settings["rho"]) ? solver_settings["rho"].as<double>() : -1.0;
-            qp_settings_.alpha = (solver_settings["alpha"]) ? solver_settings["alpha"].as<double>() : -1.0;
-            qp_settings_.adaptive_rho = (solver_settings["adaptive_rho"]) && solver_settings["adaptive_rho"].as<bool>();
-            qp_settings_.max_iter = (solver_settings["max_iter"]) ? solver_settings["max_iter"].as<int>() : -1;
-
-            qp_solver_.UpdateSettings(qp_settings_);
+            osqp_settings_.eps_rel = (solver_settings["rel_tol"]) ? solver_settings["rel_tol"].as<double>() : -1.0;
+            osqp_settings_.eps_abs = (solver_settings["abs_tol"]) ? solver_settings["abs_tol"].as<double>() : -1.0;
+            osqp_settings_.verbose = (solver_settings["verbose"]) && solver_settings["verbose"].as<bool>();
+            osqp_settings_.polish = (solver_settings["polish"]) && solver_settings["polish"].as<bool>();
+            if (solver_settings["rho"]) {
+                osqp_settings_.rho = solver_settings["rho"].as<double>();
+            }
+            if (solver_settings["alpha"]) {
+                osqp_settings_.alpha = solver_settings["alpha"].as<double>();
+            }
+            osqp_settings_.adaptive_rho = (solver_settings["adaptive_rho"]) && solver_settings["adaptive_rho"].as<bool>();
+            if (solver_settings["max_iter"]) {
+                osqp_settings_.max_iter = solver_settings["max_iter"].as<int>();
+            }
         }
 
         // ---------- Constraint Settings ---------- //
@@ -101,7 +105,6 @@ namespace torc::mpc {
 
             const int total_width = 50;
 
-            solvers::OSQPInterfaceSettings qp_settings_ = qp_solver_.GetSettings();
 
             auto time_now = std::chrono::system_clock::now();
             std::time_t time1_now = std::chrono::system_clock::to_time_t(time_now);
@@ -114,14 +117,14 @@ namespace torc::mpc {
             std::cout << "\tNodes: " << nodes_ << std::endl;
 
             std::cout << "Solver settings: " << std::endl;
-            std::cout << "\tRelative tolerance: " << qp_settings_.rel_tol << std::endl;
-            std::cout << "\tAbsolute tolerance: " << qp_settings_.abs_tol << std::endl;
-            std::cout << "\tVerbose: " << ((qp_settings_.verbose == 1) ? "True" : "False") << std::endl;
-            std::cout << "\tPolish: " << ((qp_settings_.polish == 1) ? "True" : "False") << std::endl;
-            std::cout << "\trho: " << qp_settings_.rho << std::endl;
-            std::cout << "\talpha: " << qp_settings_.alpha << std::endl;
-            std::cout << "\tAdaptive rho: " << qp_settings_.adaptive_rho << std::endl;
-            std::cout << "\tMax iterations: " << qp_settings_.max_iter << std::endl;
+            std::cout << "\tRelative tolerance: " << osqp_settings_.eps_rel << std::endl;
+            std::cout << "\tAbsolute tolerance: " << osqp_settings_.eps_abs << std::endl;
+            std::cout << "\tVerbose: " << (osqp_settings_.verbose ? "True" : "False") << std::endl;
+            std::cout << "\tPolish: " << (osqp_settings_.polish ? "True" : "False") << std::endl;
+            std::cout << "\trho: " << osqp_settings_.rho << std::endl;
+            std::cout << "\talpha: " << osqp_settings_.alpha << std::endl;
+            std::cout << "\tAdaptive rho: " << osqp_settings_.adaptive_rho << std::endl;
+            std::cout << "\tMax iterations: " << osqp_settings_.max_iter << std::endl;
 
             std::cout << "Constraints:" << std::endl;
             std::cout << "\tFriction coefficient: " << friction_coef_ << std::endl;
@@ -147,16 +150,44 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::Configure() {
+        utils::TORCTimer config_timer;
+        config_timer.Tic();
         // Create the constraint matrix
-        constraints_.lb.resize(GetNumConstraints());
-        constraints_.ub.resize(GetNumConstraints());
-        constraints_.A.resize(GetNumConstraints(), GetNumDecisionVars());
+        osqp_instance_.constraint_matrix.resize(GetNumConstraints(), GetNumDecisionVars());
+        osqp_instance_.lower_bounds.resize(GetNumConstraints());
+        osqp_instance_.upper_bounds.resize(GetNumConstraints());
+        osqp_instance_.objective_vector.resize(GetNumDecisionVars());
+        osqp_instance_.objective_matrix.resize(GetNumDecisionVars(), GetNumDecisionVars());
+
+        osqp_instance_.objective_matrix.setIdentity();
+        osqp_instance_.objective_vector.setConstant(2);
 
         // Create A sparsity pattern to configure OSQP with
         CreateConstraintSparsityPattern();
 
+        // Init OSQP
+        auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
+
         // Reset the triplet index, so we can re-use the triplet vector without re-allocating
         triplet_idx_ = 0;
+        config_timer.Toc();
+        if (verbose_) {
+            std::cout << "MPC configuration took " << config_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
+        }
+    }
+
+    Trajectory FullOrderMpc::Compute(const vectorx_t& state) {
+        utils::TORCTimer compute_timer;
+        compute_timer.Tic();
+        auto status = osqp_solver_.Solve();
+
+        compute_timer.Toc();
+        if (verbose_) {
+            std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
+        }
+
+        Trajectory traj;
+        return traj;
     }
 
     // ------------------------------------------------- //
@@ -194,16 +225,11 @@ namespace torc::mpc {
             }
         }
 
-        std::cout << "max row in triplet: " << max_row << std::endl;
-        std::cout << "max col in triplet: " << max_col << std::endl;
-
-        std::cout << "A rows: " << constraints_.A.rows() << std::endl;
-        std::cout << "A cols: " << constraints_.A.cols() << std::endl;
-
+        std::cout << "max row: " << max_row << std::endl;
+        std::cout << "max col: " << max_col << std::endl;
 
         // Make the matrix with the sparsity pattern
-        constraints_.A.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
-        std::cout << constraints_.A << std::endl;
+        osqp_instance_.constraint_matrix.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
     }
 
     void FullOrderMpc::AddIntegrationPattern(int node) {

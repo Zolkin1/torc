@@ -8,7 +8,8 @@
 
 #include <Eigen/Core>
 
-#include "osqp_interface.h"
+#include "osqp++.h"
+#include "constraint.h"
 #include "full_order_rigid_body.h"
 #include "trajectory.h"
 
@@ -132,8 +133,10 @@ namespace torc::mpc {
     //---------- Member Variables ---------- //
         fs::path config_file_;
 
-        solvers::OSQPInterface qp_solver_;
-        constraints::SparseBoxConstraints constraints_;
+        // OSQP Interface
+        osqp::OsqpInstance osqp_instance_;
+        osqp::OsqpSolver osqp_solver_;
+        osqp::OsqpSettings osqp_settings_;
 
         // Hold the constraint matrix as a vector of triplets
         std::vector<Eigen::Triplet<double>> constraint_triplets_;

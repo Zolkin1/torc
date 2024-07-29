@@ -1,4 +1,4 @@
-message(STATUS "Building MPC")
+message(STATUS "Configuring MPC")
 
 set(MPC_INC "${torc_SOURCE_DIR}/mpc/include")
 set(MPC_HEADER_LIST
@@ -26,14 +26,39 @@ target_include_directories(Mpc PUBLIC
 # ------- Model ------ #
 target_link_libraries(Mpc PUBLIC Models)
 
+# ------- Constraints ------ #
+target_link_libraries(Mpc PUBLIC Constraints)
+
 # ------- Solver ------ #
-target_link_libraries(Mpc PUBLIC SolverInterfaces)
+#target_link_libraries(Mpc PUBLIC SolverInterfaces)
+find_package(osqp REQUIRED)
+if (NOT TARGET osqpstatic)  # This is what osqp-cpp looks for
+    message(STATUS "osqpstatic target not found, checking osqp::osqpstatic...")
+    if (NOT TARGET osqp::osqpstatic)
+        message(STATUS "Could not find osqp::osqpstatic, osqp-cpp will try to fetch it...")
+    else ()
+        message(STATUS "Found osqp::osqpstatic. Using it in osqp-cpp.")
+        add_library(osqpstatic ALIAS osqp::osqpstatic)
+    endif ()
+endif ()
+include(FetchContent)
+
+set(OSQP-CPP_BUILD_TESTS OFF CACHE BOOL "Build OSQP-CPP without tests")
+set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "Variable for OSQP-CPP ABSL dep")
+
+FetchContent_Declare(
+        osqp-cpp
+        GIT_REPOSITORY https://github.com/google/osqp-cpp.git
+        GIT_TAG 43433736334d6b515ea4b0247156fea9e56c0d3f
+)
+
+FetchContent_MakeAvailable(osqp-cpp)
+target_link_libraries(Mpc PUBLIC osqp-cpp)
 
 # ------- Utils ------ #
 target_link_libraries(Mpc PUBLIC Utils)
 
 #----------- YAML ----------- #
-include(FetchContent)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 FetchContent_Declare(
         yaml-cpp
