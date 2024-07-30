@@ -450,11 +450,11 @@ namespace torc::models {
         return df_dq;
     }
 
-    vectorx_t FullOrderRigidBody::GetUpperJointLimits() const {
+    vectorx_t FullOrderRigidBody::GetUpperConfigLimits() const {
         return pin_model_.upperPositionLimit;
     }
 
-    vectorx_t FullOrderRigidBody::GetLowerJointLimits() const {
+    vectorx_t FullOrderRigidBody::GetLowerConfigLimits() const {
         return pin_model_.lowerPositionLimit;
     }
 
@@ -463,7 +463,7 @@ namespace torc::models {
     }
 
     vectorx_t FullOrderRigidBody::GetTorqueJointLimits() const {
-        return pin_model_.effortLimit;
+        return pin_model_.effortLimit.tail(GetNumInputs());
     }
 
 

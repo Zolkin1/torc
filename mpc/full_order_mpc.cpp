@@ -383,10 +383,12 @@ namespace torc::mpc {
 
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
 
-        // TODO: Add bounds
-        // Get these with a call to pinocchio's model's upperPositionLimit and lowerPositionLimit
-//        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).setConstant();
-//        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).setZero();
+        // Set configuration bounds
+        // Ignore the first element as it is assumed that the first 7 elements are all identical and very large (i.e. no restrictions on the floating base).
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim())
+            = robot_model_->GetLowerConfigLimits().tail(robot_model_->GetVelDim());
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim())
+            = robot_model_->GetUpperConfigLimits().tail(robot_model_->GetVelDim());
 
     }
 
@@ -396,10 +398,9 @@ namespace torc::mpc {
 
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
 
-        // TODO: Add bounds
-        // Get these with a call to pinocchio's model's velocityLimit
-//        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).setConstant();
-//        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).setZero();
+        // Set velocity bounds
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()) = -robot_model_->GetVelocityJointLimits();
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()) = robot_model_->GetVelocityJointLimits();
     }
 
     void FullOrderMpc::AddTorqueBoxConstraint(int node) {
@@ -408,10 +409,9 @@ namespace torc::mpc {
 
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs());
 
-        // TODO: Add bounds
-        // Get these with a call to pinocchio's model's effort limit
-//        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).setConstant();
-//        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).setZero();
+        // Set torque bounds
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits();
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits();
     }
 
     void FullOrderMpc::AddSwingHeightConstraint(int node) {
