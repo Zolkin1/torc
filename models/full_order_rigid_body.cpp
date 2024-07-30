@@ -450,6 +450,25 @@ namespace torc::models {
         return df_dq;
     }
 
+    vectorx_t FullOrderRigidBody::GetUpperJointLimits() const {
+        return pin_model_.upperPositionLimit;
+    }
+
+    vectorx_t FullOrderRigidBody::GetLowerJointLimits() const {
+        return pin_model_.lowerPositionLimit;
+    }
+
+    vectorx_t FullOrderRigidBody::GetVelocityJointLimits() const {
+        return pin_model_.velocityLimit;
+    }
+
+    vectorx_t FullOrderRigidBody::GetTorqueJointLimits() const {
+        return pin_model_.effortLimit;
+    }
+
+
+
+
 //    vectorx_t FullOrderRigidBody::TauToInputs(const vectorx_t& tau) const {
 //        assert(tau == this->GetNumJoints());
 //        return
