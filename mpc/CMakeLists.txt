@@ -31,16 +31,19 @@ target_link_libraries(Mpc PUBLIC Constraints)
 
 # ------- Solver ------ #
 #target_link_libraries(Mpc PUBLIC SolverInterfaces)
-find_package(osqp REQUIRED)
-if (NOT TARGET osqpstatic)  # This is what osqp-cpp looks for
-    message(STATUS "osqpstatic target not found, checking osqp::osqpstatic...")
-    if (NOT TARGET osqp::osqpstatic)
-        message(STATUS "Could not find osqp::osqpstatic, osqp-cpp will try to fetch it...")
-    else ()
-        message(STATUS "Found osqp::osqpstatic. Using it in osqp-cpp.")
-        add_library(osqpstatic ALIAS osqp::osqpstatic)
+if (BUILD_WITH_OSQP)
+    find_package(osqp)
+    if (NOT TARGET osqpstatic)  # This is what osqp-cpp looks for
+        message(STATUS "osqpstatic target not found, checking osqp::osqpstatic...")
+        if (NOT TARGET osqp::osqpstatic)
+            message(STATUS "Could not find osqp::osqpstatic, osqp-cpp will try to fetch it...")
+        else ()
+            message(STATUS "Found osqp::osqpstatic. Using it in osqp-cpp.")
+            add_library(osqpstatic ALIAS osqp::osqpstatic)
+        endif ()
     endif ()
 endif ()
+
 include(FetchContent)
 
 set(OSQP-CPP_BUILD_TESTS OFF CACHE BOOL "Build OSQP-CPP without tests")
