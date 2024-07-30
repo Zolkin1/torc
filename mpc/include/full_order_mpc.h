@@ -19,6 +19,7 @@ namespace torc::mpc {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3x_t = Eigen::Matrix3Xd;
+    using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using sp_matrixx_t = Eigen::SparseMatrix<double>;
 
     class FullOrderMpc {
@@ -80,6 +81,7 @@ namespace torc::mpc {
             matrixx_t id_force_mat;
             matrixx_t fric_cone_mat;
             vectorx_t swing_vec;
+            matrix6x_t frame_jacobian;
             matrixx_t holo_mat;
             vectorx_t acc;
             std::vector<models::ExternalForce> f_ext;
@@ -130,6 +132,7 @@ namespace torc::mpc {
         void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start);
         void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start);
         void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
+        void VectorToTriplet(const vectorx_t& vec, int row_start, int col_start);
         void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
         /**
          * @brief Assign a matrix that is diagonal and all of the same value to triplets. Assumes the matrix is square.
@@ -177,8 +180,6 @@ namespace torc::mpc {
         // Warm start trajectory
         Trajectory traj_;
 
-        // TODO: Add support for contact variables
-
         // dt's
         std::vector<double> dt_;
 
@@ -196,6 +197,9 @@ namespace torc::mpc {
         // Contact settings
         int num_contact_locations_{};
         std::vector<std::string> contact_frames_{};
+
+        // TODO: Populate
+        std::map<std::string, std::vector<double>> swing_traj_;
     };
 } // namepsace torc::mpc
 

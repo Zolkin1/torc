@@ -12,6 +12,7 @@
 #include "frame_state_types.h"
 
 namespace torc::models {
+    using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
 
     class PinocchioModel : public BaseModel {
     public:
@@ -92,7 +93,7 @@ namespace torc::models {
          */
         FrameState GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v);
 
-        void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const;
+        void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J) const;
 
     protected:
 

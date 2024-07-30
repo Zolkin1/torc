@@ -10,6 +10,8 @@
 
 #include <utility>
 
+#include "full_order_rigid_body.h"
+
 namespace torc::models {
     const std::string PinocchioModel::ROOT_JOINT = "root_joint";
 
@@ -227,12 +229,13 @@ namespace torc::models {
          return GetFrameState(frame);
      }
 
-    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const {
+    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J) const {
         const long idx = GetFrameIdx(frame);
         if (idx == -1) {
             throw std::runtime_error("Provided frame does not exist.");
         }
 
+        J.resize(6, GetVelDim());
         J.setZero();
 
         pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, J);

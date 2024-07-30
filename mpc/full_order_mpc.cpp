@@ -200,6 +200,7 @@ namespace torc::mpc {
         for (const auto& frame : contact_frames_) {
             ws_->f_ext.emplace_back(frame, vector3_t::Zero());
         }
+        ws_->frame_jacobian.resize(6, robot_model_->GetVelDim());
 
         config_timer.Toc();
         if (verbose_) {
@@ -415,7 +416,30 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::AddSwingHeightConstraint(int node) {
+        int row_start = GetConstraintRow(node, SwingHeight);
+        const int col_start = GetDecisionIdx(node, Configuration);
 
+        robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+
+        for (const auto& frame : contact_frames_) {
+            // Compute frame jacobian for each contact frame
+            robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), ws_->frame_jacobian);
+            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
+
+            // Grab just the z-height element
+            ws_->swing_vec = ws_->frame_jacobian.row(2);
+
+            VectorToTriplet(ws_->swing_vec, row_start, col_start);
+
+            // TODO: Is this correct with the geometry?
+            osqp_instance_.lower_bounds(row_start)
+                = -frame_pos(2) + traj_.GetConfiguration(node).dot(ws_->swing_vec) - swing_traj_[frame][node];
+
+            osqp_instance_.upper_bounds(row_start)
+                = -frame_pos(2) + traj_.GetConfiguration(node).dot(ws_->swing_vec) + swing_traj_[frame][node];
+
+            row_start++;
+        }
     }
 
     void FullOrderMpc::AddHolonomicConstraint(int node) {
@@ -721,6 +745,12 @@ namespace torc::mpc {
                 constraint_triplets_[triplet_idx_] = Eigen::Triplet<double>(row_start + row, col_start + col, mat(row, col));
                 triplet_idx_++;
             }
+        }
+    }
+
+    void FullOrderMpc::VectorToTriplet(const vectorx_t& vec, int row_start, int col_start) {
+        for (int col = 0; col < vec.size(); col++) {
+            constraint_triplets_.emplace_back(row_start, col_start + col, vec(col));
         }
     }
 

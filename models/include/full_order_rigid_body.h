@@ -107,11 +107,8 @@ namespace torc::models {
         void ParseInput(const vectorx_t& input, vectorx_t& tau) const;
 
         [[nodiscard]] vectorx_t GetUpperConfigLimits() const;
-
         [[nodiscard]] vectorx_t GetLowerConfigLimits() const;
-
         [[nodiscard]] vectorx_t GetVelocityJointLimits() const;
-
         [[nodiscard]] vectorx_t GetTorqueJointLimits() const;
 
         /**
