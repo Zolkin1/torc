@@ -52,7 +52,7 @@ namespace torc::models {
                                             const vectorx_t& input,
                                             const RobotContactInfo& contact_info) const;
 
-        [[nodiscard]] vectorx_t InverseDynamics(const vectorx_t& state, const vectorx_t& a,
+        [[nodiscard]] vectorx_t InverseDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a,
                                                 const std::vector<ExternalForce>& f_ext);
 //                                                const pinocchio::container::aligned_vector<pinocchio::Force>& forces);
 

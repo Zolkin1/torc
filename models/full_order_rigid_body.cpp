@@ -91,12 +91,9 @@ namespace torc::models {
         return BuildStateDerivative(v, contact_data_->ddq);
     }
 
-    vectorx_t FullOrderRigidBody::InverseDynamics(const torc::models::vectorx_t& state, const vectorx_t& a,
+    vectorx_t FullOrderRigidBody::InverseDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a,
                                                   const std::vector<ExternalForce>& f_ext) {
 //                                                  const pinocchio::container::aligned_vector<pinocchio::Force>& forces) {
-        vectorx_t q, v;
-        ParseState(state, q, v);
-
         // Convert force to a pinocchio force
         pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
 

@@ -19,6 +19,7 @@ namespace torc::mpc {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3x_t = Eigen::Matrix3Xd;
+    using sp_matrixx_t = Eigen::SparseMatrix<double>;
 
     class FullOrderMpc {
     public:
@@ -49,6 +50,8 @@ namespace torc::mpc {
          */
         Trajectory Compute(const vectorx_t& state);
 
+        void SetVerbosity(bool verbose);
+
 
     protected:
     private:
@@ -76,12 +79,26 @@ namespace torc::mpc {
             matrixx_t id_state_mat;
             matrixx_t id_force_mat;
             matrixx_t fric_cone_mat;
-            matrixx_t q_identity;
-            matrixx_t v_identity;
-            matrixx_t tau_identity;
             vectorx_t swing_vec;
             matrixx_t holo_mat;
+            vectorx_t acc;
+            std::vector<models::ExternalForce> f_ext;
         };
+
+    // -------- Constraint Creation -------- //
+        void CreateConstraints();
+        void AddICConstraint();
+        void AddIntegrationConstraint(int node);
+        void AddIDConstraint(int node);
+        void AddFrictionConeConstraint(int node);
+        void AddConfigurationBoxConstraint(int node);
+        void AddVelocityBoxConstraint(int node);
+        void AddTorqueBoxConstraint(int node);
+        void AddSwingHeightConstraint(int node);
+        void AddHolonomicConstraint(int node);
+
+    // ----------- Cost Creation ----------- //
+        void CreateCost();
 
     // ----- Sparsity Pattern Creation ----- //
         /**
@@ -92,6 +109,7 @@ namespace torc::mpc {
          * Then this will reset the triplet index
          */
         void CreateConstraintSparsityPattern();
+        void AddICPattern();
         void AddIntegrationPattern(int node);
         void AddIDPattern(int node);
         void AddFrictionConePattern(int node);
@@ -113,6 +131,14 @@ namespace torc::mpc {
         void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start);
         void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
         void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
+        /**
+         * @brief Assign a matrix that is diagonal and all of the same value to triplets. Assumes the matrix is square.
+         * @param val
+         * @param row_start
+         * @param col_start
+         * @param size
+         */
+        void DiagonalScalarMatrixToTriplet(double val, int row_start, int col_start, int size);
 
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
@@ -127,7 +153,7 @@ namespace torc::mpc {
         void UpdateConfigurations();
 
         static constexpr int CONTACT_3DOF = 3;
-        static constexpr int FLOATING_VEL = 7;
+        static constexpr int FLOATING_VEL = 6;
         static constexpr int FRICTION_CONE_SIZE = 4;
 
     //---------- Member Variables ---------- //
@@ -138,11 +164,23 @@ namespace torc::mpc {
         osqp::OsqpSolver osqp_solver_;
         osqp::OsqpSettings osqp_settings_;
 
+        sp_matrixx_t A;
+//        constraints::SparseBoxConstraints constraints_;
+
         // Hold the constraint matrix as a vector of triplets
         std::vector<Eigen::Triplet<double>> constraint_triplets_;
         int triplet_idx_{};
 
+        // Model
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;
+
+        // Warm start trajectory
+        Trajectory traj_;
+
+        // TODO: Add support for contact variables
+
+        // dt's
+        std::vector<double> dt_;
 
         // Workspace
         std::unique_ptr<Workspace> ws_;

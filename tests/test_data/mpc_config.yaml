@@ -1,6 +1,7 @@
 general_settings:
-  nodes: 20
+  nodes: 2
   verbose: True
+  node_dt: 0.02
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6

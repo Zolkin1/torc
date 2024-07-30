@@ -243,47 +243,47 @@ public:
     }
 };
 
-//TEST_CASE("Quadruped Inverse Dynamics", "[model][pinocchio][id]") {
-//    using namespace torc::models;
-//    const std::string pin_model_name = "test_pin_model";
-//
-//    constexpr double MARGIN = 1e-6;
-//
-//    std::filesystem::path a1_urdf = std::filesystem::current_path();
-//    a1_urdf += "/test_data/test_a1.urdf";
-//
-//    ModelTester a1_model(pin_model_name, a1_urdf);
-//
-//    constexpr int INPUT_SIZE = 12;
-//    constexpr int STATE_SIZE = 37;
-//
-//    // ----------------------------------------------- //
-//    // --------------- Inverse Dynamics -------------- //
-//    // ----------------------------------------------- //
-//    for (int i = 0; i < 10; i++) {
-//        vectorx_t input = vectorx_t::Zero(INPUT_SIZE);
-//        input.setRandom();
-//        vectorx_t x = a1_model.GetRandomState();
-//        vectorx_t a(a1_model.GetVelDim());
-//        a.setRandom();
-//        a = 10 * a;
-//
-//        // Get some random forces
-//        std::vector<ExternalForce> forces;
-//        forces.emplace_back("FR_foot", vector3_t::Zero());
-//        forces.emplace_back("FL_foot", vector3_t::Zero());
-//
-//        // Get the inverse dynamics
-//        vectorx_t tau = a1_model.InverseDynamics(x, a, forces);
-//
-//        // With zero external force, the result from the inverse dynamics should match the result from the forward dynamics
-//        vectorx_t q, v;
-//        a1_model.ParseState(x, q, v);
-//        vectorx_t xdot = a1_model.GetDynamicsFullTau(q, v, tau);
-//
-//        REQUIRE(VectorEqualWithMargin(xdot.tail(18), a, MARGIN));
-//    }
-//}
+TEST_CASE("Quadruped Inverse Dynamics", "[model][pinocchio][id]") {
+    using namespace torc::models;
+    const std::string pin_model_name = "test_pin_model";
+
+    constexpr double MARGIN = 1e-6;
+
+    std::filesystem::path a1_urdf = std::filesystem::current_path();
+    a1_urdf += "/test_data/test_a1.urdf";
+
+    ModelTester a1_model(pin_model_name, a1_urdf);
+
+    constexpr int INPUT_SIZE = 12;
+    constexpr int STATE_SIZE = 37;
+
+    // ----------------------------------------------- //
+    // --------------- Inverse Dynamics -------------- //
+    // ----------------------------------------------- //
+    for (int i = 0; i < 10; i++) {
+        vectorx_t input = vectorx_t::Zero(INPUT_SIZE);
+        input.setRandom();
+        vectorx_t x = a1_model.GetRandomState();
+        vectorx_t a(a1_model.GetVelDim());
+        a.setRandom();
+        a = 10 * a;
+
+        // Get some random forces
+        std::vector<ExternalForce> forces;
+        forces.emplace_back("FR_foot", vector3_t::Zero());
+        forces.emplace_back("FL_foot", vector3_t::Zero());
+
+        // Get the inverse dynamics
+        vectorx_t q, v;
+        a1_model.ParseState(x, q, v);
+        vectorx_t tau = a1_model.InverseDynamics(q, v, a, forces);
+
+        // With zero external force, the result from the inverse dynamics should match the result from the forward dynamics
+        vectorx_t xdot = a1_model.GetDynamicsFullTau(q, v, tau);
+
+        REQUIRE(VectorEqualWithMargin(xdot.tail(18), a, MARGIN));
+    }
+}
 
 TEST_CASE("Quadruped Inverse Dynamics Derivatives", "[model][pinocchio][id][derivatves]") {
     using namespace torc::models;

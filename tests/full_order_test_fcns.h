@@ -249,13 +249,14 @@ void CheckInverseDynamicsDerivatives(torc::models::FullOrderRigidBody& model, co
         dtau_dv.setZero(model.GetVelDim(), model.GetVelDim());
         dtau_da.setZero(model.GetVelDim(), model.GetVelDim());
 
+        vectorx_t q_rand, v_rand;
+        model.ParseState(random_state, q_rand, v_rand);
+
         // Calculate analytic derivatives
-//        model.InverseDynamicsDerivative(random_state, random_acc, f_ext, dtau_dq, dtau_dv, dtau_da);
+//        model.InverseDynamicsDerivative(q_rand, v_rand, random_acc, f_ext, dtau_dq, dtau_dv, dtau_da);
 
         // Check wrt Configs
 //        vectorx_t tau_1 = model.InverseDynamics(random_state, random_acc, f_ext);
-        vectorx_t q_rand, v_rand;
-        model.ParseState(random_state, q_rand, v_rand);
 
         std::cout << "configuration: " << q_rand << std::endl;
 

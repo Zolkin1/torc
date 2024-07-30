@@ -27,6 +27,8 @@ namespace torc::mpc {
         UpdateConfigurations();
 
         ws_ = std::make_unique<Workspace>();
+        traj_.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(),
+                          robot_model_->GetNumInputs(), contact_frames_, nodes_);
     }
 
     void FullOrderMpc::UpdateConfigurations() {
@@ -51,6 +53,16 @@ namespace torc::mpc {
 
             if (general_settings["verbose"]) {
                 verbose_ = general_settings["verbose"].as<bool>();
+            }
+
+            if (general_settings["node_dt"]) {
+                const auto dt = general_settings["node_dt"].as<double>();
+                dt_.resize(nodes_ - 1);
+                for (double & it : dt_) {
+                    it = dt;
+                }
+            } else {
+                throw std::runtime_error("Node dt not specified!");
             }
         }
 
@@ -96,8 +108,8 @@ namespace torc::mpc {
             throw std::runtime_error("No contact settings provided!");
         }
         YAML::Node contact_settings = config["contacts"];
-        num_contact_locations_ = contact_settings["num_contact_locations"].as<int>();
         contact_frames_ = contact_settings["contact_frames"].as<std::vector<std::string>>();
+        num_contact_locations_ = contact_frames_.size();
 
         if (verbose_) {
             using std::setw;
@@ -161,15 +173,34 @@ namespace torc::mpc {
 
         osqp_instance_.objective_matrix.setIdentity();
         osqp_instance_.objective_vector.setConstant(2);
+        osqp_instance_.lower_bounds.setConstant(-1);
+        osqp_instance_.upper_bounds.setConstant(1);
 
         // Create A sparsity pattern to configure OSQP with
         CreateConstraintSparsityPattern();
+
+        // Copy into constraints, which is what will be updated throughout the code
+        // FromTriplets destroys the object, and osqp-cpp uses a reference to osqp_instance_, so we can't destroy it.
+        // Thus, we will use constraints_ to hold the new constraints then copy the data vector in.
+        // I believe we can update the bounds in place though.
+        A = osqp_instance_.constraint_matrix;
 
         // Init OSQP
         auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
 
         // Reset the triplet index, so we can re-use the triplet vector without re-allocating
         triplet_idx_ = 0;
+
+        // Setup trajectory
+        traj_.SetNumNodes(nodes_);
+        traj_.SetDefault(robot_model_->GetNeutralConfig());
+
+        // Setup remaining workspace memory
+        ws_->acc.resize(robot_model_->GetVelDim());
+        for (const auto& frame : contact_frames_) {
+            ws_->f_ext.emplace_back(frame, vector3_t::Zero());
+        }
+
         config_timer.Toc();
         if (verbose_) {
             std::cout << "MPC configuration took " << config_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
@@ -179,6 +210,20 @@ namespace torc::mpc {
     Trajectory FullOrderMpc::Compute(const vectorx_t& state) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
+
+        vectorx_t q, v;
+        robot_model_->ParseState(state, q, v);
+
+        traj_.SetConfiguration(0, q);
+        traj_.SetVelocity(0, v);
+
+        CreateConstraints();
+//        assert(triplet_idx_ == constraint_triplets_.size());
+
+        CreateCost();
+
+        // Update OSQP
+        osqp_solver_.UpdateConstraintMatrix(osqp_instance_.constraint_matrix);
         auto status = osqp_solver_.Solve();
 
         compute_timer.Toc();
@@ -186,8 +231,202 @@ namespace torc::mpc {
             std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
         }
 
-        Trajectory traj;
-        return traj;
+        return traj_;
+    }
+
+    // ------------------------------------------------- //
+    // -------------- Constraint Creation -------------- //
+    // ------------------------------------------------- //
+    void FullOrderMpc::CreateConstraints() {
+        triplet_idx_ = 0;
+        AddICConstraint();
+        for (int node = 0; node < nodes_ - 1; node++) {
+            // Dynamics related constraints don't happen in the last node
+            AddIntegrationConstraint(node);
+            AddIDConstraint(node);
+            AddFrictionConeConstraint(node);
+            AddConfigurationBoxConstraint(node);
+            AddVelocityBoxConstraint(node);
+            AddTorqueBoxConstraint(node);
+//            AddSwingHeightConstraint(node);
+//            AddHolonomicConstraint(node);
+        }
+
+        AddFrictionConeConstraint(nodes_ - 1);
+        AddConfigurationBoxConstraint(nodes_ - 1);
+        AddVelocityBoxConstraint(nodes_ - 1);
+        AddTorqueBoxConstraint(nodes_ - 1);
+//        AddSwingHeightConstraint(nodes_ - 1);
+//        AddHolonomicConstraint(nodes_ - 1);
+    }
+
+    void FullOrderMpc::AddICConstraint() {
+        // Set constraint matrix
+        int row_start = 0;
+        int col_start = 0;
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+
+        row_start += robot_model_->GetVelDim();
+        col_start += robot_model_->GetVelDim();
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+
+        // Set bounds
+        // TODO: Need to convert these configurations into the proper tangent space!
+//        osqp_instance_.lower_bounds.head(robot_model_->GetVelDim()) = traj_.GetConfiguration(0);
+//        osqp_instance_.upper_bounds.head(robot_model_->GetVelDim()) = traj_.GetConfiguration(0);
+
+        osqp_instance_.lower_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()) = traj_.GetVelocity(0);
+        osqp_instance_.upper_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()) = traj_.GetVelocity(0);
+    }
+
+    void FullOrderMpc::AddIntegrationConstraint(int node) {
+        assert(node != nodes_ - 1);
+
+        const int row_start = GetConstraintRow(node, Integrator);
+
+        // q_k identity
+        int col_start = GetDecisionIdx(node, Configuration);
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+
+        // q_k+1 negative identity
+        col_start = GetDecisionIdx(node + 1, Configuration);
+        DiagonalScalarMatrixToTriplet(-1, row_start, col_start, robot_model_->GetVelDim());
+
+        // TODO: What is this sparsity pattern?
+        // velocity mapping
+        // TODO: SET!!
+        col_start = GetDecisionIdx(node, Velocity);
+        ws_->int_mat.setConstant(1);
+        MatrixToTriplet(ws_->int_mat, row_start, col_start);
+        // TODO: SET!!
+
+        // TODO: Set the bounds
+    }
+
+    void FullOrderMpc::AddIDConstraint(int node) {
+        assert(node != nodes_ - 1);
+
+        ws_->acc = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
+
+        const int row_start = GetConstraintRow(node, ID);
+
+        // dtau_dq
+        int col_start = GetDecisionIdx(node, Configuration);
+        ws_->id_state_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
+        MatrixToTriplet(ws_->id_state_mat, row_start, col_start);
+
+        // dtau_dv
+        col_start = GetDecisionIdx(node, Velocity);
+        MatrixToTriplet(ws_->id_state_mat, row_start, col_start);
+
+        // dtau_dtau
+        col_start = GetDecisionIdx(node, Torque);
+        DiagonalScalarMatrixToTriplet(-1, row_start + FLOATING_VEL, col_start, robot_model_->GetNumInputs());
+
+        // dtau_df
+        col_start = GetDecisionIdx(node, GroundForce);
+        ws_->id_force_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, num_contact_locations_*CONTACT_3DOF, 1);
+        MatrixToTriplet(ws_->id_force_mat, row_start, col_start);
+
+        // dtau_dv2
+        col_start = GetDecisionIdx(node + 1, Velocity);
+        MatrixToTriplet(ws_->id_state_mat, row_start, col_start);
+
+        // Set the bounds
+        for (auto& f : ws_->f_ext) {
+            f.force_linear = traj_.GetForce(node, f.frame_name);
+        }
+
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL)
+            = robot_model_->InverseDynamics(traj_.GetConfiguration(node), traj_.GetVelocity(node), ws_->acc, ws_->f_ext);
+        osqp_instance_.lower_bounds.segment(row_start + FLOATING_VEL, robot_model_->GetNumInputs()) -= traj_.GetTau(node);
+
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL) =
+                osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL);
+
+    }
+
+    void FullOrderMpc::AddFrictionConeConstraint(int node) {
+        int row_start = GetConstraintRow(node, FrictionCone);
+        int col_start = GetDecisionIdx(node, GroundForce);
+
+        vector3_t h = {1, 0, 0};
+        vector3_t l = {0, 1, 0};
+        vector3_t n = {0, 0, 1};
+
+        ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
+                -(h + n*friction_coef_).transpose(),
+                (l - n*friction_coef_).transpose(),
+                -(l + n*friction_coef_).transpose();
+
+        for (int contact = 0; contact < num_contact_locations_; contact++) {
+            // Setting force to zero when in swing
+            DiagonalScalarMatrixToTriplet(1, row_start, col_start, CONTACT_3DOF);
+            osqp_instance_.lower_bounds.segment(row_start, CONTACT_3DOF).setZero();
+            osqp_instance_.upper_bounds.segment(row_start, CONTACT_3DOF).setZero();
+
+            row_start += CONTACT_3DOF;
+
+            // Force in friction cone when in contact
+            MatrixToTriplet(ws_->fric_cone_mat, row_start, col_start);
+            osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setConstant(-std::numeric_limits<double>::max());
+            osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
+
+            row_start += FRICTION_CONE_SIZE;
+            col_start += CONTACT_3DOF;
+        }
+    }
+
+    void FullOrderMpc::AddConfigurationBoxConstraint(int node) {
+        const int row_start = GetConstraintRow(node, ConfigBox);
+        const int col_start = GetDecisionIdx(node, Configuration);
+
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+
+        // TODO: Add bounds
+        // Get these with a call to pinocchio's model's upperPositionLimit and lowerPositionLimit
+//        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).setConstant();
+//        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).setZero();
+
+    }
+
+    void FullOrderMpc::AddVelocityBoxConstraint(int node) {
+        const int row_start = GetConstraintRow(node, VelBox);
+        const int col_start = GetDecisionIdx(node, Velocity);
+
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+
+        // TODO: Add bounds
+        // Get these with a call to pinocchio's model's velocityLimit
+//        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).setConstant();
+//        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).setZero();
+    }
+
+    void FullOrderMpc::AddTorqueBoxConstraint(int node) {
+        const int row_start = GetConstraintRow(node, TorqueBox);
+        const int col_start = GetDecisionIdx(node, Torque);
+
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs());
+
+        // TODO: Add bounds
+        // Get these with a call to pinocchio's model's effort limit
+//        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).setConstant();
+//        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).setZero();
+    }
+
+    void FullOrderMpc::AddSwingHeightConstraint(int node) {
+
+    }
+
+    void FullOrderMpc::AddHolonomicConstraint(int node) {
+
+    }
+
+    // ------------------------------------------------- //
+    // ----------------- Cost Creation ----------------- //
+    // ------------------------------------------------- //
+    void FullOrderMpc::CreateCost() {
+
     }
 
     // ------------------------------------------------- //
@@ -195,6 +434,8 @@ namespace torc::mpc {
     // ------------------------------------------------- //
     void FullOrderMpc::CreateConstraintSparsityPattern() {
         // Fill out the triplets with dummy values -- this will allocate all the memory for the triplets
+        AddICPattern();
+
         for (int node = 0; node < nodes_ - 1; node++) {
             // Dynamics related constraints don't happen in the last node
             AddIntegrationPattern(node);
@@ -214,22 +455,35 @@ namespace torc::mpc {
         AddSwingHeightPattern(nodes_ - 1);
         AddHolonomicPattern(nodes_ - 1);
 
-        int max_row = -1;
-        int max_col = -1;
-        for (const auto& trip : constraint_triplets_) {
-            if (trip.col() > max_col) {
-                max_col = trip.col();
-            }
-            if (trip.row() > max_row) {
-                max_row = trip.row();
-            }
-        }
-
-        std::cout << "max row: " << max_row << std::endl;
-        std::cout << "max col: " << max_col << std::endl;
+//        int max_row = -1;
+//        int max_col = -1;
+//        for (const auto& trip : constraint_triplets_) {
+//            if (trip.col() > max_col) {
+//                max_col = trip.col();
+//            }
+//            if (trip.row() > max_row) {
+//                max_row = trip.row();
+//            }
+//        }
+//
+//        std::cout << "max row: " << max_row << std::endl;
+//        std::cout << "max col: " << max_col << std::endl;
 
         // Make the matrix with the sparsity pattern
         osqp_instance_.constraint_matrix.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
+    }
+
+    void FullOrderMpc::AddICPattern() {
+        int row_start = 0;
+        int col_start = 0;
+        matrixx_t id;
+        id.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+        MatrixToNewTriplet(id, row_start, col_start);
+
+        row_start += robot_model_->GetVelDim();
+        col_start += robot_model_->GetVelDim();
+
+        MatrixToNewTriplet(id, row_start, col_start);
     }
 
     void FullOrderMpc::AddIntegrationPattern(int node) {
@@ -289,7 +543,16 @@ namespace torc::mpc {
 
         matrixx_t id;
         id.setIdentity(CONTACT_3DOF, CONTACT_3DOF);
-        ws_->fric_cone_mat.setConstant(4, 3, 1);
+
+        vector3_t h = {1, 0, 0};
+        vector3_t l = {0, 1, 0};
+        vector3_t n = {0, 0, 1};
+
+        ws_->fric_cone_mat.resize(FRICTION_CONE_SIZE, CONTACT_3DOF);
+        ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
+                -(h + n*friction_coef_).transpose(),
+                (l - n*friction_coef_).transpose(),
+                -(l + n*friction_coef_).transpose();
 
         for (int contact = 0; contact < num_contact_locations_; contact++) {
             // Setting force to zero when in swing
@@ -309,24 +572,27 @@ namespace torc::mpc {
         const int row_start = GetConstraintRow(node, ConfigBox);
         const int col_start = GetDecisionIdx(node, Configuration);
 
-        ws_->q_identity.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-        MatrixToNewTriplet(ws_->q_identity, row_start, col_start);
+        matrixx_t id;
+        id.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+        MatrixToNewTriplet(id, row_start, col_start);
     }
 
     void FullOrderMpc::AddVelocityBoxPattern(int node) {
         const int row_start = GetConstraintRow(node, VelBox);
         const int col_start = GetDecisionIdx(node, Velocity);
 
-        ws_->v_identity.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-        MatrixToNewTriplet(ws_->v_identity, row_start, col_start);
+        matrixx_t id;
+        id.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+        MatrixToNewTriplet(id, row_start, col_start);
     }
 
     void FullOrderMpc::AddTorqueBoxPattern(int node) {
         const int row_start = GetConstraintRow(node, TorqueBox);
         const int col_start = GetDecisionIdx(node, Torque);
 
-        ws_->tau_identity.setIdentity(robot_model_->GetNumInputs(), robot_model_->GetNumInputs());
-        MatrixToNewTriplet(ws_->tau_identity, row_start, col_start);
+        matrixx_t id;
+        id.setIdentity(robot_model_->GetNumInputs(), robot_model_->GetNumInputs());
+        MatrixToNewTriplet(id, row_start, col_start);
     }
 
     void FullOrderMpc::AddSwingHeightPattern(int node) {
@@ -359,7 +625,9 @@ namespace torc::mpc {
     int FullOrderMpc::GetNumConstraints() const {
         // Need to account for the fact that the last node is different
         // The last node does NOT have a ID or integrator constraint
-        return GetConstraintsPerNode() * nodes_ - (NumIntegratorConstraintsNode() + NumIDConstraintsNode());
+        // The start also has an initial condition constraint
+        return GetConstraintsPerNode() * nodes_ - (NumIntegratorConstraintsNode() + NumIDConstraintsNode())
+            + robot_model_->GetVelDim()*2;
     }
 
     int FullOrderMpc::GetConstraintsPerNode() const {
@@ -399,6 +667,7 @@ namespace torc::mpc {
 
     int FullOrderMpc::GetConstraintRow(int node, const ConstraintType& constraint) const {
         int row = GetConstraintsPerNode()*node;
+        row += 2*robot_model_->GetVelDim(); // Account for initial condition constraints
         if (node == nodes_ - 1) {
             row -= NumIntegratorConstraintsNode() + NumIDConstraintsNode();
         }
@@ -463,6 +732,13 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::DiagonalScalarMatrixToTriplet(double val, int row_start, int col_start, int size) {
+        for (int idx = 0; idx < size; idx++) {
+            constraint_triplets_[triplet_idx_] = Eigen::Triplet<double>(row_start + idx, col_start + idx, val);
+            triplet_idx_++;
+        }
+    }
+
     // ------------------------------------------------- //
     // ----- Getters for Sizes of Individual nodes ----- //
     // ------------------------------------------------- //
@@ -501,6 +777,11 @@ namespace torc::mpc {
 
     int FullOrderMpc::NumHolonomicConstraintsNode() const {
         return num_contact_locations_*2;
+    }
+
+    // Other functions
+    void FullOrderMpc::SetVerbosity(bool verbose) {
+        verbose_ = verbose;
     }
 
 } // namespace torc::mpc
