@@ -158,7 +158,7 @@ namespace torc::mpc {
         static constexpr int CONTACT_3DOF = 3;
         static constexpr int FLOATING_VEL = 6;
         static constexpr int FRICTION_CONE_SIZE = 4;
-
+        static constexpr int POS_VARS = 3;
     //---------- Member Variables ---------- //
         fs::path config_file_;
 

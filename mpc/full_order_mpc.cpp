@@ -261,6 +261,7 @@ namespace torc::mpc {
 //        AddHolonomicConstraint(nodes_ - 1);
     }
 
+    // TODO: Remove if everything is defined as a difference
     void FullOrderMpc::AddICConstraint() {
         // Set constraint matrix
         int row_start = 0;
@@ -272,10 +273,7 @@ namespace torc::mpc {
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
 
         // Set bounds
-        // TODO: Need to convert these configurations into the proper tangent space!
-//        osqp_instance_.lower_bounds.head(robot_model_->GetVelDim()) = traj_.GetConfiguration(0);
-//        osqp_instance_.upper_bounds.head(robot_model_->GetVelDim()) = traj_.GetConfiguration(0);
-
+        // There is no configuration initial condition since the configuration is determined by differences between the nodes
         osqp_instance_.lower_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()) = traj_.GetVelocity(0);
         osqp_instance_.upper_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()) = traj_.GetVelocity(0);
     }
@@ -283,25 +281,54 @@ namespace torc::mpc {
     void FullOrderMpc::AddIntegrationConstraint(int node) {
         assert(node != nodes_ - 1);
 
-        const int row_start = GetConstraintRow(node, Integrator);
+        int row_start = GetConstraintRow(node, Integrator);
 
-        // q_k identity
+        // q^b_k identity
         int col_start = GetDecisionIdx(node, Configuration);
-        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, POS_VARS);
 
-        // q_k+1 negative identity
+        // q^q_k negative identity
+        row_start += 3;
+        col_start += 3;
+        DiagonalScalarMatrixToTriplet(-1, row_start, col_start, 3);
+
+        // q^j_k identity
+        row_start += 3;
+        col_start += 3;
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs());   // TODO Should probably be num joints not inputs
+
+        // q^b_k+1 negative identity
+        row_start = GetConstraintRow(node, Integrator);
         col_start = GetDecisionIdx(node + 1, Configuration);
-        DiagonalScalarMatrixToTriplet(-1, row_start, col_start, robot_model_->GetVelDim());
+        DiagonalScalarMatrixToTriplet(-1, row_start, col_start, POS_VARS);
 
-        // TODO: What is this sparsity pattern?
-        // velocity mapping
-        // TODO: SET!!
+        // q^j_k+1 negative identity
+        row_start += 3;
+        col_start += 6;
+        DiagonalScalarMatrixToTriplet(-1, row_start, col_start, robot_model_->GetNumInputs());      // TODO Should probably be num joints not inputs
+
+        // v_k dt*identity
+        row_start = GetConstraintRow(node, Integrator);
         col_start = GetDecisionIdx(node, Velocity);
-        ws_->int_mat.setConstant(1);
-        MatrixToTriplet(ws_->int_mat, row_start, col_start);
-        // TODO: SET!!
+        DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, robot_model_->GetVelDim());
 
-        // TODO: Set the bounds
+        // Base position bounds
+        const vector3_t pos_constant = -traj_.GetConfiguration(node + 1).head<POS_VARS>() + traj_.GetConfiguration(node).head<POS_VARS>() + dt_[node]*traj_.GetVelocity(node).head<POS_VARS>();
+        osqp_instance_.lower_bounds.segment<POS_VARS>(row_start) = pos_constant;
+        osqp_instance_.upper_bounds.segment<POS_VARS>(row_start) = pos_constant;
+        row_start += POS_VARS;
+
+        // Base orientation bounds
+        // TODO: Add in orientation constant
+        vector3_t orientation_constant = dt_[node]*traj_.GetVelocity(node).segment<3>(POS_VARS); //-log(q_k^-1*q_k+1) + dt*v;
+        osqp_instance_.lower_bounds.segment<3>(row_start) = orientation_constant;
+        osqp_instance_.upper_bounds.segment<3>(row_start) = orientation_constant;
+
+        // Joint bounds
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = // TODO Should probably be num joints not inputs
+            - traj_.GetConfiguration(node+1).tail(robot_model_->GetNumInputs())
+            + traj_.GetConfiguration(node).tail(robot_model_->GetNumInputs())
+            + dt_[node]*traj_.GetVelocity(node).tail(robot_model_->GetNumInputs());
     }
 
     void FullOrderMpc::AddIDConstraint(int node) {
@@ -384,6 +411,9 @@ namespace torc::mpc {
 
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
 
+        // TODO: Add orientation constraints
+        //  In the current formulation orientation constraints are very complex as we have a recursive definition to get the orientation at a node
+
         // Set configuration bounds
         // Ignore the first element as it is assumed that the first 7 elements are all identical and very large (i.e. no restrictions on the floating base).
         osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim())
@@ -400,8 +430,8 @@ namespace torc::mpc {
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
 
         // Set velocity bounds
-        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()) = -robot_model_->GetVelocityJointLimits();
-        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()) = robot_model_->GetVelocityJointLimits();
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()) = -robot_model_->GetVelocityJointLimits() - traj_.GetVelocity(node);
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()) = robot_model_->GetVelocityJointLimits() - traj_.GetVelocity(node);
     }
 
     void FullOrderMpc::AddTorqueBoxConstraint(int node) {
@@ -411,8 +441,8 @@ namespace torc::mpc {
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs());
 
         // Set torque bounds
-        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits();
-        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits();
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits() - traj_.GetTau(node);
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits() - traj_.GetTau(node);
     }
 
     void FullOrderMpc::AddSwingHeightConstraint(int node) {
