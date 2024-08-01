@@ -364,6 +364,34 @@ namespace torc::models {
             *qbar_k*pinocchio::quaternion::exp3(xi)*pinocchio::quaternion::exp3(w*dt));
     }
 
+    void FullOrderRigidBody::FrameVelDerivWrtConfiguration(const vectorx_t& q,
+        const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian) {
+        // TODO: Consider swapping for auto diff
+
+        pinocchio::computeForwardKinematicsDerivatives(pin_model_, *pin_data_, q, v, a);
+
+        matrix6x_t j2(6, GetVelDim());
+
+        pinocchio::getFrameVelocityDerivatives(pin_model_, *pin_data_,
+            GetFrameIdx(frame), pinocchio::WORLD, jacobian, j2);
+
+        // TODO: The first 6 elements don't match because the jacobian is using local velocity vectors, I want perturbations in the global config
+        // So for now, we will use finite differencing on the first few elements
+        vector3_t frame_vel = GetFrameState(frame, q, v, pinocchio::WORLD).vel.linear();
+
+        static constexpr double FD_DELTA = 1e-8;
+        vectorx_t q_pert = q;
+        for (int i = 0; i < FLOATING_VEL; i++) {
+            PerturbConfiguration(q_pert, FD_DELTA, i);
+            vector3_t frame_pos_pert = GetFrameState(frame, q_pert, v, pinocchio::WORLD).vel.linear();
+            q_pert = q;
+
+            for (int j = 0; j < frame_vel.size(); j++) {
+                jacobian(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
+            }
+        }
+    }
+
 
     vectorx_t FullOrderRigidBody::InputsToTau(const vectorx_t& input) const {
         assert(input.size() == act_mat_.cols());
@@ -474,6 +502,21 @@ namespace torc::models {
         return pin_model_.effortLimit.tail(GetNumInputs());
     }
 
+    void FullOrderRigidBody::PerturbConfiguration(vectorx_t& q, double delta, int idx) {
+        if (idx > GetVelDim()) {
+            throw std::runtime_error("Invalid q perturbation index!");
+        }
+
+        if (idx < 3) {
+            q(idx) += delta;
+        } else if (idx < 6) {
+            vector3_t q_pert = vector3_t::Zero();
+            q_pert(idx - 3) += delta;
+            q.array().segment<4>(3) = (static_cast<quat_t>(q.segment<4>(3)) * pinocchio::quaternion::exp3(q_pert)).coeffs();
+        } else {
+            q(idx + 1) += delta;
+        }
+    }
 
 
 

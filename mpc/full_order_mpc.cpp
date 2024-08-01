@@ -6,10 +6,15 @@
 #include "yaml-cpp/yaml.h"
 
 #include "full_order_mpc.h"
+
+#include <pinocchio/algorithm/kinematics-derivatives.hxx>
+
 #include "eigen_utils.h"
 #include "torc_timer.h"
 
 // TODO: Figure out how I want to handle the geometry stuff
+// TODO: Determine exactly which frame the floating base velocities are in. Pinocchio puts them in the local frame,
+//  Mujoco puts them in the global frame. If I do it all in the local frame, then I think it makes more sense.
 
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const fs::path& config_file, const fs::path& model_path)
@@ -289,7 +294,7 @@ namespace torc::mpc {
         // q^q_k linearization
         row_start += POS_VARS;
         col_start += POS_VARS;
-        matrix3_t dxi = GetQuatIntegrationLinearizationXi(node);
+        matrix3_t dxi = QuatIntegrationLinearizationXi(node);
         MatrixToTriplet(dxi, row_start, col_start);
         // DiagonalScalarMatrixToTriplet(-1, row_start, col_start, 3);
 
@@ -316,7 +321,7 @@ namespace torc::mpc {
         // v^q_k linearization
         row_start += POS_VARS;
         col_start += POS_VARS;
-        matrix3_t dv = GetQuatIntegrationLinearizationW(node);
+        matrix3_t dv = QuatIntegrationLinearizationW(node);
         MatrixToTriplet(dv, row_start, col_start);
 
         // v^j_k dt*identity
@@ -426,7 +431,7 @@ namespace torc::mpc {
         // Configuration linearization
         row_start += POS_VARS;
         col_start += POS_VARS;
-        matrix43_t q_lin = GetQuatLinearization(node);
+        matrix43_t q_lin = QuatLinearization(node);
         MatrixToTriplet(q_lin, row_start, col_start);
 
         // joint identity
@@ -470,16 +475,8 @@ namespace torc::mpc {
         int row_start = GetConstraintRow(node, SwingHeight);
         const int col_start = GetDecisionIdx(node, Configuration);
 
-        // TODO: Clean up the code to have less redundant function calls
         for (const auto& frame : contact_frames_) {
-            // Try pinocchio's: getFrameAccelerationDerivatives(). Remember to call computeForwardKinematicsDerivatives() first
-            // I need to verify that it works as expected. I expect the following:
-            // v_partial_dq should be the derivative that I want for the configuration linearization
-            // v_partial_dv should be the frame jacobian called below
-
-            // TODO: Calculate dframe_pos/dq, which I think is just the frame jacobian, verify with fd.
-            // Compute frame jacobian for each contact frame
-            robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), ws_->frame_jacobian);
+            SwingHeightLinearization(node, frame, ws_->frame_jacobian);
 
             // Grab just the z-height element
             ws_->swing_vec = ws_->frame_jacobian.row(2);
@@ -489,12 +486,11 @@ namespace torc::mpc {
             robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
             vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
 
-            // TODO: Is this correct with the geometry?
+            // Set bounds
             osqp_instance_.lower_bounds(row_start)
-                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) - swing_traj_[frame][node];
-
+                = -frame_pos(2) - swing_traj_[frame][node];
             osqp_instance_.upper_bounds(row_start)
-                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) + swing_traj_[frame][node];
+                = -frame_pos(2) + swing_traj_[frame][node];
 
             row_start++;
         }
@@ -517,16 +513,13 @@ namespace torc::mpc {
 
             // TODO: Need to compute how the velocity changes wrt q
 
-            // Get the frame position on the warm start trajectory
+            // Get the frame vel on the warm start trajectory
             robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
-            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
+            vector3_t frame_vel = robot_model_->GetFrameState(frame).vel.linear();
 
             // TODO: Is this correct with the geometry?
-            osqp_instance_.lower_bounds(row_start)
-                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) - swing_traj_[frame][node];
-
-            osqp_instance_.upper_bounds(row_start)
-                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) + swing_traj_[frame][node];
+            osqp_instance_.lower_bounds.segment<2>(row_start) = -frame_vel.head<2>();
+            osqp_instance_.upper_bounds.segment<2>(row_start) = -frame_vel.head<2>();
 
             row_start++;
         }
@@ -535,7 +528,7 @@ namespace torc::mpc {
     // -------------------------------------- //
     // -------- Linearization Helpers ------- //
     // -------------------------------------- //
-    matrix3_t FullOrderMpc::GetQuatIntegrationLinearizationXi(int node) {
+    matrix3_t FullOrderMpc::QuatIntegrationLinearizationXi(int node) {
         assert(node != nodes_ - 1);
         constexpr double DELTA = 1e-8;
 
@@ -559,7 +552,7 @@ namespace torc::mpc {
         return update_fd;
     }
 
-    matrix3_t FullOrderMpc::GetQuatIntegrationLinearizationW(int node) {
+    matrix3_t FullOrderMpc::QuatIntegrationLinearizationW(int node) {
         assert(node != nodes_ - 1);
 
         // TODO: Change for code gen derivative
@@ -582,7 +575,7 @@ namespace torc::mpc {
         return update_fd;
     }
 
-    matrix43_t FullOrderMpc::GetQuatLinearization(int node) {
+    matrix43_t FullOrderMpc::QuatLinearization(int node) {
         matrix43_t q_lin;
 
         quat_t qbar = traj_.GetQuat(node);
@@ -603,6 +596,20 @@ namespace torc::mpc {
         return q_lin;
     }
 
+    void FullOrderMpc::SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian) {
+        jacobian.resize(6, robot_model_->GetVelDim());
+        jacobian.setZero();
+        // *** Note *** The pinocchio body velocity is in the local frame, put I want perturbations to
+        // configurations in the world frame, so we can always set the first 3x3 mat to identity
+        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian );
+        jacobian.topLeftCorner<3,3>().setIdentity();
+    }
+
+    void FullOrderMpc::HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian) {
+        // pinocchio::impl::computeForwardKinematicsDerivatives()
+        robot_model_->FrameVelDerivWrtConfiguration(traj_.GetConfiguration(node),
+            traj_.GetVelocity(node), vectorx_t::Zero(robot_model_->GetVelDim()), frame, jacobian);
+    }
 
 
     // ------------------------------------------------- //

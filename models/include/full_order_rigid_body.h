@@ -109,10 +109,15 @@ namespace torc::models {
         vector3_t QuaternionIntegrationRelative(const quat_t& qbar_kp1, const quat_t& qbar_k, const vector3_t& xi,
             const vector3_t& w, double dt);
 
+        void FrameVelDerivWrtConfiguration(const vectorx_t& q,
+            const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian);
+
         [[nodiscard]] vectorx_t GetUpperConfigLimits() const;
         [[nodiscard]] vectorx_t GetLowerConfigLimits() const;
         [[nodiscard]] vectorx_t GetVelocityJointLimits() const;
         [[nodiscard]] vectorx_t GetTorqueJointLimits() const;
+
+        void PerturbConfiguration(vectorx_t& q, double delta, int idx);
 
         /**
          * Takes the torques on the actuated coordinates and maps to a vector of

@@ -83,7 +83,8 @@ namespace torc::models {
          * @param frame name
          * @return frame placement (in world frame) and velocity (in local frame).
          */
-        [[nodiscard]] FrameState GetFrameState(const std::string& frame) const;
+        [[nodiscard]] FrameState GetFrameState(const std::string& frame,
+            const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED) const;
 
         /**
          * Calculate the frame state after calling the forward kinematics.
@@ -91,7 +92,8 @@ namespace torc::models {
          * @param state of the robot
          * @return frame placement (in world frame) and velocity (in local frame).
          */
-        FrameState GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v);
+        FrameState GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v,
+            const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED);
 
         void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J) const;
 

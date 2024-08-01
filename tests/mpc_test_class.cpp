@@ -23,6 +23,11 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     MpcTestClass mpc(mpc_config, a1_urdf);
 
     mpc.CheckQuaternionIntegration();
-    mpc.BenchmarkQuaternionIntegrationLin();
-    mpc.BenchmarkQuaternionConfigurationLin();
+    mpc.CheckSwingHeightLin();
+    mpc.CheckHolonomicLin();
+    // mpc.BenchmarkQuaternionIntegrationLin();
+    // mpc.BenchmarkQuaternionConfigurationLin();
+    // mpc.BenchmarkSwingHeightLin();
+    // mpc.BenchmarkHolonomicLin();
+    // mpc.BenchmarkCompute();
 }

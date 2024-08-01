@@ -213,20 +213,19 @@ namespace torc::models {
          pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
     }
 
-    FrameState PinocchioModel::GetFrameState(const std::string& frame) const {
+    FrameState PinocchioModel::GetFrameState(const std::string& frame, const pinocchio::ReferenceFrame& ref) const {
         const long idx = GetFrameIdx(frame);
         if (idx != -1) {
             FrameState state(pin_data_->oMf.at(idx),
-                             pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx));
+                             pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx, ref));
             return state;
-        } else {
-            throw std::runtime_error("Provided frame does not exist.");
         }
+        throw std::runtime_error("Provided frame does not exist.");
     }
 
-     FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v) {
+     FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v, const pinocchio::ReferenceFrame& ref) {
          SecondOrderFK(q, v);
-         return GetFrameState(frame);
+         return GetFrameState(frame, ref);
      }
 
     void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J) const {
@@ -238,7 +237,7 @@ namespace torc::models {
         J.resize(6, GetVelDim());
         J.setZero();
 
-        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, J);
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, pinocchio::LOCAL_WORLD_ALIGNED, J);
     }
 
 } // torc::models

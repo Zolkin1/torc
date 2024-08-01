@@ -102,11 +102,14 @@ namespace torc::mpc {
         void AddHolonomicConstraint(int node);
 
     // -------- Linearization Helpers ------- //
-        matrix3_t GetQuatIntegrationLinearizationXi(int node);
-        matrix3_t GetQuatIntegrationLinearizationW(int node);
+        matrix3_t QuatIntegrationLinearizationXi(int node);
+        matrix3_t QuatIntegrationLinearizationW(int node);
 
-        matrix43_t GetQuatLinearization(int node);
+        matrix43_t QuatLinearization(int node);
 
+        void SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian);
+
+        void HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian);
     // ----------- Cost Creation ----------- //
         void CreateCost();
 
