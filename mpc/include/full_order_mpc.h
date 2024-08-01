@@ -110,6 +110,7 @@ namespace torc::mpc {
         void SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian);
 
         void HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian);
+        void HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian);
     // ----------- Cost Creation ----------- //
         void CreateCost();
 
@@ -142,7 +143,7 @@ namespace torc::mpc {
 
         void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start);
         void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start);
-        void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
+        void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, bool prune_zeros=false);
         void VectorToTriplet(const vectorx_t& vec, int row_start, int col_start);
         void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
         /**
@@ -168,6 +169,7 @@ namespace torc::mpc {
 
         static constexpr int CONTACT_3DOF = 3;
         static constexpr int FLOATING_VEL = 6;
+        static constexpr int FLOATING_BASE = 7;
         static constexpr int FRICTION_CONE_SIZE = 4;
         static constexpr int POS_VARS = 3;
         static constexpr int QUAT_VARS = 4;
@@ -181,7 +183,7 @@ namespace torc::mpc {
         osqp::OsqpSolver osqp_solver_;
         osqp::OsqpSettings osqp_settings_;
 
-        sp_matrixx_t A;
+        sp_matrixx_t A_;
 //        constraints::SparseBoxConstraints constraints_;
 
         // Hold the constraint matrix as a vector of triplets
