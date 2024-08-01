@@ -348,7 +348,6 @@ namespace torc::mpc {
         row_start += POS_VARS;
 
         // Base orientation bounds
-        // vector3_t orientation_constant = dt_[node]*traj_.GetVelocity(node).segment<3>(POS_VARS); //-log(q_k^-1*q_k+1) + dt*v;
         osqp_instance_.lower_bounds.segment<3>(row_start).setZero();
         osqp_instance_.upper_bounds.segment<3>(row_start).setZero();
 
@@ -620,7 +619,7 @@ namespace torc::mpc {
 
     void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
         // TODO: Verify the frames
-        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian);
+        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::WORLD);
     }
 
 
@@ -657,24 +656,24 @@ namespace torc::mpc {
         AddSwingHeightPattern(nodes_ - 1);
         AddHolonomicPattern(nodes_ - 1);
 
-        int max_row = -1;
-        int max_col = -1;
-        for (const auto& trip : constraint_triplets_) {
-            if (trip.col() > max_col) {
-                max_col = trip.col();
-            }
-            if (trip.row() > max_row) {
-                max_row = trip.row();
-            }
-        }
-
-        std::cout << "max row: " << max_row << std::endl;
-        std::cout << "max col: " << max_col << std::endl;
+        // int max_row = -1;
+        // int max_col = -1;
+        // for (const auto& trip : constraint_triplets_) {
+        //     if (trip.col() > max_col) {
+        //         max_col = trip.col();
+        //     }
+        //     if (trip.row() > max_row) {
+        //         max_row = trip.row();
+        //     }
+        // }
+        //
+        // std::cout << "max row: " << max_row << std::endl;
+        // std::cout << "max col: " << max_col << std::endl;
 
         // Make the matrix with the sparsity pattern
         osqp_instance_.constraint_matrix.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
 
-        std::cout << "A: \n" << osqp_instance_.constraint_matrix << std::endl;
+        // std::cout << "A: \n" << osqp_instance_.constraint_matrix << std::endl;
     }
 
     void FullOrderMpc::AddICPattern() {

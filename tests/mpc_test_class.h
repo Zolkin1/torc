@@ -15,13 +15,102 @@ namespace torc::mpc {
         MpcTestClass(const fs::path& config_file, const fs::path& model_path)
             : FullOrderMpc(config_file, model_path) {}
 
-        void CheckQuaternionIntegration() {
-            // Make some
+        void CheckQuaternionIntLin() {
+            PrintTestHeader("Quaternion Integration Linearization");
+
+            for (int k = 0; k < 5; k++) {
+                // Random state
+                vectorx_t q_rand = robot_model_->GetRandomConfig();
+                vectorx_t q2_rand = robot_model_->GetRandomConfig();
+
+                vectorx_t v_rand = robot_model_->GetRandomVel();
+                vectorx_t v2_rand = robot_model_->GetRandomVel();
+
+                traj_.SetConfiguration(0, q_rand);
+                traj_.SetVelocity(0, v_rand);
+                traj_.SetConfiguration(1, q2_rand);
+                traj_.SetVelocity(1, v2_rand);
+
+                // xi
+                // Analytic
+                matrix3_t dxi = QuatIntegrationLinearizationXi(0);
+
+                // Finite difference
+                matrix3_t fd = matrix3_t::Zero();
+                vector3_t xi = vector3_t::Zero();
+                vector3_t xi1 = robot_model_->QuaternionIntegrationRelative( traj_.GetQuat(1),
+                    traj_.GetQuat(0), xi, traj_.GetVelocity(0).segment<3>(3), 0.02);
+                for (int i = 0; i < 3; i++) {
+                    xi(i) += FD_DELTA;
+                    vector3_t xi2 = robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(1),
+                        traj_.GetQuat(0), xi, traj_.GetVelocity(0).segment<3>(3), 0.02);
+                    for (int j = 0; j < 3; j++) {
+                        fd(j, i) = (xi2(j) - xi1(j))/FD_DELTA;
+                        CHECK_THAT(fd(j,i) - dxi(j, i),
+                            Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                    }
+
+                    xi(i) -= FD_DELTA;
+                }
+
+                // w
+                // Analytic
+                matrix3_t dw = QuatIntegrationLinearizationW(0);
+
+                // Finite difference
+                fd = matrix3_t::Zero();
+                xi = vector3_t::Zero();
+                vector3_t w = traj_.GetVelocity(0).segment<3>(3);
+                for (int i = 0; i < 3; i++) {
+                    w(i) += FD_DELTA;
+                    vector3_t xi2 = robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(1),
+                        traj_.GetQuat(0), xi, w, 0.02);
+                    for (int j = 0; j < 3; j++) {
+                        fd(j, i) = (xi2(j) - xi1(j))/FD_DELTA;
+                        CHECK_THAT(fd(j,i) - dw(j, i),
+                            Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                    }
+
+                    w(i) -= FD_DELTA;
+                }
+            }
+        }
+
+        void CheckQuaternionLin() {
+            PrintTestHeader("Quaternion Value Linearization");
+
+            for (int k = 0; k < 5; k++) {
+                // Random state
+                vectorx_t q_rand = robot_model_->GetRandomConfig();
+                traj_.SetConfiguration(0, q_rand);
+
+                // Analytic
+                matrix43_t q_int_lin = QuatLinearization(0);
+
+                // Finite difference
+                matrix43_t fd = matrix43_t::Zero();
+                quat_t q1 = traj_.GetQuat(0);
+                vector3_t v = vector3_t::Zero();
+                for (int i = 0; i < 3; i++) {
+                    v(i) += FD_DELTA;
+                    quat_t q2 = q1*pinocchio::quaternion::exp3(v);
+                    v(i) -= FD_DELTA;
+
+                    fd(0, i) = (q2.x() - q1.x())/FD_DELTA;
+                    fd(1, i) = (q2.y() - q1.y())/FD_DELTA;
+                    fd(2, i) = (q2.z() - q1.z())/FD_DELTA;
+                    fd(3, i) = (q2.w() - q1.w())/FD_DELTA;
+
+                    for (int j = 0; j < 4; j++) {
+                        CHECK_THAT(fd(j,i) - q_int_lin(j, i),
+                            Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                    }
+                }
+            }
         }
 
         void CheckSwingHeightLin() {
             PrintTestHeader("Swing Height Linearization");
-            constexpr double FD_MARGIN = 1e-5;
 
             for (int k = 0; k < 5; k++) {
                 vectorx_t q_rand = robot_model_->GetRandomConfig();
@@ -55,9 +144,8 @@ namespace torc::mpc {
 
         void CheckHolonomicLin() {
             PrintTestHeader("Holonomic Linearization");
-            constexpr double FD_MARGIN = 1e-5;
 
-            for (int k = 0; k < 1; k++) {
+            for (int k = 0; k < 5; k++) {
                 vectorx_t q_rand = robot_model_->GetRandomConfig();
                 vectorx_t v_rand = robot_model_->GetRandomVel();
                 vectorx_t q_original = q_rand;
@@ -65,6 +153,7 @@ namespace torc::mpc {
                 traj_.SetVelocity(0, v_rand);
 
                 for (const auto& frame : contact_frames_) {
+                    // ------- Configuration ------- //
                     // Analytic solution
                     matrix6x_t jacobian = matrix6x_t::Zero(6, robot_model_->GetVelDim());
                     HolonomicLinearizationq(0, frame, jacobian);
@@ -76,6 +165,26 @@ namespace torc::mpc {
                         PerturbConfiguration(q_rand, FD_DELTA, i);
                         vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
                         q_rand = q_original;
+
+                        for (int j = 0; j < frame_vel.size(); j++) {
+                            frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
+                            CHECK_THAT(frame_fd(j,i) - jacobian(j, i),
+                                Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                        }
+                    }
+
+                    // ------- Velocity ------- //
+                    // Analytic solution
+                    jacobian.setZero();
+                    HolonomicLinearizationv(0, frame, jacobian);
+
+                    // Finite difference
+                    frame_fd.setZero();
+                    frame_vel = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
+                    for (int i = 0; i < robot_model_->GetVelDim(); i++) {
+                        v_rand(i) += FD_DELTA;
+                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
+                        v_rand(i) -= FD_DELTA;
 
                         for (int j = 0; j < frame_vel.size(); j++) {
                             frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
@@ -152,6 +261,8 @@ namespace torc::mpc {
                 q(idx + 1) += delta;
             }
         }
+
+        static constexpr double FD_MARGIN = 1e-5;
     };
 } // namespacre torc::mpc
 

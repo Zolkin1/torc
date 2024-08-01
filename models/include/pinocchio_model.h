@@ -95,7 +95,8 @@ namespace torc::models {
         FrameState GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v,
             const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED);
 
-        void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J) const;
+        void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J,
+            const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED) const;
 
     protected:
 

@@ -228,7 +228,8 @@ namespace torc::models {
          return GetFrameState(frame, ref);
      }
 
-    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J) const {
+    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J,
+        const pinocchio::ReferenceFrame& ref) const {
         const long idx = GetFrameIdx(frame);
         if (idx == -1) {
             throw std::runtime_error("Provided frame does not exist.");
@@ -237,7 +238,7 @@ namespace torc::models {
         J.resize(6, GetVelDim());
         J.setZero();
 
-        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, pinocchio::LOCAL_WORLD_ALIGNED, J);
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, ref, J);
     }
 
 } // torc::models
