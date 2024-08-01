@@ -64,6 +64,11 @@ namespace torc::mpc {
         return q_[node];
     }
 
+    quat_t Trajectory::GetQuat(int node) {
+        return static_cast<quat_t>(q_[node].segment<4>(3));
+    }
+
+
     vectorx_t Trajectory::GetVelocity(int node) {
         return v_[node];
     }

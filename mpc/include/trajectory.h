@@ -8,10 +8,12 @@
 #include <map>
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 
 namespace torc::mpc {
     using vectorx_t = Eigen::VectorXd;
     using vector3_t = Eigen::Vector3d;
+    using quat_t = Eigen::Quaterniond;
 
     class Trajectory {
     public:
@@ -26,6 +28,7 @@ namespace torc::mpc {
         void SetForce(int node, const std::string& frame, const vector3_t& f);
 
         vectorx_t GetConfiguration(int node);
+        quat_t GetQuat(int node);
         vectorx_t GetVelocity(int node);
         vectorx_t GetTau(int node);
         vector3_t GetForce(int node, const std::string& frame);

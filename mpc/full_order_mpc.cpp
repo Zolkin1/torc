@@ -261,21 +261,20 @@ namespace torc::mpc {
 //        AddHolonomicConstraint(nodes_ - 1);
     }
 
-    // TODO: Remove if everything is defined as a difference
     void FullOrderMpc::AddICConstraint() {
         // Set constraint matrix
         int row_start = 0;
         int col_start = 0;
-        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
-
-        row_start += robot_model_->GetVelDim();
-        col_start += robot_model_->GetVelDim();
-        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, 2*robot_model_->GetVelDim());
 
         // Set bounds
-        // There is no configuration initial condition since the configuration is determined by differences between the nodes
-        osqp_instance_.lower_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()) = traj_.GetVelocity(0);
-        osqp_instance_.upper_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()) = traj_.GetVelocity(0);
+        // Configuration differences are all set to 0
+        osqp_instance_.lower_bounds.head(robot_model_->GetVelDim()).setZero();
+        osqp_instance_.upper_bounds.head(robot_model_->GetVelDim()).setZero();
+
+        // Velocity differences are all set to 0
+        osqp_instance_.lower_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()).setZero();
+        osqp_instance_.upper_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()).setZero();
     }
 
     void FullOrderMpc::AddIntegrationConstraint(int node) {
@@ -287,10 +286,12 @@ namespace torc::mpc {
         int col_start = GetDecisionIdx(node, Configuration);
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, POS_VARS);
 
-        // q^q_k negative identity
-        row_start += 3;
-        col_start += 3;
-        DiagonalScalarMatrixToTriplet(-1, row_start, col_start, 3);
+        // q^q_k linearization
+        row_start += POS_VARS;
+        col_start += POS_VARS;
+        matrix3_t dxi = GetQuatIntegrationLinearizationXi(node);
+        MatrixToTriplet(dxi, row_start, col_start);
+        // DiagonalScalarMatrixToTriplet(-1, row_start, col_start, 3);
 
         // q^j_k identity
         row_start += 3;
@@ -307,10 +308,21 @@ namespace torc::mpc {
         col_start += 6;
         DiagonalScalarMatrixToTriplet(-1, row_start, col_start, robot_model_->GetNumInputs());      // TODO Should probably be num joints not inputs
 
-        // v_k dt*identity
+        // v^b_k dt*identity
         row_start = GetConstraintRow(node, Integrator);
         col_start = GetDecisionIdx(node, Velocity);
-        DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, robot_model_->GetVelDim());
+        DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, POS_VARS);
+
+        // v^q_k linearization
+        row_start += POS_VARS;
+        col_start += POS_VARS;
+        matrix3_t dv = GetQuatIntegrationLinearizationW(node);
+        MatrixToTriplet(dv, row_start, col_start);
+
+        // v^j_k dt*identity
+        row_start += 3;
+        col_start += 3;
+        DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, robot_model_->GetNumInputs());   // TODO Should probably be num joints not inputs
 
         // Base position bounds
         const vector3_t pos_constant = -traj_.GetConfiguration(node + 1).head<POS_VARS>() + traj_.GetConfiguration(node).head<POS_VARS>() + dt_[node]*traj_.GetVelocity(node).head<POS_VARS>();
@@ -319,10 +331,9 @@ namespace torc::mpc {
         row_start += POS_VARS;
 
         // Base orientation bounds
-        // TODO: Add in orientation constant
-        vector3_t orientation_constant = dt_[node]*traj_.GetVelocity(node).segment<3>(POS_VARS); //-log(q_k^-1*q_k+1) + dt*v;
-        osqp_instance_.lower_bounds.segment<3>(row_start) = orientation_constant;
-        osqp_instance_.upper_bounds.segment<3>(row_start) = orientation_constant;
+        // vector3_t orientation_constant = dt_[node]*traj_.GetVelocity(node).segment<3>(POS_VARS); //-log(q_k^-1*q_k+1) + dt*v;
+        osqp_instance_.lower_bounds.segment<3>(row_start).setZero();
+        osqp_instance_.upper_bounds.segment<3>(row_start).setZero();
 
         // Joint bounds
         osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = // TODO Should probably be num joints not inputs
@@ -406,20 +417,28 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::AddConfigurationBoxConstraint(int node) {
-        const int row_start = GetConstraintRow(node, ConfigBox);
-        const int col_start = GetDecisionIdx(node, Configuration);
+        int row_start = GetConstraintRow(node, ConfigBox);
+        int col_start = GetDecisionIdx(node, Configuration);
 
-        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
+        // pos identity
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, POS_VARS);
 
-        // TODO: Add orientation constraints
-        //  In the current formulation orientation constraints are very complex as we have a recursive definition to get the orientation at a node
+        // Configuration linearization
+        row_start += POS_VARS;
+        col_start += POS_VARS;
+        matrix43_t q_lin = GetQuatLinearization(node);
+        MatrixToTriplet(q_lin, row_start, col_start);
+
+        // joint identity
+        row_start += QUAT_VARS;
+        col_start += 3;
+        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs()); // TODO Should probably be num joints not inputs
 
         // Set configuration bounds
-        // Ignore the first element as it is assumed that the first 7 elements are all identical and very large (i.e. no restrictions on the floating base).
-        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim())
-            = robot_model_->GetLowerConfigLimits().tail(robot_model_->GetVelDim());
-        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim())
-            = robot_model_->GetUpperConfigLimits().tail(robot_model_->GetVelDim());
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetConfigDim())
+            = robot_model_->GetLowerConfigLimits() - traj_.GetConfiguration(node);
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetConfigDim())
+            = robot_model_->GetUpperConfigLimits() - traj_.GetConfiguration(node);
 
     }
 
@@ -430,8 +449,10 @@ namespace torc::mpc {
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetVelDim());
 
         // Set velocity bounds
-        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()) = -robot_model_->GetVelocityJointLimits() - traj_.GetVelocity(node);
-        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()) = robot_model_->GetVelocityJointLimits() - traj_.GetVelocity(node);
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim())
+            = -robot_model_->GetVelocityJointLimits() - traj_.GetVelocity(node);
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim())
+            = robot_model_->GetVelocityJointLimits() - traj_.GetVelocity(node);
     }
 
     void FullOrderMpc::AddTorqueBoxConstraint(int node) {
@@ -449,32 +470,140 @@ namespace torc::mpc {
         int row_start = GetConstraintRow(node, SwingHeight);
         const int col_start = GetDecisionIdx(node, Configuration);
 
-        robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
-
+        // TODO: Clean up the code to have less redundant function calls
         for (const auto& frame : contact_frames_) {
+            // Try pinocchio's: getFrameAccelerationDerivatives(). Remember to call computeForwardKinematicsDerivatives() first
+            // I need to verify that it works as expected. I expect the following:
+            // v_partial_dq should be the derivative that I want for the configuration linearization
+            // v_partial_dv should be the frame jacobian called below
+
+            // TODO: Calculate dframe_pos/dq, which I think is just the frame jacobian, verify with fd.
             // Compute frame jacobian for each contact frame
             robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), ws_->frame_jacobian);
-            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
 
             // Grab just the z-height element
             ws_->swing_vec = ws_->frame_jacobian.row(2);
-
             VectorToTriplet(ws_->swing_vec, row_start, col_start);
+
+            // Get the frame position on the warm start trajectory
+            robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
 
             // TODO: Is this correct with the geometry?
             osqp_instance_.lower_bounds(row_start)
-                = -frame_pos(2) + traj_.GetConfiguration(node).dot(ws_->swing_vec) - swing_traj_[frame][node];
+                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) - swing_traj_[frame][node];
 
             osqp_instance_.upper_bounds(row_start)
-                = -frame_pos(2) + traj_.GetConfiguration(node).dot(ws_->swing_vec) + swing_traj_[frame][node];
+                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) + swing_traj_[frame][node];
 
             row_start++;
         }
     }
 
     void FullOrderMpc::AddHolonomicConstraint(int node) {
+        int row_start = GetConstraintRow(node, Holonomic);
+        const int col_start = GetDecisionIdx(node, Configuration);
 
+        // Try pinocchio's: getFrameAccelerationDerivatives(). Remember to call computeForwardKinematicsDerivatives() first
+        // I need to verify that it works as expected. I expect the following:
+        // v_partial_dq should be the derivative that I want for the configuration linearization
+        // v_partial_dv should be the frame jacobian called below
+
+        for (const auto& frame : contact_frames_) {
+            // Compute frame jacobian for each contact frame
+            robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), ws_->frame_jacobian);
+
+            // Grab just the x-y elements
+
+            // TODO: Need to compute how the velocity changes wrt q
+
+            // Get the frame position on the warm start trajectory
+            robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
+
+            // TODO: Is this correct with the geometry?
+            osqp_instance_.lower_bounds(row_start)
+                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) - swing_traj_[frame][node];
+
+            osqp_instance_.upper_bounds(row_start)
+                = -frame_pos(2) + traj_.GetVelocity(node).dot(ws_->swing_vec) + swing_traj_[frame][node];
+
+            row_start++;
+        }
     }
+
+    // -------------------------------------- //
+    // -------- Linearization Helpers ------- //
+    // -------------------------------------- //
+    matrix3_t FullOrderMpc::GetQuatIntegrationLinearizationXi(int node) {
+        assert(node != nodes_ - 1);
+        constexpr double DELTA = 1e-8;
+
+        // TODO: Change for code gen derivative
+        quat_t qbar_kp1 = traj_.GetQuat(node+1);
+        quat_t qbar_k = traj_.GetQuat(node);
+        vector3_t xi = vector3_t::Zero();
+        vector3_t w = traj_.GetVelocity(node).segment<3>(POS_VARS);
+        const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+        matrix3_t update_fd = matrix3_t::Zero();
+        for (int i = 0; i < 3; i++) {
+            xi(i) += DELTA;
+            vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+            for (int j = 0; j < 3; j++) {
+                update_fd(j, i) = (xi2_kp1(j) - xi1_kp1(j))/DELTA;
+            }
+
+            xi(i) -= DELTA;
+        }
+
+        return update_fd;
+    }
+
+    matrix3_t FullOrderMpc::GetQuatIntegrationLinearizationW(int node) {
+        assert(node != nodes_ - 1);
+
+        // TODO: Change for code gen derivative
+        quat_t qbar_kp1 = traj_.GetQuat(node+1);
+        quat_t qbar_k = traj_.GetQuat(node);
+        vector3_t xi = vector3_t::Zero();
+        vector3_t w = traj_.GetVelocity(node).segment<3>(POS_VARS);
+        const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+        matrix3_t update_fd = matrix3_t::Zero();
+        for (int i = 0; i < 3; i++) {
+            w(i) += FD_DELTA;
+            vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+            for (int j = 0; j < 3; j++) {
+                update_fd(j, i) = (xi2_kp1(j) - xi1_kp1(j))/FD_DELTA;
+            }
+
+            w(i) -= FD_DELTA;
+        }
+
+        return update_fd;
+    }
+
+    matrix43_t FullOrderMpc::GetQuatLinearization(int node) {
+        matrix43_t q_lin;
+
+        quat_t qbar = traj_.GetQuat(node);
+        quat_t q_pert;
+        vector3_t pert = vector3_t::Zero();
+        for (int i = 0; i < 3; i++) {
+            pert(i) += FD_DELTA;
+            pinocchio::quaternion::exp3(pert, q_pert);
+            pert(i) -= FD_DELTA;
+            q_pert = qbar*q_pert;
+
+            q_lin(0, i) = (q_pert.x() - qbar.x())/FD_DELTA;
+            q_lin(1, i) = (q_pert.y() - qbar.y())/FD_DELTA;
+            q_lin(2, i) = (q_pert.z() - qbar.z())/FD_DELTA;
+            q_lin(3, i) = (q_pert.w() - qbar.w())/FD_DELTA;
+        }
+
+        return q_lin;
+    }
+
+
 
     // ------------------------------------------------- //
     // ----------------- Cost Creation ----------------- //

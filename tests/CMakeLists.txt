@@ -74,7 +74,7 @@ endif ()
 #target_link_libraries(controller_tests PUBLIC Controllers)
 
 # --------- MPC Tests --------- #
-add_executable(mpc_tests mpc_tests.cpp)
+add_executable(mpc_tests mpc_tests.cpp mpc_test_class.cpp)
 target_link_libraries(mpc_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(mpc_tests PUBLIC Mpc)
 catch_discover_tests(mpc_tests)

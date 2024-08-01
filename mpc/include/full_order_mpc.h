@@ -17,8 +17,11 @@ namespace torc::mpc {
     namespace fs = std::filesystem;
 
     using vectorx_t = Eigen::VectorXd;
+    using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3x_t = Eigen::Matrix3Xd;
+    using matrix3_t = Eigen::Matrix3d;
+    using matrix43_t = Eigen::Matrix<double, 4, 3>;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using sp_matrixx_t = Eigen::SparseMatrix<double>;
 
@@ -55,7 +58,6 @@ namespace torc::mpc {
 
 
     protected:
-    private:
         enum ConstraintType {
         Integrator,
         ID,
@@ -98,6 +100,12 @@ namespace torc::mpc {
         void AddTorqueBoxConstraint(int node);
         void AddSwingHeightConstraint(int node);
         void AddHolonomicConstraint(int node);
+
+    // -------- Linearization Helpers ------- //
+        matrix3_t GetQuatIntegrationLinearizationXi(int node);
+        matrix3_t GetQuatIntegrationLinearizationW(int node);
+
+        matrix43_t GetQuatLinearization(int node);
 
     // ----------- Cost Creation ----------- //
         void CreateCost();
@@ -159,6 +167,9 @@ namespace torc::mpc {
         static constexpr int FLOATING_VEL = 6;
         static constexpr int FRICTION_CONE_SIZE = 4;
         static constexpr int POS_VARS = 3;
+        static constexpr int QUAT_VARS = 4;
+        static constexpr double FD_DELTA = 1e-8;
+
     //---------- Member Variables ---------- //
         fs::path config_file_;
 
@@ -200,6 +211,8 @@ namespace torc::mpc {
 
         // TODO: Populate
         std::map<std::string, std::vector<double>> swing_traj_;
+
+    private:
     };
 } // namepsace torc::mpc
 

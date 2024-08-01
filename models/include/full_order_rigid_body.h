@@ -106,6 +106,9 @@ namespace torc::models {
 
         void ParseInput(const vectorx_t& input, vectorx_t& tau) const;
 
+        vector3_t QuaternionIntegrationRelative(const quat_t& qbar_kp1, const quat_t& qbar_k, const vector3_t& xi,
+            const vector3_t& w, double dt);
+
         [[nodiscard]] vectorx_t GetUpperConfigLimits() const;
         [[nodiscard]] vectorx_t GetLowerConfigLimits() const;
         [[nodiscard]] vectorx_t GetVelocityJointLimits() const;

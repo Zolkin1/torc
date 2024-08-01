@@ -357,6 +357,14 @@ namespace torc::models {
       tau = act_mat_ * input;
     }
 
+    vector3_t FullOrderRigidBody::QuaternionIntegrationRelative(const quat_t& qbar_kp1, const quat_t& qbar_k,
+        const vector3_t& xi, const vector3_t& w, double dt) {
+        return pinocchio::quaternion::log3(
+            (qbar_kp1).inverse()
+            *qbar_k*pinocchio::quaternion::exp3(xi)*pinocchio::quaternion::exp3(w*dt));
+    }
+
+
     vectorx_t FullOrderRigidBody::InputsToTau(const vectorx_t& input) const {
         assert(input.size() == act_mat_.cols());
         return act_mat_*input;
