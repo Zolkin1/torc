@@ -105,6 +105,8 @@ namespace torc::mpc {
         matrix3_t QuatIntegrationLinearizationXi(int node);
         matrix3_t QuatIntegrationLinearizationW(int node);
 
+        void InverseDynamicsLinearization(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
+
         matrix43_t QuatLinearization(int node);
 
         void SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian);

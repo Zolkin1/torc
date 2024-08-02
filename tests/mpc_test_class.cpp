@@ -23,6 +23,7 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     MpcTestClass mpc(mpc_config, a1_urdf);
 
     mpc.CheckQuaternionIntLin();
+    mpc.CheckInverseDynamicsLin();
     mpc.CheckQuaternionLin();
     mpc.CheckSwingHeightLin();
     mpc.CheckHolonomicLin();

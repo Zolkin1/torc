@@ -190,15 +190,15 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), contact_data_->ddq_dtau * act_mat_; //contact_data_->Minv * act_mat_;
     }
 
-    void FullOrderRigidBody::InverseDynamicsDerivative(const torc::models::vectorx_t& state,
-                                                       const torc::models::vectorx_t& a,
+    void FullOrderRigidBody::InverseDynamicsDerivative(const vectorx_t& q,
+                                                       const vectorx_t& v,
+                                                       const vectorx_t& a,
 //                                                       const pinocchio::container::aligned_vector<pinocchio::Force>& forces,
                                                        const std::vector<ExternalForce>& f_ext,
-                                                       torc::models::matrixx_t& dtau_dq,
-                                                       torc::models::matrixx_t& dtau_dv,
-                                                       torc::models::matrixx_t& dtau_da) {
-        vectorx_t q, v;
-        ParseState(state, q, v);
+                                                       matrixx_t& dtau_dq,
+                                                       matrixx_t& dtau_dv,
+                                                       matrixx_t& dtau_da,
+                                                       matrixx_t& dtau_df) {
         assert(dtau_dq.rows() == GetVelDim());
         assert(dtau_dq.cols() == GetVelDim());
         assert(dtau_dv.rows() == GetVelDim());
@@ -211,9 +211,9 @@ namespace torc::models {
 
         pinocchio::computeRNEADerivatives(pin_model_, *pin_data_, q, v, a, forces, dtau_dq, dtau_dv, dtau_da);
 
-        matrixx_t df_dq = ExternalForcesDerivativeWrtConfiguration(q, f_ext);
+        // matrixx_t df_dq = ExternalForcesDerivativeWrtConfiguration(q, f_ext);
 
-        dtau_dq = dtau_dq + df_dq;
+        // dtau_dq = dtau_dq + df_dq;
 
         // I also need to account for how forces varies wrt q, i.e. I should add J(q)*dforces_dq to dtau_dq
     }

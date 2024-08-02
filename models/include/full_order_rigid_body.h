@@ -74,13 +74,15 @@ namespace torc::models {
                                 matrixx_t& A,
                                 matrixx_t& B);
 
-        void InverseDynamicsDerivative(const vectorx_t& state,
+        void InverseDynamicsDerivative(const vectorx_t& q,
+                                       const vectorx_t& v,
                                        const vectorx_t& a,
 //                                       const pinocchio::container::aligned_vector<pinocchio::Force>& forces,
                                        const std::vector<ExternalForce>& f_ext,
                                        matrixx_t& dtau_dq,
                                        matrixx_t& dtau_dv,
-                                       matrixx_t& dtau_da);
+                                       matrixx_t& dtau_da,
+                                       matrixx_t& dtau_df);
 
         void ImpulseDerivative(const vectorx_t& state,
                                const vectorx_t& input,

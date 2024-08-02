@@ -76,6 +76,105 @@ namespace torc::mpc {
             }
         }
 
+        void CheckInverseDynamicsLin() {
+            PrintTestHeader("Inverse Dynamics Linearization");
+
+            // Random state
+            vectorx_t q_rand = robot_model_->GetRandomConfig();
+            vectorx_t q2_rand = robot_model_->GetRandomConfig();
+
+            vectorx_t v_rand = robot_model_->GetRandomVel();
+            vectorx_t v2_rand = v_rand; // + (robot_model_->GetRandomVel() * 0.05);
+
+            dt_[0] = 0.02;
+
+            // vectorx_t tau_rand = vectorx_t::Random(robot_model_->GetNumInputs());
+            // tau_rand = tau_rand.cwiseMax(30);
+            // tau_rand = tau_rand.cwiseMin(-30);
+            // traj_.SetTau(0, tau_rand);
+
+            std::vector<models::ExternalForce> f_ext;
+            for (const auto& frame : contact_frames_) {
+                vector3_t force = vector3_t::Zero(); //vector3_t::Random().cwiseMax(-100).cwiseMin(100);
+                std::cout << "force: " << force.transpose() << std::endl;
+                traj_.SetForce(0, frame, force);
+                f_ext.emplace_back(frame, force);
+            }
+
+            traj_.SetConfiguration(0, q_rand);
+            traj_.SetConfiguration(1, q2_rand);
+            traj_.SetVelocity(0, v_rand);
+            traj_.SetVelocity(1, v2_rand);
+
+            // Analytic
+            matrixx_t dtau_dq, dtau_dv1, dtau_dv2, dtau_df;
+            dtau_dq = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            dtau_dv1 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            dtau_dv2 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            dtau_df = matrixx_t::Zero(robot_model_->GetVelDim(), num_contact_locations_*3);
+
+            InverseDynamicsLinearization(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+
+            // Finite Difference
+            // ----- Configuration ----- //
+            matrixx_t fd_q = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            vectorx_t a = (v2_rand - v_rand)/dt_[0];
+            std::cout << "a: " << a.transpose() << std::endl;
+            vectorx_t tau1 = robot_model_->InverseDynamics(q_rand, v_rand, a, f_ext);
+            for (int i = 0; i < robot_model_->GetVelDim(); i++) {
+                PerturbConfiguration(q_rand, FD_DELTA, i);
+                vectorx_t tau2 = robot_model_->InverseDynamics(q_rand, v_rand, a, f_ext);
+
+                for (int j = 0; j < robot_model_->GetVelDim(); j++) {
+                    fd_q(j, i) = (tau2(j) - tau1(j))/FD_DELTA;
+                }
+
+                q_rand = traj_.GetConfiguration(0);
+            }
+
+            std::cout << "q analytic: \n" << dtau_dq << std::endl;
+            std::cout << "q fd: \n" << fd_q << std::endl;
+
+            // ----- Velocity ----- //
+            matrixx_t fd_v = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            for (int i = 0; i < robot_model_->GetVelDim(); i++) {
+                v_rand(i) += FD_DELTA;
+                // a = (v2_rand - v_rand)/dt_[0];
+
+                vectorx_t tau2 = robot_model_->InverseDynamics(q_rand, v_rand, a, f_ext);
+
+                for (int j = 0; j < robot_model_->GetVelDim(); j++) {
+                    fd_v(j, i) = (tau2(j) - tau1(j))/FD_DELTA;
+                }
+
+                v_rand(i) -= FD_DELTA;
+            }
+
+            std::cout << "v analytic: \n" << dtau_dv1 << std::endl;
+            std::cout << "v fd: \n" << fd_v << std::endl;
+
+            // ----- Velocity 2 ----- //
+            matrixx_t fd_v2 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            for (int i = 0; i < robot_model_->GetVelDim(); i++) {
+                v2_rand(i) += FD_DELTA;
+                // a = (v2_rand - v_rand)/dt_[0];
+
+                vectorx_t tau2 = robot_model_->InverseDynamics(q_rand, v_rand, a, f_ext);
+
+                for (int j = 0; j < robot_model_->GetVelDim(); j++) {
+                    fd_v2(j, i) = (tau2(j) - tau1(j))/FD_DELTA;
+                }
+
+                v2_rand(i) -= FD_DELTA;
+            }
+
+            std::cout << "v2 analytic: \n" << dtau_dv2 << std::endl;
+            std::cout << "v2 fd: \n" << fd_v2 << std::endl;
+
+            a = (v2_rand - v_rand)/FD_DELTA;
+        }
+
+
         void CheckQuaternionLin() {
             PrintTestHeader("Quaternion Value Linearization");
 

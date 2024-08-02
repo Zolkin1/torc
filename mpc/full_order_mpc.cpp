@@ -115,7 +115,7 @@ namespace torc::mpc {
         YAML::Node contact_settings = config["contacts"];
         contact_frames_ = contact_settings["contact_frames"].as<std::vector<std::string>>();
         num_contact_locations_ = contact_frames_.size();
-        for (const auto frame : contact_frames_) {
+        for (const auto& frame : contact_frames_) {
             std::vector<double> swing_traj;
             swing_traj.resize(nodes_);
             swing_traj_.insert(std::pair<std::string, std::vector<double>>(frame, swing_traj));
@@ -581,6 +581,31 @@ namespace torc::mpc {
 
         return update_fd;
     }
+
+    void FullOrderMpc::InverseDynamicsLinearization(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1,
+        matrixx_t& dtau_dv2, matrixx_t& dtau_df) {
+        assert(node != nodes_ - 1);
+
+        // Compute acceleration via finite difference
+        vectorx_t a = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
+        std::cout << "mpc a: " << a.transpose() << std::endl;
+        std::cout << "mpc dt: " << dt_[node] << std::endl;
+
+        // Get external forces
+        std::vector<models::ExternalForce> f_ext;
+        for (const auto& frame : contact_frames_) {
+            f_ext.emplace_back(frame, traj_.GetForce(node, frame));
+        }
+
+        robot_model_->InverseDynamicsDerivative(traj_.GetConfiguration(node), traj_.GetVelocity(node),
+            a, f_ext, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+
+        // Compute the velocity derivatives
+        dtau_dv1 = dtau_dv1 - dtau_dv2*dt_[node];
+        dtau_dv2 = dtau_dv2*dt_[node];
+
+    }
+
 
     matrix43_t FullOrderMpc::QuatLinearization(int node) {
         matrix43_t q_lin;
