@@ -361,18 +361,19 @@ namespace torc::mpc {
     void FullOrderMpc::AddIDConstraint(int node) {
         assert(node != nodes_ - 1);
 
-        ws_->acc = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
-
         const int row_start = GetConstraintRow(node, ID);
+
+        // compute all derivative terms
+        InverseDynamicsLinearization(node, ws_->id_config_mat,
+            ws_->id_vel1_mat, ws_->id_vel2_mat, ws_->id_force_mat);
 
         // dtau_dq
         int col_start = GetDecisionIdx(node, Configuration);
-        ws_->id_state_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-        MatrixToTriplet(ws_->id_state_mat, row_start, col_start);
+        MatrixToTriplet(ws_->id_config_mat, row_start, col_start);
 
         // dtau_dv
         col_start = GetDecisionIdx(node, Velocity);
-        MatrixToTriplet(ws_->id_state_mat, row_start, col_start);
+        MatrixToTriplet(ws_->id_vel1_mat, row_start, col_start);
 
         // dtau_dtau
         col_start = GetDecisionIdx(node, Torque);
@@ -380,12 +381,11 @@ namespace torc::mpc {
 
         // dtau_df
         col_start = GetDecisionIdx(node, GroundForce);
-        ws_->id_force_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, num_contact_locations_*CONTACT_3DOF, 1);
         MatrixToTriplet(ws_->id_force_mat, row_start, col_start);
 
         // dtau_dv2
         col_start = GetDecisionIdx(node + 1, Velocity);
-        MatrixToTriplet(ws_->id_state_mat, row_start, col_start);
+        MatrixToTriplet(ws_->id_vel2_mat, row_start, col_start);
 
         // Set the bounds
         for (auto& f : ws_->f_ext) {
@@ -587,9 +587,9 @@ namespace torc::mpc {
         assert(node != nodes_ - 1);
 
         // Compute acceleration via finite difference
-        vectorx_t a = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
-        std::cout << "mpc a: " << a.transpose() << std::endl;
-        std::cout << "mpc dt: " << dt_[node] << std::endl;
+        ws_->acc = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
+        // std::cout << "mpc a: " << a.transpose() << std::endl;
+        // std::cout << "mpc dt: " << dt_[node] << std::endl;
 
         // Get external forces
         std::vector<models::ExternalForce> f_ext;
@@ -598,12 +598,15 @@ namespace torc::mpc {
         }
 
         robot_model_->InverseDynamicsDerivative(traj_.GetConfiguration(node), traj_.GetVelocity(node),
-            a, f_ext, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+            ws_->acc, f_ext, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+
+        // Note that only the upper triangular part of dtau_da is filled, so we need to extract it
+        dtau_dv2.triangularView<Eigen::StrictlyLower>() =
+                       dtau_dv2.transpose().triangularView<Eigen::StrictlyLower>();
 
         // Compute the velocity derivatives
-        dtau_dv1 = dtau_dv1 - dtau_dv2*dt_[node];
-        dtau_dv2 = dtau_dv2*dt_[node];
-
+        dtau_dv1 = dtau_dv1 - dtau_dv2/dt_[node];
+        dtau_dv2 = dtau_dv2/dt_[node];
     }
 
 
@@ -643,7 +646,6 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
-        // TODO: Verify the frames
         robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::WORLD);
     }
 
@@ -742,12 +744,13 @@ namespace torc::mpc {
 
         // dtau_dq
         int col_start = GetDecisionIdx(node, Configuration);
-        ws_->id_state_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-        MatrixToNewTriplet(ws_->id_state_mat, row_start, col_start);
+        ws_->id_config_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
+        MatrixToNewTriplet(ws_->id_config_mat, row_start, col_start);
 
         // dtau_dv
         col_start = GetDecisionIdx(node, Velocity);
-        MatrixToNewTriplet(ws_->id_state_mat, row_start, col_start);
+        ws_->id_vel1_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
+        MatrixToNewTriplet(ws_->id_vel1_mat, row_start, col_start);
 
         // dtau_dtau
         col_start = GetDecisionIdx(node, Torque);
@@ -762,7 +765,8 @@ namespace torc::mpc {
 
         // dtau_dv2
         col_start = GetDecisionIdx(node + 1, Velocity);
-        MatrixToNewTriplet(ws_->id_state_mat, row_start, col_start);
+        ws_->id_vel2_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
+        MatrixToNewTriplet(ws_->id_vel2_mat, row_start, col_start);
     }
 
     void FullOrderMpc::AddFrictionConePattern(int node) {

@@ -79,7 +79,9 @@ namespace torc::mpc {
         // TODO: Consider adding a workspace where I can put intermediate values without needing to allocate memory
         struct Workspace {
             matrixx_t int_mat;
-            matrixx_t id_state_mat;
+            matrixx_t id_config_mat;
+            matrixx_t id_vel1_mat;
+            matrixx_t id_vel2_mat;
             matrixx_t id_force_mat;
             matrixx_t fric_cone_mat;
             vectorx_t swing_vec;

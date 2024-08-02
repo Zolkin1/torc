@@ -9,6 +9,7 @@
 #include "pinocchio/algorithm/impulse-dynamics.hpp"
 #include "pinocchio/algorithm/impulse-dynamics-derivatives.hpp"
 #include "pinocchio/algorithm/proximal.hpp"
+#include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include "full_order_rigid_body.h"
 
@@ -97,10 +98,7 @@ namespace torc::models {
         // Convert force to a pinocchio force
         pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
 
-        pinocchio::rnea(this->pin_model_, *this->pin_data_, q, v, a, forces);
-
-        vectorx_t tau = this->pin_data_->tau;
-        return tau;
+        return pinocchio::rnea(this->pin_model_, *this->pin_data_, q, v, a, forces);
     }
 
     vectorx_t FullOrderRigidBody::GetImpulseDynamics(const vectorx_t& state,
@@ -205,15 +203,84 @@ namespace torc::models {
         assert(dtau_dv.cols() == GetVelDim());
         assert(dtau_da.rows() == GetVelDim());
         assert(dtau_da.cols() == GetVelDim());
+        assert(dtau_df.cols() == f_ext.size()*3);
+        assert(dtau_df.rows() == GetVelDim());
         assert(a.size() == v.size());
 
         pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
 
-        pinocchio::computeRNEADerivatives(pin_model_, *pin_data_, q, v, a, forces, dtau_dq, dtau_dv, dtau_da);
+        pinocchio::computeRNEADerivatives(pin_model_, *pin_data_, q, v, a, dtau_dq, dtau_dv, dtau_da); // forces
+
+        // dtau_df is the partial of tau wrt the linear external forces at the contact points in the world frame
+        // so dtau_df is vel_dim X 3*contact_points
+        // Each force enters through a frame jacobian
+        matrix6x_t jacobian = matrix6x_t::Zero(6, GetVelDim());
+        int df_idx = 0;
+        // No need to call computeJointJacobians first because rneaDerivatives internally updates all of this
+        for (const auto& f : f_ext) {
+            pinocchio::getFrameJacobian(pin_model_, *pin_data_, GetFrameIdx(f.frame_name), pinocchio::LOCAL_WORLD_ALIGNED, jacobian);
+            dtau_df.middleCols<3>(df_idx) = -jacobian.topRows<3>().transpose();
+            jacobian.setZero();
+            df_idx += 3;
+        }
+
+        // The forces change due to the configuration as determined by the jacobian
+
+        // TODO: The finite difference is correct, need to re-create with analytic derivatives. look at frame velocity derivative stuff
+        // pinocchio::computeForwardKinematicsDerivatives(pin_model_, *pin_data_, q, v, a);
+        // matrixx_t dtf_dq = matrixx_t::Zero(GetVelDim(), GetVelDim());
+        // matrix6x_t j1, j2;
+        // j1 = matrixx_t::Zero(6, GetVelDim());
+        // j2 = j1;
+        // int idx = 0;
+        // for (const auto& f : f_ext) {
+        //     pinocchio::getFrameVelocityDerivatives(pin_model_, *pin_data_, GetFrameIdx(f.frame_name), pinocchio::LOCAL_WORLD_ALIGNED, j1, j2);
+        //     dtf_dq.middleCols<3>(idx) = -j1.topRows<3>().transpose();
+        //     idx += 3;
+        // }
+
+        // for (int i = 0; i < forces.size(); i++) {
+        //     forces[i].linear() = f_ext[i].force_linear;
+        //     forces[i].angular().setZero();
+        // }
+        // pinocchio::computeStaticTorqueDerivatives(pin_model_, *pin_data_, q, forces, dtf_dq);
+
+        // std::cout << "analytic: \n" << dtf_dq << std::endl;
+
+        // TODO: Move to codegen
+        // Try with finite difference
+        vectorx_t force_vec = vectorx_t::Zero(3*f_ext.size());
+        int f_idx = 0;
+        for (const auto& f : f_ext) {
+            force_vec.segment<3>(f_idx) = f.force_linear;
+            f_idx += 3;
+        }
+
+        matrixx_t fd = matrixx_t::Zero(GetVelDim(), GetVelDim());
+        vectorx_t tau1 = dtau_df*force_vec;
+        vectorx_t v_eps = vectorx_t::Zero(GetVelDim());
+        vectorx_t q2, tau2;
+        static constexpr double FD_DELTA = 1e-8;
+        for (int i = 0; i < GetVelDim(); i++) {
+            v_eps(i) += FD_DELTA;
+            q2 = pinocchio::integrate(pin_model_, q, v_eps);
+            tau2 = vectorx_t::Zero(GetVelDim());
+            for (const auto& f : f_ext) {
+                pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q2, GetFrameIdx(f.frame_name), pinocchio::LOCAL_WORLD_ALIGNED, jacobian);
+                tau2 += -jacobian.topRows<3>().transpose()*f.force_linear;
+                jacobian.setZero();
+            }
+
+            fd.col(i) = (tau2 - tau1)/FD_DELTA;
+
+            v_eps(i) -= FD_DELTA;
+        }
+
+        // std::cout << "fd: \n" << fd << std::endl;
 
         // matrixx_t df_dq = ExternalForcesDerivativeWrtConfiguration(q, f_ext);
 
-        // dtau_dq = dtau_dq + df_dq;
+        dtau_dq = dtau_dq + fd;
 
         // I also need to account for how forces varies wrt q, i.e. I should add J(q)*dforces_dq to dtau_dq
     }
@@ -405,6 +472,7 @@ namespace torc::models {
 
         // Convert force to a pinocchio force
         pinocchio::container::aligned_vector<pinocchio::Force> forces(this->GetNumJoints(), pinocchio::Force::Zero());
+        // TODO: Is this just data.oMi.act(data.f)? Like here: https://github.com/stack-of-tasks/pinocchio/blob/c989669e255715e2fa2504b3226664bf20de6fb5/unittest/rnea-derivatives.cpp#L143
         for (const auto& f : f_ext) {
             // *** Note *** for now I only support 3DOF contacts. To support 6DOF contacts just need to add the additional torques in from the contact (similar to how the linear forces are translated)
             // Get the frame where the contact is
@@ -429,61 +497,77 @@ namespace torc::models {
     }
 
     matrixx_t FullOrderRigidBody::ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce>& f_ext) {
-        // sum of J(q) * df_dq
-        // J(q) are the frame jacobians for the joints
-        // df_dq is the derivative of ConvertExternalForcesToPin
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
-        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+        // For now we will finite difference, but later we will use ad codegen
+        // TODO: Use codegen
+        const static double FD_DELTA = 1e-8;
+        matrixx_t df_dq = matrixx_t::Zero(GetVelDim(), GetVelDim());
+        vectorx_t v_eps =vectorx_t::Zero(GetVelDim());
+        vectorx_t q2 = q;
 
-//        matrixx_t df_dq = matrixx_t::Zero(this->GetVelDim(), this->GetVelDim());
-        matrix6x_t df_dq = matrixx_t::Zero(6, this->GetVelDim());
-        for (const auto& f : f_ext) {
-            // Get the contact frame
-            const int frame_idx = this->GetFrameIdx(f.frame_name);
-            // Get the parent frame
-            const int jnt_idx = this->pin_model_.frames.at(frame_idx).parentJoint;
-            const vector3_t translationContactToJoint = pin_model_.frames.at(frame_idx).placement.translation();
+        for (int i = 0; i < GetVelDim(); i++) {
+            v_eps(i) += FD_DELTA;
+            q2 = pinocchio::integrate(pin_model_, q, v_eps);
+            v_eps(i) -= FD_DELTA;
 
-            // Get the contact Jacobian
-//            matrix6x_t J = matrix6x_t::Zero(6, this->GetVelDim());
-//            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, J);
 
-            // Get the derivative of joint frame wrt q (i.e. a frame jacobian)
-            std::cout << "true joint name: " << this->pin_model_.names.at(jnt_idx) << std::endl;
-            int joint_frame_idx = this->GetFrameIdx(this->pin_model_.names.at(jnt_idx));
-            std::cout << "joint frame: " << this->pin_model_.frames.at(joint_frame_idx).name << std::endl;
-            std::cout << "torso frame: " << this->pin_model_.frames.at(GetFrameIdx("base")).name << std::endl;
-
-            matrix6x_t joint_frame_jacobian = matrix6x_t::Zero(6, this->GetVelDim());
-            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, joint_frame_jacobian);
-
-            matrix6x_t joint_frame_jacobian_world = matrix6x_t::Zero(6, this->GetVelDim());
-            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::WORLD, joint_frame_jacobian_world);
-
-            matrix6x_t torso_frame_jacobian_world = matrix6x_t::Zero(6, this->GetVelDim());
-            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, GetFrameIdx("base"), pinocchio::LOCAL_WORLD_ALIGNED, torso_frame_jacobian_world);
-
-            std::cout << "Joint frame jacobian: \n" << joint_frame_jacobian << std::endl;
-            std::cout << "Joint frame jacobian wrt world: \n" << joint_frame_jacobian_world << std::endl;
-            std::cout << "Torso frame jacobian wrt world: \n" << torso_frame_jacobian_world << std::endl;
-
-            // Get the rotation from the world frame to the joint frame
-            const Eigen::Matrix3d rotationWorldToJoint = pin_data_->oMi[jnt_idx].rotation().transpose();
-
-            matrix6x_t dFdq = matrix6x_t::Zero(6, this->GetVelDim());
-            dFdq.topRows<3>() = joint_frame_jacobian_world.bottomRows<3>(); //joint_frame_jacobian_world.bottomRows<3>();
-            for (int i = 0; i < this->GetVelDim(); i++) {
-                dFdq.block<3,1>(3, i) = translationContactToJoint.cross(joint_frame_jacobian_world.block<3,1>(3, i));
-            }
-
-            std::cout << "dFdq: \n" << dFdq << std::endl;
-
-            // TODO: I have the correct sparsity pattern and same general patterns, but the numbers are off
-//            df_dq = df_dq - joint_frame_jacobian.transpose()*dFdq;
-            df_dq = dFdq; // For now we just want to compare it against the function
         }
 
-        return df_dq;
+
+//         // sum of J(q) * df_dq
+//         // J(q) are the frame jacobians for the joints
+//         // df_dq is the derivative of ConvertExternalForcesToPin
+//         pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+//         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+//
+// //        matrixx_t df_dq = matrixx_t::Zero(this->GetVelDim(), this->GetVelDim());
+//         matrix6x_t df_dq = matrixx_t::Zero(6, this->GetVelDim());
+//         for (const auto& f : f_ext) {
+//             // Get the contact frame
+//             const int frame_idx = this->GetFrameIdx(f.frame_name);
+//             // Get the parent frame
+//             const int jnt_idx = this->pin_model_.frames.at(frame_idx).parentJoint;
+//             const vector3_t translationContactToJoint = pin_model_.frames.at(frame_idx).placement.translation();
+//
+//             // Get the contact Jacobian
+// //            matrix6x_t J = matrix6x_t::Zero(6, this->GetVelDim());
+// //            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, J);
+//
+//             // Get the derivative of joint frame wrt q (i.e. a frame jacobian)
+//             std::cout << "true joint name: " << this->pin_model_.names.at(jnt_idx) << std::endl;
+//             int joint_frame_idx = this->GetFrameIdx(this->pin_model_.names.at(jnt_idx));
+//             std::cout << "joint frame: " << this->pin_model_.frames.at(joint_frame_idx).name << std::endl;
+//             std::cout << "torso frame: " << this->pin_model_.frames.at(GetFrameIdx("base")).name << std::endl;
+//
+//             matrix6x_t joint_frame_jacobian = matrix6x_t::Zero(6, this->GetVelDim());
+//             pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, joint_frame_jacobian);
+//
+//             matrix6x_t joint_frame_jacobian_world = matrix6x_t::Zero(6, this->GetVelDim());
+//             pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, joint_frame_idx, pinocchio::WORLD, joint_frame_jacobian_world);
+//
+//             matrix6x_t torso_frame_jacobian_world = matrix6x_t::Zero(6, this->GetVelDim());
+//             pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, GetFrameIdx("base"), pinocchio::LOCAL_WORLD_ALIGNED, torso_frame_jacobian_world);
+//
+//             std::cout << "Joint frame jacobian: \n" << joint_frame_jacobian << std::endl;
+//             std::cout << "Joint frame jacobian wrt world: \n" << joint_frame_jacobian_world << std::endl;
+//             std::cout << "Torso frame jacobian wrt world: \n" << torso_frame_jacobian_world << std::endl;
+//
+//             // Get the rotation from the world frame to the joint frame
+//             const Eigen::Matrix3d rotationWorldToJoint = pin_data_->oMi[jnt_idx].rotation().transpose();
+//
+//             matrix6x_t dFdq = matrix6x_t::Zero(6, this->GetVelDim());
+//             dFdq.topRows<3>() = joint_frame_jacobian_world.bottomRows<3>(); //joint_frame_jacobian_world.bottomRows<3>();
+//             for (int i = 0; i < this->GetVelDim(); i++) {
+//                 dFdq.block<3,1>(3, i) = translationContactToJoint.cross(joint_frame_jacobian_world.block<3,1>(3, i));
+//             }
+//
+//             std::cout << "dFdq: \n" << dFdq << std::endl;
+//
+//             // TODO: I have the correct sparsity pattern and same general patterns, but the numbers are off
+// //            df_dq = df_dq - joint_frame_jacobian.transpose()*dFdq;
+//             df_dq = dFdq; // For now we just want to compare it against the function
+//         }
+//
+//         return df_dq;
     }
 
     vectorx_t FullOrderRigidBody::GetUpperConfigLimits() const {
@@ -518,6 +602,12 @@ namespace torc::models {
         }
     }
 
+    // DEBUG ------
+    pinocchio::Model FullOrderRigidBody::GetModel() const {
+        return pin_model_;
+    }
+
+    // DEBUG ------
 
 
 //    vectorx_t FullOrderRigidBody::TauToInputs(const vectorx_t& tau) const {

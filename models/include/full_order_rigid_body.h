@@ -136,6 +136,10 @@ namespace torc::models {
 
         matrixx_t ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce>& f_ext);
 
+        // DEBUG ------
+        pinocchio::Model GetModel() const;
+        // ------------
+
         constexpr static size_t STATE_Q_IDX = 0;
         constexpr static size_t STATE_V_IDX = 1;
 
