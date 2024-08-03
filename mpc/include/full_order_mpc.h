@@ -15,6 +15,8 @@
 #include "explicit_fn.h"
 #include "autodiff_fn.h"
 
+#include "cost_function.h"
+
 
 namespace torc::mpc {
     namespace fs = std::filesystem;
@@ -119,8 +121,10 @@ namespace torc::mpc {
         void HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian);
         void HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian);
     // ----------- Cost Creation ----------- //
-        void UpdateCost();
-        void CreateDefaultCost();
+        // void UpdateCost();
+        // void CreateDefaultCost();
+        // Helper function
+        // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;
 
     // ----- Sparsity Pattern Creation ----- //
         /**
@@ -199,8 +203,7 @@ namespace torc::mpc {
         int triplet_idx_{};
 
         // Cost
-        std::unique_ptr<fn::AutodiffFn<double>> config_cost_fcn_;
-        std::unique_ptr<fn::AutodiffFn<double>> vel_cost_fcn_;
+        CostFunction cost_;
         vectorx_t vel_tracking_weight_;
         vectorx_t config_tracking_weight_;
 

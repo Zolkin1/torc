@@ -150,9 +150,25 @@ namespace torc::fn {
          */
         [[nodiscard]] size_t GetDim() const { return this->dim_; }
 
+        vectorx_t GradientFiniteDiff(const vectorx_t& x) const {
+            static constexpr double FD_DELTA = 1e-8;
+            vectorx_t fd = vectorx_t::Zero(x.size());
+            vectorx_t dx = fd;
+            scalar_t val1 = Evaluate(x);
+            for (int i = 0; i < x.size(); i++) {
+                dx(i) += FD_DELTA;
+                fd(i) = (Evaluate(x + dx) - val1)/FD_DELTA;
+                dx(i) -= FD_DELTA;
+            }
 
-    protected:
+            return fd;
+        }
+
+
+        // TODO: delete!
         std::function<scalar_t(vectorx_t)> func_;   // the original function
+    protected:
+        // std::function<scalar_t(vectorx_t)> func_;   // the original function
         std::function<vectorx_t(vectorx_t)> grad_;  // the gradient of the function
         std::function<matrixx_t(vectorx_t)> hess_;  // the hessian of the function
         size_t dim_ = 1;

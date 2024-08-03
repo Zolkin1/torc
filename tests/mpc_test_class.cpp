@@ -29,11 +29,13 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     mpc.CheckQuaternionLin();
     mpc.CheckSwingHeightLin();
     mpc.CheckHolonomicLin();
+    mpc.CheckCostFunctionDerivatives();
     // mpc.BenchmarkQuaternionIntegrationLin();
     // mpc.BenchmarkInverseDynamicsLin();
     // mpc.BenchmarkQuaternionConfigurationLin();
     // mpc.BenchmarkSwingHeightLin();
     // mpc.BenchmarkHolonomicLin();
-    mpc.BenchmarkConstraints();
+    // mpc.BenchmarkConstraints();
     // mpc.BenchmarkCompute();
+    mpc.BenchmarkCostFunctions();
 }

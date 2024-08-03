@@ -305,7 +305,36 @@ namespace torc::mpc {
         }
 
         void CheckCostFunctionDerivatives() {
+            PrintTestHeader("Cost Function Derivatives");
+            for (int k = 0; k < 5; k++) {
+                // ----- Configuration cost ----- //
+                vectorx_t d_rand = robot_model_->GetRandomVel();
+                vectorx_t bar_rand = robot_model_->GetRandomConfig();
+                vectorx_t target_rand = robot_model_->GetRandomConfig();
 
+                // Analytic
+                vectorx_t arg;
+                FormCostFcnArg(d_rand, bar_rand, target_rand, arg);
+                vectorx_t grad_c = config_cost_fcn_->Gradient(arg);
+
+                // Finite difference
+                vectorx_t fd_c = config_cost_fcn_->GradientFiniteDiff(arg);
+
+                CHECK(grad_c.isApprox(fd_c, sqrt(FD_DELTA)));
+
+                // ----- Velocity cost ----- //
+                vectorx_t vbar_rand = robot_model_->GetRandomVel();
+                vectorx_t vtarget_rand = robot_model_->GetRandomVel();
+
+                // Analytic
+                FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
+                vectorx_t grad_v = vel_cost_fcn_->Gradient(arg);
+
+                // Finite difference
+                vectorx_t fd_v = vel_cost_fcn_->GradientFiniteDiff(arg);
+
+                CHECK(grad_v.isApprox(fd_v, sqrt(FD_DELTA)));
+            }
         }
 
         // ---------------------- //
@@ -394,6 +423,39 @@ namespace torc::mpc {
                 Compute(state_rand);
             };
         }
+
+        void BenchmarkCostFunctions() {
+            // ----- Configuration cost ----- //
+            vectorx_t d_rand = robot_model_->GetRandomVel();
+            vectorx_t bar_rand = robot_model_->GetRandomConfig();
+            vectorx_t target_rand = robot_model_->GetRandomConfig();
+
+            // Analytic
+            vectorx_t arg;
+            FormCostFcnArg(d_rand, bar_rand, target_rand, arg);
+            // BENCHMARK("configuration cost function gradient") {
+            //     vectorx_t grad_c = cost_->Gradient(arg);
+            // };
+
+            // BENCHMARK("configuration cost function evaluation") {
+            //     double c1 = config_cost_fcn_->Evaluate(arg);
+            // };
+
+            // ----- Velocity cost ----- //
+            vectorx_t vbar_rand = robot_model_->GetRandomVel();
+            vectorx_t vtarget_rand = robot_model_->GetRandomVel();
+
+            // Analytic
+            FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
+            // BENCHMARK("velocity cost function gradient") {
+            //     vectorx_t grad_v = vel_cost_fcn_->Gradient(arg);
+            // };
+
+            // BENCHMARK("configuration cost function evaluation") {
+            //     double c1 = vel_cost_fcn_->Evaluate(arg);
+            // };
+        }
+
     protected:
     private:
         void PrintTestHeader(const std::string& name) {
