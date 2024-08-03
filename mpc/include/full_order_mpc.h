@@ -12,6 +12,9 @@
 #include "constraint.h"
 #include "full_order_rigid_body.h"
 #include "trajectory.h"
+#include "explicit_fn.h"
+#include "autodiff_fn.h"
+
 
 namespace torc::mpc {
     namespace fs = std::filesystem;
@@ -56,7 +59,7 @@ namespace torc::mpc {
 
         void SetVerbosity(bool verbose);
 
-
+        void UpdateCostFcn(std::unique_ptr<torc::fn::ExplicitFn<double>> cost);
     protected:
         enum ConstraintType {
         Integrator,
@@ -116,7 +119,8 @@ namespace torc::mpc {
         void HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian);
         void HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian);
     // ----------- Cost Creation ----------- //
-        void CreateCost();
+        void UpdateCost();
+        void CreateDefaultCost();
 
     // ----- Sparsity Pattern Creation ----- //
         /**
@@ -193,6 +197,12 @@ namespace torc::mpc {
         // Hold the constraint matrix as a vector of triplets
         std::vector<Eigen::Triplet<double>> constraint_triplets_;
         int triplet_idx_{};
+
+        // Cost
+        std::unique_ptr<fn::AutodiffFn<double>> config_cost_fcn_;
+        std::unique_ptr<fn::AutodiffFn<double>> vel_cost_fcn_;
+        vectorx_t vel_tracking_weight_;
+        vectorx_t config_tracking_weight_;
 
         // Model
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;

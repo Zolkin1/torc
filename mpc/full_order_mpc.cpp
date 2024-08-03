@@ -6,6 +6,7 @@
 #include "yaml-cpp/yaml.h"
 
 #include "full_order_mpc.h"
+#include "autodiff_fn.h"
 
 #include <pinocchio/algorithm/kinematics-derivatives.hxx>
 
@@ -34,6 +35,8 @@ namespace torc::mpc {
         ws_ = std::make_unique<Workspace>();
         traj_.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(),
                           robot_model_->GetNumInputs(), contact_frames_, nodes_);
+
+        CreateDefaultCost();
     }
 
     void FullOrderMpc::UpdateConfigurations() {
@@ -174,6 +177,15 @@ namespace torc::mpc {
     void FullOrderMpc::Configure() {
         utils::TORCTimer config_timer;
         config_timer.Tic();
+
+        if (!vel_cost_fcn_) {
+            throw std::runtime_error("No velocity cost function found!");
+        }
+
+        if (!config_cost_fcn_) {
+            throw std::runtime_error("No configuration cost function found!");
+        }
+
         // Create the constraint matrix
         osqp_instance_.constraint_matrix.resize(GetNumConstraints(), GetNumDecisionVars());
         osqp_instance_.lower_bounds.resize(GetNumConstraints());
@@ -239,7 +251,7 @@ namespace torc::mpc {
             throw std::runtime_error("Could not update the constraint matrix.");
         }
 
-        CreateCost();
+        UpdateCost();
 
         // Solve
         auto solve_status = osqp_solver_.Solve();
@@ -653,9 +665,73 @@ namespace torc::mpc {
     // ------------------------------------------------- //
     // ----------------- Cost Creation ----------------- //
     // ------------------------------------------------- //
-    void FullOrderMpc::CreateCost() {
+    void FullOrderMpc::UpdateCostFcn(std::unique_ptr<torc::fn::ExplicitFn<double> > cost) {
+        // TODO: Implement
+        // cost_fcn_ = std::move(cost);
+    }
+
+    void FullOrderMpc::UpdateCost() {
 
     }
+
+    void FullOrderMpc::CreateDefaultCost() {
+        // Create a cost function as the sum of smaller functions
+        // Velocity tracking, position tracking
+        // Torque cost (reduce torque)
+        namespace ADCG = CppAD::cg;
+        namespace AD = CppAD;
+
+        using cg_t = ADCG::CG<double>;
+        using adcg_t = CppAD::AD<cg_t>;
+
+        const int vel_dim = robot_model_->GetVelDim();
+        std::function<adcg_t(const Eigen::VectorX<adcg_t>&)> vel_cost = [vel_dim](const Eigen::VectorX<adcg_t>& dv_vbar_vtarget) {
+            Eigen::VectorX<adcg_t> v_diff = dv_vbar_vtarget.head(vel_dim) + dv_vbar_vtarget.segment(vel_dim, vel_dim);  // Get the current velocity
+            v_diff = v_diff - dv_vbar_vtarget.tail(vel_dim);    // Get the difference between the velocity and its target
+            return v_diff.squaredNorm();
+        };
+
+        vel_cost_fcn_ = std::make_unique<torc::fn::AutodiffFn<double>>(vel_cost, 2*vel_dim, false, false, "mpc_vel_cost");
+
+        const int config_dim = robot_model_->GetConfigDim();
+        const int joints_dim = robot_model_->GetNumInputs(); // TODO: Change to num joints
+        matrixx_t weight_mat;
+        weight_mat = config_tracking_weight_.array().matrix().asDiagonal();
+        std::cout << "weight mat: \n" << weight_mat << std::endl;
+        vectorx_t config_weight = config_tracking_weight_;
+
+        std::function<adcg_t(const Eigen::VectorX<adcg_t>&)> config_cost = [config_dim, vel_dim, joints_dim, config_weight](const Eigen::VectorX<adcg_t>& dq_qbar_qtarget) {
+            Eigen::VectorX<adcg_t> q_diff = Eigen::VectorX<adcg_t>::Zero(vel_dim);
+            // Floating base position difference
+            q_diff.head<POS_VARS>() = dq_qbar_qtarget.head<POS_VARS>() + dq_qbar_qtarget.segment<POS_VARS>(vel_dim)
+                - dq_qbar_qtarget.segment<POS_VARS>(config_dim + vel_dim); // Get the current floating base position minus target
+
+            // Floating base orientation difference
+            Eigen::Quaternion<adcg_t> qbar, q_target;
+            qbar.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(config_dim + vel_dim + POS_VARS);
+            q_target.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(vel_dim + POS_VARS);
+
+            q_diff.segment<3>(POS_VARS) = pinocchio::quaternion::log3(qbar.inverse()*q_target
+                *pinocchio::quaternion::exp3(dq_qbar_qtarget.segment<3>(POS_VARS)));
+
+            // Joint differences
+            q_diff.segment(FLOATING_VEL, joints_dim) =
+                // dq
+                dq_qbar_qtarget.segment(FLOATING_VEL, joints_dim)
+                // qbar
+                + dq_qbar_qtarget.segment(vel_dim + FLOATING_BASE, joints_dim)
+                // qtarget
+                - dq_qbar_qtarget.segment(config_dim + vel_dim + FLOATING_BASE, joints_dim);
+            for (int i = 0; i < config_weight.size(); i++) {
+                q_diff(i) = q_diff(i) * config_weight(i);
+            }
+            return q_diff.squaredNorm();
+        };
+
+        config_cost_fcn_ = std::make_unique<torc::fn::AutodiffFn<double>>(
+            config_cost, 2*config_dim + vel_dim, false, false, "mpc_config_cost");
+    }
+
 
     // ------------------------------------------------- //
     // ----------- Sparsity Pattern Creation ----------- //

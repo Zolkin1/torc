@@ -36,7 +36,7 @@ namespace torc::fn {
          * @param timestamp_files whether or not to timestamp the dynamic libraries
          * @param identifier string identifier for the cg_fn
          */
-        explicit AutodiffFn(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& cg_fn,
+        explicit AutodiffFn(const std::function<adcg_t(const Eigen::VectorX<adcg_t>&)>& cg_fn,
                             const size_t dim=1,
                             const bool& force_generate=false,
                             const bool& timestamp_files=false,
@@ -52,6 +52,7 @@ namespace torc::fn {
                 create_lib = (loaded_dim != dim);
             }
             if (create_lib) {
+                std::cout << "Compiling derivative..." << std::endl;
                 this->dim_ = dim;
                 // record operations in the ADFun object
                 std::vector<adcg_t> x(dim);

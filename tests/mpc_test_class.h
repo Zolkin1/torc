@@ -304,6 +304,13 @@ namespace torc::mpc {
             }
         }
 
+        void CheckCostFunctionDerivatives() {
+
+        }
+
+        // ---------------------- //
+        // ----- Benchmarks ----- //
+        // ---------------------- //
         void BenchmarkQuaternionIntegrationLin() {
             BENCHMARK("quaternion integration lin") {
                 auto deriv = QuatIntegrationLinearizationXi(0);

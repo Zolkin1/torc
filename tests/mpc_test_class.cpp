@@ -11,6 +11,8 @@
 
 #include "mpc_test_class.h"
 
+#include "autodiff_fn.h"
+
 TEST_CASE("MPC Test Class", "[mpc]") {
     using namespace torc::mpc;
     const std::string pin_model_name = "test_pin_model";
