@@ -7,7 +7,7 @@
 #include <iostream>
 #include <filesystem>
 #include <ctime>
-#include <cppad/cg.hpp>
+#include "pinocchio/codegen/cppadcg.hpp" // Note that using the pinocchio header is critical!
 
 #include "explicit_fn.h"
 

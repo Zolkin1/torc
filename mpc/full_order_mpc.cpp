@@ -710,9 +710,11 @@ namespace torc::mpc {
             Eigen::Quaternion<adcg_t> qbar, q_target;
             qbar.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(config_dim + vel_dim + POS_VARS);
             q_target.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(vel_dim + POS_VARS);
+            qbar = Eigen::Quaternion<adcg_t>(qbar.conjugate().coeffs() / qbar.squaredNorm());   // Assumes norm > 0
 
-            q_diff.segment<3>(POS_VARS) = pinocchio::quaternion::log3(qbar.inverse()*q_target
-                *pinocchio::quaternion::exp3(dq_qbar_qtarget.segment<3>(POS_VARS)));
+            q_diff.segment<3>(POS_VARS) = pinocchio::quaternion::log3(
+                qbar * q_target
+                 * pinocchio::quaternion::exp3(dq_qbar_qtarget.segment<3>(POS_VARS)));
 
             // Joint differences
             q_diff.segment(FLOATING_VEL, joints_dim) =
@@ -729,7 +731,7 @@ namespace torc::mpc {
         };
 
         config_cost_fcn_ = std::make_unique<torc::fn::AutodiffFn<double>>(
-            config_cost, 2*config_dim + vel_dim, false, false, "mpc_config_cost");
+            config_cost, 2*config_dim + vel_dim, true, false, "mpc_config_cost");
     }
 
 
