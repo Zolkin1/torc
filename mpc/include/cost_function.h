@@ -23,20 +23,19 @@ namespace torc::mpc {
     using sp_matrixx_t = Eigen::SparseMatrix<double>;
 
     enum CostTypes {
-        Configuration,
+        Configuration = 0,
         Velocity
     };
+
     class CostFunction {
     public:
-        CostFunction();
+        CostFunction()
+            : configured_(false) {}
 
-        void Configure(int config_size, int vel_size, int joint_size, const vectorx_t& config_weights, const vectorx_t& vel_weights) {
+        void Configure(int config_size, int vel_size, int joint_size, const std::vector<CostTypes>& costs, const std::vector<vectorx_t>& weights) {
             config_size_ = config_size;
             vel_size_ = vel_size;
             joint_size_ = joint_size;
-
-            config_weights_ = config_weights;
-            vel_weights_ = vel_weights;
 
             namespace ADCG = CppAD::cg;
             namespace AD = CppAD;
@@ -44,11 +43,31 @@ namespace torc::mpc {
             using cg_t = ADCG::CG<double>;
             using adcg_t = CppAD::AD<cg_t>;
 
-            vel_cost_fcn_ = std::make_unique<torc::fn::AutodiffFn<double>>(
-                CreateDefaultCost<adcg_t>(Velocity), 3*vel_size_, true, false, "mpc_vel_cost");
+            if (costs.size() != weights.size()) {
+                throw std::runtime_error("Cost terms and weights must be the same size!");
+            }
 
-            config_cost_fcn_ = std::make_unique<torc::fn::AutodiffFn<double>>(
-                CreateDefaultCost<adcg_t>(Configuration), 2*config_size_ + vel_size_, true, false, "mpc_config_cost");
+            weights_.resize(costs.size());
+            int idx = 0;
+            for (const auto& cost_term : costs) {
+                cost_idxs_.insert(std::pair<CostTypes, int>(cost_term, idx));
+                weights_[cost_idxs_[cost_term]] = weights[idx];
+                idx++;
+
+
+                if (cost_term == Configuration) {
+                    cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
+                        CreateDefaultCost<adcg_t>(Configuration), 2*config_size_ + vel_size_, true, false, "mpc_config_cost"));
+                }
+                else if (cost_term == Velocity) {
+                    cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
+                        CreateDefaultCost<adcg_t>(Velocity), 3*vel_size_, true, false, "mpc_vel_cost"));
+                }
+                // CppAD functions are slow to evaluate, so get the double function
+                cost_fcn_terms_[cost_idxs_[cost_term]]->func_ = CreateDefaultCost<double>(cost_term);
+            }
+
+            configured_ = true;
         }
 
         void Linearize(const Trajectory& traj, const std::vector<vectorx_t>& q_target,
@@ -69,14 +88,10 @@ namespace torc::mpc {
             // TODO: Implement
         }
 
-        double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const CostTypes& type) {
+        [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const CostTypes& type) {
             vectorx_t arg;
             FormCostFcnArg(decision_var, reference, target, arg);
-            if (type == Configuration) {
-                return config_cost_fcn_->Evaluate(arg);
-            } else if (type == Velocity) {
-                return vel_cost_fcn_->Evaluate(arg);
-            }
+            return cost_fcn_terms_[cost_idxs_[type]]->Evaluate(arg);
         }
 
 
@@ -86,30 +101,34 @@ namespace torc::mpc {
         static constexpr int FLOATING_VEL = 6;
         static constexpr int FLOATING_BASE = 7;
 
-        template<typename ScalarT>
+        template<class ScalarT>
         std::function<ScalarT(Eigen::VectorX<ScalarT>)> CreateDefaultCost(const CostTypes& type) {
             int config_size = config_size_;
             int vel_size = vel_size_;
             int joint_size = joint_size_;
 
+            vectorx_t weight = weights_[cost_idxs_[type]];
+
             if (type == Configuration) {
-                vectorx_t config_weights = config_weights_;
-                return [config_size, vel_size, joint_size, config_weights]<ScalarT>(const Eigen::VectorX<ScalarT>& dq_qbar_qtarget) {
+                if (weight.size() != config_size_) {
+                    throw std::runtime_error("Configuration weight has wrong size!");
+                }
+                return [config_size, vel_size, joint_size, weight](const Eigen::VectorX<ScalarT>& dq_qbar_qtarget) {
                     Eigen::VectorX<ScalarT> q_diff = Eigen::VectorX<ScalarT>::Zero(vel_size);
                     // Floating base position difference
-                    q_diff.template head<POS_VARS>() = dq_qbar_qtarget.template head<POS_VARS>() + dq_qbar_qtarget.segment<POS_VARS>(vel_size)
-                        - dq_qbar_qtarget.segment<POS_VARS>(config_size + vel_size); // Get the current floating base position minus target
+                    q_diff.template head<POS_VARS>() = dq_qbar_qtarget.template head<POS_VARS>() + dq_qbar_qtarget.segment(vel_size, POS_VARS)
+                        - dq_qbar_qtarget.segment(config_size + vel_size, POS_VARS); // Get the current floating base position minus target
 
                     // Floating base orientation difference
                     Eigen::Quaternion<ScalarT> qbar, q_target;
-                    qbar.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(config_size + vel_size + POS_VARS);
-                    q_target.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(vel_size + POS_VARS);
+                    qbar.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(config_size + vel_size + POS_VARS);
+                    q_target.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(vel_size + POS_VARS);
                     // Eigen's inverse has an if statement, so we can't use it in codegen
                     qbar = Eigen::Quaternion<ScalarT>(qbar.conjugate().coeffs() / qbar.squaredNorm());   // Assumes norm > 0
 
-                    q_diff.segment<3>(POS_VARS) = pinocchio::quaternion::log3(
+                    q_diff.template segment<3>(POS_VARS) = pinocchio::quaternion::log3(
                         qbar * q_target
-                         * pinocchio::quaternion::exp3(dq_qbar_qtarget.segment<3>(POS_VARS)));
+                         * pinocchio::quaternion::exp3(dq_qbar_qtarget.template segment<3>(POS_VARS)));
 
                     // Joint differences
                     q_diff.segment(FLOATING_VEL, joint_size) =
@@ -119,15 +138,21 @@ namespace torc::mpc {
                         + dq_qbar_qtarget.segment(vel_size + FLOATING_BASE, joint_size)
                         // qtarget
                         - dq_qbar_qtarget.segment(config_size + vel_size + FLOATING_BASE, joint_size);
-                    for (int i = 0; i < config_weights.size(); i++) {
-                        q_diff(i) = q_diff(i) * config_weights(i);
+                    for (int i = 0; i < weight.size(); i++) {
+                        q_diff(i) = q_diff(i) * weight(i);
                     }
                     return q_diff.squaredNorm();
                 };
             } else if (type == Velocity) {
-                return [vel_size]<ScalarT>(const Eigen::VectorX<ScalarT>& dv_vbar_vtarget) {
+                if (weight.size() != vel_size_) {
+                    throw std::runtime_error("Velocity weight has wrong size!");
+                }
+                return [vel_size, weight](const Eigen::VectorX<ScalarT>& dv_vbar_vtarget) {
                     Eigen::VectorX<ScalarT> v_diff = dv_vbar_vtarget.head(vel_size) + dv_vbar_vtarget.segment(vel_size, vel_size);  // Get the current velocity
                     v_diff = v_diff - dv_vbar_vtarget.tail(vel_size);    // Get the difference between the velocity and its target
+                    for (int i = 0; i < weight.size(); i++) {
+                        v_diff(i) = v_diff(i) * weight(i);
+                    }
                     return v_diff.squaredNorm();
                 };
             }
@@ -143,11 +168,13 @@ namespace torc::mpc {
         int vel_size_;
         int joint_size_;
 
-        vectorx_t config_weights_;
-        vectorx_t vel_weights_;
+        std::vector<std::unique_ptr<fn::ExplicitFn<double>>> cost_fcn_terms_;
+        std::vector<vectorx_t> weights_;
+        std::map<CostTypes, int> cost_idxs_;
+        // std::unique_ptr<fn::ExplicitFn<double>> config_cost_fcn_;
+        // std::unique_ptr<fn::ExplicitFn<double>> vel_cost_fcn_;
 
-        std::unique_ptr<fn::AutodiffFn<double>> config_cost_fcn_;
-        std::unique_ptr<fn::AutodiffFn<double>> vel_cost_fcn_;
+        bool configured_;
     private:
     };
 }    // namespace torc::mpc

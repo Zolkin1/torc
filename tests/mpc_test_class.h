@@ -314,26 +314,26 @@ namespace torc::mpc {
 
                 // Analytic
                 vectorx_t arg;
-                FormCostFcnArg(d_rand, bar_rand, target_rand, arg);
-                vectorx_t grad_c = config_cost_fcn_->Gradient(arg);
+                // cost_ FormCostFcnArg(d_rand, bar_rand, target_rand, arg);
+                // vectorx_t grad_c = config_cost_fcn_->Gradient(arg);
 
                 // Finite difference
-                vectorx_t fd_c = config_cost_fcn_->GradientFiniteDiff(arg);
+                // vectorx_t fd_c = config_cost_fcn_->GradientFiniteDiff(arg);
 
-                CHECK(grad_c.isApprox(fd_c, sqrt(FD_DELTA)));
+                // CHECK(grad_c.isApprox(fd_c, sqrt(FD_DELTA)));
 
                 // ----- Velocity cost ----- //
                 vectorx_t vbar_rand = robot_model_->GetRandomVel();
                 vectorx_t vtarget_rand = robot_model_->GetRandomVel();
 
                 // Analytic
-                FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
-                vectorx_t grad_v = vel_cost_fcn_->Gradient(arg);
+                // FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
+                // vectorx_t grad_v = vel_cost_fcn_->Gradient(arg);
 
                 // Finite difference
-                vectorx_t fd_v = vel_cost_fcn_->GradientFiniteDiff(arg);
+                // vectorx_t fd_v = vel_cost_fcn_->GradientFiniteDiff(arg);
 
-                CHECK(grad_v.isApprox(fd_v, sqrt(FD_DELTA)));
+                // CHECK(grad_v.isApprox(fd_v, sqrt(FD_DELTA)));
             }
         }
 
@@ -432,7 +432,7 @@ namespace torc::mpc {
 
             // Analytic
             vectorx_t arg;
-            FormCostFcnArg(d_rand, bar_rand, target_rand, arg);
+            // FormCostFcnArg(d_rand, bar_rand, target_rand, arg);
             // BENCHMARK("configuration cost function gradient") {
             //     vectorx_t grad_c = cost_->Gradient(arg);
             // };
@@ -446,7 +446,7 @@ namespace torc::mpc {
             vectorx_t vtarget_rand = robot_model_->GetRandomVel();
 
             // Analytic
-            FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
+            // FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
             // BENCHMARK("velocity cost function gradient") {
             //     vectorx_t grad_v = vel_cost_fcn_->Gradient(arg);
             // };

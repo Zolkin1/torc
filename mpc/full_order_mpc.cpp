@@ -36,7 +36,7 @@ namespace torc::mpc {
         traj_.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(),
                           robot_model_->GetNumInputs(), contact_frames_, nodes_);
 
-        CreateDefaultCost();
+        // CreateDefaultCost();
     }
 
     void FullOrderMpc::UpdateConfigurations() {
@@ -217,8 +217,16 @@ namespace torc::mpc {
         ws_->frame_jacobian.resize(6, robot_model_->GetVelDim());
 
         // Setup cost function
+        // TODO: Move this
+        std::vector<vectorx_t> weights;
+        weights.emplace_back(vectorx_t::Constant(robot_model_->GetConfigDim(), 1));
+        weights.emplace_back(vectorx_t::Constant(robot_model_->GetVelDim(), 1));
+
+        std::vector<CostTypes> costs;
+        costs.emplace_back(CostTypes::Configuration);
+        costs.emplace_back(CostTypes::Velocity);
         cost_.Configure(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(),
-            config_tracking_weight_, vel_tracking_weight_);
+            costs, weights);
 
         config_timer.Toc();
         if (verbose_) {

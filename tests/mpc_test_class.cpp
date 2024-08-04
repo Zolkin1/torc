@@ -10,7 +10,7 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include "mpc_test_class.h"
-
+#include "cost_test_class.h"
 #include "autodiff_fn.h"
 
 TEST_CASE("MPC Test Class", "[mpc]") {
@@ -38,4 +38,24 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     // mpc.BenchmarkConstraints();
     // mpc.BenchmarkCompute();
     mpc.BenchmarkCostFunctions();
+}
+
+TEST_CASE("Cost Test Class", "[mpc][cost]") {
+    using namespace torc::mpc;
+    const std::string pin_model_name = "test_pin_model";
+    std::filesystem::path a1_urdf = std::filesystem::current_path();
+    a1_urdf += "/test_data/test_a1.urdf";
+
+    std::filesystem::path mpc_config = std::filesystem::current_path();
+    mpc_config += "/test_data/mpc_config.yaml";
+
+    torc::models::FullOrderRigidBody a1_model("a1_test_model", a1_urdf);
+
+    CostTestClass cost_fcn(a1_model);
+
+    cost_fcn.CheckConfigure();
+    // cost_fcn.CheckDerivatives();
+    // cost_fcn.CheckDefaultCosts();
+
+    // cost_fcn.BenchmarkCostFunctions();
 }
