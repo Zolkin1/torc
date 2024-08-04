@@ -93,6 +93,11 @@ namespace torc::mpc {
             matrix6x_t frame_jacobian;
             matrixx_t holo_mat;
             vectorx_t acc;
+            matrixx_t obj_config_mat;
+            matrixx_t obj_vel_mat;
+            // TODO: Consider combining these two vectors
+            vectorx_t obj_config_vector;
+            vectorx_t obj_vel_vector;
             std::vector<models::ExternalForce> f_ext;
         };
 
@@ -121,7 +126,8 @@ namespace torc::mpc {
         void HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian);
         void HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian);
     // ----------- Cost Creation ----------- //
-        // void UpdateCost();
+        void CreateCostPattern();
+        void UpdateCost();
         // void CreateDefaultCost();
         // Helper function
         // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;
@@ -153,19 +159,21 @@ namespace torc::mpc {
         int GetDecisionIdx(int node, const DecisionType& var_type) const;
         int GetConstraintRow(int node, const ConstraintType& constraint) const;
 
-        void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start);
-        void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start);
-        void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, bool prune_zeros=false);
-        void VectorToTriplet(const vectorx_t& vec, int row_start, int col_start);
-        void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start);
+        void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
+        void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
+        void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx, bool prune_zeros=false);
+        void VectorToTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
+        void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
         /**
          * @brief Assign a matrix that is diagonal and all of the same value to triplets. Assumes the matrix is square.
          * @param val
          * @param row_start
          * @param col_start
          * @param size
+         * @param triplet
+         * @param triplet_idx
          */
-        void DiagonalScalarMatrixToTriplet(double val, int row_start, int col_start, int size);
+        void DiagonalScalarMatrixToTriplet(double val, int row_start, int col_start, int size, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
 
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
@@ -200,12 +208,22 @@ namespace torc::mpc {
 
         // Hold the constraint matrix as a vector of triplets
         std::vector<Eigen::Triplet<double>> constraint_triplets_;
-        int triplet_idx_{};
+        int constraint_triplet_idx_{};
 
         // Cost
         CostFunction cost_;
+
         vectorx_t vel_tracking_weight_;
         vectorx_t config_tracking_weight_;
+
+        std::vector<Eigen::Triplet<double>> objective_triplets_;
+        int objective_triplet_idx_{};
+
+        sp_matrixx_t objective_mat_;
+        vectorx_t objective_vec_;
+
+        std::vector<vectorx_t> q_target_;
+        std::vector<vectorx_t> v_target_;
 
         // Model
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;

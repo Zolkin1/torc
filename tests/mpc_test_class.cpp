@@ -54,8 +54,9 @@ TEST_CASE("Cost Test Class", "[mpc][cost]") {
     CostTestClass cost_fcn(a1_model);
 
     cost_fcn.CheckConfigure();
-    // cost_fcn.CheckDerivatives();
-    // cost_fcn.CheckDefaultCosts();
+    cost_fcn.CheckDerivatives();
+    cost_fcn.CheckDefaultCosts();
+    cost_fcn.CheckLinearizeQuadrasize();
 
     // cost_fcn.BenchmarkCostFunctions();
 }

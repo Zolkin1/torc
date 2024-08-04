@@ -17,7 +17,7 @@ namespace torc::mpc {
         void CheckConfigure() {
             PrintTestHeader("Cost function configure");
             std::vector<vectorx_t> weights;
-            weights.emplace_back(vectorx_t::Constant(robot_model_.GetConfigDim(), 1));
+            weights.emplace_back(vectorx_t::Constant(robot_model_.GetVelDim(), 1));
             weights.emplace_back(vectorx_t::Constant(robot_model_.GetVelDim(), 1));
 
             std::vector<CostTypes> costs;
@@ -64,6 +64,46 @@ namespace torc::mpc {
 
                 CHECK(grad_v.isApprox(fd_v, sqrt(FD_DELTA)));
             }
+        }
+
+        void CheckLinearizeQuadrasize() {
+            PrintTestHeader("Linearization and Quadratasize");
+            // ------------------------- //
+            // ----- Linearization ----- //
+            // ------------------------- //
+
+            // ----- Configuration cost ----- //
+            vectorx_t d = vectorx_t::Zero(robot_model_.GetVelDim());
+            vectorx_t bar_rand = robot_model_.GetRandomConfig();
+            vectorx_t target_rand = robot_model_.GetRandomConfig();
+            vectorx_t lin_term = vectorx_t::Zero(robot_model_.GetVelDim());
+            Linearize(bar_rand, target_rand, Configuration, lin_term);
+
+            // Finite difference
+            vectorx_t arg;
+            FormCostFcnArg(d, bar_rand, target_rand, arg);
+            vectorx_t fd_c = cost_fcn_terms_[cost_idxs_[Configuration]]->GradientFiniteDiff(arg);
+            vectorx_t partial_bar = fd_c.head(robot_model_.GetVelDim());
+
+            REQUIRE(lin_term.size() == partial_bar.size());
+            CHECK(lin_term.isApprox(partial_bar, sqrt(FD_DELTA)));
+
+            // ----- Velocity cost ----- //
+            vectorx_t vbar_rand = robot_model_.GetRandomVel();
+            vectorx_t vtarget_rand = robot_model_.GetRandomVel();
+            Linearize(vbar_rand, vtarget_rand, Velocity, lin_term);
+
+            // Finite difference
+            FormCostFcnArg(d, vbar_rand, vtarget_rand, arg);
+            vectorx_t fd_v = cost_fcn_terms_[cost_idxs_[Velocity]]->GradientFiniteDiff(arg);
+            vectorx_t partial_bar_v = fd_v.head(robot_model_.GetVelDim());
+
+            REQUIRE(lin_term.size() == partial_bar_v.size());
+            CHECK(lin_term.isApprox(partial_bar_v, sqrt(FD_DELTA)));
+
+            // ------------------------- //
+            // ------- Quadratic ------- //
+            // ------------------------- //
         }
 
         void CheckDefaultCosts() {

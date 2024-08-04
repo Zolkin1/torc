@@ -70,9 +70,27 @@ namespace torc::mpc {
             configured_ = true;
         }
 
-        void Linearize(const Trajectory& traj, const std::vector<vectorx_t>& q_target,
-            const std::vector<vectorx_t>& v_target, vectorx_t& linear_term) {
-            // TODO: Implement
+        void Linearize(const vectorx_t& reference, const vectorx_t& target, const CostTypes& type, vectorx_t& linear_term) {
+            // TODO: If all the cost terms stay in this form, I can simplify the if statement
+            if (type == Configuration) {
+                if (reference.size() != config_size_ || target.size() != config_size_) {
+                    throw std::runtime_error("[Cost Function] reference or target has the wrong size!");
+                }
+                vectorx_t arg;
+                FormCostFcnArg(vectorx_t::Zero(vel_size_), reference, target, arg);
+                linear_term.resize(vel_size_);
+                linear_term = cost_fcn_terms_[cost_idxs_[Configuration]]->Gradient(arg).head(vel_size_);
+            } else if (type == Velocity) {
+                if (reference.size() != vel_size_ || target.size() != vel_size_) {
+                    throw std::runtime_error("[Cost Function] reference or target has the wrong size!");
+                }
+                vectorx_t arg;
+                FormCostFcnArg(vectorx_t::Zero(vel_size_), reference, target, arg);
+                linear_term.resize(vel_size_);
+                linear_term = cost_fcn_terms_[cost_idxs_[Velocity]]->Gradient(arg).head(vel_size_);
+            } else {
+                throw std::runtime_error("Provided cost type not supported yet!");
+            }
         }
 
         void Quadraticize(const Trajectory& traj, const std::vector<vectorx_t>& q_target,
@@ -110,7 +128,7 @@ namespace torc::mpc {
             vectorx_t weight = weights_[cost_idxs_[type]];
 
             if (type == Configuration) {
-                if (weight.size() != config_size_) {
+                if (weight.size() != vel_size_) {
                     throw std::runtime_error("Configuration weight has wrong size!");
                 }
                 return [config_size, vel_size, joint_size, weight](const Eigen::VectorX<ScalarT>& dq_qbar_qtarget) {
@@ -167,12 +185,11 @@ namespace torc::mpc {
         int config_size_;
         int vel_size_;
         int joint_size_;
+        int nodes_;
 
         std::vector<std::unique_ptr<fn::ExplicitFn<double>>> cost_fcn_terms_;
         std::vector<vectorx_t> weights_;
         std::map<CostTypes, int> cost_idxs_;
-        // std::unique_ptr<fn::ExplicitFn<double>> config_cost_fcn_;
-        // std::unique_ptr<fn::ExplicitFn<double>> vel_cost_fcn_;
 
         bool configured_;
     private:
