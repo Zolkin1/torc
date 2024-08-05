@@ -98,6 +98,12 @@ namespace torc::models {
         void GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J,
             const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED) const;
 
+        std::string GetUrdfRobotName() const;
+
+        [[nodiscard]] vectorx_t GetUpperConfigLimits() const;
+        [[nodiscard]] vectorx_t GetLowerConfigLimits() const;
+        [[nodiscard]] vectorx_t GetVelocityJointLimits() const;
+        [[nodiscard]] vectorx_t GetTorqueJointLimits() const;
     protected:
 
         void MakePinocchioContacts(const RobotContactInfo& contact_info,

@@ -31,7 +31,7 @@ namespace torc::mpc {
         if (!fs::exists(config_file_)) {
             throw std::runtime_error("Configuration file does not exist!");
         }
-        UpdateConfigurations();
+        UpdateSettings();
 
         ws_ = std::make_unique<Workspace>();
         traj_.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(),
@@ -40,7 +40,7 @@ namespace torc::mpc {
         // CreateDefaultCost();
     }
 
-    void FullOrderMpc::UpdateConfigurations() {
+    void FullOrderMpc::UpdateSettings() {
         // Read in the yaml file.
         YAML::Node config;
         try {
@@ -154,6 +154,8 @@ namespace torc::mpc {
                "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
         }
 
+        std::cout << "vel tracking: " << vel_tracking_weight_.transpose() << std::endl;
+        std::cout << "config tracking: " << config_tracking_weight_.transpose() << std::endl;
         // ---------- Contact Settings ---------- //
         if (!config["contacts"]) {
             throw std::runtime_error("No contact settings provided!");
@@ -213,6 +215,13 @@ namespace torc::mpc {
             std::cout << "\tDecision variables: " << GetNumDecisionVars() << std::endl;
             std::cout << "\tConstraints: " << GetNumConstraints() << std::endl;
 
+            std::cout << "Robot: " << std::endl;
+            std::cout << "\tName: " << robot_model_->GetUrdfRobotName() << std::endl;
+            std::cout << "\tUpper Configuration Bounds: " << robot_model_->GetUpperConfigLimits().transpose() << std::endl;
+            std::cout << "\tLower Configuration Bounds: " << robot_model_->GetLowerConfigLimits().transpose() << std::endl;
+            std::cout << "\tVelocity Bounds: " << robot_model_->GetVelocityJointLimits().transpose() << std::endl;
+            std::cout << "\tTorque Bounds: " << robot_model_->GetTorqueJointLimits().transpose() << std::endl;
+
             std::cout << setfill('=') << setw(total_width) << "" << std::endl;
 
         }
@@ -229,6 +238,7 @@ namespace torc::mpc {
         osqp_instance_.objective_vector.resize(GetNumDecisionVars());
         osqp_instance_.objective_matrix.resize(GetNumDecisionVars(), GetNumDecisionVars());
 
+        osqp_instance_.objective_matrix.setZero();
         osqp_instance_.objective_vector.setZero();
         osqp_instance_.lower_bounds.setConstant(-1);
         osqp_instance_.upper_bounds.setConstant(1);
@@ -270,6 +280,7 @@ namespace torc::mpc {
 
         objective_mat_.resize(GetNumDecisionVars(), GetNumDecisionVars());
         CreateCostPattern();
+        objective_mat_ = osqp_instance_.objective_matrix;
 
         // Init OSQP
         auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
@@ -280,7 +291,7 @@ namespace torc::mpc {
         }
     }
 
-    Trajectory FullOrderMpc::Compute(const vectorx_t& state) {
+    void FullOrderMpc::Compute(const vectorx_t& state, Trajectory& traj_out) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
 
@@ -297,7 +308,7 @@ namespace torc::mpc {
             }
 
             if (constraint_triplet.value() == 0) {
-                constraint_triplet = Eigen::Triplet<double>(constraint_triplet.row(), constraint_triplet.col(), 1e-1);
+                // constraint_triplet = Eigen::Triplet<double>(constraint_triplet.row(), constraint_triplet.col(), 1e-1);
                 // std::cerr << "constraint 0 in triplet! Adding eps." << std::endl;
                 // throw std::runtime_error("constraint 0 in triplet!");
             }
@@ -313,7 +324,10 @@ namespace torc::mpc {
             }
         }
 
+        // std::cout << "integration section: \n" << A_.middleRows(GetConstraintRow(0, Integrator), robot_model_->GetVelDim());
+
         // TODO: Create q_target, v_target
+        // *** Note *** The cost function is wrt to the difference vector, so it really gives the absolute cost decrease
         UpdateCost();
         for (const auto& objective_triplet : objective_triplets_) {
             if(std::isnan(objective_triplet.value())) {
@@ -324,6 +338,10 @@ namespace torc::mpc {
                 throw std::runtime_error("objective 0 in triplet!");
             }
         }
+        // std::cout << "objective mat: \n" << objective_mat_ << std::endl;
+        // std::cout << "objective vec: " << osqp_instance_.objective_vector.transpose() << std::endl;
+        // std::cout << "A: \n" << A_ << std::endl;
+
         auto status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
         if (!status.ok()) {
             std::cerr << "status: " << status << std::endl;
@@ -361,6 +379,8 @@ namespace torc::mpc {
             }
         }
 
+        ConvertSolutionToTraj(osqp_solver_.primal_solution(), traj_out);
+        traj_ = traj_out;
         // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
 
         compute_timer.Toc();
@@ -368,7 +388,13 @@ namespace torc::mpc {
             std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
         }
 
-        return traj_;
+        double c1 = cost_.GetTermCost(vectorx_t::Zero(robot_model_->GetVelDim()), traj_.GetConfiguration(0), q_target_[0], CostTypes::Configuration);
+        std::cout << "Cost before optimization: " << c1 << std::endl;
+
+        vectorx_t q_after = osqp_solver_.primal_solution().head(robot_model_->GetVelDim());
+        std::cout << "q after: " << q_after.transpose() << std::endl;
+        double c2 = cost_.GetTermCost(q_after, traj_.GetConfiguration(0), q_target_[0], CostTypes::Configuration);
+        std::cout << "Cost after optimization: " << c2 << std::endl;
     }
 
     // ------------------------------------------------- //
@@ -378,15 +404,24 @@ namespace torc::mpc {
         constraint_triplet_idx_ = 0;
         AddICConstraint();
         for (int node = 0; node < nodes_ - 1; node++) {
+            // std::cout << "node: " << node << std::endl;
+            // std::cout << "config: " << traj_.GetConfiguration(node).transpose() << std::endl;
+            // std::cout << "vel: " << traj_.GetVelocity(node).transpose() << std::endl;
+            // std::cout << "torque: " << traj_.GetTau(node).transpose() << std::endl;
+
             // Dynamics related constraints don't happen in the last node
             AddIntegrationConstraint(node);
-            AddIDConstraint(node);
+            // AddIDConstraint(node);
             AddFrictionConeConstraint(node);
             AddConfigurationBoxConstraint(node);
             AddVelocityBoxConstraint(node);
             AddTorqueBoxConstraint(node);
-            AddSwingHeightConstraint(node);
-            AddHolonomicConstraint(node);
+
+            // These could conflict with the initial condition constraints
+            if (node > 1) {
+                AddSwingHeightConstraint(node);
+                // AddHolonomicConstraint(node);
+            }
         }
 
         AddFrictionConeConstraint(nodes_ - 1);
@@ -394,7 +429,7 @@ namespace torc::mpc {
         AddVelocityBoxConstraint(nodes_ - 1);
         AddTorqueBoxConstraint(nodes_ - 1);
         AddSwingHeightConstraint(nodes_ - 1);
-        AddHolonomicConstraint(nodes_ - 1);
+        // AddHolonomicConstraint(nodes_ - 1);
 
         if (constraint_triplet_idx_ != constraint_triplets_.size()) {
             std::cerr << "triplet_idx: " << constraint_triplet_idx_ << "\nconstraint triplet size: " << constraint_triplets_.size() << std::endl;
@@ -434,7 +469,6 @@ namespace torc::mpc {
         col_start += POS_VARS;
         matrix3_t dxi = QuatIntegrationLinearizationXi(node);
         MatrixToTriplet(dxi, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
-        // DiagonalScalarMatrixToTriplet(-1, row_start, col_start, 3);
 
         // q^j_k identity
         row_start += 3;
@@ -463,6 +497,7 @@ namespace torc::mpc {
         DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);   // TODO Should probably be num joints not inputs
 
         // Base position bounds
+        row_start = GetConstraintRow(node, Integrator);
         const vector3_t pos_constant = -traj_.GetConfiguration(node + 1).head<POS_VARS>() + traj_.GetConfiguration(node).head<POS_VARS>() + dt_[node]*traj_.GetVelocity(node).head<POS_VARS>();
         osqp_instance_.lower_bounds.segment<POS_VARS>(row_start) = pos_constant;
         osqp_instance_.upper_bounds.segment<POS_VARS>(row_start) = pos_constant;
@@ -471,14 +506,21 @@ namespace torc::mpc {
         // Base orientation bounds
         osqp_instance_.lower_bounds.segment<3>(row_start).setZero();
         osqp_instance_.upper_bounds.segment<3>(row_start).setZero();
+        row_start += 3;
 
         // Joint bounds
         osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = // TODO Should probably be num joints not inputs
-            - traj_.GetConfiguration(node+1).tail(robot_model_->GetNumInputs())
-            + traj_.GetConfiguration(node).tail(robot_model_->GetNumInputs())
-            + dt_[node]*traj_.GetVelocity(node).tail(robot_model_->GetNumInputs());
+             traj_.GetConfiguration(node+1).tail(robot_model_->GetNumInputs())
+            - traj_.GetConfiguration(node).tail(robot_model_->GetNumInputs())
+            - dt_[node]*traj_.GetVelocity(node).tail(robot_model_->GetNumInputs());
         osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs()) =
             osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs());
+
+        row_start = GetConstraintRow(node, Integrator);
+        std::cout << "velocity traj tail: " << traj_.GetVelocity(node).tail(robot_model_->GetNumInputs()).transpose() << std::endl;
+        std::cout << "next node traj tail: " << traj_.GetConfiguration(node+1).tail(robot_model_->GetNumInputs()).transpose() << std::endl;
+        std::cout << "lb integration: " << osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).transpose() << std::endl;
+        std::cout << "ub integration: " << osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).transpose() << std::endl;
     }
 
     void FullOrderMpc::AddIDConstraint(int node) {
@@ -574,11 +616,15 @@ namespace torc::mpc {
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_); // TODO Should probably be num joints not inputs
 
         // Set configuration bounds
+        row_start = GetConstraintRow(node, ConfigBox);
         osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetConfigDim())
             = robot_model_->GetLowerConfigLimits() - traj_.GetConfiguration(node);
+
         osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetConfigDim())
             = robot_model_->GetUpperConfigLimits() - traj_.GetConfiguration(node);
 
+        std::cout << "lb: " << osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetConfigDim()).transpose() << std::endl;
+        std::cout << "ub: " << osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetConfigDim()).transpose() << std::endl;
     }
 
     void FullOrderMpc::AddVelocityBoxConstraint(int node) {
@@ -625,6 +671,11 @@ namespace torc::mpc {
                 = -frame_pos(2) - swing_traj_[frame][node];
             osqp_instance_.upper_bounds(row_start)
                 = -frame_pos(2) + swing_traj_[frame][node];
+
+            std::cout << "frame: " << frame << std::endl;
+            std::cout << "frame pos: " << frame_pos.transpose() << std::endl;
+            std::cout << "lb: " << osqp_instance_.lower_bounds(row_start) << std::endl;
+            std::cout << "ub: " << osqp_instance_.upper_bounds(row_start) << std::endl;
 
             row_start++;
         }
@@ -785,6 +836,9 @@ namespace torc::mpc {
         }
 
         ws_->obj_vel_mat = matrixx_t::Identity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+        for (int i = 0; i < vel_tracking_weight_.size(); i++) {
+            ws_->obj_vel_mat.row(i) = ws_->obj_vel_mat.row(i)*((vel_tracking_weight_(i) != 0) ? 1 : 0);
+        }
 
         for (int i = 0; i < nodes_; i++) {
             // Configuration Tracking
@@ -880,13 +934,15 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_ - 1; node++) {
             // Dynamics related constraints don't happen in the last node
             AddIntegrationPattern(node);
-            AddIDPattern(node);
+            // AddIDPattern(node);
             AddFrictionConePattern(node);
             AddConfigurationBoxPattern(node);
             AddVelocityBoxPattern(node);
             AddTorqueBoxPattern(node);
-            AddSwingHeightPattern(node);
-            AddHolonomicPattern(node);
+            if (node > 1) {
+                AddSwingHeightPattern(node);
+                // AddHolonomicPattern(node);
+            }
         }
 
         AddFrictionConePattern(nodes_ - 1);
@@ -894,7 +950,7 @@ namespace torc::mpc {
         AddVelocityBoxPattern(nodes_ - 1);
         AddTorqueBoxPattern(nodes_ - 1);
         AddSwingHeightPattern(nodes_ - 1);
-        AddHolonomicPattern(nodes_ - 1);
+        // AddHolonomicPattern(nodes_ - 1);
 
         // int max_row = -1;
         // int max_col = -1;
@@ -1036,6 +1092,7 @@ namespace torc::mpc {
             }
         }
         q_box.block<QUAT_VARS, 3>(POS_VARS, POS_VARS).setConstant(1);
+
         MatrixToNewTriplet(q_box, row_start, col_start, constraint_triplets_);
     }
 
@@ -1088,6 +1145,41 @@ namespace torc::mpc {
     // ------------------------------------------------- //
     // ---------------- Helper Functions --------------- //
     // ------------------------------------------------- //
+    void FullOrderMpc::ConvertSolutionToTraj(const vectorx_t& qp_sol, Trajectory& traj) {
+        if (traj.GetNumNodes() != nodes_) {
+            traj.SetNumNodes(nodes_);
+        }
+
+        for (int node = 0; node < nodes_; node++) {
+            vectorx_t config_new = traj_.GetConfiguration(node);
+
+            std::cout << "q dec: " << qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).transpose()  << std::endl;
+
+            // Position and joints are simple addition
+            config_new.head<POS_VARS>() += qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).head<3>();
+            config_new.tail(robot_model_->GetNumInputs()) += qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).tail(robot_model_->GetNumInputs());
+
+            // Quaternion
+            config_new.segment<QUAT_VARS>(POS_VARS) = (static_cast<quat_t>(config_new.segment<QUAT_VARS>(POS_VARS))
+                * pinocchio::quaternion::exp3(
+                    qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).segment<3>(POS_VARS))).coeffs();
+
+            traj.SetConfiguration(node, config_new);
+
+            traj.SetVelocity(node,
+                qp_sol.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node));
+            traj.SetTau(node,
+                qp_sol.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()) + traj_.GetTau(node));
+            int force_idx = 0;
+            for (const auto& frame : contact_frames_) {
+                traj.SetForce(node, frame,
+                    qp_sol.segment<3>(GetDecisionIdx(node, GroundForce) + 3*force_idx) + traj_.GetForce(node, frame));
+                force_idx++;
+            }
+        }
+    }
+
+
     int FullOrderMpc::GetNumConstraints() const {
         // Need to account for the fact that the last node is different
         // The last node does NOT have a ID or integrator constraint
@@ -1257,5 +1349,15 @@ namespace torc::mpc {
     void FullOrderMpc::SetVerbosity(bool verbose) {
         verbose_ = verbose;
     }
+
+    std::vector<std::string> FullOrderMpc::GetContactFrames() const {
+        return contact_frames_;
+    }
+
+    int FullOrderMpc::GetNumNodes() const {
+        return nodes_;
+    }
+
+
 
 } // namespace torc::mpc

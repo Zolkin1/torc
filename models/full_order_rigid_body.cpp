@@ -570,22 +570,6 @@ namespace torc::models {
 //         return df_dq;
     }
 
-    vectorx_t FullOrderRigidBody::GetUpperConfigLimits() const {
-        return pin_model_.upperPositionLimit;
-    }
-
-    vectorx_t FullOrderRigidBody::GetLowerConfigLimits() const {
-        return pin_model_.lowerPositionLimit;
-    }
-
-    vectorx_t FullOrderRigidBody::GetVelocityJointLimits() const {
-        return pin_model_.velocityLimit;
-    }
-
-    vectorx_t FullOrderRigidBody::GetTorqueJointLimits() const {
-        return pin_model_.effortLimit.tail(GetNumInputs());
-    }
-
     void FullOrderRigidBody::PerturbConfiguration(vectorx_t& q, double delta, int idx) {
         if (idx > GetVelDim()) {
             throw std::runtime_error("Invalid q perturbation index!");

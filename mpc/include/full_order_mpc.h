@@ -28,7 +28,7 @@ namespace torc::mpc {
     using matrix3_t = Eigen::Matrix3d;
     using matrix43_t = Eigen::Matrix<double, 4, 3>;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
-    using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long>;
+    using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
     class FullOrderMpc {
     public:
@@ -57,11 +57,15 @@ namespace torc::mpc {
          * @param state
          * @return
          */
-        Trajectory Compute(const vectorx_t& state);
+        void Compute(const vectorx_t& state, Trajectory& traj_out);
 
         void SetVerbosity(bool verbose);
 
         void UpdateCostFcn(std::unique_ptr<torc::fn::ExplicitFn<double>> cost);
+
+        std::vector<std::string> GetContactFrames() const;
+
+        int GetNumNodes() const;
     protected:
         enum ConstraintType {
         Integrator,
@@ -151,6 +155,8 @@ namespace torc::mpc {
         void AddHolonomicPattern(int node);
 
     // ----- Helper Functions ----- //
+        void ConvertSolutionToTraj(const vectorx_t& qp_sol, Trajectory& traj);
+
         [[nodiscard]] int GetNumConstraints() const;
         [[nodiscard]] int GetConstraintsPerNode() const;
         [[nodiscard]] int GetNumDecisionVars() const;
@@ -184,7 +190,7 @@ namespace torc::mpc {
         [[nodiscard]] int NumSwingHeightConstraintsNode() const;
         [[nodiscard]] int NumHolonomicConstraintsNode() const;
 
-        void UpdateConfigurations();
+        void UpdateSettings();
 
         static constexpr int CONTACT_3DOF = 3;
         static constexpr int FLOATING_VEL = 6;

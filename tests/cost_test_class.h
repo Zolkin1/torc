@@ -18,13 +18,16 @@ namespace torc::mpc {
             PrintTestHeader("Cost function configure");
             std::vector<vectorx_t> weights;
             weights.emplace_back(vectorx_t::Constant(robot_model_.GetVelDim(), 1));
+            // weights[0].segment<3>(3).setZero();
+            // weights[0].tail(robot_model_.GetNumInputs()).setZero();
+            // weights[0].segment(1,2).setZero();
             weights.emplace_back(vectorx_t::Constant(robot_model_.GetVelDim(), 1));
 
             std::vector<CostTypes> costs;
             costs.emplace_back(Configuration);
             costs.emplace_back(Velocity);
 
-            Configure(robot_model_.GetConfigDim(), robot_model_.GetVelDim(), robot_model_.GetNumInputs(), false, costs, weights);
+            Configure(robot_model_.GetConfigDim(), robot_model_.GetVelDim(), robot_model_.GetNumInputs(), true, costs, weights);
             REQUIRE(configured_);
             REQUIRE(cost_idxs_.size() == costs.size());
             REQUIRE(cost_fcn_terms_.size() == costs.size());
@@ -49,6 +52,8 @@ namespace torc::mpc {
                 // Finite difference
                 vectorx_t fd_c = cost_fcn_terms_[cost_idxs_[Configuration]]->GradientFiniteDiff(arg);
 
+                std::cout << "grad: " << grad_c.transpose() << std::endl;
+                std::cout << "fd: " << fd_c.transpose() << std::endl;
                 CHECK(grad_c.isApprox(fd_c, sqrt(FD_DELTA)));
 
                 // ----- Velocity cost ----- //
@@ -129,6 +134,7 @@ namespace torc::mpc {
 
         void CheckDefaultCosts() {
             PrintTestHeader("Cost function values");
+            std::cout << "weight config: " << weights_[0].transpose() << std::endl;
 
             // ----- Configuration cost ----- //
             vectorx_t d = vectorx_t::Constant(robot_model_.GetVelDim(), 1);

@@ -1,8 +1,8 @@
 general_settings:
-  nodes: 13
+  nodes: 3
   verbose: True
   node_dt: 0.02
-  compile_derivatives: False
+  compile_derivatives: True
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
@@ -16,8 +16,8 @@ constraints:
   friction_coef: 0.5
   max_grf: 200
 costs:
-  configuration_tracking_weights: [100, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-  velocity_tracking_weights: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  configuration_tracking_weights: [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  velocity_tracking_weights: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] #[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
   leg_tracking_weight: 10
   torso_tracking_weight: 100
   force_tracking_weight: 1

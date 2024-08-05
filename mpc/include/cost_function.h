@@ -21,7 +21,7 @@ namespace torc::mpc {
     using matrix3_t = Eigen::Matrix3d;
     using matrix43_t = Eigen::Matrix<double, 4, 3>;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
-    using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long>;
+    using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
     enum CostTypes {
         Configuration = 0,
@@ -115,11 +115,11 @@ namespace torc::mpc {
                 hessian_term.resize(vel_size_, vel_size_);
 
                 // Make sure its PSD so use Gauss-Newton Approximation
-                vectorx_t grad = cost_fcn_terms_[cost_idxs_[Configuration]]->Gradient(arg).head(vel_size_);
-                double cost = cost_fcn_terms_[cost_idxs_[Configuration]]->Evaluate(arg);
-                if (cost < 1e-6) {
-                    cost = 1e-6;
-                }
+                // vectorx_t grad = cost_fcn_terms_[cost_idxs_[Configuration]]->Gradient(arg).head(vel_size_);
+                // double cost = cost_fcn_terms_[cost_idxs_[Configuration]]->Evaluate(arg);
+                // if (cost < 1e-6) {
+                //     cost = 1e-6;
+                // }
                 hessian_term  = GetConfigurationTrackingJacobian(arg).transpose() * GetConfigurationTrackingJacobian(arg);
             } else if (type == Velocity) {
                 if (reference.size() != vel_size_ || target.size() != vel_size_) {
@@ -214,6 +214,7 @@ namespace torc::mpc {
                 if (weight.size() != vel_size_) {
                     throw std::runtime_error("Velocity weight has wrong size!");
                 }
+                std::cout << "weight: " << weight.transpose() << std::endl;
                 return [vel_size, weight](const Eigen::VectorX<ScalarT>& dv_vbar_vtarget) {
                     Eigen::VectorX<ScalarT> v_diff = dv_vbar_vtarget.head(vel_size) + dv_vbar_vtarget.segment(vel_size, vel_size);  // Get the current velocity
                     v_diff = v_diff - dv_vbar_vtarget.tail(vel_size);    // Get the difference between the velocity and its target
@@ -237,11 +238,10 @@ namespace torc::mpc {
             // Floating base position difference
             q_diff.template head<POS_VARS>() = dq_qbar_qtarget.template head<POS_VARS>() + dq_qbar_qtarget.segment(vel_size_, POS_VARS)
                 - dq_qbar_qtarget.segment(config_size_ + vel_size_, POS_VARS); // Get the current floating base position minus target
-
             // Floating base orientation difference
             Eigen::Quaternion<ScalarT> qbar, q_target;
-            qbar.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(config_size_ + vel_size_ + POS_VARS);
-            q_target.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(vel_size_ + POS_VARS);
+            qbar.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(vel_size_ + POS_VARS);
+            q_target.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(config_size_ + vel_size_ + POS_VARS);
             // Eigen's inverse has an if statement, so we can't use it in codegen
             qbar = Eigen::Quaternion<ScalarT>(qbar.conjugate().coeffs() / qbar.squaredNorm());   // Assumes norm > 0
 
@@ -260,6 +260,7 @@ namespace torc::mpc {
             for (int i = 0; i < weights_[cost_idxs_[Configuration]].size(); i++) {
                 q_diff(i) = q_diff(i) * weights_[cost_idxs_[Configuration]](i);
             }
+
             return q_diff;
         }
 

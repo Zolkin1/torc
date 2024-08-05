@@ -433,8 +433,10 @@ namespace torc::mpc {
 
         void BenchmarkCompute() {
             vectorx_t state_rand = robot_model_->GetRandomState();
+            Trajectory traj;
+            traj.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(), contact_frames_, nodes_);
             BENCHMARK("mpc compute") {
-                Compute(state_rand);
+                Compute(state_rand, traj);
             };
         }
 

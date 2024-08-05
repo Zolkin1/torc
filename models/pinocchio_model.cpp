@@ -90,17 +90,17 @@ namespace torc::models {
     }
 
     vectorx_t PinocchioModel::GetNeutralConfig() const {
-        return pinocchio::neutral(pin_model_);
+        return pinocchio::neutral(pin_model_).cwiseMax(GetLowerConfigLimits()).cwiseMin(GetUpperConfigLimits());
     }
 
     vectorx_t PinocchioModel::GetRandomConfig() const {
-        // Make dummy limits
-        const vectorx_t ub = vectorx_t::Constant(GetConfigDim(), 10);
-        const vectorx_t lb = vectorx_t::Constant(GetConfigDim(), -10);
-
         vectorx_t q(GetConfigDim());
-        pinocchio::randomConfiguration(pin_model_, lb, ub, q);
+        vectorx_t lb = GetLowerConfigLimits();
+        vectorx_t ub = GetUpperConfigLimits();
+        lb.head<FLOATING_CONFIG>() = vectorx_t::Constant(FLOATING_CONFIG, -10);
+        ub.head<FLOATING_CONFIG>() = vectorx_t::Constant(FLOATING_CONFIG, 10);
 
+        pinocchio::randomConfiguration(pin_model_, lb, ub, q);
         return q;
     }
 
@@ -240,5 +240,30 @@ namespace torc::models {
 
         pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, ref, J);
     }
+
+    std::string PinocchioModel::GetUrdfRobotName() const {
+        return pin_model_.name;
+    }
+
+    vectorx_t PinocchioModel::GetUpperConfigLimits() const {
+        vectorx_t q_ub = pin_model_.upperPositionLimit;
+        q_ub.head<FLOATING_CONFIG>() = q_ub.head<FLOATING_CONFIG>().cwiseMin(100);
+        return q_ub;
+    }
+
+    vectorx_t PinocchioModel::GetLowerConfigLimits() const {
+        vectorx_t q_lb = pin_model_.lowerPositionLimit;
+        q_lb.head<FLOATING_CONFIG>() = q_lb.head<FLOATING_CONFIG>().cwiseMax(-100);
+        return q_lb;
+    }
+
+    vectorx_t PinocchioModel::GetVelocityJointLimits() const {
+        return pin_model_.velocityLimit;
+    }
+
+    vectorx_t PinocchioModel::GetTorqueJointLimits() const {
+        return pin_model_.effortLimit.tail(GetNumInputs());
+    }
+
 
 } // torc::models

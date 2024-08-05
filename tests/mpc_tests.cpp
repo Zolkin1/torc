@@ -24,14 +24,26 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
 
     mpc.Configure();
 
-
     torc::models::FullOrderRigidBody a1("a1", a1_urdf);
 
-    vectorx_t random_state = a1.GetRandomState();
-    mpc.Compute(random_state);
+    vectorx_t random_state(a1.GetConfigDim() + a1.GetVelDim());
+    random_state << a1.GetNeutralConfig(), Eigen::VectorXd::Zero(a1.GetVelDim());
+    // random_state << a1.GetRandomState();
+    // random_state.tail(a1.GetVelDim()).setZero();
+    std::cout << "initial config: " << random_state.head(a1.GetConfigDim()).transpose() << std::endl;
+    std::cout << "initial vel: " << random_state.tail(a1.GetVelDim()).transpose() << std::endl;
+    Trajectory traj;
+    traj.UpdateSizes(a1.GetConfigDim(), a1.GetVelDim(), a1.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
+    mpc.Compute(random_state, traj);
+
+    for (int i = 0; i < traj.GetNumNodes(); i++) {
+        std::cout << "Node: " << i << std::endl;
+        std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+    }
 
     random_state = a1.GetRandomState();
-    mpc.Compute(random_state);
+    mpc.Compute(random_state, traj);
 
 //    torc::models::RigidBody a1_model(pin_model_name, a1_urdf);
 //

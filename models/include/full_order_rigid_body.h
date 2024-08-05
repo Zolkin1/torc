@@ -114,11 +114,6 @@ namespace torc::models {
         void FrameVelDerivWrtConfiguration(const vectorx_t& q,
             const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian);
 
-        [[nodiscard]] vectorx_t GetUpperConfigLimits() const;
-        [[nodiscard]] vectorx_t GetLowerConfigLimits() const;
-        [[nodiscard]] vectorx_t GetVelocityJointLimits() const;
-        [[nodiscard]] vectorx_t GetTorqueJointLimits() const;
-
         void PerturbConfiguration(vectorx_t& q, double delta, int idx);
 
         /**
