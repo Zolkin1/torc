@@ -28,7 +28,7 @@ namespace torc::mpc {
     using matrix3_t = Eigen::Matrix3d;
     using matrix43_t = Eigen::Matrix<double, 4, 3>;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
-    using sp_matrixx_t = Eigen::SparseMatrix<double>;
+    using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long>;
 
     class FullOrderMpc {
     public:
@@ -81,7 +81,6 @@ namespace torc::mpc {
             GroundForce
         };
 
-        // TODO: Consider adding a workspace where I can put intermediate values without needing to allocate memory
         struct Workspace {
             matrixx_t int_mat;
             matrixx_t id_config_mat;
@@ -210,6 +209,9 @@ namespace torc::mpc {
         std::vector<Eigen::Triplet<double>> constraint_triplets_;
         int constraint_triplet_idx_{};
 
+        // Codegen
+        bool compile_derivatves_;
+
         // Cost
         CostFunction cost_;
 
@@ -220,7 +222,7 @@ namespace torc::mpc {
         int objective_triplet_idx_{};
 
         sp_matrixx_t objective_mat_;
-        vectorx_t objective_vec_;
+        // vectorx_t objective_vec_;
 
         std::vector<vectorx_t> q_target_;
         std::vector<vectorx_t> v_target_;

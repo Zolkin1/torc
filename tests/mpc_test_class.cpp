@@ -24,12 +24,14 @@ TEST_CASE("MPC Test Class", "[mpc]") {
 
     MpcTestClass mpc(mpc_config, a1_urdf);
 
+    mpc.Configure();
+
     mpc.CheckQuaternionIntLin();
     mpc.CheckInverseDynamicsLin();
     mpc.CheckQuaternionLin();
     mpc.CheckSwingHeightLin();
     mpc.CheckHolonomicLin();
-    mpc.CheckCostFunctionDerivatives();
+    mpc.CheckCostFunctionDefiniteness();
     // mpc.BenchmarkQuaternionIntegrationLin();
     // mpc.BenchmarkInverseDynamicsLin();
     // mpc.BenchmarkQuaternionConfigurationLin();
@@ -37,7 +39,7 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     // mpc.BenchmarkHolonomicLin();
     // mpc.BenchmarkConstraints();
     // mpc.BenchmarkCompute();
-    mpc.BenchmarkCostFunctions();
+    // mpc.BenchmarkCostFunctions();
 }
 
 TEST_CASE("Cost Test Class", "[mpc][cost]") {
@@ -46,8 +48,8 @@ TEST_CASE("Cost Test Class", "[mpc][cost]") {
     std::filesystem::path a1_urdf = std::filesystem::current_path();
     a1_urdf += "/test_data/test_a1.urdf";
 
-    std::filesystem::path mpc_config = std::filesystem::current_path();
-    mpc_config += "/test_data/mpc_config.yaml";
+    // std::filesystem::path mpc_config = std::filesystem::current_path();
+    // mpc_config += "/test_data/mpc_config.yaml";
 
     torc::models::FullOrderRigidBody a1_model("a1_test_model", a1_urdf);
 

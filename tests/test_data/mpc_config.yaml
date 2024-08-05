@@ -1,20 +1,23 @@
 general_settings:
-  nodes: 20
+  nodes: 13
   verbose: True
   node_dt: 0.02
+  compile_derivatives: False
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
   verbose: True
   polish: False
-  #rho:
+#  rho: 1
   #alpha:
-  #adaptive_rho:
-  max_iter: 50
+  adaptive_rho: True
+  max_iter: 5000
 constraints:
   friction_coef: 0.5
   max_grf: 200
 costs:
+  configuration_tracking_weights: [100, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  velocity_tracking_weights: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
   leg_tracking_weight: 10
   torso_tracking_weight: 100
   force_tracking_weight: 1

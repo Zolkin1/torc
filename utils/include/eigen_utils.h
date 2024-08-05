@@ -12,7 +12,11 @@ namespace torc::utils {
      */
     template <class scalar_t>
     Eigen::VectorX<scalar_t> StdToEigenVector(const std::vector<scalar_t>& vec) {
-        return Eigen::Map<Eigen::VectorX<scalar_t> , Eigen::Unaligned>(vec.data(), vec.size());
+        Eigen::VectorX<scalar_t> eig_vec(vec.size());
+        for (int i = 0; i < eig_vec.size(); i++) {
+            eig_vec(i) = vec[i];
+        }
+        return eig_vec;
     }
 
     /**

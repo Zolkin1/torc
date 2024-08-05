@@ -9,17 +9,18 @@
 #include "autodiff_fn.h"
 
 #include <pinocchio/algorithm/kinematics-derivatives.hxx>
+#include <Eigen/Dense>
 
 #include "eigen_utils.h"
 #include "torc_timer.h"
 
-// TODO: Figure out how I want to handle the geometry stuff
-// TODO: Determine exactly which frame the floating base velocities are in. Pinocchio puts them in the local frame,
-//  Mujoco puts them in the global frame. If I do it all in the local frame, then I think it makes more sense.
+// TODO: I think there is a weird scaling issue that is causing nans with enough nodes.
+//  for now, it looks like at 14 nodes I consistently get nans. At 13 nodes, the residuals look really bad and don't
+//  ever get much better. I wonder if this has to do with small values being put in places?
 
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const fs::path& config_file, const fs::path& model_path)
-        : config_file_(config_file), verbose_(true) {
+        : config_file_(config_file), verbose_(true), cost_("full_order_mpc_cost"), compile_derivatves_(true) {
         // Verify the robot file exists
         if (!fs::exists(model_path)) {
             throw std::runtime_error("Robot file does not exist!");
@@ -72,6 +73,10 @@ namespace torc::mpc {
             } else {
                 throw std::runtime_error("Node dt not specified!");
             }
+
+            if (general_settings["compile_derivatives"]) {
+                compile_derivatves_ = general_settings["compile_derivatives"].as<bool>();
+            }
         }
 
         // ---------- Solver Settings ---------- //
@@ -95,6 +100,9 @@ namespace torc::mpc {
             if (solver_settings["max_iter"]) {
                 osqp_settings_.max_iter = solver_settings["max_iter"].as<int>();
             }
+            if (solver_settings["adaptive_rho"]) {
+                osqp_settings_.adaptive_rho = solver_settings["adaptive_rho"].as<bool>();
+            }
         }
 
         // ---------- Constraint Settings ---------- //
@@ -110,6 +118,41 @@ namespace torc::mpc {
             throw std::runtime_error("No cost settings provided!");
         }
         YAML::Node cost_settings = config["costs"];
+        if (cost_settings["configuration_tracking_weights"]) {
+            auto config_tracking_weights = cost_settings["configuration_tracking_weights"].as<std::vector<double>>();
+            config_tracking_weight_ = utils::StdToEigenVector(config_tracking_weights);
+        }
+
+        if (config_tracking_weight_.size() < robot_model_->GetVelDim()) {
+            std::cerr << "Configuration tracking weight size is too small, adding zeros." <<
+               "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
+            int starting_size = config_tracking_weight_.size();
+            config_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
+            for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
+                config_tracking_weight_(i) = 0;
+            }
+        } else if (config_tracking_weight_.size() > robot_model_->GetVelDim()) {
+            std::cerr << "Configuration tracking weight is too large. Ignoring end values." <<
+               "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
+        }
+
+        if (cost_settings["velocity_tracking_weights"]) {
+            auto vel_tracking_weights = cost_settings["velocity_tracking_weights"].as<std::vector<double>>();
+            vel_tracking_weight_ = utils::StdToEigenVector(vel_tracking_weights);
+        }
+
+        if (vel_tracking_weight_.size() < robot_model_->GetVelDim()) {
+            std::cerr << "Velocity tracking weight size is too small, adding zeros." <<
+               "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
+            int starting_size = vel_tracking_weight_.size();
+            vel_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
+            for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
+                vel_tracking_weight_(i) = 0;
+            }
+        } else if (vel_tracking_weight_.size() > robot_model_->GetVelDim()) {
+            std::cerr << "Velocity tracking weight is too large. Ignoring end values." <<
+               "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
+        }
 
         // ---------- Contact Settings ---------- //
         if (!config["contacts"]) {
@@ -140,6 +183,7 @@ namespace torc::mpc {
             std::cout << "General settings: " << std::endl;
             std::cout << "\tVerbose: " << (verbose_ ? "True" : "False") << std::endl;
             std::cout << "\tNodes: " << nodes_ << std::endl;
+            std::cout << "\tCompile derivatives: " << (compile_derivatves_ ? "True" : "False") << std::endl;
 
             std::cout << "Solver settings: " << std::endl;
             std::cout << "\tRelative tolerance: " << osqp_settings_.eps_rel << std::endl;
@@ -148,7 +192,7 @@ namespace torc::mpc {
             std::cout << "\tPolish: " << (osqp_settings_.polish ? "True" : "False") << std::endl;
             std::cout << "\trho: " << osqp_settings_.rho << std::endl;
             std::cout << "\talpha: " << osqp_settings_.alpha << std::endl;
-            std::cout << "\tAdaptive rho: " << osqp_settings_.adaptive_rho << std::endl;
+            std::cout << "\tAdaptive rho: " << (osqp_settings_.adaptive_rho ? "True" : "False") << std::endl;
             std::cout << "\tMax iterations: " << osqp_settings_.max_iter << std::endl;
 
             std::cout << "Constraints:" << std::endl;
@@ -185,8 +229,7 @@ namespace torc::mpc {
         osqp_instance_.objective_vector.resize(GetNumDecisionVars());
         osqp_instance_.objective_matrix.resize(GetNumDecisionVars(), GetNumDecisionVars());
 
-        osqp_instance_.objective_matrix.setIdentity();
-        osqp_instance_.objective_vector.setConstant(2);
+        osqp_instance_.objective_vector.setZero();
         osqp_instance_.lower_bounds.setConstant(-1);
         osqp_instance_.upper_bounds.setConstant(1);
 
@@ -198,9 +241,6 @@ namespace torc::mpc {
         // Thus, we will use constraints_ to hold the new constraints then copy the data vector in.
         // I believe we can update the bounds in place though.
         A_ = osqp_instance_.constraint_matrix;
-
-        // Init OSQP
-        auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
 
         // Reset the triplet index, so we can re-use the triplet vector without re-allocating
         constraint_triplet_idx_ = 0;
@@ -219,18 +259,20 @@ namespace torc::mpc {
         // Setup cost function
         // TODO: Move this
         std::vector<vectorx_t> weights;
-        weights.emplace_back(vectorx_t::Constant(robot_model_->GetVelDim(), 1));
-        weights.emplace_back(vectorx_t::Constant(robot_model_->GetVelDim(), 1));
+        weights.emplace_back(config_tracking_weight_);
+        weights.emplace_back(vel_tracking_weight_);
 
         std::vector<CostTypes> costs;
         costs.emplace_back(CostTypes::Configuration);
         costs.emplace_back(CostTypes::Velocity);
-        cost_.Configure(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(),
+        cost_.Configure(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(), compile_derivatves_,
         costs, weights);
 
         objective_mat_.resize(GetNumDecisionVars(), GetNumDecisionVars());
-        objective_vec_.resize(GetNumDecisionVars());
         CreateCostPattern();
+
+        // Init OSQP
+        auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
 
         config_timer.Toc();
         if (verbose_) {
@@ -249,24 +291,77 @@ namespace torc::mpc {
         traj_.SetVelocity(0, v);
 
         CreateConstraints();
-        assert(triplet_idx_ == constraint_triplets_.size());
+        for (auto& constraint_triplet : constraint_triplets_) {
+            if(std::isnan(constraint_triplet.value())) {
+                throw std::runtime_error("nan in constraint mat");
+            }
 
-        // TODO: Change to objective and constraints
-        A_.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
-        auto status = osqp_solver_.UpdateConstraintMatrix(A_);
-        if (!status.ok()) {
-            std::cerr << "status: " << status << std::endl;
-            throw std::runtime_error("Could not update the constraint matrix.");
+            if (constraint_triplet.value() == 0) {
+                constraint_triplet = Eigen::Triplet<double>(constraint_triplet.row(), constraint_triplet.col(), 1e-1);
+                // std::cerr << "constraint 0 in triplet! Adding eps." << std::endl;
+                // throw std::runtime_error("constraint 0 in triplet!");
+            }
+        }
+
+        for (int i = 0; i < osqp_instance_.lower_bounds.size(); i++) {
+            if (std::isnan(osqp_instance_.lower_bounds(i))) {
+                throw std::runtime_error("lower bound has nan at" + i);
+            }
+
+            if (std::isnan(osqp_instance_.upper_bounds(i))) {
+                throw std::runtime_error("upper bound has nan at " + i);
+            }
         }
 
         // TODO: Create q_target, v_target
-        // TODO: Can I update the vectors and mats in the osqp_instance?
-        // cost_.Linearize(traj_, q_target, v_target, osqp_instance_.objective_vector);
-        // cost_.Quadraticize(traj_, q_target, v_target, osqp_instance_.objective_matrix);
         UpdateCost();
+        for (const auto& objective_triplet : objective_triplets_) {
+            if(std::isnan(objective_triplet.value())) {
+                throw std::runtime_error("nan in constraint mat");
+            }
+
+            if (objective_triplet.value() == 0) {
+                throw std::runtime_error("objective 0 in triplet!");
+            }
+        }
+        auto status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
+        if (!status.ok()) {
+            std::cerr << "status: " << status << std::endl;
+            throw std::runtime_error("Could not update the objective and constraint matrix.");
+        }
+
+        status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
+        if (!status.ok()) {
+            std::cerr << "status: " << status << std::endl;
+            throw std::runtime_error("Could not update the objective vector.");
+        }
+
+        status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
+        if (!status.ok()) {
+            std::cerr << "status: " << status << std::endl;
+            throw std::runtime_error("Could not update the constraint bounds.");
+        }
 
         // Solve
         auto solve_status = osqp_solver_.Solve();
+        if (!status.ok()) {
+            std::cerr << "status: " << status << std::endl;
+            throw std::runtime_error("Could not solve the QP.");
+        }
+
+        for (const auto& res : osqp_solver_.primal_solution()) {
+            if (std::isnan(res)) {
+                throw std::runtime_error("nan in primal solution");
+            }
+        }
+
+        for (const auto& res : osqp_solver_.dual_solution()) {
+            if (std::isnan(res)) {
+                throw std::runtime_error("nan in dual solution");
+            }
+        }
+
+        // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
 
         compute_timer.Toc();
         if (verbose_) {
@@ -305,6 +400,8 @@ namespace torc::mpc {
             std::cerr << "triplet_idx: " << constraint_triplet_idx_ << "\nconstraint triplet size: " << constraint_triplets_.size() << std::endl;
             throw std::runtime_error("Constraints did not populate the full matrix!");
         }
+
+        A_.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
     }
 
     void FullOrderMpc::AddICConstraint() {
@@ -380,6 +477,8 @@ namespace torc::mpc {
             - traj_.GetConfiguration(node+1).tail(robot_model_->GetNumInputs())
             + traj_.GetConfiguration(node).tail(robot_model_->GetNumInputs())
             + dt_[node]*traj_.GetVelocity(node).tail(robot_model_->GetNumInputs());
+        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs()) =
+            osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs());
     }
 
     void FullOrderMpc::AddIDConstraint(int node) {
@@ -678,8 +777,14 @@ namespace torc::mpc {
     // ----------------- Cost Creation ----------------- //
     // ------------------------------------------------- //
     void FullOrderMpc::CreateCostPattern() {
-        ws_->obj_config_mat = matrixx_t::Constant(robot_model_->GetConfigDim(), robot_model_->GetConfigDim(), 1);
-        ws_->obj_vel_mat = matrixx_t::Constant(robot_model_->GetVelDim(), robot_model_->GetVelDim(), 1);
+        ws_->obj_config_mat = matrixx_t::Identity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+        ws_->obj_config_mat.block<3, 3>(POS_VARS, POS_VARS) = matrix3_t::Constant(1);
+
+        for (int i = 0; i < config_tracking_weight_.size(); i++) {
+            ws_->obj_config_mat.row(i) = ws_->obj_config_mat.row(i)*((config_tracking_weight_(i) != 0) ? 1 : 0);
+        }
+
+        ws_->obj_vel_mat = matrixx_t::Identity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
 
         for (int i = 0; i < nodes_; i++) {
             // Configuration Tracking
@@ -691,7 +796,11 @@ namespace torc::mpc {
             MatrixToNewTriplet(ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_);
         }
 
-        ws_->obj_config_vector.resize(robot_model_->GetConfigDim());
+        osqp_instance_.objective_matrix.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
+
+        // std::cout << "obj pattern:\n" << osqp_instance_.objective_matrix << std::endl;
+
+        ws_->obj_config_vector.resize(robot_model_->GetVelDim());
         ws_->obj_vel_vector.resize(robot_model_->GetVelDim());
     }
 
@@ -701,6 +810,9 @@ namespace torc::mpc {
     // }
 
     void FullOrderMpc::UpdateCost() {
+        objective_triplet_idx_ = 0;
+        osqp_instance_.objective_vector.setZero();
+
         if (q_target_.size() != v_target_.size()) {
             std::cerr << "Configuration target and velocity target have mis-matched sizes. Filling with default values." << std::endl;
         }
@@ -725,89 +837,38 @@ namespace torc::mpc {
         }
 
         for (int node = 0; node < nodes_; node++) {
+            int decision_idx = GetDecisionIdx(node, Configuration);
             cost_.Linearize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_vector);
-            osqp_instance_.objective_vector.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()) = ws_->obj_config_vector;
+            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) = ws_->obj_config_vector;
 
+            cost_.Quadraticize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_mat);
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    if (ws_->obj_config_mat(i+3, j+3) == 0 && config_tracking_weight_(i+3) != 0) {
+                        ws_->obj_config_mat(i+3, j+3) += 1e-1; // TODO: Consider changing back to 1e-10
+                    }
+                }
+            }
+            MatrixToTriplet(ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+
+            decision_idx = GetDecisionIdx(node, Velocity);
             cost_.Linearize(traj_.GetVelocity(node), v_target_[node], CostTypes::Velocity, ws_->obj_vel_vector);
-            osqp_instance_.objective_vector.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) = ws_->obj_vel_vector;
+            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) = ws_->obj_vel_vector;
+
+            cost_.Quadraticize(traj_.GetVelocity(node), v_target_[node], CostTypes::Velocity, ws_->obj_vel_mat);
+            MatrixToTriplet(ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
         }
 
+        objective_mat_.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
+
+        // std::cout << "obj mat:\n" << objective_mat_ << std::endl;
+        //
+        // std::cout << "triplet idx: " << objective_triplet_idx_ << std::endl;
+        // std::cout << "triplet size: " << objective_triplets_.size() << std::endl;
+        if (objective_triplet_idx_ != objective_triplets_.size()) {
+            throw std::runtime_error("[Cost Function] Could not populate the cost function matrix correctly.");
+        }
     }
-
-    // void FullOrderMpc::CreateDefaultCost() {
-    //     // Create a cost function as the sum of smaller functions
-    //     // Velocity tracking, position tracking
-    //     // Torque cost (reduce torque)
-    //     namespace ADCG = CppAD::cg;
-    //     namespace AD = CppAD;
-    //
-    //     using cg_t = ADCG::CG<double>;
-    //     using adcg_t = CppAD::AD<cg_t>;
-    //
-    //     const int vel_dim = robot_model_->GetVelDim();
-    //     std::function<adcg_t(const Eigen::VectorX<adcg_t>&)> vel_cost = [vel_dim](const Eigen::VectorX<adcg_t>& dv_vbar_vtarget) {
-    //         Eigen::VectorX<adcg_t> v_diff = dv_vbar_vtarget.head(vel_dim) + dv_vbar_vtarget.segment(vel_dim, vel_dim);  // Get the current velocity
-    //         v_diff = v_diff - dv_vbar_vtarget.tail(vel_dim);    // Get the difference between the velocity and its target
-    //         return v_diff.squaredNorm();
-    //     };
-    //
-    //     vel_cost_fcn_ = std::make_unique<torc::fn::AutodiffFn<double>>(vel_cost, 3*vel_dim, true, false, "mpc_vel_cost");
-    //
-    //     const int config_dim = robot_model_->GetConfigDim();
-    //     const int joints_dim = robot_model_->GetNumInputs(); // TODO: Change to num joints
-    //     matrixx_t weight_mat;
-    //     weight_mat = config_tracking_weight_.array().matrix().asDiagonal();
-    //     std::cout << "weight mat: \n" << weight_mat << std::endl;
-    //     vectorx_t config_weight = config_tracking_weight_;
-    //
-    //     std::function<adcg_t(const Eigen::VectorX<adcg_t>&)> config_cost = [config_dim, vel_dim, joints_dim, config_weight](const Eigen::VectorX<adcg_t>& dq_qbar_qtarget) {
-    //         Eigen::VectorX<adcg_t> q_diff = Eigen::VectorX<adcg_t>::Zero(vel_dim);
-    //         // Floating base position difference
-    //         q_diff.head<POS_VARS>() = dq_qbar_qtarget.head<POS_VARS>() + dq_qbar_qtarget.segment<POS_VARS>(vel_dim)
-    //             - dq_qbar_qtarget.segment<POS_VARS>(config_dim + vel_dim); // Get the current floating base position minus target
-    //
-    //         // Floating base orientation difference
-    //         Eigen::Quaternion<adcg_t> qbar, q_target;
-    //         qbar.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(config_dim + vel_dim + POS_VARS);
-    //         q_target.coeffs() = dq_qbar_qtarget.segment<QUAT_VARS>(vel_dim + POS_VARS);
-    //         // Eigen's inverse has an if statement, so we can't use it in codegen
-    //         qbar = Eigen::Quaternion<adcg_t>(qbar.conjugate().coeffs() / qbar.squaredNorm());   // Assumes norm > 0
-    //
-    //         q_diff.segment<3>(POS_VARS) = pinocchio::quaternion::log3(
-    //             qbar * q_target
-    //              * pinocchio::quaternion::exp3(dq_qbar_qtarget.segment<3>(POS_VARS)));
-    //
-    //         // Joint differences
-    //         q_diff.segment(FLOATING_VEL, joints_dim) =
-    //             // dq
-    //             dq_qbar_qtarget.segment(FLOATING_VEL, joints_dim)
-    //             // qbar
-    //             + dq_qbar_qtarget.segment(vel_dim + FLOATING_BASE, joints_dim)
-    //             // qtarget
-    //             - dq_qbar_qtarget.segment(config_dim + vel_dim + FLOATING_BASE, joints_dim);
-    //         for (int i = 0; i < config_weight.size(); i++) {
-    //             q_diff(i) = q_diff(i) * config_weight(i);
-    //         }
-    //         return q_diff.squaredNorm();
-    //     };
-    //
-    //     // =========================== Testing
-    //     // std::function<double(const Eigen::VectorX<double>&)>
-    //     auto cost_builder = [config_dim, vel_dim, joints_dim, config_weight]<typename ScalarT>(int cost) {
-    //
-    //     };
-    //     // =========================== Testing
-    //
-    //     config_cost_fcn_ = std::make_unique<torc::fn::AutodiffFn<double>>(
-    //         config_cost, 2*config_dim + vel_dim, true, false, "mpc_config_cost");
-    //     config_cost_fcn_->func_ = cost_builder(0);
-    // }
-
-    // void FullOrderMpc::FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const {
-    //     arg.resize(delta.size() + bar.size() + target.size());
-    //     arg << delta, bar, target;
-    // }
-
 
     // ------------------------------------------------- //
     // ----------- Sparsity Pattern Creation ----------- //

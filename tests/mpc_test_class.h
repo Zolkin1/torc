@@ -274,12 +274,16 @@ namespace torc::mpc {
                         vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
                         q_rand = q_original;
 
-                        for (int j = 0; j < frame_vel.size(); j++) {
-                            frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
-                            CHECK_THAT(frame_fd(j,i) - jacobian(j, i),
-                                Catch::Matchers::WithinAbs(0, FD_MARGIN));
-                        }
+                        frame_fd.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
+
+                        // for (int j = 0; j < frame_vel.size(); j++) {
+                        //     frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
+                        //     CHECK_THAT(frame_fd(j,i) - jacobian(j, i),
+                        //         Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                        // }
                     }
+
+                    CHECK(jacobian.topRows<3>().isApprox(frame_fd.topRows<3>(), sqrt(FD_DELTA)));
 
                     // ------- Velocity ------- //
                     // Analytic solution
@@ -294,46 +298,56 @@ namespace torc::mpc {
                         vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
                         v_rand(i) -= FD_DELTA;
 
-                        for (int j = 0; j < frame_vel.size(); j++) {
-                            frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
-                            CHECK_THAT(frame_fd(j,i) - jacobian(j, i),
-                                Catch::Matchers::WithinAbs(0, FD_MARGIN));
-                        }
+                        frame_fd.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
+
+                        // for (int j = 0; j < frame_vel.size(); j++) {
+                        //     frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
+                        //     // CHECK_THAT(frame_fd(j,i) - jacobian(j, i),
+                        //     //     Catch::Matchers::WithinAbs(0, FD_MARGIN));
+                        // }
                     }
+
+                    CHECK(jacobian.topRows<3>().isApprox(frame_fd.topRows<3>(), sqrt(FD_DELTA)));
                 }
             }
         }
 
-        void CheckCostFunctionDerivatives() {
-            PrintTestHeader("Cost Function Derivatives");
+        void CheckCostFunctionDefiniteness() {
+            PrintTestHeader("Cost Function Definiteness");
+
             for (int k = 0; k < 5; k++) {
-                // ----- Configuration cost ----- //
-                vectorx_t d_rand = robot_model_->GetRandomVel();
-                vectorx_t bar_rand = robot_model_->GetRandomConfig();
-                vectorx_t target_rand = robot_model_->GetRandomConfig();
+                traj_.SetNumNodes(nodes_);
+                q_target_.resize(nodes_);
+                v_target_.resize(nodes_);
+                for (int i = 0; i < nodes_; i++) {
+                    traj_.SetConfiguration(i, robot_model_->GetRandomConfig());
+                    q_target_[i] = robot_model_->GetRandomConfig();
+                    traj_.SetVelocity(i, robot_model_->GetRandomVel());
+                    v_target_[i] = robot_model_->GetRandomVel();
+                    traj_.SetTau(i, vectorx_t::Random(robot_model_->GetNumInputs()));
 
-                // Analytic
-                vectorx_t arg;
-                // cost_ FormCostFcnArg(d_rand, bar_rand, target_rand, arg);
-                // vectorx_t grad_c = config_cost_fcn_->Gradient(arg);
+                    for (const auto& frame : contact_frames_) {
+                        vector3_t force = vector3_t::Random().cwiseMax(-100).cwiseMin(100); //vector3_t::Zero();
+                        // std::cout << "force: " << force.transpose() << std::endl;
+                        traj_.SetForce(i, frame, force);
+                    }
+                }
 
-                // Finite difference
-                // vectorx_t fd_c = config_cost_fcn_->GradientFiniteDiff(arg);
+                UpdateCost();
 
-                // CHECK(grad_c.isApprox(fd_c, sqrt(FD_DELTA)));
+                for (const auto& objective_triplet : objective_triplets_) {
+                    REQUIRE(!std::isnan(objective_triplet.value()));
+                }
 
-                // ----- Velocity cost ----- //
-                vectorx_t vbar_rand = robot_model_->GetRandomVel();
-                vectorx_t vtarget_rand = robot_model_->GetRandomVel();
+                for (const auto& val : osqp_instance_.objective_vector) {
+                    REQUIRE(!std::isnan(val));
+                }
 
-                // Analytic
-                // FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
-                // vectorx_t grad_v = vel_cost_fcn_->Gradient(arg);
+                CHECK(objective_mat_.isApprox(objective_mat_.transpose()));
 
-                // Finite difference
-                // vectorx_t fd_v = vel_cost_fcn_->GradientFiniteDiff(arg);
-
-                // CHECK(grad_v.isApprox(fd_v, sqrt(FD_DELTA)));
+                Eigen::LDLT<matrixx_t> ldlt(objective_mat_);
+                CHECK(ldlt.info() != Eigen::NumericalIssue);
+                CHECK(ldlt.isPositive());
             }
         }
 

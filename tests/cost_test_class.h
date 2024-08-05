@@ -12,7 +12,7 @@ namespace torc::mpc {
     class CostTestClass : public CostFunction {
     public:
         explicit CostTestClass(const models::FullOrderRigidBody& model)
-            : robot_model_(model) {}
+            : CostFunction("test_cost"), robot_model_(model) {}
 
         void CheckConfigure() {
             PrintTestHeader("Cost function configure");
@@ -24,7 +24,7 @@ namespace torc::mpc {
             costs.emplace_back(Configuration);
             costs.emplace_back(Velocity);
 
-            Configure(robot_model_.GetConfigDim(), robot_model_.GetVelDim(), robot_model_.GetNumInputs(), costs, weights);
+            Configure(robot_model_.GetConfigDim(), robot_model_.GetVelDim(), robot_model_.GetNumInputs(), false, costs, weights);
             REQUIRE(configured_);
             REQUIRE(cost_idxs_.size() == costs.size());
             REQUIRE(cost_fcn_terms_.size() == costs.size());
@@ -102,8 +102,29 @@ namespace torc::mpc {
             CHECK(lin_term.isApprox(partial_bar_v, sqrt(FD_DELTA)));
 
             // ------------------------- //
+            // -------- Jacobian ------- //
+            // ------------------------- //
+            FormCostFcnArg(d, bar_rand, target_rand, arg);
+            matrixx_t jac = GetConfigurationTrackingJacobian(arg);
+            matrixx_t gtg_from_jac = 4*(jac*GetConfigurationDiffVector(arg))*(jac*GetConfigurationDiffVector(arg)).transpose();
+            Linearize(bar_rand, target_rand, Configuration, lin_term);
+
+            matrixx_t gtg = lin_term*lin_term.transpose();
+
+            CHECK(gtg_from_jac.isApprox(gtg));
+
+            // ------------------------- //
             // ------- Quadratic ------- //
             // ------------------------- //
+            matrixx_t hess_term;
+            Quadraticize(bar_rand, target_rand, Configuration, hess_term);
+            REQUIRE(hess_term.rows() == robot_model_.GetVelDim());
+            REQUIRE(hess_term.cols() == robot_model_.GetVelDim());
+
+            // FormCostFcnArg(d, bar_rand, target_rand, arg);
+            // matrixx_t fd_c = cost_fcn_terms_[cost_idxs_[Configuration]]->GradientFiniteDiff(arg);
+            // vectorx_t partial_bar = fd_c.head(robot_model_.GetVelDim());
+
         }
 
         void CheckDefaultCosts() {
