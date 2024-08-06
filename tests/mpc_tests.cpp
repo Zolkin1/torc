@@ -27,59 +27,59 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
     torc::models::FullOrderRigidBody a1("a1", a1_urdf);
 
     vectorx_t random_state(a1.GetConfigDim() + a1.GetVelDim());
-    random_state << a1.GetNeutralConfig(), Eigen::VectorXd::Zero(a1.GetVelDim());
-    // random_state << a1.GetRandomState();
+    // random_state << a1.GetNeutralConfig(), Eigen::VectorXd::Zero(a1.GetVelDim());
+    // random_state(2) += 0.321;
+    random_state << a1.GetRandomState();
     // random_state.tail(a1.GetVelDim()).setZero();
     std::cout << "initial config: " << random_state.head(a1.GetConfigDim()).transpose() << std::endl;
     std::cout << "initial vel: " << random_state.tail(a1.GetVelDim()).transpose() << std::endl;
     Trajectory traj;
     traj.UpdateSizes(a1.GetConfigDim(), a1.GetVelDim(), a1.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
+
+    vectorx_t q_neutral = a1.GetNeutralConfig();
+    q_neutral(2) += 0.321;
+    traj.SetDefault(q_neutral);
+
+    mpc.SetWarmStartTrajectory(traj);
+
     mpc.Compute(random_state, traj);
 
-    for (int i = 0; i < traj.GetNumNodes(); i++) {
-        std::cout << "Node: " << i << std::endl;
-        std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-    }
+    // for (int i = 0; i < traj.GetNumNodes(); i++) {
+    //     std::cout << "Node: " << i << std::endl;
+    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+    // }
 
-    random_state = a1.GetRandomState();
+    // random_state = a1.GetRandomState();
     mpc.Compute(random_state, traj);
-
-//    torc::models::RigidBody a1_model(pin_model_name, a1_urdf);
-//
-//    constexpr int NODES = 10;
-//    MPCContact mpc(a1_model, NODES);
-//
-//    ContactTrajectory traj;
-//    traj.Reset(NODES, a1_model.GetConfigDim(), a1_model.GetVelDim());
-//
-//    mpc.ToBilateralData(traj);
 }
-// #if ENABLE_BENCHMARKS
-// TEST_CASE("MPC Benchmarks [A1]", "[mpc][benchmarks]") {
-//     // Benchmarking with the A1
-//     using namespace torc::mpc;
-//     const std::string pin_model_name = "test_pin_model";
-//     std::filesystem::path a1_urdf = std::filesystem::current_path();
-//     a1_urdf += "/test_data/test_a1.urdf";
-//
-//     std::filesystem::path mpc_config = std::filesystem::current_path();
-//     mpc_config += "/test_data/mpc_config.yaml";
-//
-//     FullOrderMpc mpc(mpc_config, a1_urdf);
-//     mpc.SetVerbosity(false);
-//
-//     BENCHMARK("MPC Configure [A1]") {
-//         mpc.Configure();
-//     };
-//
-//     torc::models::FullOrderRigidBody a1("a1", a1_urdf);
-//     vectorx_t random_state = a1.GetRandomState();
-//     BENCHMARK("MPC Compute [A1]") {
-//         mpc.Compute(random_state);
-//     };
-// }
-// #endif
+#if ENABLE_BENCHMARKS
+TEST_CASE("MPC Benchmarks [A1]", "[mpc][benchmarks]") {
+    // Benchmarking with the A1
+    using namespace torc::mpc;
+    const std::string pin_model_name = "test_pin_model";
+    std::filesystem::path a1_urdf = std::filesystem::current_path();
+    a1_urdf += "/test_data/test_a1.urdf";
+
+    std::filesystem::path mpc_config = std::filesystem::current_path();
+    mpc_config += "/test_data/mpc_config.yaml";
+
+    FullOrderMpc mpc(mpc_config, a1_urdf);
+    mpc.SetVerbosity(false);
+
+    BENCHMARK("MPC Configure [A1]") {
+        mpc.Configure();
+    };
+
+    torc::models::FullOrderRigidBody a1("a1", a1_urdf);
+    vectorx_t random_state = a1.GetRandomState();
+    BENCHMARK("MPC Compute [A1]") {
+        mpc.Compute(random_state);
+    };
+}
+#endif
+
+
 // using vector3_t = Eigen::Vector3d;
 // using matrix3_t = Eigen::Matrix3d;
 // using quat_t = Eigen::Quaterniond;

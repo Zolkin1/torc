@@ -60,12 +60,10 @@ namespace torc::mpc {
         void Compute(const vectorx_t& state, Trajectory& traj_out);
 
         void SetVerbosity(bool verbose);
+        [[nodiscard]] std::vector<std::string> GetContactFrames() const;
+        [[nodiscard]] int GetNumNodes() const;
 
-        void UpdateCostFcn(std::unique_ptr<torc::fn::ExplicitFn<double>> cost);
-
-        std::vector<std::string> GetContactFrames() const;
-
-        int GetNumNodes() const;
+        void SetWarmStartTrajectory(const Trajectory& traj);
     protected:
         enum ConstraintType {
         Integrator,
