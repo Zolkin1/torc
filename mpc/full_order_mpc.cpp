@@ -399,16 +399,18 @@ namespace torc::mpc {
             AddIntegrationConstraint(node);
             AddIDConstraint(node);
             AddFrictionConeConstraint(node);
-            AddConfigurationBoxConstraint(node);
-            AddVelocityBoxConstraint(node);
             AddTorqueBoxConstraint(node);
 
             // These could conflict with the initial condition constraints
             if (node > 1) {
+                // Configuration is set for the initial condition and the next node, do not constrain it
+                AddConfigurationBoxConstraint(node);
                 AddSwingHeightConstraint(node);
             }
             if (node > 0) {
+                // Velocity is fixed for the initial condition, do not constrain it
                 AddHolonomicConstraint(node);
+                AddVelocityBoxConstraint(node);
             }
         }
 
@@ -930,14 +932,16 @@ namespace torc::mpc {
             AddIntegrationPattern(node);
             AddIDPattern(node);
             AddFrictionConePattern(node);
-            AddConfigurationBoxPattern(node);
-            AddVelocityBoxPattern(node);
             AddTorqueBoxPattern(node);
             if (node > 1) {
+                // Configuration is set for the initial condition and the next node, do not constrain it
+                AddConfigurationBoxPattern(node);
                 AddSwingHeightPattern(node);
             }
             if (node > 0) {
+                // Velocity is fixed for the initial condition, do not constrain it
                 AddHolonomicPattern(node);
+                AddVelocityBoxPattern(node);
             }
         }
 
@@ -947,6 +951,20 @@ namespace torc::mpc {
         AddTorqueBoxPattern(nodes_ - 1);
         AddSwingHeightPattern(nodes_ - 1);
         AddHolonomicPattern(nodes_ - 1);
+
+        int row_max = 0;
+        int col_max = 0;
+        for (auto constraint_triplet : constraint_triplets_) {
+            if (constraint_triplet.row() > row_max) {
+                row_max = constraint_triplet.row();
+            }
+            if (constraint_triplet.col() > col_max) {
+                col_max = constraint_triplet.col();
+            }
+        }
+
+        std::cout << "row max: " << row_max << std::endl;
+        std::cout << "col max: " << col_max << std::endl;
 
         // Make the matrix with the sparsity pattern
         osqp_instance_.constraint_matrix.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
@@ -1166,7 +1184,8 @@ namespace torc::mpc {
         // Need to account for the fact that the last node is different
         // The last node does NOT have a ID or integrator constraint
         // The start also has an initial condition constraint
-        return GetConstraintsPerNode() * nodes_ - (NumIntegratorConstraintsNode() + NumIDConstraintsNode())
+        return GetConstraintsPerNode() * nodes_ - (NumIntegratorConstraintsNode() + NumIDConstraintsNode()
+            + 2*NumConfigBoxConstraintsNode() + 2*NumSwingHeightConstraintsNode() + NumHolonomicConstraintsNode() + NumVelocityBoxConstraintsNode())
             + robot_model_->GetVelDim()*2;
     }
 
@@ -1208,6 +1227,13 @@ namespace torc::mpc {
     int FullOrderMpc::GetConstraintRow(int node, const ConstraintType& constraint) const {
         int row = GetConstraintsPerNode()*node;
         row += 2*robot_model_->GetVelDim(); // Account for initial condition constraints
+        if (node > 0) {
+            row -= NumHolonomicConstraintsNode() + NumVelocityBoxConstraintsNode();
+            if (node > 1) {
+                row -= 2*NumConfigBoxConstraintsNode() + 2*NumSwingHeightConstraintsNode();
+            }
+        }
+
         if (node == nodes_ - 1) {
             row -= NumIntegratorConstraintsNode() + NumIDConstraintsNode();
         }
