@@ -44,11 +44,11 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
 
     mpc.Compute(random_state, traj);
 
-    // for (int i = 0; i < traj.GetNumNodes(); i++) {
-    //     std::cout << "Node: " << i << std::endl;
-    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-    // }
+    for (int i = 0; i < traj.GetNumNodes(); i++) {
+        std::cout << "Node: " << i << std::endl;
+        std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+    }
 
     // random_state = a1.GetRandomState();
     mpc.Compute(random_state, traj);

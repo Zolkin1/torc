@@ -147,6 +147,8 @@ namespace torc::mpc {
         void CreateCostPattern();
         void UpdateCost();
         double GetFullCost(const vectorx_t& qp_res);
+
+        void LineSearch();
         // void CreateDefaultCost();
         // Helper function
         // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;

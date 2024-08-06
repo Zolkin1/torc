@@ -377,7 +377,6 @@ namespace torc::mpc {
 #endif
 
         ConvertSolutionToTraj(osqp_solver_.primal_solution(), traj_out);
-        traj_ = traj_out;
         // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
 
         double alpha = 0;
@@ -386,6 +385,8 @@ namespace torc::mpc {
         stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
             GetFullCost(osqp_solver_.primal_solution()), alpha, osqp_solver_.primal_solution().norm(),
             compute_timer.Duration<std::chrono::microseconds>().count()/1000.0);
+
+        traj_ = traj_out;
 
         if (verbose_) {
             std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;

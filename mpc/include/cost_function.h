@@ -141,8 +141,7 @@ namespace torc::mpc {
 
             vectorx_t arg;
             FormCostFcnArg(decision_var, reference, target, arg);
-            // TODO: Why am I off by a factor of 4?
-            return 0.25*cost_fcn_terms_[cost_idxs_[type]]->Evaluate(arg);
+            return cost_fcn_terms_[cost_idxs_[type]]->Evaluate(arg);
         }
 
 
