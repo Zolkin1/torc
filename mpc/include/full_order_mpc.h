@@ -30,6 +30,21 @@ namespace torc::mpc {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
+    // TODO:
+    //  - Line search (probably do more cost function verification)
+    //  - Setting swing trajectory
+    //  - Setting q target and v target
+    //  - Setting contact schedule
+
+    struct MpcStats {
+        osqp::OsqpExitCode solve_status;    // Exit code from solver
+        double qp_cost;                     // OSQP Cost
+        double full_cost;                   // Full nonlinear cost
+        double alpha;                       // Linesearch alpha value
+        double qp_res_norm;                 // Norm of the QP result vector
+        double total_compute_time;          // Time for the entire Compute function
+    };
+
     class FullOrderMpc {
     public:
         FullOrderMpc(const fs::path& config_file, const fs::path& model_path);
@@ -62,6 +77,7 @@ namespace torc::mpc {
         void SetVerbosity(bool verbose);
         [[nodiscard]] std::vector<std::string> GetContactFrames() const;
         [[nodiscard]] int GetNumNodes() const;
+        void PrintStatistics() const;
 
         void SetWarmStartTrajectory(const Trajectory& traj);
     protected:
@@ -242,6 +258,9 @@ namespace torc::mpc {
 
         // Workspace
         std::unique_ptr<Workspace> ws_;
+
+        // Recording state
+        std::vector<MpcStats> stats_;
 
         // General settings
         bool verbose_;

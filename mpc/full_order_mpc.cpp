@@ -334,18 +334,21 @@ namespace torc::mpc {
         // std::cout << "objective vec: " << osqp_instance_.objective_vector.transpose() << std::endl;
         // std::cout << "A: \n" << A_ << std::endl;
 
+        // Set matrices
         auto status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
         if (!status.ok()) {
             std::cerr << "status: " << status << std::endl;
             throw std::runtime_error("Could not update the objective and constraint matrix.");
         }
 
+        // Set objective vector
         status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
         if (!status.ok()) {
             std::cerr << "status: " << status << std::endl;
             throw std::runtime_error("Could not update the objective vector.");
         }
 
+        // Set upper and lower bounds
         status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
         if (!status.ok()) {
             std::cerr << "status: " << status << std::endl;
@@ -377,7 +380,13 @@ namespace torc::mpc {
         traj_ = traj_out;
         // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
 
+        double alpha = 0;
+
         compute_timer.Toc();
+        stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
+            cost_.GetCost(osqp_solver_.primal_solution()), alpha, osqp_solver_.primal_solution().norm(),
+            compute_timer.Duration<std::chrono::microseconds>().count()/1000.0);
+
         if (verbose_) {
             std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
         }
@@ -1368,7 +1377,75 @@ namespace torc::mpc {
         traj_ = traj;
     }
 
+    void FullOrderMpc::PrintStatistics() const {
+        using std::setw;
+        using std::setfill;
+
+        const int col_width = 20;
+        const int total_width = 7*col_width;
 
 
+        auto time_now = std::chrono::system_clock::now();
+        std::time_t time1_now = std::chrono::system_clock::to_time_t(time_now);
 
+        std::cout << setfill('=') << setw(total_width/2 - 7) << "" << " MPC Statistics " << setw(total_width/2 - 7) << "" << std::endl;
+        std::cout << setfill(' ');
+        std::cout << setw(col_width) << "Solve #"
+                << setw(col_width) << "Solve Status"
+                << setw(col_width) << "Time (ms)"
+                << setw(col_width) << "Step Norm"
+                << setw(col_width) << "Alpha"
+                << setw(col_width) << "Full Cost"
+                << setw(col_width) << "QP Cost" << std::endl;
+        // << setw(col_width) << "Constraints"
+        // << setw(col_width) << "Merit"
+        // << setw(col_width) << "Merit dd"
+        for (int solve = 0; solve < stats_.size(); solve++) {
+            std::string solve_status;
+            switch (stats_[solve].solve_status) {
+                case osqp::OsqpExitCode::kOptimal:
+                    solve_status = "Optimal Sol. Found";
+                    break;
+                case osqp::OsqpExitCode::kPrimalInfeasible:
+                    solve_status = "Primal Infeasible";
+                    break;
+                case osqp::OsqpExitCode::kDualInfeasible:
+                    solve_status = "Dual Infeasible";
+                    break;
+                case osqp::OsqpExitCode::kOptimalInaccurate:
+                    solve_status = "Optimal Inaccurate";
+                    break;
+                case osqp::OsqpExitCode::kPrimalInfeasibleInaccurate:
+                    solve_status = "Primal Infeasible Inaccurate";
+                    break;
+                case osqp::OsqpExitCode::kDualInfeasibleInaccurate:
+                    solve_status = "Dual Infeasible Inaccurate";
+                    break;
+                case osqp::OsqpExitCode::kMaxIterations:
+                    solve_status = "Max Iterations";
+                    break;
+                case osqp::OsqpExitCode::kInterrupted:
+                    solve_status = "Interrupted";
+                    break;
+                case osqp::OsqpExitCode::kNonConvex:
+                    solve_status = "Non-Convex";
+                    break;
+                case osqp::OsqpExitCode::kTimeLimitReached:
+                    solve_status = "Time Limit";
+                    break;
+                case osqp::OsqpExitCode::kUnknown:
+                    solve_status = "Unknown";
+                    break;
+            }
+            std::cout << setw(col_width) << solve
+                      << setw(col_width) << solve_status
+                      << setw(col_width) << stats_[solve].total_compute_time
+                      << setw(col_width) << stats_[solve].qp_res_norm
+                      << setw(col_width) << stats_[solve].alpha
+                      << setw(col_width) << stats_[solve].full_cost
+                      << setw(col_width) << stats_[solve].qp_cost << std::endl;
+        }
+
+
+    }
 } // namespace torc::mpc

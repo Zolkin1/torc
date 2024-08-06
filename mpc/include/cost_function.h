@@ -134,10 +134,11 @@ namespace torc::mpc {
             }
         }
 
-        // double GetCost(const vectorx_t& qp_res) {
-        //     // TODO: Implement
-        // }
-        //
+        double GetCost(const vectorx_t& qp_res) {
+            // TODO: Implement
+            return 0;
+        }
+
         // double GetCost(const Trajectory& traj) {
         //     // TODO: Implement
         // }

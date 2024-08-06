@@ -52,6 +52,9 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
 
     // random_state = a1.GetRandomState();
     mpc.Compute(random_state, traj);
+
+    mpc.PrintStatistics();
+
 }
 #if ENABLE_BENCHMARKS
 TEST_CASE("MPC Benchmarks [A1]", "[mpc][benchmarks]") {
