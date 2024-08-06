@@ -35,7 +35,13 @@ namespace torc::mpc {
     //  - Line search (probably do more cost function verification)
     //  - Setting swing trajectory
     //  - Setting q target and v target
-    //  - Setting contact schedule
+    //  - Setting contact schedule - this might be effecting the numerics of the solve
+    enum LineSearchCondition {
+        ConstraintViolation,
+        CostReduction,
+        Both,
+        MinAlpha
+    };
 
     struct MpcStats {
         osqp::OsqpExitCode solve_status;    // Exit code from solver
@@ -44,6 +50,7 @@ namespace torc::mpc {
         double alpha;                       // Linesearch alpha value
         double qp_res_norm;                 // Norm of the QP result vector
         double total_compute_time;          // Time for the entire Compute function
+        LineSearchCondition ls_condition;   // Condition for line search termination
     };
 
     class FullOrderMpc {
@@ -131,6 +138,18 @@ namespace torc::mpc {
         void AddSwingHeightConstraint(int node);
         void AddHolonomicConstraint(int node);
 
+    // -------- Constraint Violation -------- //
+        double GetConstraintViolation(const vectorx_t& qp_res);
+        double GetICViolation(const vectorx_t& qp_res);
+        double GetIntegrationViolation(const vectorx_t& qp_res, int node);
+        double GetIDViolation(const vectorx_t& qp_res, int node);
+        double GetFrictionViolation(const vectorx_t& qp_res, int node);
+        double GetToqueBoxViolation(const vectorx_t& qp_res, int node);
+        double GetConfigurationBoxViolation(const vectorx_t& qp_res, int node);
+        double GetVelocityBoxViolation(const vectorx_t& qp_res, int node);
+        double GetSwingHeightViolation(const vectorx_t& qp_res, int node);
+        double GetHolonomicViolation(const vectorx_t& qp_res, int node);
+
     // -------- Linearization Helpers ------- //
         matrix3_t QuatIntegrationLinearizationXi(int node);
         matrix3_t QuatIntegrationLinearizationW(int node);
@@ -148,7 +167,7 @@ namespace torc::mpc {
         void UpdateCost();
         double GetFullCost(const vectorx_t& qp_res);
 
-        void LineSearch();
+        void LineSearch(const vectorx_t& qp_res);
         // void CreateDefaultCost();
         // Helper function
         // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;
@@ -250,6 +269,10 @@ namespace torc::mpc {
 
         std::vector<vectorx_t> q_target_;
         std::vector<vectorx_t> v_target_;
+
+        // Line search
+        double alpha_;
+        LineSearchCondition ls_condition_;
 
         // Model
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;
