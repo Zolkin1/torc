@@ -1,5 +1,5 @@
 general_settings:
-  nodes: 20
+  nodes: 32
   verbose: True
   node_dt: 0.02
   compile_derivatives: True
@@ -8,10 +8,10 @@ solver_settings:
   abs_tol: 1e-6
   verbose: True
   polish: False
-#  rho: 1
+  rho: 0.02
 #  alpha:
   adaptive_rho: True
-  max_iter: 5000
+  max_iter: 50
 constraints:
   friction_coef: 0.5
   max_grf: 200

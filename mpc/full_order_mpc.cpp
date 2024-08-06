@@ -54,6 +54,9 @@ namespace torc::mpc {
             YAML::Node general_settings = config["general_settings"];
             if (general_settings["nodes"]) {
                 nodes_ = general_settings["nodes"].as<int>();
+                if (nodes_ < 3) {
+                    throw std::invalid_argument("nodes must be >= 3!");
+                }
             } else {
                 throw std::runtime_error("Number of nodes not specified!");
             }
@@ -165,6 +168,9 @@ namespace torc::mpc {
             std::vector<double> swing_traj;
             swing_traj.resize(nodes_);
             swing_traj_.insert(std::pair<std::string, std::vector<double>>(frame, swing_traj));
+
+            // Set everything to not in contact
+            in_contact_[frame] = std::vector<int>(nodes_);
         }
 
         if (verbose_) {
@@ -199,7 +205,9 @@ namespace torc::mpc {
             std::cout << "\tFriction coefficient: " << friction_coef_ << std::endl;
             std::cout << "\tMaximum ground reaction force: " << max_grf_ << std::endl;
 
-            std::cout << "Costs:" << std::endl << std::endl;
+            std::cout << "Costs:" << std::endl;
+            std::cout << "\tConfiguration tracking weight: " << config_tracking_weight_.transpose() << std::endl;
+            std::cout << "\tVelocity tracking weight: " << vel_tracking_weight_.transpose() << std::endl;
 
             std::cout << "Contacts:" << std::endl;
             std::cout << "\tNumber of contact locations: " << num_contact_locations_ << std::endl;
@@ -289,6 +297,28 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::UpdateContactSchedule(const ContactSchedule& contact_schedule) {
+        // Convert the contact schedule into the binary digits I need
+        for (auto& [frame, schedule] : contact_schedule.frame_schedule_map) {
+            if (in_contact_.contains(frame)) {
+                // Break the continuous time contact schedule into each node
+                double time = 0;
+                for (int node = 0; node < nodes_; node++) {
+                    if (contact_schedule.InContact(frame, time)) {
+                        in_contact_[frame][node] = 1;
+                    } else {
+                        in_contact_[frame][node] = 0;
+                    }
+                    time += dt_[node];
+                }
+            } else {
+                throw std::runtime_error("Contact schedule contains contact frames not recognized by the MPC!");
+            }
+        }
+
+    }
+
+
     void FullOrderMpc::Compute(const vectorx_t& state, Trajectory& traj_out) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
@@ -376,15 +406,15 @@ namespace torc::mpc {
         }
 #endif
 
-        LineSearch(osqp_solver_.primal_solution());
+        auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
 
         ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
         // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
 
         compute_timer.Toc();
         stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
-            GetFullCost(alpha_*osqp_solver_.primal_solution()), alpha_, (alpha_*osqp_solver_.primal_solution()).norm(),
-            compute_timer.Duration<std::chrono::microseconds>().count()/1000.0, ls_condition_);
+            cost_ls, alpha_, (alpha_*osqp_solver_.primal_solution()).norm(),
+            compute_timer.Duration<std::chrono::microseconds>().count()/1000.0, ls_condition_, constraint_ls);
 
         traj_ = traj_out;
 
@@ -398,6 +428,9 @@ namespace torc::mpc {
     // ------------------------------------------------- //
     void FullOrderMpc::CreateConstraints() {
         constraint_triplet_idx_ = 0;
+        osqp_instance_.lower_bounds.setZero();
+        osqp_instance_.upper_bounds.setZero();
+
         AddICConstraint();
         for (int node = 0; node < nodes_ - 1; node++) {
             // std::cout << "node: " << node << std::endl;
@@ -568,6 +601,7 @@ namespace torc::mpc {
             f.force_linear = traj_.GetForce(node, f.frame_name);
         }
 
+        // TODO: Verify that the zero torque on the floating base is being implemented correctly
         osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL)
             = -robot_model_->InverseDynamics(traj_.GetConfiguration(node), traj_.GetVelocity(node), ws_->acc, ws_->f_ext);
         osqp_instance_.lower_bounds.segment(row_start + FLOATING_VEL, robot_model_->GetNumInputs()) += traj_.GetTau(node);
@@ -589,16 +623,29 @@ namespace torc::mpc {
                 (l - n*friction_coef_).transpose(),
                 -(l + n*friction_coef_).transpose();
 
-        for (int contact = 0; contact < num_contact_locations_; contact++) {
+        for (const auto& frame : contact_frames_) {
             // Setting force to zero when in swing
-            DiagonalScalarMatrixToTriplet(1, row_start, col_start, CONTACT_3DOF, constraint_triplets_, constraint_triplet_idx_);
+            DiagonalScalarMatrixToTriplet((1-in_contact_[frame][node])*1, row_start, col_start, CONTACT_3DOF,
+                constraint_triplets_, constraint_triplet_idx_);
             osqp_instance_.lower_bounds.segment(row_start, CONTACT_3DOF).setZero();
             osqp_instance_.upper_bounds.segment(row_start, CONTACT_3DOF).setZero();
 
             row_start += CONTACT_3DOF;
 
             // Force in friction cone when in contact
-            MatrixToTriplet(ws_->fric_cone_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, true);
+            if (in_contact_[frame][node]) {
+                MatrixToTriplet(in_contact_[frame][node]*ws_->fric_cone_mat, row_start, col_start,
+                   constraint_triplets_, constraint_triplet_idx_, true);
+            } else {
+                for (int i = 0; i < ws_->fric_cone_mat.rows(); i++) {
+                    for (int j = 0; j < ws_->fric_cone_mat.cols(); j++) {
+                        if (ws_->fric_cone_mat(i,j) != 0) {
+                            constraint_triplets_[constraint_triplet_idx_] = Eigen::Triplet<double>(i + row_start, j + col_start, 0);
+                            constraint_triplet_idx_++;
+                        }
+                    }
+                }
+            }
             osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setConstant(-std::numeric_limits<double>::max());
             osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
 
@@ -657,7 +704,7 @@ namespace torc::mpc {
         DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);
 
         // Set torque bounds
-        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits() - traj_.GetTau(node);
+        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = -robot_model_->GetTorqueJointLimits() - traj_.GetTau(node);
         osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs()) = robot_model_->GetTorqueJointLimits() - traj_.GetTau(node);
     }
 
@@ -699,16 +746,16 @@ namespace torc::mpc {
             // Get velocity linearization
             HolonomicLinearizationv(node, frame, ws_->frame_jacobian);
             int col_start = GetDecisionIdx(node, Velocity);
-            MatrixToTriplet(ws_->frame_jacobian.topRows<2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
 
             // Get configuration linearization
             ws_->frame_jacobian.setZero();
             HolonomicLinearizationq(node, frame, ws_->frame_jacobian);
             col_start = GetDecisionIdx(node, Configuration);
-            MatrixToTriplet(ws_->frame_jacobian.topRows<2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
 
             // Get the frame vel on the warm start trajectory
-            vector3_t frame_vel = robot_model_->GetFrameState(frame, traj_.GetConfiguration(node), traj_.GetVelocity(node)).vel.linear();
+            vector3_t frame_vel = in_contact_[frame][node]*robot_model_->GetFrameState(frame, traj_.GetConfiguration(node), traj_.GetVelocity(node)).vel.linear();
 
             osqp_instance_.lower_bounds.segment<2>(row_start) = -frame_vel.head<2>();
             osqp_instance_.upper_bounds.segment<2>(row_start) = -frame_vel.head<2>();
@@ -730,7 +777,7 @@ namespace torc::mpc {
             violation += GetIntegrationViolation(qp_res, node);
             violation += GetIDViolation(qp_res, node);
             violation += GetFrictionViolation(qp_res, node);
-            violation += GetToqueBoxViolation(qp_res, node);
+            violation += GetTorqueBoxViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
             if (node > 1) {
@@ -748,7 +795,7 @@ namespace torc::mpc {
         violation += GetFrictionViolation(qp_res, nodes_ - 1);
         violation += GetConfigurationBoxViolation(qp_res, nodes_ - 1);
         violation += GetVelocityBoxViolation(qp_res, nodes_ - 1);
-        violation += GetToqueBoxViolation(qp_res, nodes_ - 1);
+        violation += GetTorqueBoxViolation(qp_res, nodes_ - 1);
         violation += GetSwingHeightViolation(qp_res, nodes_ - 1);
         violation += GetHolonomicViolation(qp_res, nodes_ - 1);
 
@@ -760,37 +807,92 @@ namespace torc::mpc {
     }
 
     double FullOrderMpc::GetIntegrationViolation(const vectorx_t &qp_res, int node) {
+        vectorx_t q_k;
+        ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+            traj_.GetConfiguration(node), q_k);
+        vectorx_t q_kp1;
+        ConvertdqToq(qp_res.segment(GetDecisionIdx(node+1, Configuration), robot_model_->GetVelDim()),
+            traj_.GetConfiguration(node+1), q_kp1);
+
+        double violation = 0;
         // Position
+        violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>()).squaredNorm();
 
         // Orientation
+        violation += (qp_res.segment(GetDecisionIdx(node + 1, Configuration) + POS_VARS, 3) -
+            robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(node+1), traj_.GetQuat(node),
+                qp_res.segment(GetDecisionIdx(node, Configuration) + POS_VARS, 3),
+                qp_res.segment(GetDecisionIdx(node, Velocity) + POS_VARS, 3), dt_[node])).squaredNorm();
 
         // Joints
+        violation += (q_kp1.tail(robot_model_->GetNumInputs()) - q_k.tail(robot_model_->GetNumInputs())).squaredNorm();
 
-        return 0;
+        return violation;
     }
 
     double FullOrderMpc::GetIDViolation(const vectorx_t &qp_res, int node) {
-        return 0;
+        vectorx_t q;
+        ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+            traj_.GetConfiguration(node), q);
+        const vectorx_t v = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
+        const vectorx_t v2 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
+
+        vectorx_t tau(robot_model_->GetVelDim());
+        tau << Eigen::Vector<double, FLOATING_VEL>::Zero(),
+            qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()) + traj_.GetTau(node);
+        // tau.head<FLOATING_VEL>() = Eigen::Vector<double, FLOATING_VEL>::Zero();
+        // tau.tail(robot_model_->GetNumInputs()) = qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs());
+
+        const vectorx_t a = (v2 - v)/dt_[node];
+
+        std::vector<models::ExternalForce> f_ext;
+        int idx = GetDecisionIdx(node, GroundForce);
+        for (const auto& frame : contact_frames_) {
+            f_ext.emplace_back(frame, qp_res.segment(idx, 3) + traj_.GetForce(node, frame));
+            // std::cout << "frame: " << frame << ", force: " << qp_res.segment(idx, 3).transpose() + traj_.GetForce(node, frame).transpose() << std::endl;
+            idx += 3;
+        }
+
+        const vectorx_t tau_id = robot_model_->InverseDynamics(q, v, a, f_ext);
+
+        // std::cout << "tau dec: " << tau.transpose() << std::endl;
+        // std::cout << "tau id: " << tau_id.transpose() << std::endl;
+
+        return (tau - tau_id).squaredNorm();
     }
 
     double FullOrderMpc::GetFrictionViolation(const vectorx_t &qp_res, int node) {
         double violation = 0;
-        for (int force_idx = 0; force_idx < num_contact_locations_; force_idx++) {
+        int idx = GetDecisionIdx(node, GroundForce);
+        for (const auto& frame : contact_frames_) {
             // No force constraint
-            vector3_t force = qp_res.segment(GetDecisionIdx(node, GroundForce) + 3*force_idx, 3);
-            violation += force.squaredNorm();
+            vector3_t force = qp_res.segment(idx, 3);
+            violation += (1-in_contact_[frame][node])*force.squaredNorm();
 
             // Friction Cone constraints
-            Eigen::Vector4d force_vio = ws_->fric_cone_mat*qp_res.segment(GetDecisionIdx(node, GroundForce) + 3*force_idx, 3);
+            Eigen::Vector4d force_vio = ws_->fric_cone_mat*qp_res.segment(idx, 3);
             force_vio = force_vio.cwiseMax(0);  // Upper bound of 0, no lower bound
-            violation += force_vio.squaredNorm();
+            violation += in_contact_[frame][node]*force_vio.squaredNorm();
+            idx += 3;
         }
 
         return violation;
     }
 
     double FullOrderMpc::GetConfigurationBoxViolation(const vectorx_t &qp_res, int node) {
-        return 0;
+        vectorx_t q;
+        ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+            traj_.GetConfiguration(node), q);
+
+        for (int i = 0; i < q.size(); i++) {
+            if (q(i) < robot_model_->GetLowerConfigLimits()(i)) {
+                q(i) = q(i) - robot_model_->GetLowerConfigLimits()(i);
+            } else if (q(i) > robot_model_->GetUpperConfigLimits()(i)) {
+                q(i) = q(i) - robot_model_->GetUpperConfigLimits()(i);
+            }
+        }
+
+        return q.squaredNorm();
     }
 
     double FullOrderMpc::GetVelocityBoxViolation(const vectorx_t &qp_res, int node) {
@@ -806,7 +908,7 @@ namespace torc::mpc {
         return vel.squaredNorm();
     }
 
-    double FullOrderMpc::GetToqueBoxViolation(const vectorx_t &qp_res, int node) {
+    double FullOrderMpc::GetTorqueBoxViolation(const vectorx_t &qp_res, int node) {
         vectorx_t tau = qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()) + traj_.GetTau(node);
         for (int i = 0; i < tau.size(); i++) {
             if (tau(i) < -robot_model_->GetTorqueJointLimits()(i)) {
@@ -820,11 +922,41 @@ namespace torc::mpc {
     }
 
     double FullOrderMpc::GetHolonomicViolation(const vectorx_t &qp_res, int node) {
-        return 0;
+        double violation = 0;
+        vectorx_t q;
+        ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration),
+            robot_model_->GetVelDim()), traj_.GetConfiguration(node), q);
+
+        const vectorx_t v = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) +
+            traj_.GetVelocity(node);
+
+        robot_model_->SecondOrderFK(q, v);
+        for (const auto& frame : contact_frames_) {
+            vector3_t frame_vel = robot_model_->GetFrameState(frame).vel.linear();
+            violation += in_contact_[frame][node]*frame_vel.head<2>().squaredNorm();
+        }
+
+        return violation;
     }
 
     double FullOrderMpc::GetSwingHeightViolation(const vectorx_t &qp_res, int node) {
-        return 0;
+        const int idx = GetDecisionIdx(node, Configuration);
+        // Convert to a configuration
+        vectorx_t q_new;
+        ConvertdqToq(qp_res.segment(idx, robot_model_->GetVelDim()), traj_.GetConfiguration(node), q_new);
+        robot_model_->FirstOrderFK(q_new);
+
+        double violation = 0;
+
+        for (const auto& frame : contact_frames_) {
+            // Get the frame position on the warm start trajectory
+            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
+
+            // For now, assuming this is an equality constraint
+            violation += std::pow((frame_pos(2) - swing_traj_[frame][node]), 2);
+        }
+
+        return violation;
     }
 
 
@@ -1052,7 +1184,7 @@ namespace torc::mpc {
         return cost;
     }
 
-    void FullOrderMpc::LineSearch(const vectorx_t& qp_res) {
+    std::pair<double, double> FullOrderMpc::LineSearch(const vectorx_t& qp_res) {
         // Backtracing linesearch from ETH
         alpha_ = 1;
         // TODO: Make these parameter set in the yaml
@@ -1064,7 +1196,7 @@ namespace torc::mpc {
         const double gamma_alpha = 0.5;
         const double alpha_min = 1e-4;
 
-        double theta_k = GetConstraintViolation(qp_res);
+        double theta_k = GetConstraintViolation(vectorx_t::Zero(qp_res.size()));
         double phi_k = GetFullCost(vectorx_t::Zero(qp_res.size()));
 
         while (alpha_ > alpha_min) {
@@ -1074,23 +1206,25 @@ namespace torc::mpc {
             if (theta_kp1 >= theta_max) {
                 if (theta_kp1 < (1 - gamma_theta)*theta_k) {
                     ls_condition_ = ConstraintViolation;
-                    return;
+                    return std::make_pair(theta_kp1, phi_kp1);
                 }
             } else if (std::max(theta_k, theta_kp1) < theta_min && osqp_instance_.objective_vector.dot(qp_res) < 0) {
                 if (phi_kp1 < (phi_k + eta*alpha_*osqp_instance_.objective_vector.dot(qp_res))) {
                     ls_condition_ = CostReduction;
-                    return;
+                    return std::make_pair(theta_kp1, phi_kp1);
                 }
             } else {
                 if (phi_kp1 < (1 - gamma_phi)*phi_k || theta_kp1 < (1 - gamma_theta)*theta_k) {
                     ls_condition_ = Both;
-                    return;
+                    return std::make_pair(theta_kp1, phi_kp1);
                 }
             }
             alpha_ = gamma_alpha*alpha_;
         }
         ls_condition_ = MinAlpha;
         alpha_ = 0;
+
+        return std::make_pair(theta_k, phi_k);
     }
 
 
@@ -1325,19 +1459,9 @@ namespace torc::mpc {
             traj.SetNumNodes(nodes_);
         }
 
+        vectorx_t config_new;
         for (int node = 0; node < nodes_; node++) {
-            vectorx_t config_new = traj_.GetConfiguration(node);
-
-            // std::cout << "q dec: " << qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).transpose()  << std::endl;
-
-            // Position and joints are simple addition
-            config_new.head<POS_VARS>() += qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).head<3>();
-            config_new.tail(robot_model_->GetNumInputs()) += qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).tail(robot_model_->GetNumInputs());
-
-            // Quaternion
-            config_new.segment<QUAT_VARS>(POS_VARS) = (static_cast<quat_t>(config_new.segment<QUAT_VARS>(POS_VARS))
-                * pinocchio::quaternion::exp3(
-                    qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()).segment<3>(POS_VARS))).coeffs();
+            ConvertdqToq(qp_sol.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()), traj_.GetConfiguration(node), config_new);
 
             traj.SetConfiguration(node, config_new);
 
@@ -1404,8 +1528,9 @@ namespace torc::mpc {
         row += 2*robot_model_->GetVelDim(); // Account for initial condition constraints
         if (node > 0) {
             row -= NumHolonomicConstraintsNode() + NumVelocityBoxConstraintsNode();
+            row -= NumConfigBoxConstraintsNode() + NumSwingHeightConstraintsNode();
             if (node > 1) {
-                row -= 2*NumConfigBoxConstraintsNode() + 2*NumSwingHeightConstraintsNode();
+                row -= NumConfigBoxConstraintsNode() + NumSwingHeightConstraintsNode();
             }
         }
 
@@ -1414,13 +1539,19 @@ namespace torc::mpc {
         }
         switch (constraint) {
             case Holonomic:
-                row += NumSwingHeightConstraintsNode();
+                if (node > 1) {
+                    row += NumSwingHeightConstraintsNode();
+                }
             case SwingHeight:
                 row += NumTorqueBoxConstraintsNode();
             case TorqueBox:
-                row += NumVelocityBoxConstraintsNode();
+                if (node > 0) {
+                    row += NumVelocityBoxConstraintsNode();
+                }
             case VelBox:
-                row += NumConfigBoxConstraintsNode();
+                if (node > 1) {
+                    row += NumConfigBoxConstraintsNode();
+                }
             case ConfigBox:
                 row += NumFrictionConeConstraintsNode();
             case FrictionCone:
@@ -1490,6 +1621,21 @@ namespace torc::mpc {
         }
     }
 
+    // TODO: Is this just pinocchio::integrate()?
+    void FullOrderMpc::ConvertdqToq(const vectorx_t& dq, const vectorx_t& q_ref, vectorx_t& q) const {
+        q.resize(robot_model_->GetConfigDim());
+        q = q_ref;
+
+        // Position and joints are simple addition
+        q.head<POS_VARS>() += dq.head<3>();
+        q.tail(robot_model_->GetNumInputs()) += dq.tail(robot_model_->GetNumInputs());
+
+        // Quaternion
+        q.segment<QUAT_VARS>(POS_VARS) = (static_cast<quat_t>(q.segment<QUAT_VARS>(POS_VARS))
+            * pinocchio::quaternion::exp3(dq.segment<3>(POS_VARS))).coeffs();
+    }
+
+
     // ------------------------------------------------- //
     // ----- Getters for Sizes of Individual nodes ----- //
     // ------------------------------------------------- //
@@ -1543,12 +1689,38 @@ namespace torc::mpc {
         traj_ = traj;
     }
 
+    void FullOrderMpc::SetConstantConfigTarget(const vectorx_t& q_target) {
+        for (int node = 0; node < nodes_; node++) {
+            q_target_[node] = q_target;
+        }
+    }
+
+    void FullOrderMpc::SetConstantVelTarget(const vectorx_t& v_target) {
+        for (int node = 0; node < nodes_; node++) {
+            v_target_[node] = v_target;
+        }
+    }
+
+    void FullOrderMpc::SetConfigTarget(const std::vector<vectorx_t>& q_target) {
+        if (q_target.size() != nodes_) {
+            throw std::invalid_argument("Configuration target has the wrong number of nodes!");
+        }
+        q_target_ = q_target;
+    }
+
+    void FullOrderMpc::SetVelTarget(const std::vector<vectorx_t>& v_target) {
+        if (v_target.size() != nodes_) {
+            throw std::invalid_argument("Velocity target has the wrong number of nodes!");
+        }
+        q_target_ = v_target;
+    }
+
     void FullOrderMpc::PrintStatistics() const {
         using std::setw;
         using std::setfill;
 
-        const int col_width = 20;
-        const int total_width = 8*col_width;
+        const int col_width = 25;
+        const int total_width = 9*col_width;
 
 
         auto time_now = std::chrono::system_clock::now();
@@ -1562,6 +1734,7 @@ namespace torc::mpc {
                 << setw(col_width) << "d-norm (post LS)"
                 << setw(col_width) << "Alpha"
                 << setw(col_width) << "LS Termination"
+                << setw(col_width) << "Constraint Vio."
                 << setw(col_width) << "Cost (post LS)"
                 << setw(col_width) << "QP Cost (pre LS)" << std::endl;
         // << setw(col_width) << "Constraints"
@@ -1583,10 +1756,10 @@ namespace torc::mpc {
                     solve_status = "Optimal Inaccurate";
                     break;
                 case osqp::OsqpExitCode::kPrimalInfeasibleInaccurate:
-                    solve_status = "Primal Infeasible Inaccurate";
+                    solve_status = "Primal Infeas. Inacc.";
                     break;
                 case osqp::OsqpExitCode::kDualInfeasibleInaccurate:
-                    solve_status = "Dual Infeasible Inaccurate";
+                    solve_status = "Dual Infeas. Inacc.";
                     break;
                 case osqp::OsqpExitCode::kMaxIterations:
                     solve_status = "Max Iterations";
@@ -1626,10 +1799,38 @@ namespace torc::mpc {
                       << setw(col_width) << stats_[solve].qp_res_norm
                       << setw(col_width) << stats_[solve].alpha
                       << setw(col_width) << ls_termination_condition
+                      << setw(col_width) << stats_[solve].constraint_violation
                       << setw(col_width) << stats_[solve].full_cost
                       << setw(col_width) << stats_[solve].qp_cost << std::endl;
         }
-
-
     }
+
+    void FullOrderMpc::PrintContactSchedule() const {
+        std::cout << std::setw(17) << "";
+        double time = 0.00;
+        for (int node = 0; node < nodes_; node++) {
+            std::cout << std::setw(1) << std::fixed << std::setprecision(2) << " " << time;
+
+            time += dt_[node];
+        }
+
+        for (const auto& frame : contact_frames_) {
+            std::cout << std::endl;
+
+            std::cout << std::setw(15) << frame << "  ";
+            for (int node = 0; node < nodes_; node++) {
+                if (in_contact_.at(frame)[node]) {
+                    std::cout << " ____";
+                } else {
+                    std::cout << " xxxx";
+                }
+            }
+            std::cout << std::endl;
+
+            // Reset precision and formatting to default
+            std::cout.unsetf(std::ios::fixed);
+            std::cout.precision(6); // Default precision (usually 6)
+        }
+    }
+
 } // namespace torc::mpc

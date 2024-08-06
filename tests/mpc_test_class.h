@@ -351,6 +351,61 @@ namespace torc::mpc {
             }
         }
 
+        void CheckConstraintIdx() {
+            PrintTestHeader("Constraint Index");
+            int row1 = 2*robot_model_->GetVelDim();
+            int row2 = GetConstraintRow(0, Integrator);
+            CHECK(row2 == row1);  // Starts after the initial condition constraint
+            row1 += NumIntegratorConstraintsNode();
+
+            for (int node = 0; node < nodes_; node++) {
+
+                if (node < nodes_ - 1) {
+                    if (node != 0) {
+                        row2 = GetConstraintRow(node, Integrator);
+                        CHECK(row2 == row1);
+                        row1 += NumIntegratorConstraintsNode();
+                    }
+
+                    row2 = GetConstraintRow(node, ID);
+                    CHECK(row2 == row1);
+                    row1 += NumIDConstraintsNode();
+                }
+
+                row2 = GetConstraintRow(node, FrictionCone);
+                CHECK(row2 == row1);
+                row1 += NumFrictionConeConstraintsNode();
+
+                if (node > 1) {
+                    row2 = GetConstraintRow(node, ConfigBox);
+                    CHECK(row2 == row1);
+                    row1 += NumConfigBoxConstraintsNode();
+                }
+
+                if (node > 0) {
+                    row2 = GetConstraintRow(node, VelBox);
+                    CHECK(row2 == row1);
+                    row1 += NumVelocityBoxConstraintsNode();
+                }
+
+                row2 = GetConstraintRow(node, TorqueBox);
+                CHECK(row2 == row1);
+                row1 += NumTorqueBoxConstraintsNode();
+
+                if (node > 1) {
+                    row2 = GetConstraintRow(node, SwingHeight);
+                    CHECK(row2 == row1);
+                    row1 += NumSwingHeightConstraintsNode();
+                }
+
+                if (node > 0) {
+                    row2 = GetConstraintRow(node, Holonomic);
+                    CHECK(row2 == row1);
+                    row1 += NumHolonomicConstraintsNode();
+                }
+            }
+        }
+
         // ---------------------- //
         // ----- Benchmarks ----- //
         // ---------------------- //

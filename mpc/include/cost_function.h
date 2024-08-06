@@ -206,7 +206,6 @@ namespace torc::mpc {
                 if (weight.size() != vel_size_) {
                     throw std::runtime_error("Velocity weight has wrong size!");
                 }
-                std::cout << "weight: " << weight.transpose() << std::endl;
                 return [vel_size, weight](const Eigen::VectorX<ScalarT>& dv_vbar_vtarget) {
                     Eigen::VectorX<ScalarT> v_diff = dv_vbar_vtarget.head(vel_size) + dv_vbar_vtarget.segment(vel_size, vel_size);  // Get the current velocity
                     v_diff = v_diff - dv_vbar_vtarget.tail(vel_size);    // Get the difference between the velocity and its target

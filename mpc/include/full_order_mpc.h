@@ -9,14 +9,10 @@
 #include <Eigen/Core>
 
 #include "osqp++.h"
-#include "constraint.h"
 #include "full_order_rigid_body.h"
 #include "trajectory.h"
-#include "explicit_fn.h"
-#include "autodiff_fn.h"
-
 #include "cost_function.h"
-
+#include "contact_schedule.h"
 
 namespace torc::mpc {
     namespace fs = std::filesystem;
@@ -31,11 +27,7 @@ namespace torc::mpc {
     using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
     // TODO:
-    //  - Fix the orientation integration step (make sure the orientation is updated correctly)
-    //  - Line search (probably do more cost function verification)
     //  - Setting swing trajectory
-    //  - Setting q target and v target
-    //  - Setting contact schedule - this might be effecting the numerics of the solve
     enum LineSearchCondition {
         ConstraintViolation,
         CostReduction,
@@ -51,6 +43,7 @@ namespace torc::mpc {
         double qp_res_norm;                 // Norm of the QP result vector
         double total_compute_time;          // Time for the entire Compute function
         LineSearchCondition ls_condition;   // Condition for line search termination
+        double constraint_violation;        // Constraint violation
     };
 
     class FullOrderMpc {
@@ -70,7 +63,7 @@ namespace torc::mpc {
          *
          * Also can perform any time discretization scaling.
          */
-        void UpdateContactSchedule();
+        void UpdateContactSchedule(const ContactSchedule& contact_schedule);
 
         /**
          * @brief Computes the trajectory given the current state.
@@ -86,8 +79,16 @@ namespace torc::mpc {
         [[nodiscard]] std::vector<std::string> GetContactFrames() const;
         [[nodiscard]] int GetNumNodes() const;
         void PrintStatistics() const;
+        void PrintContactSchedule() const;
 
         void SetWarmStartTrajectory(const Trajectory& traj);
+
+        void SetConstantConfigTarget(const vectorx_t& q_target);
+        void SetConstantVelTarget(const vectorx_t& v_target);
+
+        void SetConfigTarget(const std::vector<vectorx_t>& q_target);
+        void SetVelTarget(const std::vector<vectorx_t>& v_target);
+
     protected:
         enum ConstraintType {
         Integrator,
@@ -144,7 +145,7 @@ namespace torc::mpc {
         double GetIntegrationViolation(const vectorx_t& qp_res, int node);
         double GetIDViolation(const vectorx_t& qp_res, int node);
         double GetFrictionViolation(const vectorx_t& qp_res, int node);
-        double GetToqueBoxViolation(const vectorx_t& qp_res, int node);
+        double GetTorqueBoxViolation(const vectorx_t& qp_res, int node);
         double GetConfigurationBoxViolation(const vectorx_t& qp_res, int node);
         double GetVelocityBoxViolation(const vectorx_t& qp_res, int node);
         double GetSwingHeightViolation(const vectorx_t& qp_res, int node);
@@ -167,7 +168,7 @@ namespace torc::mpc {
         void UpdateCost();
         double GetFullCost(const vectorx_t& qp_res);
 
-        void LineSearch(const vectorx_t& qp_res);
+        std::pair<double, double> LineSearch(const vectorx_t& qp_res);
         // void CreateDefaultCost();
         // Helper function
         // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;
@@ -217,6 +218,7 @@ namespace torc::mpc {
          */
         void DiagonalScalarMatrixToTriplet(double val, int row_start, int col_start, int size, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
 
+        void ConvertdqToq(const vectorx_t& dq, const vectorx_t& q_ref, vectorx_t& q) const;
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
         [[nodiscard]] int NumIDConstraintsNode() const;
@@ -279,6 +281,10 @@ namespace torc::mpc {
 
         // Warm start trajectory
         Trajectory traj_;
+
+        // Contact schedule
+        std::map<std::string, std::vector<int>> in_contact_;
+        ContactSchedule cs_;
 
         // dt's
         std::vector<double> dt_;

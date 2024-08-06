@@ -32,6 +32,7 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     mpc.CheckSwingHeightLin();
     mpc.CheckHolonomicLin();
     mpc.CheckCostFunctionDefiniteness();
+    mpc.CheckConstraintIdx();
     // mpc.BenchmarkQuaternionIntegrationLin();
     // mpc.BenchmarkInverseDynamicsLin();
     // mpc.BenchmarkQuaternionConfigurationLin();

@@ -8,6 +8,7 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include "full_order_mpc.h"
+#include "contact_schedule.h"
 
 #define ENABLE_BENCHMARKS false
 
@@ -42,20 +43,57 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
 
     mpc.SetWarmStartTrajectory(traj);
 
+    ContactSchedule cs(mpc.GetContactFrames());
+    const double contact_time = 0.3;
+    double time = 0;
+    for (int i = 0; i < 3; i++) {
+        if (i % 2 != 0) {
+            cs.InsertContact("FR_foot", time, time + contact_time);
+            cs.InsertContact("RL_foot", time, time + contact_time);
+        } else {
+            cs.InsertContact("FL_foot", time, time + contact_time);
+            cs.InsertContact("RR_foot", time, time + contact_time);
+        }
+        time += contact_time;
+    }
+
+    mpc.UpdateContactSchedule(cs);
+
     mpc.Compute(random_state, traj);
 
-    for (int i = 0; i < traj.GetNumNodes(); i++) {
-        std::cout << "Node: " << i << std::endl;
-        std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-    }
+    // for (int i = 0; i < traj.GetNumNodes(); i++) {
+    //     std::cout << "Node: " << i << std::endl;
+    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+    //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+    // }
 
     // random_state = a1.GetRandomState();
     mpc.Compute(random_state, traj);
 
     mpc.PrintStatistics();
-
+    std::cout << std::endl << std::endl;
+    mpc.PrintContactSchedule();
 }
+
+TEST_CASE("Contact schedule", "[mpc][contact schedule]") {
+    std::cout << "Contact Schedule Tests" << std::endl;
+    torc::mpc::ContactSchedule cs({"LF_FRONT", "RF_FRONT"});
+    cs.InsertContact("LF_FRONT", 0.1, 0.2);
+    cs.InsertContact("RF_FRONT", 0.05, 0.15);
+
+    CHECK(!cs.InContact("LF_FRONT", 0.075));
+    CHECK(!cs.InContact("LF_FRONT", 0.25));
+    CHECK(cs.InContact("LF_FRONT", 0.12));
+    CHECK(cs.InContact("LF_FRONT", 0.2));
+
+    CHECK(cs.InContact("RF_FRONT", 0.1));
+    CHECK(cs.InContact("RF_FRONT", 0.12));
+    CHECK(cs.InContact("RF_FRONT", 0.05));
+    CHECK(!cs.InContact("RF_FRONT", 0.025));
+    CHECK(!cs.InContact("RF_FRONT", 0.25));
+}
+
 #if ENABLE_BENCHMARKS
 TEST_CASE("MPC Benchmarks [A1]", "[mpc][benchmarks]") {
     // Benchmarking with the A1

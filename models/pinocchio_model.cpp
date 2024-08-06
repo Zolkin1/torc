@@ -258,7 +258,7 @@ namespace torc::models {
     }
 
     vectorx_t PinocchioModel::GetVelocityJointLimits() const {
-        return pin_model_.velocityLimit;
+        return pin_model_.velocityLimit.cwiseMin(1000); // Bound at 1000 to prevent having crazy large numbers
     }
 
     vectorx_t PinocchioModel::GetTorqueJointLimits() const {

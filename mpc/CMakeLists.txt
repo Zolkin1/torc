@@ -5,7 +5,8 @@ set(MPC_HEADER_LIST
 #    "${MPC_INC}/mpc_base.h"
     "${MPC_INC}/trajectory.h"
     "${MPC_INC}/full_order_mpc.h"
-    "${MPC_INC}/cost_function.h")
+    "${MPC_INC}/cost_function.h"
+    "${MPC_INC}/contact_schedule.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -13,7 +14,8 @@ set(MPC_SOURCE_LIST
         full_order_mpc.cpp
 #        mpc_contact.cpp
         trajectory.cpp
-        cost_function.cpp)
+        cost_function.cpp
+        contact_schedule.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}
