@@ -31,6 +31,7 @@ namespace torc::mpc {
     using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
     // TODO:
+    //  - Fix the orientation integration step (make sure the orientation is updated correctly)
     //  - Line search (probably do more cost function verification)
     //  - Setting swing trajectory
     //  - Setting q target and v target
@@ -145,6 +146,7 @@ namespace torc::mpc {
     // ----------- Cost Creation ----------- //
         void CreateCostPattern();
         void UpdateCost();
+        double GetFullCost(const vectorx_t& qp_res);
         // void CreateDefaultCost();
         // Helper function
         // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;

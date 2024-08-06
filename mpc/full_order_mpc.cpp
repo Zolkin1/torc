@@ -384,7 +384,7 @@ namespace torc::mpc {
 
         compute_timer.Toc();
         stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
-            cost_.GetCost(osqp_solver_.primal_solution()), alpha, osqp_solver_.primal_solution().norm(),
+            GetFullCost(osqp_solver_.primal_solution()), alpha, osqp_solver_.primal_solution().norm(),
             compute_timer.Duration<std::chrono::microseconds>().count()/1000.0);
 
         if (verbose_) {
@@ -928,6 +928,18 @@ namespace torc::mpc {
             throw std::runtime_error("[Cost Function] Could not populate the cost function matrix correctly.");
         }
     }
+
+    double FullOrderMpc::GetFullCost(const vectorx_t& qp_res) {
+        double cost = 0;
+        for (int node = 0; node < nodes_; node++) {
+            cost += cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration);
+            cost += cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
+                traj_.GetVelocity(node), v_target_[node], CostTypes::Velocity);
+        }
+        return cost;
+    }
+
 
     // ------------------------------------------------- //
     // ----------- Sparsity Pattern Creation ----------- //

@@ -134,15 +134,6 @@ namespace torc::mpc {
             }
         }
 
-        double GetCost(const vectorx_t& qp_res) {
-            // TODO: Implement
-            return 0;
-        }
-
-        // double GetCost(const Trajectory& traj) {
-        //     // TODO: Implement
-        // }
-
         [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const CostTypes& type) {
             if (!configured_) {
                 throw std::runtime_error("Cost function not configured yet!");
@@ -150,7 +141,8 @@ namespace torc::mpc {
 
             vectorx_t arg;
             FormCostFcnArg(decision_var, reference, target, arg);
-            return cost_fcn_terms_[cost_idxs_[type]]->Evaluate(arg);
+            // TODO: Why am I off by a factor of 4?
+            return 0.25*cost_fcn_terms_[cost_idxs_[type]]->Evaluate(arg);
         }
 
 
