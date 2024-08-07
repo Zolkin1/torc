@@ -2,9 +2,10 @@
 // Created by zolkin on 8/6/24.
 //
 
+#include <algorithm>
+
 #include "contact_schedule.h"
 
-#include <bits/ranges_algo.h>
 
 namespace torc::mpc {
     ContactSchedule::ContactSchedule(const std::vector<std::string>& frames) {

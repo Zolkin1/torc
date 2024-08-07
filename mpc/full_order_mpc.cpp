@@ -17,8 +17,8 @@
 #define NAN_CHECKS 0
 
 namespace torc::mpc {
-    FullOrderMpc::FullOrderMpc(const fs::path& config_file, const fs::path& model_path)
-        : config_file_(config_file), verbose_(true), cost_("full_order_mpc_cost"), compile_derivatves_(true) {
+    FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
+        : config_file_(config_file), verbose_(true), cost_(name), compile_derivatves_(true) {
         // Verify the robot file exists
         if (!fs::exists(model_path)) {
             throw std::runtime_error("Robot file does not exist!");
@@ -329,7 +329,11 @@ namespace torc::mpc {
         traj_.SetConfiguration(0, q);
         traj_.SetVelocity(0, v);
 
+        utils::TORCTimer constraint_timer;
+        constraint_timer.Tic();
         CreateConstraints();
+        constraint_timer.Toc();
+
         for (auto& constraint_triplet : constraint_triplets_) {
             if(std::isnan(constraint_triplet.value())) {
                 throw std::runtime_error("nan in constraint mat");
@@ -346,8 +350,10 @@ namespace torc::mpc {
             }
         }
 
-        // TODO: Create q_target, v_target
+        utils::TORCTimer cost_timer;
+        cost_timer.Tic();
         UpdateCost();
+        cost_timer.Toc();
 #if NAN_CHECKS
         for (const auto& objective_triplet : objective_triplets_) {
             if(std::isnan(objective_triplet.value())) {
@@ -387,10 +393,6 @@ namespace torc::mpc {
 
         // Solve
         auto solve_status = osqp_solver_.Solve();
-        if (!status.ok()) {
-            std::cerr << "status: " << status << std::endl;
-            throw std::runtime_error("Could not solve the QP.");
-        }
 
 #if NAN_CHECKS
         for (const auto& res : osqp_solver_.primal_solution()) {
@@ -406,6 +408,7 @@ namespace torc::mpc {
         }
 #endif
 
+        // TODO: Put back
         auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
 
         ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
@@ -414,7 +417,10 @@ namespace torc::mpc {
         compute_timer.Toc();
         stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
             cost_ls, alpha_, (alpha_*osqp_solver_.primal_solution()).norm(),
-            compute_timer.Duration<std::chrono::microseconds>().count()/1000.0, ls_condition_, constraint_ls);
+            compute_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+            constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+            cost_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+            ls_condition_, constraint_ls);
 
         traj_ = traj_out;
 
@@ -1720,7 +1726,7 @@ namespace torc::mpc {
         using std::setfill;
 
         const int col_width = 25;
-        const int total_width = 9*col_width;
+        const int total_width = 11*col_width;
 
 
         auto time_now = std::chrono::system_clock::now();
@@ -1731,6 +1737,8 @@ namespace torc::mpc {
         std::cout << setw(col_width) << "Solve #"
                 << setw(col_width) << "Solve Status"
                 << setw(col_width) << "Time (ms)"
+                << setw(col_width) << "Constr. Time (ms)"
+                << setw(col_width) << "Cost Time (ms)"
                 << setw(col_width) << "d-norm (post LS)"
                 << setw(col_width) << "Alpha"
                 << setw(col_width) << "LS Termination"
@@ -1796,6 +1804,8 @@ namespace torc::mpc {
             std::cout << setw(col_width) << solve
                       << setw(col_width) << solve_status
                       << setw(col_width) << stats_[solve].total_compute_time
+                      << setw(col_width) << stats_[solve].constraint_time
+                      << setw(col_width) << stats_[solve].cost_time
                       << setw(col_width) << stats_[solve].qp_res_norm
                       << setw(col_width) << stats_[solve].alpha
                       << setw(col_width) << ls_termination_condition

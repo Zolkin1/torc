@@ -496,6 +496,7 @@ namespace torc::models {
         return forces;
     }
 
+    // TODO: Delete
     matrixx_t FullOrderRigidBody::ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce>& f_ext) {
         // For now we will finite difference, but later we will use ad codegen
         // TODO: Use codegen
@@ -508,9 +509,9 @@ namespace torc::models {
             v_eps(i) += FD_DELTA;
             q2 = pinocchio::integrate(pin_model_, q, v_eps);
             v_eps(i) -= FD_DELTA;
-
-
         }
+
+        return df_dq;
 
 
 //         // sum of J(q) * df_dq

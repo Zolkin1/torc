@@ -12,7 +12,7 @@
 
 #define ENABLE_BENCHMARKS false
 
-TEST_CASE("Basic MPC Test", "[mpc]") {
+TEST_CASE("A1 MPC Test", "[mpc]") {
     using namespace torc::mpc;
     const std::string pin_model_name = "test_pin_model";
     std::filesystem::path a1_urdf = std::filesystem::current_path();
@@ -21,7 +21,7 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
     std::filesystem::path mpc_config = std::filesystem::current_path();
     mpc_config += "/test_data/mpc_config.yaml";
 
-    FullOrderMpc mpc(mpc_config, a1_urdf);
+    FullOrderMpc mpc("a1_mpc", mpc_config, a1_urdf);
 
     mpc.Configure();
 
@@ -74,6 +74,72 @@ TEST_CASE("Basic MPC Test", "[mpc]") {
     mpc.PrintStatistics();
     std::cout << std::endl << std::endl;
     mpc.PrintContactSchedule();
+    std::cout << std::endl << std::endl;
+}
+
+TEST_CASE("Achilles MPC Test", "[mpc]") {
+    using namespace torc::mpc;
+    const std::string pin_model_name = "test_pin_model";
+    std::filesystem::path achilles_urdf = std::filesystem::current_path();
+    achilles_urdf += "/test_data/achilles.urdf";
+
+    std::filesystem::path mpc_config = std::filesystem::current_path();
+    mpc_config += "/test_data/achilles_mpc_config.yaml";
+
+    FullOrderMpc mpc("achilles_mpc", mpc_config, achilles_urdf);
+
+    mpc.Configure();
+
+    torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
+
+    vectorx_t random_state(achilles.GetConfigDim() + achilles.GetVelDim());
+    // random_state << a1.GetNeutralConfig(), Eigen::VectorXd::Zero(a1.GetVelDim());
+    // random_state(2) += 0.321;
+    random_state << achilles.GetRandomState();
+    // random_state.tail(a1.GetVelDim()).setZero();
+    std::cout << "initial config: " << random_state.head(achilles.GetConfigDim()).transpose() << std::endl;
+    std::cout << "initial vel: " << random_state.tail(achilles.GetVelDim()).transpose() << std::endl;
+    Trajectory traj;
+    traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
+
+    vectorx_t q_neutral = achilles.GetNeutralConfig();
+    q_neutral(2) += 0.321;
+    traj.SetDefault(q_neutral);
+
+    mpc.SetWarmStartTrajectory(traj);
+
+    ContactSchedule cs(mpc.GetContactFrames());
+    const double contact_time = 0.3;
+    double time = 0;
+    for (int i = 0; i < 3; i++) {
+        if (i % 2 != 0) {
+            cs.InsertContact("right_foot", time, time + contact_time);
+            cs.InsertContact("right_hand", time, time + contact_time);
+        } else {
+            cs.InsertContact("left_foot", time, time + contact_time);
+            cs.InsertContact("left_hand", time, time + contact_time);
+        }
+        time += contact_time;
+    }
+
+    mpc.UpdateContactSchedule(cs);
+
+    mpc.Compute(random_state, traj);
+
+    // for (int i = 0; i < traj.GetNumNodes(); i++) {
+    //     std::cout << "Node: " << i << std::endl;
+    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+    //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+    // }
+
+    // random_state = a1.GetRandomState();
+    mpc.Compute(random_state, traj);
+
+    mpc.PrintStatistics();
+    std::cout << std::endl << std::endl;
+    mpc.PrintContactSchedule();
+    std::cout << std::endl << std::endl;
 }
 
 TEST_CASE("Contact schedule", "[mpc][contact schedule]") {

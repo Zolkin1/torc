@@ -42,13 +42,15 @@ namespace torc::mpc {
         double alpha;                       // Linesearch alpha value
         double qp_res_norm;                 // Norm of the QP result vector
         double total_compute_time;          // Time for the entire Compute function
+        double constraint_time;             // Time to add the constraints
+        double cost_time;                   // Time to add the costs
         LineSearchCondition ls_condition;   // Condition for line search termination
         double constraint_violation;        // Constraint violation
     };
 
     class FullOrderMpc {
     public:
-        FullOrderMpc(const fs::path& config_file, const fs::path& model_path);
+        FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path);
 
         /**
          * @brief Allocate the large sections of memory, setup the QP solver.

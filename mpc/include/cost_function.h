@@ -30,7 +30,7 @@ namespace torc::mpc {
 
     class CostFunction {
     public:
-        CostFunction(const std::string& name)
+        explicit CostFunction(const std::string& name)
             : name_(name), configured_(false), compile_derivatives_(true) {}
 
         void Configure(int config_size, int vel_size, int joint_size, bool compile_derivatives, const std::vector<CostTypes>& costs, const std::vector<vectorx_t>& weights) {
@@ -186,7 +186,7 @@ namespace torc::mpc {
                 AD::ADFun<cg_t> ad_fn(x, y_std);
 
                 // generate library source code
-                ADCG::ModelCSourceGen<double> c_gen(ad_fn, this->name_);
+                ADCG::ModelCSourceGen<double> c_gen(ad_fn, this->name_ + "_jacobian");
                 c_gen.setCreateJacobian(true);
                 c_gen.setCreateHessian(true);
                 ADCG::ModelLibraryCSourceGen<double> lib_gen(c_gen);
@@ -195,7 +195,7 @@ namespace torc::mpc {
                 // compile source code into a dynamic library
                 ADCG::GccCompiler<double> compiler;
                 this->config_jacobian_lib_ = lib_processor.createDynamicLibrary(compiler);
-                this->config_jacobian_model_ = this->config_jacobian_lib_->model(this->name_);
+                this->config_jacobian_model_ = this->config_jacobian_lib_->model(this->name_ + "_jacobian");
                 // } else {
                 // }
                 return [this, joint_size, vel_size, config_size, weight](const Eigen::VectorX<ScalarT>& dq_qbar_qtarget) {
@@ -264,13 +264,13 @@ namespace torc::mpc {
         }
 
         std::string name_;
+        bool configured_;
+        bool compile_derivatives_;
 
         int config_size_{};
         int vel_size_{};
         int joint_size_{};
         int nodes_{};
-
-        bool compile_derivatives_;
 
         std::vector<std::unique_ptr<fn::ExplicitFn<double>>> cost_fcn_terms_;
         std::vector<vectorx_t> weights_;
@@ -278,8 +278,6 @@ namespace torc::mpc {
 
         std::unique_ptr<CppAD::cg::DynamicLib<double>> config_jacobian_lib_;
         std::unique_ptr<CppAD::cg::GenericModel<double>> config_jacobian_model_;
-
-        bool configured_;
     private:
     };
 }    // namespace torc::mpc

@@ -145,7 +145,7 @@ namespace torc::fn {
             // original function
             const std::function<scalar_t(vectorx_t)> func = [cg_fn, dim](const vectorx_t& x) {
                 Eigen::VectorX<adcg_t> x_eigen(dim);
-                for (int i = 0; i < dim; ++i) {
+                for (size_t i = 0; i < dim; ++i) {
                     x_eigen[i] = adcg_t(x[i]);
                 }
                 return AD::Value(cg_fn(x_eigen)).getValue();    // first get the cg_t, then extract the scalar_t
