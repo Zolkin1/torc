@@ -38,6 +38,7 @@ add_subdirectory(functions)
 add_subdirectory(constraints)
 #add_subdirectory(solver_interfaces)
 add_subdirectory(mpc)
+add_subdirectory(sample_planner)
 #add_subdirectory(controllers)
 add_subdirectory(utils)
 

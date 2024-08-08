@@ -79,6 +79,12 @@ target_link_libraries(mpc_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(mpc_tests PUBLIC Mpc)
 catch_discover_tests(mpc_tests)
 
+# --------- Sample Planner Tests --------- #
+add_executable(sample_planner_tests sample_planner_tests.cpp)
+target_link_libraries(sample_planner_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(sample_planner_tests PUBLIC SamplePlanner)
+catch_discover_tests(sample_planner_tests)
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
