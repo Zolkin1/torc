@@ -34,6 +34,7 @@ namespace torc::mpc {
         ws_ = std::make_unique<Workspace>();
         traj_.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(),
                           robot_model_->GetNumInputs(), contact_frames_, nodes_);
+        traj_.SetDtVector(dt_);
 
         // CreateDefaultCost();
     }
@@ -264,6 +265,7 @@ namespace torc::mpc {
         // Setup trajectory
         traj_.SetNumNodes(nodes_);
         traj_.SetDefault(robot_model_->GetNeutralConfig());
+        traj_.SetDtVector(dt_);
 
         // Setup remaining workspace memory
         ws_->acc.resize(robot_model_->GetVelDim());
@@ -319,41 +321,37 @@ namespace torc::mpc {
     }
 
 
-    void FullOrderMpc::Compute(const vectorx_t& state, Trajectory& traj_out) {
+    void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
 
-        vectorx_t q, v;
-        robot_model_->ParseState(state, q, v);
-
         traj_.SetConfiguration(0, q);
         traj_.SetVelocity(0, v);
+         utils::TORCTimer constraint_timer;
+         constraint_timer.Tic();
+         CreateConstraints();
+         constraint_timer.Toc();
 
-        utils::TORCTimer constraint_timer;
-        constraint_timer.Tic();
-        CreateConstraints();
-        constraint_timer.Toc();
+         for (auto& constraint_triplet : constraint_triplets_) {
+             if(std::isnan(constraint_triplet.value())) {
+                 throw std::runtime_error("nan in constraint mat");
+             }
+         }
 
-        for (auto& constraint_triplet : constraint_triplets_) {
-            if(std::isnan(constraint_triplet.value())) {
-                throw std::runtime_error("nan in constraint mat");
-            }
-        }
+         for (int i = 0; i < osqp_instance_.lower_bounds.size(); i++) {
+             if (std::isnan(osqp_instance_.lower_bounds(i))) {
+                 throw std::runtime_error("lower bound has nan at" + i);
+             }
 
-        for (int i = 0; i < osqp_instance_.lower_bounds.size(); i++) {
-            if (std::isnan(osqp_instance_.lower_bounds(i))) {
-                throw std::runtime_error("lower bound has nan at" + i);
-            }
+             if (std::isnan(osqp_instance_.upper_bounds(i))) {
+                 throw std::runtime_error("upper bound has nan at " + i);
+             }
+         }
 
-            if (std::isnan(osqp_instance_.upper_bounds(i))) {
-                throw std::runtime_error("upper bound has nan at " + i);
-            }
-        }
-
-        utils::TORCTimer cost_timer;
-        cost_timer.Tic();
-        UpdateCost();
-        cost_timer.Toc();
+         utils::TORCTimer cost_timer;
+         cost_timer.Tic();
+         UpdateCost();
+         cost_timer.Toc();
 #if NAN_CHECKS
         for (const auto& objective_triplet : objective_triplets_) {
             if(std::isnan(objective_triplet.value())) {
@@ -366,33 +364,33 @@ namespace torc::mpc {
         }
 #endif
 
-        // std::cout << "objective mat: \n" << objective_mat_ << std::endl;
-        // std::cout << "objective vec: " << osqp_instance_.objective_vector.transpose() << std::endl;
-        // std::cout << "A: \n" << A_ << std::endl;
+         // std::cout << "objective mat: \n" << objective_mat_ << std::endl;
+         // std::cout << "objective vec: " << osqp_instance_.objective_vector.transpose() << std::endl;
+         // std::cout << "A: \n" << A_ << std::endl;
 
-        // Set matrices
-        auto status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
-        if (!status.ok()) {
-            std::cerr << "status: " << status << std::endl;
-            throw std::runtime_error("Could not update the objective and constraint matrix.");
-        }
+         // Set matrices
+         auto status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
+         if (!status.ok()) {
+             std::cerr << "status: " << status << std::endl;
+             throw std::runtime_error("Could not update the objective and constraint matrix.");
+         }
 
-        // Set objective vector
-        status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
-        if (!status.ok()) {
-            std::cerr << "status: " << status << std::endl;
-            throw std::runtime_error("Could not update the objective vector.");
-        }
+         // Set objective vector
+         status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
+         if (!status.ok()) {
+             std::cerr << "status: " << status << std::endl;
+             throw std::runtime_error("Could not update the objective vector.");
+         }
 
-        // Set upper and lower bounds
-        status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
-        if (!status.ok()) {
-            std::cerr << "status: " << status << std::endl;
-            throw std::runtime_error("Could not update the constraint bounds.");
-        }
+         // Set upper and lower bounds
+         status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
+         if (!status.ok()) {
+             std::cerr << "status: " << status << std::endl;
+             throw std::runtime_error("Could not update the constraint bounds.");
+         }
 
-        // Solve
-        auto solve_status = osqp_solver_.Solve();
+         // Solve
+         auto solve_status = osqp_solver_.Solve();
 
 #if NAN_CHECKS
         for (const auto& res : osqp_solver_.primal_solution()) {
@@ -408,25 +406,25 @@ namespace torc::mpc {
         }
 #endif
 
-        // TODO: Put back
-        auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
+         auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
 
-        ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
-        // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
+         ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
+        traj_out.SetDtVector(dt_);
+         // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
 
-        compute_timer.Toc();
-        stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
-            cost_ls, alpha_, (alpha_*osqp_solver_.primal_solution()).norm(),
-            compute_timer.Duration<std::chrono::microseconds>().count()/1000.0,
-            constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0,
-            cost_timer.Duration<std::chrono::microseconds>().count()/1000.0,
-            ls_condition_, constraint_ls);
+         compute_timer.Toc();
+         stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
+             cost_ls, alpha_, (alpha_*osqp_solver_.primal_solution()).norm(),
+             compute_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+             constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+             cost_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+             ls_condition_, constraint_ls);
 
-        traj_ = traj_out;
+         traj_ = traj_out;
 
-        if (verbose_) {
-            std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
-        }
+         if (verbose_) {
+             std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
+         }
     }
 
     // ------------------------------------------------- //

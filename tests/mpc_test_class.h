@@ -15,7 +15,9 @@ namespace torc::mpc {
     class MpcTestClass : public FullOrderMpc {
     public:
         MpcTestClass(const fs::path& config_file, const fs::path& model_path)
-            : FullOrderMpc("mpc_test_class", config_file, model_path) {}
+            : FullOrderMpc("mpc_test_class", config_file, model_path) {
+            CHECK(dt_.size() == nodes_ - 1);
+        }
 
         void CheckQuaternionIntLin() {
             PrintTestHeader("Quaternion Integration Linearization");
@@ -487,11 +489,12 @@ namespace torc::mpc {
         }
 
         void BenchmarkCompute() {
-            vectorx_t state_rand = robot_model_->GetRandomState();
+            vectorx_t q_rand = robot_model_->GetRandomConfig();
+            vectorx_t v_rand = robot_model_->GetRandomVel();
             Trajectory traj;
             traj.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(), contact_frames_, nodes_);
             BENCHMARK("mpc compute") {
-                Compute(state_rand, traj);
+                Compute(q_rand, v_rand, traj);
             };
         }
 

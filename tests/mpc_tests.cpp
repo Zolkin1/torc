@@ -28,12 +28,11 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
     torc::models::FullOrderRigidBody a1("a1", a1_urdf);
 
     vectorx_t random_state(a1.GetConfigDim() + a1.GetVelDim());
-    // random_state << a1.GetNeutralConfig(), Eigen::VectorXd::Zero(a1.GetVelDim());
-    // random_state(2) += 0.321;
-    random_state << a1.GetRandomState();
+    vectorx_t q_rand = a1.GetRandomConfig();
+    vectorx_t v_rand = a1.GetRandomVel();
     // random_state.tail(a1.GetVelDim()).setZero();
-    std::cout << "initial config: " << random_state.head(a1.GetConfigDim()).transpose() << std::endl;
-    std::cout << "initial vel: " << random_state.tail(a1.GetVelDim()).transpose() << std::endl;
+    std::cout << "initial config: " << q_rand.transpose() << std::endl;
+    std::cout << "initial vel: " << v_rand.transpose() << std::endl;
     Trajectory traj;
     traj.UpdateSizes(a1.GetConfigDim(), a1.GetVelDim(), a1.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
 
@@ -59,7 +58,7 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
 
     mpc.UpdateContactSchedule(cs);
 
-    mpc.Compute(random_state, traj);
+    mpc.Compute(q_rand, v_rand, traj);
 
     // for (int i = 0; i < traj.GetNumNodes(); i++) {
     //     std::cout << "Node: " << i << std::endl;
@@ -69,7 +68,7 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
     // }
 
     // random_state = a1.GetRandomState();
-    mpc.Compute(random_state, traj);
+    mpc.Compute(q_rand, v_rand, traj);
 
     mpc.PrintStatistics();
     std::cout << std::endl << std::endl;
@@ -93,9 +92,9 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
 
     vectorx_t random_state(achilles.GetConfigDim() + achilles.GetVelDim());
-    // random_state << a1.GetNeutralConfig(), Eigen::VectorXd::Zero(a1.GetVelDim());
-    // random_state(2) += 0.321;
-    random_state << achilles.GetRandomState();
+    vectorx_t q_rand = achilles.GetRandomConfig();
+    vectorx_t v_rand = achilles.GetRandomVel();
+
     // random_state.tail(a1.GetVelDim()).setZero();
     std::cout << "initial config: " << random_state.head(achilles.GetConfigDim()).transpose() << std::endl;
     std::cout << "initial vel: " << random_state.tail(achilles.GetVelDim()).transpose() << std::endl;
@@ -124,7 +123,7 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
 
     mpc.UpdateContactSchedule(cs);
 
-    mpc.Compute(random_state, traj);
+    mpc.Compute(q_rand, v_rand, traj);
 
     // for (int i = 0; i < traj.GetNumNodes(); i++) {
     //     std::cout << "Node: " << i << std::endl;
@@ -134,7 +133,7 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     // }
 
     // random_state = a1.GetRandomState();
-    mpc.Compute(random_state, traj);
+    mpc.Compute(q_rand, v_rand, traj);
 
     mpc.PrintStatistics();
     std::cout << std::endl << std::endl;
@@ -158,6 +157,100 @@ TEST_CASE("Contact schedule", "[mpc][contact schedule]") {
     CHECK(cs.InContact("RF_FRONT", 0.05));
     CHECK(!cs.InContact("RF_FRONT", 0.025));
     CHECK(!cs.InContact("RF_FRONT", 0.25));
+}
+
+TEST_CASE("Trajectory Interpolation", "[trajectory]") {
+    std::cout << "====== Trajectory Interpolation =====" << std::endl;
+    using namespace torc::mpc;
+
+    std::filesystem::path achilles_urdf = std::filesystem::current_path();
+    achilles_urdf += "/test_data/achilles.urdf";
+    torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
+
+    std::filesystem::path mpc_config = std::filesystem::current_path();
+    mpc_config += "/test_data/achilles_mpc_config.yaml";
+
+    FullOrderMpc mpc("achilles_mpc", mpc_config, achilles_urdf);
+
+    Trajectory traj;
+    traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(),
+        mpc.GetContactFrames(), mpc.GetNumNodes());
+
+    vectorx_t q_neutral = achilles.GetNeutralConfig();
+    traj.SetDefault(q_neutral);
+
+    std::vector<double> dt(mpc.GetNumNodes() - 1);
+    std::fill(dt.begin(), dt.end(), 0.02);
+    traj.SetDtVector(dt);
+
+    // ----- Configuration ----- //
+    // Checks when all the configurations are the same
+    vectorx_t q_interp;
+    traj.GetConfigInterp(0, q_interp);
+    CHECK(q_interp.isApprox(q_neutral));
+
+    traj.GetConfigInterp(0.1, q_interp);
+    CHECK(q_interp.isApprox(q_neutral));
+
+    traj.GetConfigInterp(0.213, q_interp);
+    CHECK(q_interp.isApprox(q_neutral));
+
+    // Checks when there are differences
+    vectorx_t q_rand = achilles.GetRandomConfig();
+    traj.SetConfiguration(1, q_rand);
+
+    traj.GetConfigInterp(0, q_interp);
+    CHECK(q_interp.isApprox(q_neutral));
+
+    traj.GetConfigInterp(0.01, q_interp);
+    // This is the expected vector EXCEPT for the quaternion part
+    vectorx_t q_expect = 0.5*q_rand + 0.5*q_neutral;
+
+    CHECK(q_interp.head<3>().isApprox(q_expect.head<3>()));
+    CHECK(q_interp.tail(achilles.GetNumInputs()).isApprox(q_expect.tail(achilles.GetNumInputs())));
+    // TODO: Add check for quaternion values
+
+    // ----- Velocity ----- //
+    // Checks when all the configurations are the same
+    vectorx_t v_zero = vectorx_t::Zero(achilles.GetVelDim());
+    vectorx_t v_interp;
+    traj.GetVelocityInterp(0, v_interp);
+    CHECK(v_interp.isApprox(v_zero));
+
+    traj.GetVelocityInterp(0.1, v_interp);
+    CHECK(v_interp.isApprox(v_zero));
+
+    traj.GetVelocityInterp(0.213, v_interp);
+    CHECK(v_interp.isApprox(v_zero));
+
+    // Checks when there are differences
+    vectorx_t v_rand = achilles.GetRandomVel();
+    traj.SetVelocity(1, v_rand);
+
+    traj.GetVelocityInterp(0, v_interp);
+    CHECK(v_interp.isApprox(v_zero));
+
+    traj.GetVelocityInterp(0.01, v_interp);
+    vectorx_t v_expect = 0.5*v_rand + 0.5*v_zero;
+    CHECK(v_interp.isApprox(v_expect));
+
+    traj.GetVelocityInterp(0.005, v_interp);
+    v_expect = 0.25*v_rand + 0.75*v_zero;
+    CHECK(v_interp.isApprox(v_expect));
+
+    // ---- Torque ----- //
+    // (Mostly covered by velocity because they use the same internals)
+    vectorx_t tau_interp;
+    vectorx_t tau_zero = vectorx_t::Zero(achilles.GetNumInputs());
+
+    vectorx_t tau_rand = vectorx_t::Random(achilles.GetNumInputs());
+    traj.SetTau(1, tau_rand);
+
+    traj.GetTorqueInterp(0.01, tau_interp);
+    vectorx_t tau_expect = 0.5*tau_rand + 0.5*tau_zero;
+    CHECK(tau_interp.isApprox(tau_expect));
+
+    // TODO: Add force checks
 }
 
 #if ENABLE_BENCHMARKS

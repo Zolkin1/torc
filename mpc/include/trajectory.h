@@ -26,12 +26,18 @@ namespace torc::mpc {
         void SetVelocity(int node, const vectorx_t& v);
         void SetTau(int node, const vectorx_t& tau);
         void SetForce(int node, const std::string& frame, const vector3_t& f);
+        void SetDtVector(const std::vector<double>& dt);
 
         vectorx_t GetConfiguration(int node);
         quat_t GetQuat(int node);
         vectorx_t GetVelocity(int node);
         vectorx_t GetTau(int node);
         vector3_t GetForce(int node, const std::string& frame);
+
+        void GetConfigInterp(double time, vectorx_t& q_out);
+        void GetVelocityInterp(double time, vectorx_t& v_out);
+        void GetTorqueInterp(double time, vectorx_t& torque_out);
+        void GetForceInterp(double time, const std::string& frame, vector3_t& force_out);
 
         void SetDefault(const vectorx_t& q_default);
 
@@ -41,11 +47,18 @@ namespace torc::mpc {
 
     protected:
     private:
+        void StandardVectorInterp(double time, vectorx_t& vec_out, const std::vector<vectorx_t>& vecs);
+
+        static constexpr int POS_VARS = 3;
+        static constexpr int QUAT_VARS = 4;
+        static constexpr int FLOATING_BASE = 7;
+
         std::vector<vectorx_t> q_;
         std::vector<vectorx_t> v_;
         std::vector<vectorx_t> tau_;
         std::vector<std::vector<vector3_t>> forces_;
         std::map<std::string, int> force_frames_;
+        std::vector<double> dt_;
         int num_frames_;
         int nodes_;
         int config_size_;
