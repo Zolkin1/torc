@@ -299,6 +299,7 @@ namespace torc::mpc {
 
         // General settings
         bool verbose_;
+        std::string base_frame_;
 
         // Constraint settings
         double friction_coef_{};

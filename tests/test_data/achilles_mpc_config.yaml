@@ -3,6 +3,7 @@ general_settings:
   verbose: True
   node_dt: 0.02
   compile_derivatives: False #True
+  base_frame: "torso"
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
@@ -20,8 +21,8 @@ costs:
 #                                   0, 0, 0,
 #                                   1, 1, 1, 1, 1, 1, 1, 1, 1,
 #                                   1, 1, 1, 1, 1, 1, 1, 1, 1]
-  configuration_tracking_weights: [ 0, 0, 0,
-                                    0, 0, 0,
+  configuration_tracking_weights: [ 1, 1, 1,
+                                    0.0, 0.0, 0.0,
                                     0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
                                     0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 ]
   velocity_tracking_weights: [1, 1, 1,

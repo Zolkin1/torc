@@ -27,6 +27,7 @@ int main() {
     q_target.resize(achilles.GetConfigDim());
     q_target << 1, 0, 0.97,
                 0, 0, 0, 1,
+                // 0.7071, 0, 0.7071, 0,
                 0, 0, -0.26,
                 0, 0.65, -0.43,
                 0, 0, 0,
@@ -55,7 +56,7 @@ int main() {
 
     mpc.Compute(q_target, v_target, traj);
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 2; i++) {
         mpc.Compute(q_target, v_target, traj);
     }
 
