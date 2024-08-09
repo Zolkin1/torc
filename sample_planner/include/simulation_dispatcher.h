@@ -39,6 +39,7 @@ namespace torc::sample {
 
     class SimulationDispatcher {
     public:
+        // Deals with the Mujoco interface and thread pool
         SimulationDispatcher(const std::string& xml_path, int num_samples);
         SimulationDispatcher(const std::string& xml_path, int num_samples, int num_threads);
 
