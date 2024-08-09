@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!-- Achilles Mujoco XML. Basic humanoid robot with no hands.
     In each leg there are:
     - 3 hip joints: roll, pitch, yaw
@@ -8,7 +9,6 @@
     - 1 elbow joint
     XML and URDF generated from CAD information.
      -->
-<?xml version="1.0" encoding="utf-8"?>
 <mujoco model="achilles">
 
   <!-- Set the angles to be in radians -->

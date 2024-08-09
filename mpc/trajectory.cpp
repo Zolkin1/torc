@@ -71,26 +71,31 @@ namespace torc::mpc {
     }
 
 
-    vectorx_t Trajectory::GetConfiguration(int node) {
+    vectorx_t Trajectory::GetConfiguration(int node) const {
         return q_[node];
     }
 
-    quat_t Trajectory::GetQuat(int node) {
+    quat_t Trajectory::GetQuat(int node) const {
         return static_cast<quat_t>(q_[node].segment<4>(3));
     }
 
 
-    vectorx_t Trajectory::GetVelocity(int node) {
+    vectorx_t Trajectory::GetVelocity(int node) const {
         return v_[node];
     }
 
-    vectorx_t Trajectory::GetTau(int node) {
+    vectorx_t Trajectory::GetTau(int node) const {
         return tau_[node];
     }
 
-    vector3_t Trajectory::GetForce(int node, const std::string& frame) {
-        return forces_[node][force_frames_[frame]];
+    vector3_t Trajectory::GetForce(int node, const std::string& frame) const {
+        return forces_[node][force_frames_.at(frame)];
     }
+
+    const std::vector<double> &Trajectory::GetDtVec() const {
+        return dt_;
+    }
+
 
     // -------------------------- //
     // ----- Interpolations ----- //
