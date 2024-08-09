@@ -98,14 +98,6 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     // random_state.tail(a1.GetVelDim()).setZero();
     std::cout << "initial config: " << random_state.head(achilles.GetConfigDim()).transpose() << std::endl;
     std::cout << "initial vel: " << random_state.tail(achilles.GetVelDim()).transpose() << std::endl;
-    Trajectory traj;
-    traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
-
-    vectorx_t q_neutral = achilles.GetNeutralConfig();
-    q_neutral(2) += 0.321;
-    traj.SetDefault(q_neutral);
-
-    mpc.SetWarmStartTrajectory(traj);
 
     ContactSchedule cs(mpc.GetContactFrames());
     const double contact_time = 0.3;
@@ -123,6 +115,27 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
 
     mpc.UpdateContactSchedule(cs);
 
+    vectorx_t q_target;
+    q_target.resize(achilles.GetConfigDim());
+    q_target << 0, 0, 0.97,
+                0, 0, 0, 1,
+                0, 0, -0.26,
+                0, 0.65, -0.43,
+                0, 0, 0,
+                0, 0, -0.26,
+                0.65, -0.43,
+                0, 0, 0;
+    mpc.SetConstantConfigTarget(q_target);
+
+    Trajectory traj;
+    traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
+
+    vectorx_t q_neutral = achilles.GetNeutralConfig();
+    q_neutral(2) += 0.321;
+    traj.SetDefault(q_neutral);
+
+    mpc.SetWarmStartTrajectory(traj);
+
     mpc.Compute(q_rand, v_rand, traj);
 
     // for (int i = 0; i < traj.GetNumNodes(); i++) {
@@ -132,7 +145,6 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
     // }
 
-    // random_state = a1.GetRandomState();
     mpc.Compute(q_rand, v_rand, traj);
 
     mpc.PrintStatistics();

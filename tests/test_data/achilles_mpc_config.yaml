@@ -2,7 +2,7 @@ general_settings:
   nodes: 32
   verbose: True
   node_dt: 0.02
-  compile_derivatives: True
+  compile_derivatives: False #True
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
@@ -11,19 +11,27 @@ solver_settings:
   rho: 0.02
   #  alpha:
   adaptive_rho: True
-  max_iter: 25
+  max_iter: 100
 constraints:
   friction_coef: 0.5
   max_grf: 200
 costs:
-  configuration_tracking_weights: [0, 0, 0,
-                                   0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0]
+#  configuration_tracking_weights: [1, 1, 1,
+#                                   0, 0, 0,
+#                                   1, 1, 1, 1, 1, 1, 1, 1, 1,
+#                                   1, 1, 1, 1, 1, 1, 1, 1, 1]
+  configuration_tracking_weights: [ 0, 0, 0,
+                                    0, 0, 0,
+                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 ]
   velocity_tracking_weights: [1, 1, 1,
-                              0, 1, 1,
-                              0, 0, 0, 0, 0, 0, 0, 0, 1,
-                              1, 0, 0, 0, 0, 0, 0, 0, 0]
+                              1, 1, 1,
+                              .1, .1, .1, .1, .1, .1, .1, .1, .1,
+                              .1, .1, .1, .1, .1, .1, .1, .1, .1]
+#  velocity_tracking_weights: [ 1, 1, 1,
+#                               1, 1, 1,
+#                               0, 0, 0, 0, 0, 0, 0, 0, 0,
+#                               0, 0, 0, 0, 0, 0, 0, 0, 0 ]
 contacts:
-  num_contact_locations: 4
-  contact_frames: ["right_foot", "left_foot", "right_hand", "left_hand"]
+  num_contact_locations: 2
+  contact_frames: ["right_foot", "left_foot"]#, "right_hand", "left_hand"]

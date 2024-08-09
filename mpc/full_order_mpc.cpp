@@ -14,7 +14,7 @@
 #include "eigen_utils.h"
 #include "torc_timer.h"
 
-#define NAN_CHECKS 0
+#define NAN_CHECKS 1
 
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
@@ -68,7 +68,7 @@ namespace torc::mpc {
 
             if (general_settings["node_dt"]) {
                 const auto dt = general_settings["node_dt"].as<double>();
-                dt_.resize(nodes_ - 1);
+                dt_.resize(nodes_);
                 for (double & it : dt_) {
                     it = dt;
                 }
@@ -332,6 +332,7 @@ namespace torc::mpc {
          CreateConstraints();
          constraint_timer.Toc();
 
+#if NAN_CHECKS
          for (auto& constraint_triplet : constraint_triplets_) {
              if(std::isnan(constraint_triplet.value())) {
                  throw std::runtime_error("nan in constraint mat");
@@ -347,6 +348,7 @@ namespace torc::mpc {
                  throw std::runtime_error("upper bound has nan at " + i);
              }
          }
+#endif
 
          utils::TORCTimer cost_timer;
          cost_timer.Tic();
@@ -408,6 +410,16 @@ namespace torc::mpc {
 
          auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
 
+#if NAN_CHECKS
+        if (std::isnan(constraint_ls)) {
+            throw std::runtime_error("nan in constraint violation line search");
+        }
+
+        if (std::isnan(cost_ls)) {
+            throw std::runtime_error("nan in cost line search");
+        }
+#endif
+
          ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
         traj_out.SetDtVector(dt_);
          // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
@@ -441,6 +453,7 @@ namespace torc::mpc {
             // std::cout << "config: " << traj_.GetConfiguration(node).transpose() << std::endl;
             // std::cout << "vel: " << traj_.GetVelocity(node).transpose() << std::endl;
             // std::cout << "torque: " << traj_.GetTau(node).transpose() << std::endl;
+            // TODO: Put back!
 
             // Dynamics related constraints don't happen in the last node
             AddIntegrationConstraint(node);
@@ -452,11 +465,11 @@ namespace torc::mpc {
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
                 AddConfigurationBoxConstraint(node);
-                AddSwingHeightConstraint(node);
+                // AddSwingHeightConstraint(node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                AddHolonomicConstraint(node);
+                // AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
             }
         }
@@ -465,8 +478,8 @@ namespace torc::mpc {
         AddConfigurationBoxConstraint(nodes_ - 1);
         AddVelocityBoxConstraint(nodes_ - 1);
         AddTorqueBoxConstraint(nodes_ - 1);
-        AddSwingHeightConstraint(nodes_ - 1);
-        AddHolonomicConstraint(nodes_ - 1);
+        // AddSwingHeightConstraint(nodes_ - 1);
+        // AddHolonomicConstraint(nodes_ - 1);
 
         if (constraint_triplet_idx_ != constraint_triplets_.size()) {
             std::cerr << "triplet_idx: " << constraint_triplet_idx_ << "\nconstraint triplet size: " << constraint_triplets_.size() << std::endl;
@@ -535,7 +548,7 @@ namespace torc::mpc {
 
         // Base position bounds
         row_start = GetConstraintRow(node, Integrator);
-        const vector3_t pos_constant = -traj_.GetConfiguration(node + 1).head<POS_VARS>() + traj_.GetConfiguration(node).head<POS_VARS>() + dt_[node]*traj_.GetVelocity(node).head<POS_VARS>();
+        const vector3_t pos_constant = traj_.GetConfiguration(node + 1).head<POS_VARS>() - traj_.GetConfiguration(node).head<POS_VARS>() - dt_[node]*traj_.GetVelocity(node).head<POS_VARS>();
         osqp_instance_.lower_bounds.segment<POS_VARS>(row_start) = pos_constant;
         osqp_instance_.upper_bounds.segment<POS_VARS>(row_start) = pos_constant;
         row_start += POS_VARS;
@@ -652,6 +665,7 @@ namespace torc::mpc {
             }
             osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setConstant(-std::numeric_limits<double>::max());
             osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
+            osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE) -= in_contact_[frame][node]*ws_->fric_cone_mat*traj_.GetForce(node, frame);
 
             row_start += FRICTION_CONE_SIZE;
             col_start += CONTACT_3DOF;
@@ -774,34 +788,36 @@ namespace torc::mpc {
     double FullOrderMpc::GetConstraintViolation(const vectorx_t &qp_res) {
         // Uses l2 norm!
 
+        // TODO: Put back!
+
         double violation = 0;
         violation += GetICViolation(qp_res);
         for (int node = 0; node < nodes_ - 1; node++) {
             // Dynamics related constraints don't happen in the last node
-            violation += GetIntegrationViolation(qp_res, node);
-            violation += GetIDViolation(qp_res, node);
-            violation += GetFrictionViolation(qp_res, node);
-            violation += GetTorqueBoxViolation(qp_res, node);
+            violation += dt_[node]*GetIntegrationViolation(qp_res, node);
+            violation += dt_[node]*GetIDViolation(qp_res, node);
+            violation += dt_[node]*GetFrictionViolation(qp_res, node);
+            violation += dt_[node]*GetTorqueBoxViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
-                violation += GetConfigurationBoxViolation(qp_res, node);
-                violation += GetSwingHeightViolation(qp_res, node);
+                violation += dt_[node]*GetConfigurationBoxViolation(qp_res, node);
+                // violation += dt_[node]*GetSwingHeightViolation(qp_res, node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                violation += GetHolonomicViolation(qp_res, node);
-                violation += GetVelocityBoxViolation(qp_res, node);
+                // violation += dt_[node]*GetHolonomicViolation(qp_res, node);
+                violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
             }
         }
 
-        violation += GetFrictionViolation(qp_res, nodes_ - 1);
-        violation += GetConfigurationBoxViolation(qp_res, nodes_ - 1);
-        violation += GetVelocityBoxViolation(qp_res, nodes_ - 1);
-        violation += GetTorqueBoxViolation(qp_res, nodes_ - 1);
-        violation += GetSwingHeightViolation(qp_res, nodes_ - 1);
-        violation += GetHolonomicViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetFrictionViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetConfigurationBoxViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetVelocityBoxViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetTorqueBoxViolation(qp_res, nodes_ - 1);
+        // violation += dt_[nodes_ - 1]*GetSwingHeightViolation(qp_res, nodes_ - 1);
+        // violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
 
         return sqrt(violation);
     }
@@ -818,18 +834,21 @@ namespace torc::mpc {
         ConvertdqToq(qp_res.segment(GetDecisionIdx(node+1, Configuration), robot_model_->GetVelDim()),
             traj_.GetConfiguration(node+1), q_kp1);
 
+        vectorx_t v_k = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim());
+
         double violation = 0;
         // Position
-        violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>()).squaredNorm();
+        violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>() - dt_[node]*v_k.head<POS_VARS>()).squaredNorm();
 
         // Orientation
         violation += (qp_res.segment(GetDecisionIdx(node + 1, Configuration) + POS_VARS, 3) -
             robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(node+1), traj_.GetQuat(node),
                 qp_res.segment(GetDecisionIdx(node, Configuration) + POS_VARS, 3),
-                qp_res.segment(GetDecisionIdx(node, Velocity) + POS_VARS, 3), dt_[node])).squaredNorm();
+                v_k.segment<3>(POS_VARS), dt_[node])).squaredNorm();
 
         // Joints
-        violation += (q_kp1.tail(robot_model_->GetNumInputs()) - q_k.tail(robot_model_->GetNumInputs())).squaredNorm();
+        violation += (q_kp1.tail(robot_model_->GetNumInputs()) - q_k.tail(robot_model_->GetNumInputs())
+            - dt_[node]*v_k.tail(robot_model_->GetNumInputs())).squaredNorm();
 
         return violation;
     }
@@ -859,8 +878,10 @@ namespace torc::mpc {
 
         const vectorx_t tau_id = robot_model_->InverseDynamics(q, v, a, f_ext);
 
-        // std::cout << "tau dec: " << tau.transpose() << std::endl;
-        // std::cout << "tau id: " << tau_id.transpose() << std::endl;
+        std::cout << "tau dec: " << tau.transpose() << std::endl;
+        std::cout << "tau id: " << tau_id.transpose() << std::endl;
+
+        std::cout << "id vio: " << (tau - tau_id).squaredNorm() << std::endl;
 
         return (tau - tau_id).squaredNorm();
     }
@@ -870,16 +891,17 @@ namespace torc::mpc {
         int idx = GetDecisionIdx(node, GroundForce);
         for (const auto& frame : contact_frames_) {
             // No force constraint
-            vector3_t force = qp_res.segment(idx, 3);
+            vector3_t force = qp_res.segment<3>(idx) + traj_.GetForce(node, frame);
             violation += (1-in_contact_[frame][node])*force.squaredNorm();
 
             // Friction Cone constraints
-            Eigen::Vector4d force_vio = ws_->fric_cone_mat*qp_res.segment(idx, 3);
+            Eigen::Vector4d force_vio = ws_->fric_cone_mat*force;
             force_vio = force_vio.cwiseMax(0);  // Upper bound of 0, no lower bound
             violation += in_contact_[frame][node]*force_vio.squaredNorm();
             idx += 3;
         }
 
+        // std::cout << "friction violation: " << violation << std::endl;
         return violation;
     }
 
@@ -893,6 +915,8 @@ namespace torc::mpc {
                 q(i) = q(i) - robot_model_->GetLowerConfigLimits()(i);
             } else if (q(i) > robot_model_->GetUpperConfigLimits()(i)) {
                 q(i) = q(i) - robot_model_->GetUpperConfigLimits()(i);
+            } else {
+                q(i) = 0;
             }
         }
 
@@ -906,6 +930,8 @@ namespace torc::mpc {
                 vel(i) = std::abs(vel(i)) - robot_model_->GetVelocityJointLimits()(i);
             } else if (vel(i) > robot_model_->GetVelocityJointLimits()(i)) {
                 vel(i) = vel(i) - robot_model_->GetVelocityJointLimits()(i);
+            } else {
+                vel(i) = 0;
             }
         }
 
@@ -914,11 +940,14 @@ namespace torc::mpc {
 
     double FullOrderMpc::GetTorqueBoxViolation(const vectorx_t &qp_res, int node) {
         vectorx_t tau = qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()) + traj_.GetTau(node);
+
         for (int i = 0; i < tau.size(); i++) {
             if (tau(i) < -robot_model_->GetTorqueJointLimits()(i)) {
-                tau(i) = std::abs(tau(i)) - robot_model_->GetTorqueJointLimits()(i);
+                tau(i) = tau(i) + robot_model_->GetTorqueJointLimits()(i);
             } else if (tau(i) > robot_model_->GetTorqueJointLimits()(i)) {
                 tau(i) = tau(i) - robot_model_->GetTorqueJointLimits()(i);
+            } else {
+                tau(i) = 0;
             }
         }
 
@@ -1200,12 +1229,18 @@ namespace torc::mpc {
         const double gamma_alpha = 0.5;
         const double alpha_min = 1e-4;
 
+        std::cout << "------ alpha: " << 0 << " ------" << std::endl;
+
         double theta_k = GetConstraintViolation(vectorx_t::Zero(qp_res.size()));
         double phi_k = GetFullCost(vectorx_t::Zero(qp_res.size()));
 
         while (alpha_ > alpha_min) {
-            double theta_kp1 = GetConstraintViolation(alpha_*qp_res);
+            std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
+            double theta_kp1 = GetConstraintViolation(alpha_*qp_res); // TODO: Consider scaling each term by corresponding dt
             double phi_kp1 = GetFullCost(alpha_*qp_res);
+
+            // TODO: Remove
+            // return std::make_pair(theta_kp1, phi_kp1);
 
             if (theta_kp1 >= theta_max) {
                 if (theta_kp1 < (1 - gamma_theta)*theta_k) {
@@ -1242,6 +1277,7 @@ namespace torc::mpc {
 
         for (int node = 0; node < nodes_ - 1; node++) {
             // Dynamics related constraints don't happen in the last node
+            // TODO: Put back!
             AddIntegrationPattern(node);
             AddIDPattern(node);
             AddFrictionConePattern(node);
@@ -1249,11 +1285,11 @@ namespace torc::mpc {
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
                 AddConfigurationBoxPattern(node);
-                AddSwingHeightPattern(node);
+                // AddSwingHeightPattern(node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                AddHolonomicPattern(node);
+                // AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
             }
         }
@@ -1262,8 +1298,8 @@ namespace torc::mpc {
         AddConfigurationBoxPattern(nodes_ - 1);
         AddVelocityBoxPattern(nodes_ - 1);
         AddTorqueBoxPattern(nodes_ - 1);
-        AddSwingHeightPattern(nodes_ - 1);
-        AddHolonomicPattern(nodes_ - 1);
+        // AddSwingHeightPattern(nodes_ - 1);
+        // AddHolonomicPattern(nodes_ - 1);
 
         int row_max = 0;
         int col_max = 0;
@@ -1694,12 +1730,25 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::SetConstantConfigTarget(const vectorx_t& q_target) {
+        if (q_target.size() != robot_model_->GetConfigDim()) {
+            throw std::runtime_error("Configuration target does not have the correct size!");
+        }
+
+        if (q_target.segment<QUAT_VARS>(POS_VARS).norm() != 1.0) {
+            throw std::runtime_error("Configuration target must have a normalized quaternion!");
+        }
+
+        q_target_.resize(nodes_);
         for (int node = 0; node < nodes_; node++) {
             q_target_[node] = q_target;
         }
     }
 
     void FullOrderMpc::SetConstantVelTarget(const vectorx_t& v_target) {
+        if (v_target.size() != robot_model_->GetVelDim()) {
+            throw std::runtime_error("Velocity target does not have the correct size!");
+        }
+        v_target_.resize(nodes_);
         for (int node = 0; node < nodes_; node++) {
             v_target_[node] = v_target;
         }
@@ -1709,12 +1758,26 @@ namespace torc::mpc {
         if (q_target.size() != nodes_) {
             throw std::invalid_argument("Configuration target has the wrong number of nodes!");
         }
+        for (const auto& q : q_target) {
+            if (q.size() != robot_model_->GetConfigDim()) {
+                throw std::runtime_error("A configuration target does not have the correct size!");
+            }
+
+            if (q.segment<QUAT_VARS>(POS_VARS).norm() != 1.0) {
+                throw std::runtime_error("A configuration target must have a normalized quaternion!");
+            }
+        }
         q_target_ = q_target;
     }
 
     void FullOrderMpc::SetVelTarget(const std::vector<vectorx_t>& v_target) {
         if (v_target.size() != nodes_) {
             throw std::invalid_argument("Velocity target has the wrong number of nodes!");
+        }
+        for (const auto& v : v_target) {
+            if (v.size() != robot_model_->GetVelDim()) {
+                throw std::runtime_error("A velocity target does not have the correct size!");
+            }
         }
         q_target_ = v_target;
     }
@@ -1740,7 +1803,7 @@ namespace torc::mpc {
                 << setw(col_width) << "d-norm (post LS)"
                 << setw(col_width) << "Alpha"
                 << setw(col_width) << "LS Termination"
-                << setw(col_width) << "Constraint Vio."
+                << setw(col_width) << "Constr. Vio. (Scaled)"
                 << setw(col_width) << "Cost (post LS)"
                 << setw(col_width) << "QP Cost (pre LS)" << std::endl;
         // << setw(col_width) << "Constraints"

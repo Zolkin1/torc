@@ -64,32 +64,32 @@ namespace torc::mpc {
     }
 
     void Trajectory::SetDtVector(const std::vector<double>& dt) {
-        if (dt.size() != q_.size() - 1) {
+        if (dt.size() != q_.size()) {
             std::cerr << "dt vector does not have the correct number of nodes! Ignoring!" << std::endl;
         }
         dt_ = dt;
     }
 
 
-    vectorx_t Trajectory::GetConfiguration(int node) {
+    vectorx_t Trajectory::GetConfiguration(int node) const {
         return q_[node];
     }
 
-    quat_t Trajectory::GetQuat(int node) {
+    quat_t Trajectory::GetQuat(int node) const {
         return static_cast<quat_t>(q_[node].segment<4>(3));
     }
 
 
-    vectorx_t Trajectory::GetVelocity(int node) {
+    vectorx_t Trajectory::GetVelocity(int node) const {
         return v_[node];
     }
 
-    vectorx_t Trajectory::GetTau(int node) {
+    vectorx_t Trajectory::GetTau(int node) const {
         return tau_[node];
     }
 
-    vector3_t Trajectory::GetForce(int node, const std::string& frame) {
-        return forces_[node][force_frames_[frame]];
+    vector3_t Trajectory::GetForce(int node, const std::string& frame) const {
+        return forces_[node][force_frames_.at(frame)];
     }
 
     // -------------------------- //
@@ -102,11 +102,11 @@ namespace torc::mpc {
             return;
         }
 
-        q_out.resize(q_[0].size());
-
         double time_tally = dt_[0];
         for (int i = 1; i < dt_.size(); i++) {
             if (time < time_tally) {
+                q_out.resize(q_[0].size());
+
                 // We know the nodes that it is between
                 double forward_weight = 1.0 - (time_tally - time)/dt_[i-1];
                 // std::cout << "forward weight: " << forward_weight << std::endl;
@@ -127,9 +127,9 @@ namespace torc::mpc {
                     throw std::runtime_error("[Trajectory] Interpolation invalid times!");
                 }
 
-                q_out.head<POS_VARS>() = forward_weight*q_[i].head<POS_VARS>() - (1 - forward_weight)*q_[i-1].head<POS_VARS>();
+                q_out.head<POS_VARS>() = forward_weight*q_[i].head<POS_VARS>() + (1 - forward_weight)*q_[i-1].head<POS_VARS>();
                 const size_t num_joints = q_[0].size() - FLOATING_BASE;
-                q_out.tail(num_joints) = forward_weight*q_[i].tail(num_joints) - (1 - forward_weight)*q_[i-1].tail(num_joints);
+                q_out.tail(num_joints) = forward_weight*q_[i].tail(num_joints) + (1 - forward_weight)*q_[i-1].tail(num_joints);
 
                 // Quaternion
                 quat_t quat_out;
@@ -141,7 +141,8 @@ namespace torc::mpc {
             time_tally += dt_[i];
         }
 
-        std::cerr << "Time is too large! No interpolation provided!" << std::endl;
+        // TODO: Put back!
+        // std::cerr << "Time is too large! No interpolation provided!" << std::endl;
     }
 
     void Trajectory::GetVelocityInterp(double time, vectorx_t& v_out) {
@@ -177,14 +178,15 @@ namespace torc::mpc {
                     throw std::runtime_error("[Trajectory] Interpolation invalid times!");
                 }
 
-                force_out = forward_weight*forces_[i][force_frames_[frame]] - (1 - forward_weight)*forces_[i-1][force_frames_[frame]];
+                force_out = forward_weight*forces_[i][force_frames_[frame]] + (1 - forward_weight)*forces_[i-1][force_frames_[frame]];
                 return;
             }
 
             time_tally += dt_[i];
         }
 
-        std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
+        // TODO: Put back!
+        // std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
     }
 
 
@@ -213,18 +215,16 @@ namespace torc::mpc {
                     throw std::runtime_error("[Trajectory] Interpolation invalid times!");
                 }
 
-                vec_out = forward_weight*vecs[i] - (1 - forward_weight)*vecs[i-1];
+                vec_out = forward_weight*vecs[i] + (1 - forward_weight)*vecs[i-1];
                 return;
             }
 
             time_tally += dt_[i];
         }
 
-        std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
+        // TODO: Put back!
+        // std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
     }
-
-
-
 
     void Trajectory::SetDefault(const vectorx_t& q_default) {
         for (int node = 0; node < nodes_; node++) {

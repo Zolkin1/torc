@@ -120,7 +120,7 @@ namespace torc::mpc {
                 // if (cost < 1e-6) {
                 //     cost = 1e-6;
                 // }
-                hessian_term  = GetConfigurationTrackingJacobian(arg).transpose() * GetConfigurationTrackingJacobian(arg);
+                hessian_term = 2*GetConfigurationTrackingJacobian(arg).transpose() * GetConfigurationTrackingJacobian(arg);
             } else if (type == Velocity) {
                 if (reference.size() != vel_size_ || target.size() != vel_size_) {
                     throw std::runtime_error("[Cost Function] velocity quadratic reference or target has the wrong size!");
