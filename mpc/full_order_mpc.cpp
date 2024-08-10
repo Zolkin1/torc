@@ -490,7 +490,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicConstraint(node);
+                AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
             }
         }
@@ -500,7 +500,7 @@ namespace torc::mpc {
         AddVelocityBoxConstraint(nodes_ - 1);
         AddTorqueBoxConstraint(nodes_ - 1);
         // AddSwingHeightConstraint(nodes_ - 1);
-        // AddHolonomicConstraint(nodes_ - 1);
+        AddHolonomicConstraint(nodes_ - 1);
 
         if (constraint_triplet_idx_ != constraint_triplets_.size()) {
             std::cerr << "triplet_idx: " << constraint_triplet_idx_ << "\nconstraint triplet size: " << constraint_triplets_.size() << std::endl;
@@ -770,15 +770,23 @@ namespace torc::mpc {
 
             // Grab just the z-height element
             ws_->swing_vec = ws_->frame_jacobian.row(2);
+
+            // todo: remove!
+            // ws_->swing_vec.setZero();
+            //
+
             VectorToTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
 
             // Get the frame position on the warm start trajectory
             robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
             vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
 
+            std::cout << "frame: " << frame << ", frame pos: " << frame_pos.transpose() << std::endl;
+            std::cout << "swing traj: " << swing_traj_[frame][node] << std::endl;
+
             // Set bounds
             osqp_instance_.lower_bounds(row_start)
-                = -frame_pos(2) - swing_traj_[frame][node];
+                = -frame_pos(2) + swing_traj_[frame][node];
             osqp_instance_.upper_bounds(row_start)
                 = -frame_pos(2) + swing_traj_[frame][node];
 
@@ -842,7 +850,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // violation += dt_[node]*GetHolonomicViolation(qp_res, node);
+                violation += dt_[node]*GetHolonomicViolation(qp_res, node);
                 violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
             }
         }
@@ -852,7 +860,7 @@ namespace torc::mpc {
         violation += dt_[nodes_ - 1]*GetVelocityBoxViolation(qp_res, nodes_ - 1);
         violation += dt_[nodes_ - 1]*GetTorqueBoxViolation(qp_res, nodes_ - 1);
         // violation += dt_[nodes_ - 1]*GetSwingHeightViolation(qp_res, nodes_ - 1);
-        // violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
 
         return sqrt(violation);
     }
@@ -940,7 +948,7 @@ namespace torc::mpc {
             idx += 3;
         }
 
-        std::cout << "friction violation: " << violation << std::endl;
+        // std::cout << "friction violation: " << violation << std::endl;
         return violation;
     }
 
@@ -1008,6 +1016,7 @@ namespace torc::mpc {
             violation += in_contact_[frame][node]*frame_vel.head<2>().squaredNorm();
         }
 
+        std::cout << "holonomic violation: " << violation << std::endl;
         return violation;
     }
 
@@ -1329,7 +1338,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicPattern(node);
+                AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
             }
         }
@@ -1339,7 +1348,7 @@ namespace torc::mpc {
         AddVelocityBoxPattern(nodes_ - 1);
         AddTorqueBoxPattern(nodes_ - 1);
         // AddSwingHeightPattern(nodes_ - 1);
-        // AddHolonomicPattern(nodes_ - 1);
+        AddHolonomicPattern(nodes_ - 1);
 
         int row_max = 0;
         int col_max = 0;

@@ -3,6 +3,7 @@ general_settings:
   verbose: True
   node_dt: 0.02
   compile_derivatives: True
+  base_frame: "trunk"
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6

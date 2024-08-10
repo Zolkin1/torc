@@ -105,10 +105,10 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     for (int i = 0; i < 3; i++) {
         if (i % 2 != 0) {
             cs.InsertContact("right_foot", time, time + contact_time);
-            cs.InsertContact("right_hand", time, time + contact_time);
+            // cs.InsertContact("right_hand", time, time + contact_time);
         } else {
             cs.InsertContact("left_foot", time, time + contact_time);
-            cs.InsertContact("left_hand", time, time + contact_time);
+            // cs.InsertContact("left_hand", time, time + contact_time);
         }
         time += contact_time;
     }

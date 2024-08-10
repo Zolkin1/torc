@@ -25,7 +25,7 @@ int main() {
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
-    q_target << 1, 0, 0.97,
+    q_target << 0, 0, 0.9, // 0.97
                 0, 0, 0, 1,
                 // 0.7071, 0, 0.7071, 0,
                 0, 0, -0.26,
@@ -38,7 +38,7 @@ int main() {
     q_target(0) = 0;
 
     v_target.resize(achilles.GetVelDim());
-    v_target << 1, 0, 0,
+    v_target << 0, 0, 0,
                 0, 0, 0,
                 0, 0, 0,
                 0, 0, 0,

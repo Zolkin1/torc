@@ -70,9 +70,6 @@ namespace torc::mpc {
         /**
          * @brief Computes the trajectory given the current state.
          *
-         * TODO: needs to reset the triplet_idx_ at some point
-         *
-         * @param state
          * @return
          */
         void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);

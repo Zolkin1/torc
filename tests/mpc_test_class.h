@@ -16,7 +16,7 @@ namespace torc::mpc {
     public:
         MpcTestClass(const fs::path& config_file, const fs::path& model_path)
             : FullOrderMpc("mpc_test_class", config_file, model_path) {
-            CHECK(dt_.size() == nodes_ - 1);
+            CHECK(dt_.size() == nodes_);
         }
 
         void CheckQuaternionIntLin() {
