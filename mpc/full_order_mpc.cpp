@@ -449,7 +449,7 @@ namespace torc::mpc {
         Compute(q, v, traj_out);
         const int MAX_COMPUTES = 10;
         for (int i = 0; i < MAX_COMPUTES; i++) {
-            if (stats_[i].constraint_violation < 1e-1) {
+            if (stats_[i].constraint_violation < nodes_*dt_[0]) {
                 std::cout << "Initial compute constraint violation converged in " << i+1 << " QP solves." << std::endl;
                 return;
             }
@@ -457,6 +457,10 @@ namespace torc::mpc {
         }
 
         std::cerr << "Did not reach constraint tolerance after " << MAX_COMPUTES << " QP solves." << std::endl;
+
+        if (verbose_) {
+            PrintStatistics();
+        }
     }
 
 
@@ -490,7 +494,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                AddHolonomicConstraint(node);
+                // AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
             }
         }
@@ -500,7 +504,7 @@ namespace torc::mpc {
         AddVelocityBoxConstraint(nodes_ - 1);
         AddTorqueBoxConstraint(nodes_ - 1);
         // AddSwingHeightConstraint(nodes_ - 1);
-        AddHolonomicConstraint(nodes_ - 1);
+        // AddHolonomicConstraint(nodes_ - 1);
 
         if (constraint_triplet_idx_ != constraint_triplets_.size()) {
             std::cerr << "triplet_idx: " << constraint_triplet_idx_ << "\nconstraint triplet size: " << constraint_triplets_.size() << std::endl;
@@ -1338,7 +1342,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                AddHolonomicPattern(node);
+                // AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
             }
         }
@@ -1348,7 +1352,7 @@ namespace torc::mpc {
         AddVelocityBoxPattern(nodes_ - 1);
         AddTorqueBoxPattern(nodes_ - 1);
         // AddSwingHeightPattern(nodes_ - 1);
-        AddHolonomicPattern(nodes_ - 1);
+        // AddHolonomicPattern(nodes_ - 1);
 
         int row_max = 0;
         int col_max = 0;
