@@ -2,17 +2,17 @@ general_settings:
   nodes: 32
   verbose: True
   node_dt: 0.02
-  compile_derivatives: False #True
+  compile_derivatives: True #True
   base_frame: "torso"
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
   verbose: True
-  polish: False
+  polish: True
   rho: 0.02
   #  alpha:
   adaptive_rho: True
-  max_iter: 100
+  max_iter: 1000
 constraints:
   friction_coef: 0.5
   max_grf: 200
@@ -21,11 +21,15 @@ costs:
 #                                   0, 0, 0,
 #                                   1, 1, 1, 1, 1, 1, 1, 1, 1,
 #                                   1, 1, 1, 1, 1, 1, 1, 1, 1]
-  configuration_tracking_weights: [ 1, 1, 1,
+#  configuration_tracking_weights: [ 1, 1, 10,
+#                                    0.0, 0.0, 0.0,
+#                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+#                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 ]
+  configuration_tracking_weights: [ 1, 1, 10,
                                     0.0, 0.0, 0.0,
-                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 ]
-  velocity_tracking_weights: [1, 1, 1,
+                                    0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                    0., 0., 0., 0., 0., 0., 0., 0., 0. ]
+  velocity_tracking_weights: [10, 10, 10,
                               1, 1, 1,
                               .1, .1, .1, .1, .1, .1, .1, .1, .1,
                               .1, .1, .1, .1, .1, .1, .1, .1, .1]

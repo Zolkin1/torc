@@ -54,11 +54,13 @@ int main() {
 
     mpc.SetWarmStartTrajectory(traj);
 
-    mpc.Compute(q_target, v_target, traj);
+    mpc.ComputeNLP(q_target, v_target, traj);
 
-    for (int i = 0; i < 2; i++) {
-        mpc.Compute(q_target, v_target, traj);
-    }
+    // mpc.Compute(q_target, v_target, traj);
+    //
+    // for (int i = 0; i < 10; i++) {
+    //     mpc.Compute(q_target, v_target, traj);
+    // }
 
     for (int i = 0; i < traj.GetNumNodes(); i++) {
         std::cout << "Node: " << i << std::endl;

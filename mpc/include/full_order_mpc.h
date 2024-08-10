@@ -77,6 +77,8 @@ namespace torc::mpc {
          */
         void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
 
+        void ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
+
         void SetVerbosity(bool verbose);
         [[nodiscard]] std::vector<std::string> GetContactFrames() const;
         [[nodiscard]] int GetNumNodes() const;

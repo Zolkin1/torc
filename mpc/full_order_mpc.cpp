@@ -445,6 +445,21 @@ namespace torc::mpc {
          }
     }
 
+    void FullOrderMpc::ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
+        Compute(q, v, traj_out);
+        const int MAX_COMPUTES = 10;
+        for (int i = 0; i < MAX_COMPUTES; i++) {
+            if (stats_[i].constraint_violation < 1e-1) {
+                std::cout << "Initial compute constraint violation converged in " << i+1 << " QP solves." << std::endl;
+                return;
+            }
+            Compute(q, v, traj_out);
+        }
+
+        std::cerr << "Did not reach constraint tolerance after " << MAX_COMPUTES << " QP solves." << std::endl;
+    }
+
+
     // ------------------------------------------------- //
     // -------------- Constraint Creation -------------- //
     // ------------------------------------------------- //
@@ -463,27 +478,27 @@ namespace torc::mpc {
 
             // Dynamics related constraints don't happen in the last node
             AddIntegrationConstraint(node);
-            // AddIDConstraint(node);
-            // AddFrictionConeConstraint(node);
-            // AddTorqueBoxConstraint(node);
+            AddIDConstraint(node);
+            AddFrictionConeConstraint(node);
+            AddTorqueBoxConstraint(node);
 
             // These could conflict with the initial condition constraints
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
-                // AddConfigurationBoxConstraint(node);
+                AddConfigurationBoxConstraint(node);
                 // AddSwingHeightConstraint(node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // AddHolonomicConstraint(node);
-                // AddVelocityBoxConstraint(node);
+                AddVelocityBoxConstraint(node);
             }
         }
 
-        // AddFrictionConeConstraint(nodes_ - 1);
-        // AddConfigurationBoxConstraint(nodes_ - 1);
-        // AddVelocityBoxConstraint(nodes_ - 1);
-        // AddTorqueBoxConstraint(nodes_ - 1);
+        AddFrictionConeConstraint(nodes_ - 1);
+        AddConfigurationBoxConstraint(nodes_ - 1);
+        AddVelocityBoxConstraint(nodes_ - 1);
+        AddTorqueBoxConstraint(nodes_ - 1);
         // AddSwingHeightConstraint(nodes_ - 1);
         // AddHolonomicConstraint(nodes_ - 1);
 
@@ -815,27 +830,27 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_ - 1; node++) {
             // Dynamics related constraints don't happen in the last node
             violation += dt_[node]*GetIntegrationViolation(qp_res, node);
-            // violation += dt_[node]*GetIDViolation(qp_res, node);
-            // violation += dt_[node]*GetFrictionViolation(qp_res, node);
-            // violation += dt_[node]*GetTorqueBoxViolation(qp_res, node);
+            violation += dt_[node]*GetIDViolation(qp_res, node);
+            violation += dt_[node]*GetFrictionViolation(qp_res, node);
+            violation += dt_[node]*GetTorqueBoxViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
-                // violation += dt_[node]*GetConfigurationBoxViolation(qp_res, node);
+                violation += dt_[node]*GetConfigurationBoxViolation(qp_res, node);
                 // violation += dt_[node]*GetSwingHeightViolation(qp_res, node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // violation += dt_[node]*GetHolonomicViolation(qp_res, node);
-                // violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
+                violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
             }
         }
 
-        // violation += dt_[nodes_ - 1]*GetFrictionViolation(qp_res, nodes_ - 1);
-        // violation += dt_[nodes_ - 1]*GetConfigurationBoxViolation(qp_res, nodes_ - 1);
-        // violation += dt_[nodes_ - 1]*GetVelocityBoxViolation(qp_res, nodes_ - 1);
-        // violation += dt_[nodes_ - 1]*GetTorqueBoxViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetFrictionViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetConfigurationBoxViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetVelocityBoxViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetTorqueBoxViolation(qp_res, nodes_ - 1);
         // violation += dt_[nodes_ - 1]*GetSwingHeightViolation(qp_res, nodes_ - 1);
         // violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
 
@@ -902,10 +917,10 @@ namespace torc::mpc {
 
         const vectorx_t tau_id = robot_model_->InverseDynamics(q, v, a, f_ext);
 
-        std::cout << "tau dec: " << tau.transpose() << std::endl;
-        std::cout << "tau id: " << tau_id.transpose() << std::endl;
-
-        std::cout << "id vio: " << (tau - tau_id).squaredNorm() << std::endl;
+        // std::cout << "tau dec: " << tau.transpose() << std::endl;
+        // std::cout << "tau id: " << tau_id.transpose() << std::endl;
+        //
+        // std::cout << "id vio: " << (tau - tau_id).squaredNorm() << std::endl;
 
         return (tau - tau_id).squaredNorm();
     }
@@ -925,7 +940,7 @@ namespace torc::mpc {
             idx += 3;
         }
 
-        // std::cout << "friction violation: " << violation << std::endl;
+        std::cout << "friction violation: " << violation << std::endl;
         return violation;
     }
 
@@ -1304,25 +1319,25 @@ namespace torc::mpc {
             // Dynamics related constraints don't happen in the last node
             // TODO: Put back!
             AddIntegrationPattern(node);
-            // AddIDPattern(node);
-            // AddFrictionConePattern(node);
-            // AddTorqueBoxPattern(node);
+            AddIDPattern(node);
+            AddFrictionConePattern(node);
+            AddTorqueBoxPattern(node);
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
-                // AddConfigurationBoxPattern(node);
+                AddConfigurationBoxPattern(node);
                 // AddSwingHeightPattern(node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // AddHolonomicPattern(node);
-                // AddVelocityBoxPattern(node);
+                AddVelocityBoxPattern(node);
             }
         }
 
-        // AddFrictionConePattern(nodes_ - 1);
-        // AddConfigurationBoxPattern(nodes_ - 1);
-        // AddVelocityBoxPattern(nodes_ - 1);
-        // AddTorqueBoxPattern(nodes_ - 1);
+        AddFrictionConePattern(nodes_ - 1);
+        AddConfigurationBoxPattern(nodes_ - 1);
+        AddVelocityBoxPattern(nodes_ - 1);
+        AddTorqueBoxPattern(nodes_ - 1);
         // AddSwingHeightPattern(nodes_ - 1);
         // AddHolonomicPattern(nodes_ - 1);
 
