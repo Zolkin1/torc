@@ -92,6 +92,31 @@ namespace torc::mpc {
         return forces_[node][force_frames_.at(frame)];
     }
 
+    const std::vector<double> &Trajectory::GetDtVec() const {
+        return dt_;
+    }
+
+    std::vector<std::string> Trajectory::GetContactFrames() const {
+        std::vector<std::string> frames;
+        for (const auto& [frame, idx] : force_frames_) {
+            frames.push_back(frame);
+        }
+
+        return frames;
+    }
+
+    double Trajectory::GetTotalTime() const {
+        double total_time = 0;
+        for (const auto& dt : dt_) {
+            total_time += dt;
+        }
+
+        return  total_time;
+    }
+
+
+
+
     // -------------------------- //
     // ----- Interpolations ----- //
     // -------------------------- //
