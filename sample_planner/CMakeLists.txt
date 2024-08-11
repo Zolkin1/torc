@@ -15,7 +15,22 @@ target_include_directories(SamplePlanner PUBLIC
 
 # ----------- MPC ----------- #
 # Needed for the trajectory and contact schedule stuff
-target_link_libraries(SamplePlanner Mpc)
+target_link_libraries(SamplePlanner PUBLIC Mpc)
+
+# ----------- ABSL -----------
+#if (NOT TARGET absl::log)
+#    message(STATUS "SamplePlanner: `absl` targets not found. Attempting to fetch contents...")
+#    FetchContent_Declare(
+#            abseil-cpp
+#            GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+#            GIT_TAG        origin/master
+#    )
+#    FetchContent_MakeAvailable(abseil-cpp)
+#else()
+#    message(STATUS "SamplePlanner: `absl` targets found.")
+#endif()
+
+target_link_libraries(SamplePlanner PUBLIC absl::log absl::log_initialize)
 
 # ------- Mujoco ------- #
 if (NOT TARGET mujoco-lib)
@@ -40,7 +55,7 @@ if (NOT TARGET mujoco-lib)
 
     set_property(TARGET mujoco-lib PROPERTY IMPORTED_LOCATION ${mujoco_SOURCE_DIR}/lib/libmujoco.so)
 
-    target_link_libraries(SamplePlanner mujoco-lib)
+    target_link_libraries(SamplePlanner PUBLIC mujoco-lib)
 endif ()
 
 # ----------- Thread Pool ----------- #
@@ -58,6 +73,6 @@ CPMAddPackage(
         VERSION 4.1.0)
 add_library(BS_thread_pool INTERFACE)
 target_include_directories(BS_thread_pool INTERFACE ${BS_thread_pool_SOURCE_DIR}/include)
-target_link_libraries(SamplePlanner BS_thread_pool)
+target_link_libraries(SamplePlanner PUBLIC BS_thread_pool)
 
 # TODO: Add in the mujoco dependency

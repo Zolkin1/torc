@@ -28,12 +28,14 @@ namespace torc::mpc {
         void SetForce(int node, const std::string& frame, const vector3_t& f);
         void SetDtVector(const std::vector<double>& dt);
 
-        vectorx_t GetConfiguration(int node) const;
-        quat_t GetQuat(int node) const;
-        vectorx_t GetVelocity(int node) const;
-        vectorx_t GetTau(int node) const;
-        vector3_t GetForce(int node, const std::string& frame) const ;
-        const std::vector<double>& GetDtVec() const;
+        [[nodiscard]] vectorx_t GetConfiguration(int node) const;
+        [[nodiscard]] quat_t GetQuat(int node) const;
+        [[nodiscard]] vectorx_t GetVelocity(int node) const;
+        [[nodiscard]] vectorx_t GetTau(int node) const;
+        [[nodiscard]] vector3_t GetForce(int node, const std::string& frame) const ;
+        [[nodiscard]] const std::vector<double>& GetDtVec() const;
+        [[nodiscard]] std::vector<std::string> GetContactFrames() const;
+        [[nodiscard]] double GetTotalTime() const;
 
         void GetConfigInterp(double time, vectorx_t& q_out);
         void GetVelocityInterp(double time, vectorx_t& v_out);

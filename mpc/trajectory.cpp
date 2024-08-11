@@ -64,7 +64,7 @@ namespace torc::mpc {
     }
 
     void Trajectory::SetDtVector(const std::vector<double>& dt) {
-        if (dt.size() != q_.size() - 1) {
+        if (dt.size() != q_.size()) {
             std::cerr << "dt vector does not have the correct number of nodes! Ignoring!" << std::endl;
         }
         dt_ = dt;
@@ -95,6 +95,26 @@ namespace torc::mpc {
     const std::vector<double> &Trajectory::GetDtVec() const {
         return dt_;
     }
+
+    std::vector<std::string> Trajectory::GetContactFrames() const {
+        std::vector<std::string> frames;
+        for (const auto& [frame, idx] : force_frames_) {
+            frames.push_back(frame);
+        }
+
+        return frames;
+    }
+
+    double Trajectory::GetTotalTime() const {
+        double total_time = 0;
+        for (const auto& dt : dt_) {
+            total_time += dt;
+        }
+
+        return  total_time;
+    }
+
+
 
 
     // -------------------------- //

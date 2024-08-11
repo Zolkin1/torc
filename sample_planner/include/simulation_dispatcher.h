@@ -5,6 +5,7 @@
 #ifndef SIMULATION_DISPATCHER_H
 #define SIMULATION_DISPATCHER_H
 
+#include <filesystem>
 #include <vector>
 #include <mujoco/mujoco.h>
 
@@ -15,12 +16,14 @@
 
 namespace torc::sample {
     using vectorx_t = Eigen::VectorXd;
+    using vector3_t = Eigen::Vector3d;
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3x_t = Eigen::Matrix3Xd;
     using matrix3_t = Eigen::Matrix3d;
     using matrix43_t = Eigen::Matrix<double, 4, 3>;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
+    namespace fs = std::filesystem;
 
     enum SampleType {
         Position,
@@ -28,27 +31,33 @@ namespace torc::sample {
     };
 
     struct InputSamples {
-        std::vector<double> dt;
-        int num_samples;
-        matrixx_t samples;
-        SampleType type;
-        std::vector<std::string> actuator_names;
-        // TODO: Do this better:
-        std::map<std::string, int> actuator_to_idx; // Maps the actuator name into the trajector vectors
+        std::vector<double> dt; // dt associated with the samples - can be different from the reference trajectory
+        matrixx_t samples;      // sample node x actuator
+        SampleType type;        // Type of sample
+        std::map<std::string, int> actuator_to_idx; // TODO: Do this better: Maps the actuator name into the trajector vectors
+
+        void InsertSample(int sample_node, const vectorx_t& actuator_sample);
     };
 
     class SimulationDispatcher {
     public:
         // Deals with the Mujoco interface and thread pool
-        SimulationDispatcher(const std::string& xml_path, int num_samples);
-        SimulationDispatcher(const std::string& xml_path, int num_samples, int num_threads);
+        SimulationDispatcher(const fs::path& xml_path, int num_samples);
+        SimulationDispatcher(const fs::path& xml_path, int num_samples, int num_threads);
 
         void SingleSimulation(const InputSamples& samples, const mpc::Trajectory& traj_ref, mpc::Trajectory& traj_out, mpc::ContactSchedule& cs_out);
 
         void BatchSimulation(const std::vector<InputSamples>& samples, const mpc::Trajectory& traj_ref, std::vector<mpc::Trajectory>& trajectories,
             std::vector<mpc::ContactSchedule>& contact_schedules);
+
+        std::string GetModelName() const;
+
+        /**
+         *
+         * @return the list of actuated joint names as used in all the torque vectors
+         */
+        std::vector<std::string> GetJointOrder() const;
     protected:
-    private:
         void CreateMJModelData(const std::string& xml_path, int num_samples);
 
         /**
@@ -67,16 +76,20 @@ namespace torc::sample {
          */
         void ResetData(mjData* data, const mpc::Trajectory& traj) const;
 
-        int GetNode(const std::vector<double>& dts, double time);
+        static int GetNode(const std::vector<double>& dts, double time);
 
-        int GetPositionActuatorCount();
-        int GetMotorActuatorCount();
+        double GetTotalJointTorque(const mjData* data, int jnt_id) const;
 
-    mjModel* model_; // MuJoCo model
-    std::vector<mjData*> data_; // MuJoCo data
+        void VerifyTrajectory(const mpc::Trajectory& traj) const;
 
-    BS::thread_pool pool;   // Thread pool
+        mjModel* model_; // MuJoCo model
+        std::vector<mjData*> data_; // MuJoCo data
 
+        std::vector<int> act_joint_id_;    // ID of all the actuated joints, in the same order as tau
+
+        BS::thread_pool pool;   // Thread pool
+
+    private:
     };
 } // namespace torc::sample
 
