@@ -90,6 +90,28 @@ namespace torc::mpc {
         void SetConfigTarget(const std::vector<vectorx_t>& q_target);
         void SetVelTarget(const std::vector<vectorx_t>& v_target);
 
+        void SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj);
+
+        /**
+         * @brief Create a default swing trajectory using the provided parameters. This will use the current contact
+         *  schedule to create the trajectory, for both swing and constant heights. In general this will only work
+         *  on flat ground scenarios. This will generate trajectories for both feet. This is mostly designed for feet
+         *  although it may also work with hands. This function assigns the same swing traj to each swing in the trajectory.
+         *
+         *  The default swing trajectory is two cubic splines attached to each other. The start and end zdot are 0.
+         *  The velocity is made constant throughout the trajectory.
+         *  If the swing time has no end during the trajectory, then we assume it is the same length as the previous contact time.
+         *
+         * @param frame the contact frame being considered
+         * @param apex_height the highest part of the swing trajectory
+         * @param end_height the height at the end of the trajectory. This is also what is used as the height for all the contacts
+         * @param start_height the height at the start of the trajectory - only for trajectories that start with swings
+         * @param apex_time the time in the trajectory when the apex is reached. If the apex_time is negative,
+         *  then we set the apex time to half way through the swing time. apex_time must be between 0 and 1 always to
+         *  represent a percentage through the swing
+         */
+        void CreateDefaultSwingTraj(const std::string& frame, double apex_height, double end_height, double start_height, double apex_time=0.5);
+
     protected:
         enum ConstraintType {
         Integrator,
@@ -220,6 +242,8 @@ namespace torc::mpc {
         void DiagonalScalarMatrixToTriplet(double val, int row_start, int col_start, int size, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
 
         void ConvertdqToq(const vectorx_t& dq, const vectorx_t& q_ref, vectorx_t& q) const;
+
+        double GetTime(int node) const;
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
         [[nodiscard]] int NumIDConstraintsNode() const;

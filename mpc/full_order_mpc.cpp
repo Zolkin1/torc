@@ -449,7 +449,7 @@ namespace torc::mpc {
         Compute(q, v, traj_out);
         const int MAX_COMPUTES = 10;
         for (int i = 0; i < MAX_COMPUTES; i++) {
-            if (stats_[i].constraint_violation < nodes_*dt_[0]) {
+            if (stats_[i].constraint_violation < nodes_*dt_[0]/2) {
                 std::cout << "Initial compute constraint violation converged in " << i+1 << " QP solves." << std::endl;
                 return;
             }
@@ -490,7 +490,7 @@ namespace torc::mpc {
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
                 AddConfigurationBoxConstraint(node);
-                // AddSwingHeightConstraint(node);
+                AddSwingHeightConstraint(node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
@@ -503,7 +503,7 @@ namespace torc::mpc {
         AddConfigurationBoxConstraint(nodes_ - 1);
         AddVelocityBoxConstraint(nodes_ - 1);
         AddTorqueBoxConstraint(nodes_ - 1);
-        // AddSwingHeightConstraint(nodes_ - 1);
+        AddSwingHeightConstraint(nodes_ - 1);
         // AddHolonomicConstraint(nodes_ - 1);
 
         if (constraint_triplet_idx_ != constraint_triplets_.size()) {
@@ -769,6 +769,8 @@ namespace torc::mpc {
         int row_start = GetConstraintRow(node, SwingHeight);
         const int col_start = GetDecisionIdx(node, Configuration);
 
+        // TODO: Consider adding a little feedback controller in the constraint to bring the foot back if it off the trajectory
+        //  Could also choose to track velocity instead of position.
         for (const auto& frame : contact_frames_) {
             SwingHeightLinearization(node, frame, ws_->frame_jacobian);
 
@@ -785,14 +787,15 @@ namespace torc::mpc {
             robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
             vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
 
-            std::cout << "frame: " << frame << ", frame pos: " << frame_pos.transpose() << std::endl;
-            std::cout << "swing traj: " << swing_traj_[frame][node] << std::endl;
+            // std::cout << "frame: " << frame << ", frame pos: " << frame_pos.transpose() << std::endl;
+            // std::cout << "swing traj: " << swing_traj_[frame][node] << std::endl;
 
             // Set bounds
+            // TODO: Remove the extra constants, they seem to make the problem more feasible, maybe my swing traj is bad
             osqp_instance_.lower_bounds(row_start)
-                = -frame_pos(2) + swing_traj_[frame][node];
+                = -frame_pos(2) + swing_traj_[frame][node] - 0.00; //-std::numeric_limits<double>::max();
             osqp_instance_.upper_bounds(row_start)
-                = -frame_pos(2) + swing_traj_[frame][node];
+                = -frame_pos(2) + swing_traj_[frame][node] + 0.00; // std::numeric_limits<double>::max();
 
             // std::cout << "frame: " << frame << std::endl;
             // std::cout << "frame pos: " << frame_pos.transpose() << std::endl;
@@ -850,11 +853,11 @@ namespace torc::mpc {
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
                 violation += dt_[node]*GetConfigurationBoxViolation(qp_res, node);
-                // violation += dt_[node]*GetSwingHeightViolation(qp_res, node);
+                violation += dt_[node]*GetSwingHeightViolation(qp_res, node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                violation += dt_[node]*GetHolonomicViolation(qp_res, node);
+                // violation += dt_[node]*GetHolonomicViolation(qp_res, node);
                 violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
             }
         }
@@ -863,8 +866,8 @@ namespace torc::mpc {
         violation += dt_[nodes_ - 1]*GetConfigurationBoxViolation(qp_res, nodes_ - 1);
         violation += dt_[nodes_ - 1]*GetVelocityBoxViolation(qp_res, nodes_ - 1);
         violation += dt_[nodes_ - 1]*GetTorqueBoxViolation(qp_res, nodes_ - 1);
-        // violation += dt_[nodes_ - 1]*GetSwingHeightViolation(qp_res, nodes_ - 1);
-        violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetSwingHeightViolation(qp_res, nodes_ - 1);
+        // violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
 
         return sqrt(violation);
     }
@@ -1338,7 +1341,7 @@ namespace torc::mpc {
             if (node > 1) {
                 // Configuration is set for the initial condition and the next node, do not constrain it
                 AddConfigurationBoxPattern(node);
-                // AddSwingHeightPattern(node);
+                AddSwingHeightPattern(node);
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
@@ -1351,7 +1354,7 @@ namespace torc::mpc {
         AddConfigurationBoxPattern(nodes_ - 1);
         AddVelocityBoxPattern(nodes_ - 1);
         AddTorqueBoxPattern(nodes_ - 1);
-        // AddSwingHeightPattern(nodes_ - 1);
+        AddSwingHeightPattern(nodes_ - 1);
         // AddHolonomicPattern(nodes_ - 1);
 
         int row_max = 0;
@@ -1729,6 +1732,16 @@ namespace torc::mpc {
             * pinocchio::quaternion::exp3(dq.segment<3>(POS_VARS))).coeffs();
     }
 
+    double FullOrderMpc::GetTime(int node) const {
+        double time = 0;
+        for (int i = 0; i < node; i++) {
+            time += dt_[i];
+        }
+
+        return time;
+    }
+
+
 
     // ------------------------------------------------- //
     // ----- Getters for Sizes of Individual nodes ----- //
@@ -1837,6 +1850,77 @@ namespace torc::mpc {
         }
         q_target_ = v_target;
     }
+
+    void FullOrderMpc::SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj) {
+        if (swing_traj_.find(frame) == swing_traj_.end()) {
+            throw std::invalid_argument("Swing frame not found!");
+        }
+
+        if (swing_traj.size() != nodes_) {
+            throw std::invalid_argument("Swing trajectory does not have the correct number of nodes!");
+        }
+
+        swing_traj_[frame] = swing_traj;
+    }
+
+    void FullOrderMpc::CreateDefaultSwingTraj(const std::string& frame, double apex_height, double end_height, double start_height, double apex_time) {
+        if (apex_time < 0 || apex_time > 1) {
+            throw std::invalid_argument("Apex time must be between 0 and 1!");
+        }
+
+        bool first_in_swing = true;
+        double swing_start = 0;
+        double swing_time = 0;
+
+        //Go through if its contact or not at each node
+        for (int node = 0; node <nodes_; node++) {
+            if (in_contact_[frame][node] == 1) {
+                // In contact, set to the lowest height
+                swing_traj_[frame][node] = end_height;
+                first_in_swing = true; // Set to true for the next time it is in swing
+            } else {
+                if (first_in_swing) {
+                    swing_start = GetTime(node);
+
+                    // Determine when we next make contact
+                    swing_time = 0;
+                    for (int j = node; j < nodes_; j++) {
+                        if (in_contact_[frame][j]) {
+                            swing_time = GetTime(j) - swing_start;
+                        }
+                    }
+                    if (swing_time == 0) {
+                        // Then we do not make contact again
+                        // For now, assume there is always an additional 0.2 seconds in the swing
+                        swing_time = GetTime(nodes_ - 1) + 0.2 - swing_start;
+                    }
+                }
+
+                // Determine which spline to use
+                double time = GetTime(node);
+                if (time < swing_time*apex_time + swing_start) {
+                    // Use the first half spline
+                    double low_height = start_height;
+                    if (swing_start > 0) {
+                        low_height = end_height;
+                    }
+                    swing_traj_[frame][node] = low_height
+                        - std::pow(apex_time*swing_time, -2) * (3*(low_height - apex_height))*(std::pow(time - swing_start, 2))
+                        + std::pow(apex_time*swing_time, -3) * 2*(low_height - apex_height) * std::pow(time - swing_start, 3);
+                } else {
+                    // Use the second half spline
+                    swing_traj_[frame][node] = apex_height
+                        - std::pow(swing_time*(1 - apex_time), -2) * (3*(apex_height - end_height))*(std::pow(time - (apex_time*swing_time + swing_start), 2))
+                        + std::pow(swing_time*(1 - apex_time), -3) * 2*(apex_height - end_height) * std::pow(time - (apex_time*swing_time + swing_start), 3);
+                }
+
+                first_in_swing = false;
+            }
+        }
+
+    }
+
+
 
     void FullOrderMpc::PrintStatistics() const {
         using std::setw;

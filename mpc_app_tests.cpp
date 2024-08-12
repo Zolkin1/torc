@@ -18,10 +18,11 @@ int main() {
 
     torc::mpc::ContactSchedule cs(mpc.GetContactFrames());
     cs.InsertContact("right_foot", 0, 1);
-    // cs.InsertContact("left_foot", 0, 1);
+    cs.InsertContact("left_foot", 0, 0.3);
     mpc.UpdateContactSchedule(cs);
 
-    mpc.UpdateContactSchedule(cs);
+    mpc.CreateDefaultSwingTraj("left_foot", 0.3, 0.02, 0.02);
+    mpc.CreateDefaultSwingTraj("right_foot", 0.3, 0.02, 0.02);
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());

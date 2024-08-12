@@ -14,8 +14,8 @@
 namespace torc::mpc {
     class MpcTestClass : public FullOrderMpc {
     public:
-        MpcTestClass(const fs::path& config_file, const fs::path& model_path)
-            : FullOrderMpc("mpc_test_class", config_file, model_path) {
+        MpcTestClass(const fs::path& config_file, const fs::path& model_path, const std::string& name)
+            : FullOrderMpc(name, config_file, model_path) {
             CHECK(dt_.size() == nodes_);
         }
 
@@ -406,6 +406,22 @@ namespace torc::mpc {
                     row1 += NumHolonomicConstraintsNode();
                 }
             }
+        }
+
+        void CheckDefaultSwingTraj() {
+            PrintTestHeader("Default Swing Traj.");
+            CreateDefaultSwingTraj(contact_frames_[0], 1, 0, 0, 0.5);
+            for (int i = 0; i < nodes_; i++) {
+                std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
+            }
+            CHECK(swing_traj_[contact_frames_[0]][0] == 0);
+            std::cout << "====" << std::endl;
+
+            CreateDefaultSwingTraj(contact_frames_[0], 1, 0, 0.1, 0.5);
+            for (int i = 0; i < nodes_; i++) {
+                std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
+            }
+            CHECK(swing_traj_[contact_frames_[0]][0] == 0.1);
         }
 
         // ---------------------- //
