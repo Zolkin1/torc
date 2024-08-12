@@ -18,7 +18,8 @@ int main() {
 
     torc::mpc::ContactSchedule cs(mpc.GetContactFrames());
     cs.InsertContact("right_foot", 0, 1);
-    cs.InsertContact("left_foot", 0, 0.3);
+    // cs.InsertContact("left_foot", 0, 0.3);
+    cs.InsertContact("left_foot", 0.3, 0.7);
     mpc.UpdateContactSchedule(cs);
 
     mpc.CreateDefaultSwingTraj("left_foot", 0.3, 0.02, 0.02);
@@ -56,6 +57,8 @@ int main() {
     mpc.SetWarmStartTrajectory(traj);
 
     mpc.ComputeNLP(q_target, v_target, traj);
+    // mpc.Compute(q_target, v_target, traj);
+    // mpc.Compute(q_target, v_target, traj);
 
     // mpc.Compute(q_target, v_target, traj);
     //
@@ -66,12 +69,21 @@ int main() {
     for (int i = 0; i < traj.GetNumNodes(); i++) {
         std::cout << "Node: " << i << std::endl;
         std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-        std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+        // std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+        // std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
         for (const auto& frame : mpc.GetContactFrames()) {
-            std::cout << "frame: " << frame << ", force: " << traj.GetForce(i, frame).transpose() << std::endl;
+            achilles.FirstOrderFK(traj.GetConfiguration(i));
+            std::cout << "frame: " << frame << ", pos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
+            // std::cout << "frame: " << frame << ", force: " << traj.GetForce(i, frame).transpose() << std::endl;
         }
         std::cout << std::endl;
+    }
+
+    for (const auto& frame : mpc.GetContactFrames()) {
+        std::cout << "frame: " << std::endl;
+        for (int i = 0; i < traj.GetNumNodes(); i++) {
+            std::cout << "node: " << i << ", z: " << mpc.swing_traj_[frame][i] << std::endl;
+        }
     }
 
     mpc.PrintStatistics();

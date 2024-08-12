@@ -28,6 +28,8 @@ namespace torc::mpc {
         Velocity
     };
 
+    // TODO: Consider adding a cost to penalize z height tracking error.
+    //  This can be convex with gauss-newton approx easily since it is in the form of a norm.
     class CostFunction {
     public:
         explicit CostFunction(const std::string& name)

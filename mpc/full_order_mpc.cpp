@@ -111,6 +111,9 @@ namespace torc::mpc {
             if (solver_settings["adaptive_rho"]) {
                 osqp_settings_.adaptive_rho = solver_settings["adaptive_rho"].as<bool>();
             }
+            if (solver_settings["scaling"]) {
+                osqp_settings_.scaling = solver_settings["scaling"].as<int>();
+            }
         }
 
         // ---------- Constraint Settings ---------- //
@@ -207,6 +210,7 @@ namespace torc::mpc {
             std::cout << "\talpha: " << osqp_settings_.alpha << std::endl;
             std::cout << "\tAdaptive rho: " << (osqp_settings_.adaptive_rho ? "True" : "False") << std::endl;
             std::cout << "\tMax iterations: " << osqp_settings_.max_iter << std::endl;
+            std::cout << "\tScaling: " << osqp_settings_.scaling << std::endl;
 
             std::cout << "Constraints:" << std::endl;
             std::cout << "\tFriction coefficient: " << friction_coef_ << std::endl;
@@ -449,7 +453,8 @@ namespace torc::mpc {
         Compute(q, v, traj_out);
         const int MAX_COMPUTES = 10;
         for (int i = 0; i < MAX_COMPUTES; i++) {
-            if (stats_[i].constraint_violation < nodes_*dt_[0]/2) {
+            // TODO: Undo the 0
+            if (stats_[i].constraint_violation < 0) {//nodes_*dt_[0]/5) {
                 std::cout << "Initial compute constraint violation converged in " << i+1 << " QP solves." << std::endl;
                 return;
             }
@@ -532,8 +537,6 @@ namespace torc::mpc {
 
     void FullOrderMpc::AddIntegrationConstraint(int node) {
         assert(node != nodes_ - 1);
-
-        // TODO: Adjust to take into account the velocity being in the local frame
 
         int row_start = GetConstraintRow(node, Integrator);
 
@@ -784,7 +787,7 @@ namespace torc::mpc {
             VectorToTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
 
             // Get the frame position on the warm start trajectory
-            robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+            robot_model_->FirstOrderFK(traj_.GetConfiguration(node));   // TODO: Move to outside the loop
             vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
 
             // std::cout << "frame: " << frame << ", frame pos: " << frame_pos.transpose() << std::endl;
@@ -1149,11 +1152,14 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian) {
-        jacobian.resize(6, robot_model_->GetVelDim());
-        jacobian.setZero();
+        // The world frame seems to behave better numerically, but I really want the LOCAL_WORLD_ALIGNED, not WORLD.
+        // TODO: Speed up by not calling ComputeJointJacobian each time.
+        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
+        // std::cout << "frame: " << frame << std::endl;
+        // std::cout << "local world aligned: \n" << jacobian << std::endl;
+
         // *** Note *** The pinocchio body velocity is in the local frame, put I want perturbations to
         // configurations in the world frame, so we can always set the first 3x3 mat to identity
-        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian );
         jacobian.topLeftCorner<3,3>().setIdentity();
     }
 
@@ -1163,7 +1169,7 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
-        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::WORLD);
+        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::WORLD); // TODO: Change frames
     }
 
 
@@ -1292,7 +1298,7 @@ namespace torc::mpc {
 
         while (alpha_ > alpha_min) {
             std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
-            double theta_kp1 = GetConstraintViolation(alpha_*qp_res); // TODO: Consider scaling each term by corresponding dt
+            double theta_kp1 = GetConstraintViolation(alpha_*qp_res);
             double phi_kp1 = GetFullCost(alpha_*qp_res);
 
             // TODO: Remove
@@ -1874,6 +1880,9 @@ namespace torc::mpc {
 
         //Go through if its contact or not at each node
         for (int node = 0; node <nodes_; node++) {
+            std::cout << "frame: " << frame << std::endl;
+            std::cout << "node: " << node << std::endl;
+            std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
             if (in_contact_[frame][node] == 1) {
                 // In contact, set to the lowest height
                 swing_traj_[frame][node] = end_height;
@@ -1887,6 +1896,7 @@ namespace torc::mpc {
                     for (int j = node; j < nodes_; j++) {
                         if (in_contact_[frame][j]) {
                             swing_time = GetTime(j) - swing_start;
+                            break;
                         }
                     }
                     if (swing_time == 0) {

@@ -112,6 +112,10 @@ namespace torc::mpc {
          */
         void CreateDefaultSwingTraj(const std::string& frame, double apex_height, double end_height, double start_height, double apex_time=0.5);
 
+        // DEBUG
+        //TODO: Make private again?
+        std::map<std::string, std::vector<double>> swing_traj_;
+        //DEBUG
     protected:
         enum ConstraintType {
         Integrator,
@@ -333,8 +337,7 @@ namespace torc::mpc {
         int num_contact_locations_{};
         std::vector<std::string> contact_frames_{};
 
-        // TODO: Populate
-        std::map<std::string, std::vector<double>> swing_traj_;
+        // std::map<std::string, std::vector<double>> swing_traj_;
 
     private:
     };
