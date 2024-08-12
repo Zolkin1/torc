@@ -214,6 +214,7 @@ namespace torc::models {
     }
 
     FrameState PinocchioModel::GetFrameState(const std::string& frame, const pinocchio::ReferenceFrame& ref) const {
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
         const long idx = GetFrameIdx(frame);
         if (idx != -1) {
             FrameState state(pin_data_->oMf.at(idx),

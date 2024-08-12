@@ -432,31 +432,51 @@ namespace torc::models {
     }
 
     void FullOrderRigidBody::FrameVelDerivWrtConfiguration(const vectorx_t& q,
-        const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian) {
-        // TODO: Consider swapping for auto diff
+        const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian,
+        const pinocchio::ReferenceFrame& ref) {
 
-        pinocchio::computeForwardKinematicsDerivatives(pin_model_, *pin_data_, q, v, a);
-
-        matrix6x_t j2(6, GetVelDim());
-
-        pinocchio::getFrameVelocityDerivatives(pin_model_, *pin_data_,
-            GetFrameIdx(frame), pinocchio::WORLD, jacobian, j2);
-
-        // TODO: The first 6 elements don't match because the jacobian is using local velocity vectors, I want perturbations in the global config
-        // So for now, we will use finite differencing on the first few elements
-        vector3_t frame_vel = GetFrameState(frame, q, v, pinocchio::WORLD).vel.linear();
-
-        static constexpr double FD_DELTA = 1e-8;
+        // --------- Finite Diff
+        constexpr double FD_DELTA = 1e-8;
+        jacobian.setZero();
         vectorx_t q_pert = q;
-        for (int i = 0; i < FLOATING_VEL; i++) {
+        vector3_t frame_vel = GetFrameState(frame, q, v, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
+        for (int i = 0; i < GetVelDim(); i++) {
             PerturbConfiguration(q_pert, FD_DELTA, i);
-            vector3_t frame_pos_pert = GetFrameState(frame, q_pert, v, pinocchio::WORLD).vel.linear();
+            vector3_t frame_pos_pert = GetFrameState(frame, q_pert, v, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
             q_pert = q;
 
-            for (int j = 0; j < frame_vel.size(); j++) {
-                jacobian(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
-            }
+            jacobian.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
         }
+        // ---------
+
+
+
+        // --------- Analytic
+        // TODO: Consider swapping for auto diff
+        // pinocchio::computeForwardKinematicsDerivatives(pin_model_, *pin_data_, q, v, a);
+        //
+        // matrix6x_t j2(6, GetVelDim());
+        //
+        // pinocchio::getFrameVelocityDerivatives(pin_model_, *pin_data_,
+        //     GetFrameIdx(frame), ref, jacobian, j2);
+        //
+        // // TODO: The first 6 elements don't match because the jacobian is using local velocity vectors, I want perturbations in the global config
+        // // So for now, we will use finite differencing on the first few elements
+        // // TODO: Put back
+        // vector3_t frame_vel = GetFrameState(frame, q, v, ref).vel.linear();
+        //
+        // static constexpr double FD_DELTA = 1e-8;
+        // vectorx_t q_pert = q;
+        // for (int i = 0; i < FLOATING_VEL; i++) {
+        //     PerturbConfiguration(q_pert, FD_DELTA, i);
+        //     vector3_t frame_pos_pert = GetFrameState(frame, q_pert, v, ref).vel.linear();
+        //     q_pert = q;
+        //
+        //     for (int j = 0; j < frame_vel.size(); j++) {
+        //         jacobian(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
+        //     }
+        // }
+        // ---------
     }
 
 

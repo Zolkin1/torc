@@ -4,13 +4,15 @@ general_settings:
   node_dt: 0.02
   compile_derivatives: True #True
   base_frame: "torso"
+  scale_cost: False
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
   verbose: True
   polish: True
-  rho: 0.02
-  #  alpha:
+  rho: 2e-3
+  alpha: 1.6
+  sigma: 1e-6
   adaptive_rho: True
   max_iter: 1000
   scaling: 1 # The scaling seems to have a large effect. Having more scaling can sometime make the problem infeasible
@@ -38,6 +40,11 @@ costs:
 #                               1, 1, 1,
 #                               0, 0, 0, 0, 0, 0, 0, 0, 0,
 #                               0, 0, 0, 0, 0, 0, 0, 0, 0 ]
+
+  torque_regularization_weights: [.01, .01, .01, .01, .01, .01, .01, .01, .01,
+                                  .01, .01, .01, .01, .01, .01, .01, .01, .01]
+#  torque_regularization_weights: [ 1, 1, 1, 1, 1, 1, 1, 1, 1,
+#                                   1, 1, 1, 1, 1, 1, 1, 1, 1 ]
 contacts:
   num_contact_locations: 2
   contact_frames: ["right_foot", "left_foot"]#, "right_hand", "left_hand"]

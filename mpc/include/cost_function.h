@@ -10,6 +10,7 @@
 #include <Eigen/Core>
 
 #include "autodiff_fn.h"
+#include "quadratic_fn.h"
 #include "pinocchio/spatial/explog-quaternion.hpp"
 #include "trajectory.h"
 
@@ -25,20 +26,23 @@ namespace torc::mpc {
 
     enum CostTypes {
         Configuration = 0,
-        Velocity
+        VelocityTracking,
+        TorqueReg,
+        ForceReg,
     };
 
-    // TODO: Consider adding a cost to penalize z height tracking error.
     //  This can be convex with gauss-newton approx easily since it is in the form of a norm.
     class CostFunction {
     public:
         explicit CostFunction(const std::string& name)
             : name_(name), configured_(false), compile_derivatives_(true) {}
 
-        void Configure(int config_size, int vel_size, int joint_size, bool compile_derivatives, const std::vector<CostTypes>& costs, const std::vector<vectorx_t>& weights) {
+        void Configure(int config_size, int vel_size, int joint_size, int input_size,
+            bool compile_derivatives, const std::vector<CostTypes>& costs, const std::vector<vectorx_t>& weights) {
             config_size_ = config_size;
             vel_size_ = vel_size;
             joint_size_ = joint_size;
+            input_size_ = input_size;
             compile_derivatives_ = compile_derivatives;
 
             if (costs.size() != weights.size()) {
@@ -61,11 +65,17 @@ namespace torc::mpc {
 
                 if (cost_term == Configuration) {
                     cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
-                        CreateDefaultCost<adcg_t>(Configuration), 2*config_size_ + vel_size_, compile_derivatives_, false, name_ + "_mpc_config_cost"));
+                        CreateDefaultCost<adcg_t>(Configuration), 2*config_size_ + vel_size_,
+                        compile_derivatives_, false, name_ + "_mpc_config_cost"));
                 }
-                else if (cost_term == Velocity) {
+                else if (cost_term == VelocityTracking) {
                     cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
-                        CreateDefaultCost<adcg_t>(Velocity), 3*vel_size_, compile_derivatives_, false, name_ + "_mpc_vel_cost"));
+                        CreateDefaultCost<adcg_t>(VelocityTracking), 3*vel_size_,
+                        compile_derivatives_, false, name_ + "_mpc_vel_cost"));
+                } else if (cost_term == TorqueReg) {
+                    cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
+                                            CreateDefaultCost<adcg_t>(TorqueReg), 3*input_size_,
+                                            compile_derivatives_, false, name_ + "_mpc_torque_reg_cost"));
                 }
                 // CppAD functions are slow to evaluate, so get the double function
                 cost_fcn_terms_[cost_idxs_[cost_term]]->func_ = CreateDefaultCost<double>(cost_term);
@@ -78,7 +88,6 @@ namespace torc::mpc {
             if (!configured_) {
                 throw std::runtime_error("Cost function not configured yet!");
             }
-            // TODO: If all the cost terms stay in this form, I can simplify the if statement
             if (type == Configuration) {
                 if (reference.size() != config_size_ || target.size() != config_size_) {
                     std::cerr << "reference: " << reference.transpose() << std::endl;
@@ -91,14 +100,22 @@ namespace torc::mpc {
                 FormCostFcnArg(vectorx_t::Zero(vel_size_), reference, target, arg);
                 linear_term.resize(vel_size_);
                 linear_term = cost_fcn_terms_[cost_idxs_[Configuration]]->Gradient(arg).head(vel_size_);
-            } else if (type == Velocity) {
+            } else if (type == VelocityTracking) {
                 if (reference.size() != vel_size_ || target.size() != vel_size_) {
                     throw std::runtime_error("[Cost Function] velocity linearization reference or target has the wrong size!");
                 }
                 vectorx_t arg;
                 FormCostFcnArg(vectorx_t::Zero(vel_size_), reference, target, arg);
                 linear_term.resize(vel_size_);
-                linear_term = cost_fcn_terms_[cost_idxs_[Velocity]]->Gradient(arg).head(vel_size_);
+                linear_term = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->Gradient(arg).head(vel_size_);
+            } else if (type == TorqueReg) {
+                if (reference.size() != input_size_ || target.size() != input_size_) {
+                    throw std::runtime_error("[Cost Function] torque linearization reference or target has the wrong size!");
+                }
+                vectorx_t arg;
+                FormCostFcnArg(vectorx_t::Zero(input_size_), reference, target, arg);
+                linear_term.resize(input_size_);
+                linear_term = cost_fcn_terms_[cost_idxs_[TorqueReg]]->Gradient(arg).head(input_size_);
             } else {
                 throw std::runtime_error("Provided cost type not supported yet!");
             }
@@ -123,14 +140,22 @@ namespace torc::mpc {
                 //     cost = 1e-6;
                 // }
                 hessian_term = 2*GetConfigurationTrackingJacobian(arg).transpose() * GetConfigurationTrackingJacobian(arg);
-            } else if (type == Velocity) {
+            } else if (type == VelocityTracking) {
                 if (reference.size() != vel_size_ || target.size() != vel_size_) {
                     throw std::runtime_error("[Cost Function] velocity quadratic reference or target has the wrong size!");
                 }
                 vectorx_t arg;
                 FormCostFcnArg(vectorx_t::Zero(vel_size_), reference, target, arg);
                 hessian_term.resize(vel_size_, vel_size_);
-                hessian_term = cost_fcn_terms_[cost_idxs_[Velocity]]->Hessian(arg).topLeftCorner(vel_size_, vel_size_);
+                hessian_term = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->Hessian(arg).topLeftCorner(vel_size_, vel_size_);
+            } else if (type == TorqueReg) {
+                if (reference.size() != input_size_ || target.size() != input_size_) {
+                    throw std::runtime_error("[Cost Function] velocity quadratic reference or target has the wrong size!");
+                }
+                vectorx_t arg;
+                FormCostFcnArg(vectorx_t::Zero(input_size_), reference, target, arg);
+                hessian_term.resize(input_size_, input_size_);
+                hessian_term = cost_fcn_terms_[cost_idxs_[TorqueReg]]->Hessian(arg).topLeftCorner(input_size_, input_size_);
             } else {
                 throw std::runtime_error("Provided cost type not supported yet!");
             }
@@ -153,6 +178,7 @@ namespace torc::mpc {
         static constexpr int FLOATING_VEL = 6;
         static constexpr int FLOATING_BASE = 7;
 
+        // TODO: Consider moving the torque and velocity constraints out
         template<class ScalarT>
         std::function<ScalarT(Eigen::VectorX<ScalarT>)> CreateDefaultCost(const CostTypes& type) {
             namespace ADCG = CppAD::cg;
@@ -204,9 +230,9 @@ namespace torc::mpc {
                     Eigen::VectorX<ScalarT> q_diff = this->GetConfigurationDiffVector(dq_qbar_qtarget);
                     return q_diff.squaredNorm();
                 };
-            } else if (type == Velocity) {
+            } else if (type == VelocityTracking) {
                 if (weight.size() != vel_size_) {
-                    throw std::runtime_error("Velocity weight has wrong size!");
+                    throw std::runtime_error("Velocity tracking weight has wrong size!");
                 }
                 return [vel_size, weight](const Eigen::VectorX<ScalarT>& dv_vbar_vtarget) {
                     Eigen::VectorX<ScalarT> v_diff = dv_vbar_vtarget.head(vel_size) + dv_vbar_vtarget.segment(vel_size, vel_size);  // Get the current velocity
@@ -215,6 +241,19 @@ namespace torc::mpc {
                         v_diff(i) = v_diff(i) * weight(i);
                     }
                     return v_diff.squaredNorm();
+                };
+            } else if (type == TorqueReg) {
+                if (weight.size() != input_size_) {
+                    throw std::runtime_error("Torque regularization weight has wrong size!");
+                }
+                int input_size = input_size_;
+                return [input_size, weight](const Eigen::VectorX<ScalarT>& dtau_taubar_tautarget) {
+                    Eigen::VectorX<ScalarT> tau_diff = dtau_taubar_tautarget.head(input_size) + dtau_taubar_tautarget.segment(input_size, input_size);  // Get the current velocity
+                    tau_diff = tau_diff - dtau_taubar_tautarget.tail(input_size);    // Get the difference between the velocity and its target
+                    for (int i = 0; i < weight.size(); i++) {
+                        tau_diff(i) = tau_diff(i) * weight(i);
+                    }
+                    return tau_diff.squaredNorm();
                 };
             }
             throw std::runtime_error("Unsupported cost type!");
@@ -272,6 +311,7 @@ namespace torc::mpc {
         int config_size_{};
         int vel_size_{};
         int joint_size_{};
+        int input_size_{};
         int nodes_{};
 
         std::vector<std::unique_ptr<fn::ExplicitFn<double>>> cost_fcn_terms_;

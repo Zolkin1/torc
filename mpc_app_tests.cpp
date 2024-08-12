@@ -69,11 +69,12 @@ int main() {
     for (int i = 0; i < traj.GetNumNodes(); i++) {
         std::cout << "Node: " << i << std::endl;
         std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-        // std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
         // std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+        achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
         for (const auto& frame : mpc.GetContactFrames()) {
-            achilles.FirstOrderFK(traj.GetConfiguration(i));
-            std::cout << "frame: " << frame << ", pos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
+            std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
+            std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
             // std::cout << "frame: " << frame << ", force: " << traj.GetForce(i, frame).transpose() << std::endl;
         }
         std::cout << std::endl;

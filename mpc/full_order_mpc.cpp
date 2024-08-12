@@ -18,7 +18,7 @@
 
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
-        : config_file_(config_file), verbose_(true), cost_(name), compile_derivatves_(true) {
+        : config_file_(config_file), verbose_(true), cost_(name), compile_derivatves_(true), scale_cost_(false) {
         // Verify the robot file exists
         if (!fs::exists(model_path)) {
             throw std::runtime_error("Robot file does not exist!");
@@ -85,6 +85,12 @@ namespace torc::mpc {
             } else {
                 throw std::runtime_error("No base frame name provided in configuration file!");
             }
+
+            if (general_settings["scale_cost"]) {
+                scale_cost_ = general_settings["scale_cost"].as<bool>();
+            } else {
+                scale_cost_ = false;
+            }
         }
 
         // ---------- Solver Settings ---------- //
@@ -113,6 +119,9 @@ namespace torc::mpc {
             }
             if (solver_settings["scaling"]) {
                 osqp_settings_.scaling = solver_settings["scaling"].as<int>();
+            }
+            if (solver_settings["sigma"]) {
+                osqp_settings_.sigma = solver_settings["sigma"].as<double>();
             }
         }
 
@@ -165,7 +174,26 @@ namespace torc::mpc {
                "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
         }
 
-        std::cout << "vel tracking: " << vel_tracking_weight_.transpose() << std::endl;
+        if (cost_settings["torque_regularization_weights"]) {
+            auto vel_tracking_weights = cost_settings["torque_regularization_weights"].as<std::vector<double>>();
+            torque_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
+        }
+
+        if (torque_reg_weight_.size() < robot_model_->GetNumInputs()) {
+            std::cerr << "Torque regularization weight size is too small, adding zeros." <<
+               "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
+            int starting_size = torque_reg_weight_.size();
+            torque_reg_weight_.conservativeResize(robot_model_->GetNumInputs());
+            for (int i = starting_size; i < robot_model_->GetNumInputs(); i++) {
+                torque_reg_weight_(i) = 0;
+            }
+        } else if (torque_reg_weight_.size() > robot_model_->GetNumInputs()) {
+            std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
+               "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
+        }
+
+
+        std::cout << "vel tracking: " << torque_reg_weight_.transpose() << std::endl;
         std::cout << "config tracking: " << config_tracking_weight_.transpose() << std::endl;
         // ---------- Contact Settings ---------- //
         if (!config["contacts"]) {
@@ -200,6 +228,7 @@ namespace torc::mpc {
             std::cout << "\tVerbose: " << (verbose_ ? "True" : "False") << std::endl;
             std::cout << "\tNodes: " << nodes_ << std::endl;
             std::cout << "\tCompile derivatives: " << (compile_derivatves_ ? "True" : "False") << std::endl;
+            std::cout << "\tScale cost: " << (scale_cost_ ? "True" : "False") << std::endl;
 
             std::cout << "Solver settings: " << std::endl;
             std::cout << "\tRelative tolerance: " << osqp_settings_.eps_rel << std::endl;
@@ -208,6 +237,7 @@ namespace torc::mpc {
             std::cout << "\tPolish: " << (osqp_settings_.polish ? "True" : "False") << std::endl;
             std::cout << "\trho: " << osqp_settings_.rho << std::endl;
             std::cout << "\talpha: " << osqp_settings_.alpha << std::endl;
+            std::cout << "\tsigma: " << osqp_settings_.sigma << std::endl;
             std::cout << "\tAdaptive rho: " << (osqp_settings_.adaptive_rho ? "True" : "False") << std::endl;
             std::cout << "\tMax iterations: " << osqp_settings_.max_iter << std::endl;
             std::cout << "\tScaling: " << osqp_settings_.scaling << std::endl;
@@ -219,6 +249,7 @@ namespace torc::mpc {
             std::cout << "Costs:" << std::endl;
             std::cout << "\tConfiguration tracking weight: " << config_tracking_weight_.transpose() << std::endl;
             std::cout << "\tVelocity tracking weight: " << vel_tracking_weight_.transpose() << std::endl;
+            std::cout << "\tTorque regularization weight: " << torque_reg_weight_.transpose() << std::endl;
 
             std::cout << "Contacts:" << std::endl;
             std::cout << "\tNumber of contact locations: " << num_contact_locations_ << std::endl;
@@ -289,12 +320,14 @@ namespace torc::mpc {
         std::vector<vectorx_t> weights;
         weights.emplace_back(config_tracking_weight_);
         weights.emplace_back(vel_tracking_weight_);
+        weights.emplace_back(torque_reg_weight_);
 
         std::vector<CostTypes> costs;
         costs.emplace_back(CostTypes::Configuration);
-        costs.emplace_back(CostTypes::Velocity);
-        cost_.Configure(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(), compile_derivatves_,
-        costs, weights);
+        costs.emplace_back(CostTypes::VelocityTracking);
+        costs.emplace_back(CostTypes::TorqueReg);
+        cost_.Configure(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(),
+            robot_model_->GetNumInputs(), compile_derivatves_, costs, weights);
 
         objective_mat_.resize(GetNumDecisionVars(), GetNumDecisionVars());
         CreateCostPattern();
@@ -380,8 +413,15 @@ namespace torc::mpc {
          // std::cout << "objective vec: " << osqp_instance_.objective_vector.transpose() << std::endl;
          // std::cout << "A: \n" << A_ << std::endl;
 
+        // Set upper and lower bounds
+        auto status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
+        if (!status.ok()) {
+            std::cerr << "status: " << status << std::endl;
+            throw std::runtime_error("Could not update the constraint bounds.");
+        }
+
          // Set matrices
-         auto status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
+        status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
          if (!status.ok()) {
              std::cerr << "status: " << status << std::endl;
              throw std::runtime_error("Could not update the objective and constraint matrix.");
@@ -392,13 +432,6 @@ namespace torc::mpc {
          if (!status.ok()) {
              std::cerr << "status: " << status << std::endl;
              throw std::runtime_error("Could not update the objective vector.");
-         }
-
-         // Set upper and lower bounds
-         status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
-         if (!status.ok()) {
-             std::cerr << "status: " << status << std::endl;
-             throw std::runtime_error("Could not update the constraint bounds.");
          }
 
          // Solve
@@ -499,7 +532,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicConstraint(node);
+                AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
             }
         }
@@ -509,7 +542,7 @@ namespace torc::mpc {
         AddVelocityBoxConstraint(nodes_ - 1);
         AddTorqueBoxConstraint(nodes_ - 1);
         AddSwingHeightConstraint(nodes_ - 1);
-        // AddHolonomicConstraint(nodes_ - 1);
+        AddHolonomicConstraint(nodes_ - 1);
 
         if (constraint_triplet_idx_ != constraint_triplets_.size()) {
             std::cerr << "triplet_idx: " << constraint_triplet_idx_ << "\nconstraint triplet size: " << constraint_triplets_.size() << std::endl;
@@ -588,7 +621,7 @@ namespace torc::mpc {
         row_start = GetConstraintRow(node, Integrator);
 
         const vector3_t pos_constant = traj_.GetConfiguration(node + 1).head<POS_VARS>()
-        - traj_.GetConfiguration(node).head<POS_VARS>() - dt_[node]*R*traj_.GetVelocity(node).head<POS_VARS>();
+            - traj_.GetConfiguration(node).head<POS_VARS>() - dt_[node]*R*traj_.GetVelocity(node).head<POS_VARS>();
         osqp_instance_.lower_bounds.segment<POS_VARS>(row_start) = pos_constant;
         osqp_instance_.upper_bounds.segment<POS_VARS>(row_start) = pos_constant;
         row_start += POS_VARS;
@@ -817,16 +850,21 @@ namespace torc::mpc {
             // Get velocity linearization
             HolonomicLinearizationv(node, frame, ws_->frame_jacobian);
             int col_start = GetDecisionIdx(node, Velocity);
-            MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
+                constraint_triplets_, constraint_triplet_idx_);
 
             // Get configuration linearization
-            ws_->frame_jacobian.setZero();
-            HolonomicLinearizationq(node, frame, ws_->frame_jacobian);
-            col_start = GetDecisionIdx(node, Configuration);
-            MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            // TODO: put back!
+            // ws_->frame_jacobian.setZero();
+            // HolonomicLinearizationq(node, frame, ws_->frame_jacobian);
+            // col_start = GetDecisionIdx(node, Configuration);
+            // MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
+            //     constraint_triplets_, constraint_triplet_idx_);
 
             // Get the frame vel on the warm start trajectory
-            vector3_t frame_vel = in_contact_[frame][node]*robot_model_->GetFrameState(frame, traj_.GetConfiguration(node), traj_.GetVelocity(node)).vel.linear();
+            vector3_t frame_vel = in_contact_[frame][node]*robot_model_->GetFrameState(frame,
+                traj_.GetConfiguration(node), traj_.GetVelocity(node)).vel.linear();
+
 
             osqp_instance_.lower_bounds.segment<2>(row_start) = -frame_vel.head<2>();
             osqp_instance_.upper_bounds.segment<2>(row_start) = -frame_vel.head<2>();
@@ -860,7 +898,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // violation += dt_[node]*GetHolonomicViolation(qp_res, node);
+                violation += dt_[node]*GetHolonomicViolation(qp_res, node);
                 violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
             }
         }
@@ -870,7 +908,7 @@ namespace torc::mpc {
         violation += dt_[nodes_ - 1]*GetVelocityBoxViolation(qp_res, nodes_ - 1);
         violation += dt_[nodes_ - 1]*GetTorqueBoxViolation(qp_res, nodes_ - 1);
         violation += dt_[nodes_ - 1]*GetSwingHeightViolation(qp_res, nodes_ - 1);
-        // violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
+        violation += dt_[nodes_ - 1]*GetHolonomicViolation(qp_res, nodes_ - 1);
 
         return sqrt(violation);
     }
@@ -1169,7 +1207,7 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
-        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::WORLD); // TODO: Change frames
+        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED); // TODO: Change frames
     }
 
 
@@ -1189,6 +1227,11 @@ namespace torc::mpc {
             ws_->obj_vel_mat.row(i) = ws_->obj_vel_mat.row(i)*((vel_tracking_weight_(i) != 0) ? 1 : 0);
         }
 
+        ws_->obj_tau_mat = matrixx_t::Identity(robot_model_->GetNumInputs(), robot_model_->GetNumInputs());
+        for (int i = 0; i < vel_tracking_weight_.size(); i++) {
+            ws_->obj_tau_mat.row(i) = ws_->obj_tau_mat.row(i)*((torque_reg_weight_(i) != 0) ? 1 : 0);
+        }
+
         for (int i = 0; i < nodes_; i++) {
             // Configuration Tracking
             int decision_idx = GetDecisionIdx(i, Configuration);
@@ -1197,6 +1240,10 @@ namespace torc::mpc {
             // Velocity Tracking
             decision_idx = GetDecisionIdx(i, Velocity);
             MatrixToNewTriplet(ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_);
+
+            // Torque regularization
+            decision_idx = GetDecisionIdx(i, Torque);
+            MatrixToNewTriplet(ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_);
         }
 
         osqp_instance_.objective_matrix.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
@@ -1205,6 +1252,7 @@ namespace torc::mpc {
 
         ws_->obj_config_vector.resize(robot_model_->GetVelDim());
         ws_->obj_vel_vector.resize(robot_model_->GetVelDim());
+        ws_->obj_tau_vector.resize(robot_model_->GetNumInputs());
     }
 
     void FullOrderMpc::UpdateCost() {
@@ -1234,10 +1282,14 @@ namespace torc::mpc {
             std::cerr << "Velocity target has too many nodes. Ignoring extras." << std::endl;
         }
 
+        // For now the target torque will always be 0
+        // TODO: Consider removing the dt scaling
         for (int node = 0; node < nodes_; node++) {
+            // ----- Configuration ----- //
             int decision_idx = GetDecisionIdx(node, Configuration);
             cost_.Linearize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_vector);
-            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) = ws_->obj_config_vector;
+            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                (scale_cost_ ? dt_[node] : 1) * ws_->obj_config_vector;
 
             cost_.Quadraticize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_mat);
             // for (int i = 0; i < 3; i++) {
@@ -1247,14 +1299,31 @@ namespace torc::mpc {
             //         }
             //     }
             // }
-            MatrixToTriplet(ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat,
+                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
 
+            // ----- Velocity ----- //
             decision_idx = GetDecisionIdx(node, Velocity);
-            cost_.Linearize(traj_.GetVelocity(node), v_target_[node], CostTypes::Velocity, ws_->obj_vel_vector);
-            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) = ws_->obj_vel_vector;
+            cost_.Linearize(traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking, ws_->obj_vel_vector);
+            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                (scale_cost_ ? dt_[node] : 1) * ws_->obj_vel_vector;
 
-            cost_.Quadraticize(traj_.GetVelocity(node), v_target_[node], CostTypes::Velocity, ws_->obj_vel_mat);
-            MatrixToTriplet(ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+            cost_.Quadraticize(traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking, ws_->obj_vel_mat);
+            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_vel_mat,
+                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+
+            // ----- Torque ----- //
+            decision_idx = GetDecisionIdx(node, Torque);
+            cost_.Linearize(traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()),
+                CostTypes::TorqueReg, ws_->obj_tau_vector);
+            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
+                (scale_cost_ ? dt_[node] : 1) * ws_->obj_tau_vector;
+
+            cost_.Quadraticize(traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()),
+                CostTypes::TorqueReg, ws_->obj_tau_mat);
+            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_tau_mat,
+                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+
         }
 
         objective_mat_.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
@@ -1271,10 +1340,12 @@ namespace torc::mpc {
     double FullOrderMpc::GetFullCost(const vectorx_t& qp_res) {
         double cost = 0;
         for (int node = 0; node < nodes_; node++) {
-            cost += cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+            cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
                 traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration);
-            cost += cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
-                traj_.GetVelocity(node), v_target_[node], CostTypes::Velocity);
+            cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
+                traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking);
+            cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
+                traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()), CostTypes::TorqueReg);
         }
         return cost;
     }
@@ -1351,7 +1422,7 @@ namespace torc::mpc {
             }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicPattern(node);
+                AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
             }
         }
@@ -1361,7 +1432,7 @@ namespace torc::mpc {
         AddVelocityBoxPattern(nodes_ - 1);
         AddTorqueBoxPattern(nodes_ - 1);
         AddSwingHeightPattern(nodes_ - 1);
-        // AddHolonomicPattern(nodes_ - 1);
+        AddHolonomicPattern(nodes_ - 1);
 
         int row_max = 0;
         int col_max = 0;
@@ -1547,8 +1618,9 @@ namespace torc::mpc {
             int col_start = GetDecisionIdx(node, Velocity);
             MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
 
-            col_start = GetDecisionIdx(node, Configuration);
-            MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
+            // TODO: Put back!
+            // col_start = GetDecisionIdx(node, Configuration);
+            // MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
 
             row_start += 2;
         }

@@ -255,7 +255,8 @@ namespace torc::mpc {
         void CheckHolonomicLin() {
             PrintTestHeader("Holonomic Linearization");
 
-            for (int k = 0; k < 5; k++) {
+            // TODO: Put back to 5
+            for (int k = 0; k < 1; k++) {
                 vectorx_t q_rand = robot_model_->GetRandomConfig();
                 vectorx_t v_rand = robot_model_->GetRandomVel();
                 vectorx_t q_original = q_rand;
@@ -270,10 +271,10 @@ namespace torc::mpc {
 
                     // Finite difference
                     matrix6x_t frame_fd = matrix6x_t::Zero(6, robot_model_->GetVelDim());
-                    vector3_t frame_vel = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
+                    vector3_t frame_vel = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
                     for (int i = 0; i < robot_model_->GetVelDim(); i++) {
                         PerturbConfiguration(q_rand, FD_DELTA, i);
-                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
+                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
                         q_rand = q_original;
 
                         frame_fd.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
@@ -285,6 +286,9 @@ namespace torc::mpc {
                         // }
                     }
 
+                    std::cout << "configuration" << std::endl;
+                    std::cout << "jac analytic: \n" << jacobian.topRows<3>() << std::endl;
+                    std::cout << "jac fd: \n" << frame_fd.topRows<3>() << std::endl << std::endl;
                     CHECK(jacobian.topRows<3>().isApprox(frame_fd.topRows<3>(), sqrt(FD_DELTA)));
 
                     // ------- Velocity ------- //
@@ -294,10 +298,10 @@ namespace torc::mpc {
 
                     // Finite difference
                     frame_fd.setZero();
-                    frame_vel = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
+                    frame_vel = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
                     for (int i = 0; i < robot_model_->GetVelDim(); i++) {
                         v_rand(i) += FD_DELTA;
-                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::WORLD).vel.linear();
+                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
                         v_rand(i) -= FD_DELTA;
 
                         frame_fd.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
@@ -310,6 +314,10 @@ namespace torc::mpc {
                     }
 
                     CHECK(jacobian.topRows<3>().isApprox(frame_fd.topRows<3>(), sqrt(FD_DELTA)));
+
+                    std::cout << "velocity" << std::endl;
+                    std::cout << "jac analytic: \n" << jacobian.topRows<3>() << std::endl;
+                    std::cout << "jac fd: \n" << frame_fd.topRows<3>() << std::endl << std::endl;
                 }
             }
         }

@@ -112,7 +112,8 @@ namespace torc::models {
             const vector3_t& w, double dt);
 
         void FrameVelDerivWrtConfiguration(const vectorx_t& q,
-            const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian);
+            const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian,
+            const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED);
 
         void PerturbConfiguration(vectorx_t& q, double delta, int idx);
 

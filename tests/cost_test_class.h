@@ -22,7 +22,7 @@ namespace torc::mpc {
 
             std::vector<CostTypes> costs;
             costs.emplace_back(Configuration);
-            costs.emplace_back(Velocity);
+            costs.emplace_back(VelocityTracking);
 
             Configure(robot_model_.GetConfigDim(), robot_model_.GetVelDim(), robot_model_.GetNumInputs(), true, costs, weights);
             REQUIRE(configured_);
@@ -57,10 +57,10 @@ namespace torc::mpc {
 
                 // Analytic
                 FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
-                vectorx_t grad_v = cost_fcn_terms_[cost_idxs_[Velocity]]->Gradient(arg);
+                vectorx_t grad_v = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->Gradient(arg);
 
                 // Finite difference
-                vectorx_t fd_v = cost_fcn_terms_[cost_idxs_[Velocity]]->GradientFiniteDiff(arg);
+                vectorx_t fd_v = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->GradientFiniteDiff(arg);
 
                 CHECK(grad_v.isApprox(fd_v, sqrt(FD_DELTA)));
             }
@@ -91,11 +91,11 @@ namespace torc::mpc {
             // ----- Velocity cost ----- //
             vectorx_t vbar_rand = robot_model_.GetRandomVel();
             vectorx_t vtarget_rand = robot_model_.GetRandomVel();
-            Linearize(vbar_rand, vtarget_rand, Velocity, lin_term);
+            Linearize(vbar_rand, vtarget_rand, VelocityTracking, lin_term);
 
             // Finite difference
             FormCostFcnArg(d, vbar_rand, vtarget_rand, arg);
-            vectorx_t fd_v = cost_fcn_terms_[cost_idxs_[Velocity]]->GradientFiniteDiff(arg);
+            vectorx_t fd_v = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->GradientFiniteDiff(arg);
             vectorx_t partial_bar_v = fd_v.head(robot_model_.GetVelDim());
 
             REQUIRE(lin_term.size() == partial_bar_v.size());
@@ -152,15 +152,15 @@ namespace torc::mpc {
             vectorx_t vtarget = vbar_rand;
 
             d.setConstant(1);
-            cost = GetTermCost(d, vbar_rand, vtarget, Velocity);
+            cost = GetTermCost(d, vbar_rand, vtarget, VelocityTracking);
             CHECK(cost > 0);
 
             d.setZero();
-            cost = GetTermCost(d, vbar_rand, vtarget, Velocity);
+            cost = GetTermCost(d, vbar_rand, vtarget, VelocityTracking);
             CHECK(cost == 0);
 
             d.setRandom();
-            cost = GetTermCost(d, vbar_rand, vtarget, Velocity);
+            cost = GetTermCost(d, vbar_rand, vtarget, VelocityTracking);
             CHECK(cost >= 0);
         }
 
@@ -191,11 +191,11 @@ namespace torc::mpc {
             // Analytic
             FormCostFcnArg(d_rand, vbar_rand, vtarget_rand, arg);
             BENCHMARK("velocity cost function gradient") {
-                vectorx_t grad_v = cost_fcn_terms_[cost_idxs_[Velocity]]->Gradient(arg);
+                vectorx_t grad_v = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->Gradient(arg);
             };
 
             BENCHMARK("configuration cost function evaluation") {
-                double c1 = cost_fcn_terms_[cost_idxs_[Velocity]]->Evaluate(arg);
+                double c1 = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->Evaluate(arg);
             };
 
         }
