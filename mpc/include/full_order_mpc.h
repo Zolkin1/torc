@@ -92,6 +92,7 @@ namespace torc::mpc {
 
         void SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj);
 
+        // TODO: Move to the contact schedule class
         /**
          * @brief Create a default swing trajectory using the provided parameters. This will use the current contact
          *  schedule to create the trajectory, for both swing and constant heights. In general this will only work
@@ -332,6 +333,8 @@ namespace torc::mpc {
         // General settings
         bool verbose_;
         std::string base_frame_;
+        int max_initial_solves_;
+        double initial_constraint_tol_;
 
         // Constraint settings
         double friction_coef_{};

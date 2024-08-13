@@ -91,6 +91,18 @@ namespace torc::mpc {
             } else {
                 scale_cost_ = false;
             }
+
+            if (general_settings["max_initial_solves"]) {
+                max_initial_solves_ = general_settings["max_initial_solves"].as<int>();
+            } else {
+                max_initial_solves_ = 10;
+            }
+
+            if (general_settings["initial_constraint_tol"]) {
+                initial_constraint_tol_ = general_settings["initial_constraint_tol"].as<double>();
+            } else {
+                initial_constraint_tol_ = 1e-2;
+            }
         }
 
         // ---------- Solver Settings ---------- //
@@ -229,6 +241,8 @@ namespace torc::mpc {
             std::cout << "\tNodes: " << nodes_ << std::endl;
             std::cout << "\tCompile derivatives: " << (compile_derivatves_ ? "True" : "False") << std::endl;
             std::cout << "\tScale cost: " << (scale_cost_ ? "True" : "False") << std::endl;
+            std::cout << "\tMax initial solves: " << max_initial_solves_ << std::endl;
+            std::cout << "\tInitial constraint tolerance: " << initial_constraint_tol_ << std::endl;
 
             std::cout << "Solver settings: " << std::endl;
             std::cout << "\tRelative tolerance: " << osqp_settings_.eps_rel << std::endl;
@@ -484,17 +498,15 @@ namespace torc::mpc {
 
     void FullOrderMpc::ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
         Compute(q, v, traj_out);
-        const int MAX_COMPUTES = 10;
-        for (int i = 0; i < MAX_COMPUTES; i++) {
-            // TODO: Undo the 0
-            if (stats_[i].constraint_violation < 0) {//nodes_*dt_[0]/5) {
+        for (int i = 0; i < max_initial_solves_; i++) {
+            if (stats_[i].constraint_violation < initial_constraint_tol_) {
                 std::cout << "Initial compute constraint violation converged in " << i+1 << " QP solves." << std::endl;
                 return;
             }
             Compute(q, v, traj_out);
         }
 
-        std::cerr << "Did not reach constraint tolerance after " << MAX_COMPUTES << " QP solves." << std::endl;
+        std::cerr << "Did not reach constraint tolerance of " << initial_constraint_tol_ << " after " << max_initial_solves_ << " QP solves." << std::endl;
 
         if (verbose_) {
             PrintStatistics();
@@ -1064,7 +1076,7 @@ namespace torc::mpc {
             violation += in_contact_[frame][node]*frame_vel.head<2>().squaredNorm();
         }
 
-        std::cout << "holonomic violation: " << violation << std::endl;
+        // std::cout << "holonomic violation: " << violation << std::endl;
         return violation;
     }
 
@@ -1228,7 +1240,7 @@ namespace torc::mpc {
         }
 
         ws_->obj_tau_mat = matrixx_t::Identity(robot_model_->GetNumInputs(), robot_model_->GetNumInputs());
-        for (int i = 0; i < vel_tracking_weight_.size(); i++) {
+        for (int i = 0; i < torque_reg_weight_.size(); i++) {
             ws_->obj_tau_mat.row(i) = ws_->obj_tau_mat.row(i)*((torque_reg_weight_(i) != 0) ? 1 : 0);
         }
 
@@ -1952,9 +1964,9 @@ namespace torc::mpc {
 
         //Go through if its contact or not at each node
         for (int node = 0; node <nodes_; node++) {
-            std::cout << "frame: " << frame << std::endl;
-            std::cout << "node: " << node << std::endl;
-            std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
+            // std::cout << "frame: " << frame << std::endl;
+            // std::cout << "node: " << node << std::endl;
+            // std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
             if (in_contact_[frame][node] == 1) {
                 // In contact, set to the lowest height
                 swing_traj_[frame][node] = end_height;

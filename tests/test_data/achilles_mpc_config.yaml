@@ -5,6 +5,8 @@ general_settings:
   compile_derivatives: True #True
   base_frame: "torso"
   scale_cost: False
+  max_initial_solves: 20
+  initial_constraint_tol: 5e-3
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
