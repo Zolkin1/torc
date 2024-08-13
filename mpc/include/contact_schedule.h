@@ -59,15 +59,16 @@ namespace torc::mpc {
          *  The velocity is made constant throughout the trajectory.
          *  If the swing time has no end during the trajectory, then we assume it is the same length as the previous contact time.
          *
+         *  The start height for the first swing is determine by the time in the swing.
+         *
          * @param frame the frame to make the trajectory for
          * @param apex_height the apex height of the swing trajectory
          * @param end_height the ending height of the swing trajectory. This is also used for all in contact heights
-         * @param start_height the starting height
          * @param apex_time the percentage through the swing during which the apex should be reached
          * @param dt_vec the list of dt's. The length of which should be the number of nodes in the MPC
          * @param swing_traj the swing trajectory to populate
          */
-        void CreateSwingTraj(const std::string& frame, double apex_height, double end_height, double start_height,
+        void CreateSwingTraj(const std::string& frame, double apex_height, double end_height,
                              double apex_time, const std::vector<double>& dt_vec,  std::vector<double>& swing_traj) const;
 
 

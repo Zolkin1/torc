@@ -20,7 +20,7 @@ int main() {
     cs.InsertContact("right_foot", 0, 1);
     // cs.InsertContact("left_foot", 0, 0.3);
     cs.InsertContact("left_foot", 0.3, 0.7);
-    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.3, 0.02, 0.02, 0.5);
+    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.3, 0.02, 0.5);
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());

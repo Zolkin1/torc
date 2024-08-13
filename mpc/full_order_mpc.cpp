@@ -378,11 +378,11 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
-            double end_height, double start_height, double apex_time) {
+            double end_height, double apex_time) {
         UpdateContactSchedule(contact_schedule);
 
         for (auto& [frame, traj] : swing_traj_) {
-            contact_schedule.CreateSwingTraj(frame, apex_height, end_height, start_height, apex_time, dt_, traj);
+            contact_schedule.CreateSwingTraj(frame, apex_height, end_height, apex_time, dt_, traj);
         }
     }
 

@@ -7,6 +7,8 @@
 
 #include "contact_schedule.h"
 
+#include <iostream>
+
 
 namespace torc::mpc {
     ContactSchedule::ContactSchedule(const std::vector<std::string>& frames) {
@@ -28,6 +30,7 @@ namespace torc::mpc {
     }
 
     void ContactSchedule::InsertContact(const std::string& frame, double start_time, double stop_time) {
+        // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, stop_time);
     }
 
@@ -52,7 +55,7 @@ namespace torc::mpc {
     }
 
     void ContactSchedule::CreateSwingTraj(const std::string& frame, double apex_height, double end_height,
-        double start_height, double apex_time, const std::vector<double>& dt_vec, std::vector<double>& swing_traj) const {
+        double apex_time, const std::vector<double>& dt_vec, std::vector<double>& swing_traj) const {
         if (apex_time < 0 || apex_time > 1) {
             throw std::invalid_argument("Apex time must be between 0 and 1!");
         }
@@ -62,6 +65,7 @@ namespace torc::mpc {
         bool first_in_swing = true;
         double swing_start = 0;
         double swing_time = 0;
+        double start_height = end_height;
 
         //Go through if its contact or not at each node
         for (int node = 0; node < nodes; node++) {
@@ -78,36 +82,73 @@ namespace torc::mpc {
                     swing_start = GetTime(dt_vec, node);
 
                     // Determine when we next make contact
-                    swing_time = 0;
-                    for (int j = node; j < nodes; j++) {
-                        double j_time = GetTime(dt_vec, j);
-                        if (InContact(frame, j_time)) {
-                            swing_time = j_time - swing_start;
-                            break;
+                    // Search for the next start after the current time
+                    double smallest_start = 1e10;
+                    for (const auto& [start, end] : frame_schedule_map.at(frame)) {
+                        if (start > swing_start && start < smallest_start) {
+                            smallest_start = start;
                         }
                     }
-                    if (swing_time == 0) {
-                        // Then we do not make contact again
-                        // For now, assume there is always an additional 0.2 seconds in the swing
+
+                    if (smallest_start != 1e10) {
+                        swing_time = smallest_start - swing_start;
+                    } else {
+                        // Assume it continues for 0.2 seconds more since there is not another contact
                         swing_time = GetTime(dt_vec, nodes - 1) + 0.2 - swing_start;
                     }
                 }
 
-                // Determine which spline to use
-                if (time < swing_time*apex_time + swing_start) {
-                    // Use the first half spline
-                    double low_height = start_height;
-                    if (swing_start > 0) {
-                        low_height = end_height;
+                if (swing_start == 0) {
+                    // Get the largest negative end contact -- note that these are deleted with CleanContacts!
+                    // Get the smallest start contact
+                    double large_end = -1e10;
+                    double small_start = 1e10;
+                    for (const auto& [start, end] : frame_schedule_map.at(frame)) {
+                        if (end < 0 && end > large_end) {
+                            large_end = end;
+                        }
+                        if (start > 0 && start < small_start) {
+                            small_start = start;
+                        }
                     }
-                    swing_traj[node] = low_height
-                        - std::pow(apex_time*swing_time, -2) * (3*(low_height - apex_height))*(std::pow(time - swing_start, 2))
-                        + std::pow(apex_time*swing_time, -3) * 2*(low_height - apex_height) * std::pow(time - swing_start, 3);
+
+                    if (large_end == -1e10) {
+                        large_end = 0;
+                    }
+
+                    if (small_start == 1e10) {
+                        small_start = 0.2;
+                    }
+
+                    swing_time = small_start - large_end;
+
+                    // Determine which part of the trajectory we are on
+                    const double swing_start_real = large_end;
+
+                    if (time < swing_time*apex_time + swing_start_real) {
+                        // First half of the trajectory
+                        swing_traj[node] = end_height
+                            - std::pow(apex_time*swing_time, -2) * (3*(end_height - apex_height))*(std::pow(time - swing_start_real, 2))
+                            + std::pow(apex_time*swing_time, -3) * 2*(end_height - apex_height) * std::pow(time - swing_start_real, 3);
+                    } else {
+                        // Second half
+                        swing_traj[node] = apex_height
+                            - std::pow(swing_time*(1 - apex_time), -2) * (3*(apex_height - end_height))*(std::pow(time - (apex_time*swing_time + swing_start_real), 2))
+                            + std::pow(swing_time*(1 - apex_time), -3) * 2*(apex_height - end_height) * std::pow(time - (apex_time*swing_time + swing_start_real), 3);
+                    }
                 } else {
-                    // Use the second half spline
-                    swing_traj[node] = apex_height
-                        - std::pow(swing_time*(1 - apex_time), -2) * (3*(apex_height - end_height))*(std::pow(time - (apex_time*swing_time + swing_start), 2))
-                        + std::pow(swing_time*(1 - apex_time), -3) * 2*(apex_height - end_height) * std::pow(time - (apex_time*swing_time + swing_start), 3);
+                    // Determine which spline to use
+                    if (time < swing_time*apex_time + swing_start) {
+                        // First half of trajectory
+                        swing_traj[node] = end_height
+                            - std::pow(apex_time*swing_time, -2) * (3*(end_height - apex_height))*(std::pow(time - swing_start, 2))
+                            + std::pow(apex_time*swing_time, -3) * 2*(end_height - apex_height) * std::pow(time - swing_start, 3);
+                    } else {
+                        // Use the second half spline
+                        swing_traj[node] = apex_height
+                            - std::pow(swing_time*(1 - apex_time), -2) * (3*(apex_height - end_height))*(std::pow(time - (apex_time*swing_time + swing_start), 2))
+                            + std::pow(swing_time*(1 - apex_time), -3) * 2*(apex_height - end_height) * std::pow(time - (apex_time*swing_time + swing_start), 3);
+                    }
                 }
 
                 first_in_swing = false;

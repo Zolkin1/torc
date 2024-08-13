@@ -422,18 +422,22 @@ namespace torc::mpc {
             ContactSchedule cs;
             cs.SetFrames(contact_frames_);
             cs.InsertContact(contact_frames_[0], 0.3, 0.6);
-            UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0, 0.5);
+            UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0.5);
             for (int i = 0; i < nodes_; i++) {
                 std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
             }
-            CHECK(swing_traj_[contact_frames_[0]][0] == 0);
+            CHECK(swing_traj_[contact_frames_[0]][0] == 0.0);
             std::cout << "====" << std::endl;
 
-            UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0.1, 0.5);
+            // At time zero we should be at the apex
+            cs.InsertContact(contact_frames_[0], -0.2, -0.1);
+            cs.InsertContact(contact_frames_[0], 0.1, 0.15);
+
+            UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0.5);
             for (int i = 0; i < nodes_; i++) {
                 std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
             }
-            CHECK(swing_traj_[contact_frames_[0]][0] == 0.1);
+            CHECK(swing_traj_[contact_frames_[0]][0] == 1.0);
         }
 
         // ---------------------- //
