@@ -358,7 +358,7 @@ namespace torc::mpc {
 
     void FullOrderMpc::UpdateContactSchedule(const ContactSchedule& contact_schedule) {
         // Convert the contact schedule into the binary digits I need
-        for (auto& [frame, schedule] : contact_schedule.frame_schedule_map) {
+        for (auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
             if (in_contact_.contains(frame)) {
                 // Break the continuous time contact schedule into each node
                 double time = 0;
@@ -376,6 +376,16 @@ namespace torc::mpc {
         }
 
     }
+
+    void FullOrderMpc::UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
+            double end_height, double start_height, double apex_time) {
+        UpdateContactSchedule(contact_schedule);
+
+        for (auto& [frame, traj] : swing_traj_) {
+            contact_schedule.CreateSwingTraj(frame, apex_height, end_height, start_height, apex_time, dt_, traj);
+        }
+    }
+
 
 
     void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
@@ -1952,69 +1962,6 @@ namespace torc::mpc {
 
         swing_traj_[frame] = swing_traj;
     }
-
-    void FullOrderMpc::CreateDefaultSwingTraj(const std::string& frame, double apex_height, double end_height, double start_height, double apex_time) {
-        if (apex_time < 0 || apex_time > 1) {
-            throw std::invalid_argument("Apex time must be between 0 and 1!");
-        }
-
-        bool first_in_swing = true;
-        double swing_start = 0;
-        double swing_time = 0;
-
-        //Go through if its contact or not at each node
-        for (int node = 0; node <nodes_; node++) {
-            // std::cout << "frame: " << frame << std::endl;
-            // std::cout << "node: " << node << std::endl;
-            // std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
-            if (in_contact_[frame][node] == 1) {
-                // In contact, set to the lowest height
-                swing_traj_[frame][node] = end_height;
-                first_in_swing = true; // Set to true for the next time it is in swing
-            } else {
-                if (first_in_swing) {
-                    swing_start = GetTime(node);
-
-                    // Determine when we next make contact
-                    swing_time = 0;
-                    for (int j = node; j < nodes_; j++) {
-                        if (in_contact_[frame][j]) {
-                            swing_time = GetTime(j) - swing_start;
-                            break;
-                        }
-                    }
-                    if (swing_time == 0) {
-                        // Then we do not make contact again
-                        // For now, assume there is always an additional 0.2 seconds in the swing
-                        swing_time = GetTime(nodes_ - 1) + 0.2 - swing_start;
-                    }
-                }
-
-                // Determine which spline to use
-                double time = GetTime(node);
-                if (time < swing_time*apex_time + swing_start) {
-                    // Use the first half spline
-                    double low_height = start_height;
-                    if (swing_start > 0) {
-                        low_height = end_height;
-                    }
-                    swing_traj_[frame][node] = low_height
-                        - std::pow(apex_time*swing_time, -2) * (3*(low_height - apex_height))*(std::pow(time - swing_start, 2))
-                        + std::pow(apex_time*swing_time, -3) * 2*(low_height - apex_height) * std::pow(time - swing_start, 3);
-                } else {
-                    // Use the second half spline
-                    swing_traj_[frame][node] = apex_height
-                        - std::pow(swing_time*(1 - apex_time), -2) * (3*(apex_height - end_height))*(std::pow(time - (apex_time*swing_time + swing_start), 2))
-                        + std::pow(swing_time*(1 - apex_time), -3) * 2*(apex_height - end_height) * std::pow(time - (apex_time*swing_time + swing_start), 3);
-                }
-
-                first_in_swing = false;
-            }
-        }
-
-    }
-
-
 
     void FullOrderMpc::PrintStatistics() const {
         using std::setw;

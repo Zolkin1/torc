@@ -19,12 +19,15 @@ namespace torc::mpc {
             std::vector<vectorx_t> weights;
             weights.emplace_back(vectorx_t::Constant(robot_model_.GetVelDim(), 1));
             weights.emplace_back(vectorx_t::Constant(robot_model_.GetVelDim(), 1));
+            weights.emplace_back(vectorx_t::Constant(robot_model_.GetNumInputs(), 1));
 
             std::vector<CostTypes> costs;
             costs.emplace_back(Configuration);
             costs.emplace_back(VelocityTracking);
+            costs.emplace_back(TorqueReg);
 
-            Configure(robot_model_.GetConfigDim(), robot_model_.GetVelDim(), robot_model_.GetNumInputs(), true, costs, weights);
+            Configure(robot_model_.GetConfigDim(), robot_model_.GetVelDim(), robot_model_.GetNumInputs(),
+                robot_model_.GetNumInputs(), true, costs, weights);
             REQUIRE(configured_);
             REQUIRE(cost_idxs_.size() == costs.size());
             REQUIRE(cost_fcn_terms_.size() == costs.size());

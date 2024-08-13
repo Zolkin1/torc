@@ -416,16 +416,20 @@ namespace torc::mpc {
             }
         }
 
+
         void CheckDefaultSwingTraj() {
             PrintTestHeader("Default Swing Traj.");
-            CreateDefaultSwingTraj(contact_frames_[0], 1, 0, 0, 0.5);
+            ContactSchedule cs;
+            cs.SetFrames(contact_frames_);
+            cs.InsertContact(contact_frames_[0], 0.3, 0.6);
+            UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0, 0.5);
             for (int i = 0; i < nodes_; i++) {
                 std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
             }
             CHECK(swing_traj_[contact_frames_[0]][0] == 0);
             std::cout << "====" << std::endl;
 
-            CreateDefaultSwingTraj(contact_frames_[0], 1, 0, 0.1, 0.5);
+            UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0.1, 0.5);
             for (int i = 0; i < nodes_; i++) {
                 std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
             }
