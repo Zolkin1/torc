@@ -17,20 +17,33 @@ target_include_directories(SamplePlanner PUBLIC
 # Needed for the trajectory and contact schedule stuff
 target_link_libraries(SamplePlanner PUBLIC Mpc)
 
-# ----------- ABSL -----------
-#if (NOT TARGET absl::log)
-#    message(STATUS "SamplePlanner: `absl` targets not found. Attempting to fetch contents...")
-#    FetchContent_Declare(
-#            abseil-cpp
-#            GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-#            GIT_TAG        origin/master
-#    )
-#    FetchContent_MakeAvailable(abseil-cpp)
-#else()
-#    message(STATUS "SamplePlanner: `absl` targets found.")
-#endif()
+#----------- YAML ----------- #
+if (NOT TARGET yaml-cpp::yaml-cpp)
+    set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+    FetchContent_Declare(
+            yaml-cpp
+            GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+            GIT_TAG 0.8.0 # note all other versions are of the form yaml-cpp-x.y.z
+    )
+    FetchContent_GetProperties(yaml-cpp)
+endif ()
 
-target_link_libraries(SamplePlanner PUBLIC absl::log absl::log_initialize)
+target_link_libraries(SamplePlanner PRIVATE yaml-cpp::yaml-cpp)
+
+# ----------- ABSL -----------
+if (NOT TARGET absl::log OR NOT TARGET absl::random_random)
+    message(STATUS "SamplePlanner: `absl` targets not found. Attempting to fetch contents...")
+    FetchContent_Declare(
+            abseil-cpp
+            GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+            GIT_TAG        origin/master
+    )
+    FetchContent_MakeAvailable(abseil-cpp)
+else()
+    message(STATUS "SamplePlanner: `absl` targets found.")
+endif()
+
+target_link_libraries(SamplePlanner PRIVATE absl::log absl::log_initialize absl::random_random)
 
 # ------- Mujoco ------- #
 if (NOT TARGET mujoco-lib)

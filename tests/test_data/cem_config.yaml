@@ -1,0 +1,5 @@
+cem_settings:
+  sample_variance: 0.1
+  num_finalists: 10
+  actuator_names: ["a", "b", "c"]
+  sample_type: "Position"

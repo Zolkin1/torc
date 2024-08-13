@@ -15,10 +15,38 @@
 TEST_CASE("Basic Sample Planner Test", "[sample_planner]") {
     using namespace torc::sample;
 
+    // XML
     std::filesystem::path achilles_xml = std::filesystem::current_path();
     achilles_xml += "/test_data/achilles.xml";
 
-    CrossEntropy cem(achilles_xml, 10);
+    // Config yaml
+    std::filesystem::path cem_config = std::filesystem::current_path();
+    cem_config += "/test_data/cem_config.yaml";
+
+    // CEM
+    CrossEntropy cem(achilles_xml, 10, cem_config);
+
+    // Robot Model
+    std::filesystem::path achilles_urdf = std::filesystem::current_path();
+    achilles_urdf += "/test_data/achilles.urdf";
+    torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
+
+    // Reference trajectory
+    torc::mpc::Trajectory traj_ref;
+    const int NUM_NODES = 30;
+    traj_ref.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), {"right_foot", "left_foot"}, NUM_NODES);
+    traj_ref.SetDefault(achilles.GetRandomConfig());
+    std::vector<double> dt_vec(NUM_NODES);
+    std::fill(dt_vec.begin(), dt_vec.end(), 0.02);
+
+    torc::mpc::Trajectory traj_out;
+
+    traj_ref.SetDtVector(dt_vec);
+    cem.Plan(traj_ref, traj_out);
+
+    BENCHMARK("cem plan") {
+        cem.Plan(traj_ref, traj_out);
+    };
 }
 
 TEST_CASE("Simulation Dispatcher Class Test", "[sample_planner]") {
@@ -47,5 +75,5 @@ TEST_CASE("Simulation Dispatcher Class Test", "[sample_planner]") {
     simulation_dispatcher.CheckSingleSimuation(traj_ref);
     simulation_dispatcher.CheckBatchSimulation(traj_ref);
 
-    simulation_dispatcher.BenchmarkSims(traj_ref);
+    // simulation_dispatcher.BenchmarkSims(traj_ref);
 }

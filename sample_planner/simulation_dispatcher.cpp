@@ -122,10 +122,15 @@ namespace torc::sample {
                 traj_out.SetTau(current_node, tau_total/num_time_steps);
                 for (const auto& frame : traj_ref.GetContactFrames()) {
                     traj_out.SetForce(current_node, frame, f_avg[frame]/num_time_steps);
+                    f_avg[frame].setZero();
                 }
 
                 current_node++;
                 num_time_steps = 0;
+                q_total.setZero();
+                v_total.setZero();
+                tau_total.setZero();
+
             }
 
             // Check and update contact status
