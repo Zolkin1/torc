@@ -17,11 +17,14 @@ int main() {
     torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
 
     torc::mpc::ContactSchedule cs(mpc.GetContactFrames());
+    // cs.InsertContact("right_hand", 0, 1);
+    // cs.InsertContact("left_hand", 0, 1);
+
     // cs.InsertContact("right_foot", 0, 1);
     cs.InsertContact("foot_front_right", 0, 1);
     cs.InsertContact("foot_rear_right", 0, 1);
 
-    // cs.InsertContact("left_foot", 0.3, 0.7);
+    // cs.InsertContact("left_foot", 0, 1);
     cs.InsertContact("foot_front_left", 0.3, 0.7);
     cs.InsertContact("foot_rear_left", 0.3, 0.7);
     mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, -0.05, 0.5);
@@ -55,6 +58,26 @@ int main() {
     traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
     traj.SetDefault(q_target);
 
+    // TODO: Update the warm start trajectory forces
+    std::cout << "robot mass: " << achilles.GetMass() << std::endl;
+    double time = 0;
+    for (int i = 0; i < traj.GetNumNodes(); i++) {
+        int num_contacts = 0;
+        for (const auto& frame : mpc.GetContactFrames()) {
+            if (cs.InContact(frame, time)) {
+                num_contacts++;
+            }
+        }
+
+        for (const auto& frame : mpc.GetContactFrames()) {
+            if (cs.InContact(frame, time)) {
+                traj.SetForce(i, frame, {0, 0, 9.81*achilles.GetMass()/num_contacts});
+            }
+        }
+
+        time += traj.GetDtVec()[i];
+    }
+
     mpc.SetWarmStartTrajectory(traj);
 
     mpc.ComputeNLP(q_target, v_target, traj);
@@ -76,7 +99,7 @@ int main() {
         for (const auto& frame : mpc.GetContactFrames()) {
             std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
             std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
-            // std::cout << "frame: " << frame << ", force: " << traj.GetForce(i, frame).transpose() << std::endl;
+            std::cout << "force: " << traj.GetForce(i, frame).transpose() << std::endl;
         }
         std::cout << std::endl;
     }
