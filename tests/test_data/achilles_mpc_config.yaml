@@ -1,5 +1,5 @@
 general_settings:
-  nodes: 32
+  nodes: 5
   verbose: True
   node_dt: 0.02
   compile_derivatives: True #True
@@ -7,6 +7,7 @@ general_settings:
   scale_cost: False
   max_initial_solves: 20
   initial_constraint_tol: 5e-3
+  nodes_full_dynamics: 2    # Also determines how many nodes have torque constraints
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
@@ -14,9 +15,9 @@ solver_settings:
   polish: True
   rho: 2e-3
   alpha: 1.6
-  sigma: 1e-6
+  sigma: 1e-6 # This seems to help when its larger
   adaptive_rho: True
-  max_iter: 1000
+  max_iter: 2000
   scaling: 1 # The scaling seems to have a large effect. Having more scaling can sometime make the problem infeasible
 constraints:
   friction_coef: 0.5
@@ -34,10 +35,14 @@ costs:
                                     0.0, 0.0, 0.0,
                                     0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                     0., 0., 0., 0., 0., 0., 0., 0., 0. ]
-  velocity_tracking_weights: [10, 10, 10,
-                              1, 1, 1,
-                              .1, .1, .1, .1, .1, .1, .1, .1, .1,
-                              .1, .1, .1, .1, .1, .1, .1, .1, .1]
+#  velocity_tracking_weights: [10, 10, 10,
+#                              1, 1, 1,
+#                              .1, .1, .1, .1, .1, .1, .1, .1, .1,
+#                              .1, .1, .1, .1, .1, .1, .1, .1, .1]
+  velocity_tracking_weights: [ 10, 10, 10,
+                               1, 1, 1,
+                               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
+                               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001 ]
 #  velocity_tracking_weights: [ 1, 1, 1,
 #                               1, 1, 1,
 #                               0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -48,5 +53,8 @@ costs:
 #  torque_regularization_weights: [ 1, 1, 1, 1, 1, 1, 1, 1, 1,
 #                                   1, 1, 1, 1, 1, 1, 1, 1, 1 ]
 contacts:
-  num_contact_locations: 2
-  contact_frames: ["right_foot", "left_foot"]#, "right_hand", "left_hand"]
+  #TODO: When I have multiple contacts in the same foot then the Inverse dynamics derivative seems off
+  contact_frames: ["foot_front_right", "foot_rear_right", "foot_front_left", "foot_rear_left"]#, "right_hand", "left_hand"]
+#  contact_frames: ["foot_front_right", "foot_front_left", "foot_rear_left"]  #
+#  contact_frames: ["right_foot", "foot_front_right", "foot_rear_right"] #"left_foot"]
+# contact_frames: ["right_foot", "left_foot", "foot_front_left"]

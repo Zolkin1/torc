@@ -143,7 +143,7 @@ namespace torc::mpc {
         void CreateConstraints();
         void AddICConstraint();
         void AddIntegrationConstraint(int node);
-        void AddIDConstraint(int node);
+        void AddIDConstraint(int node, bool full_order);
         void AddFrictionConeConstraint(int node);
         void AddConfigurationBoxConstraint(int node);
         void AddVelocityBoxConstraint(int node);
@@ -155,7 +155,7 @@ namespace torc::mpc {
         double GetConstraintViolation(const vectorx_t& qp_res);
         double GetICViolation(const vectorx_t& qp_res);
         double GetIntegrationViolation(const vectorx_t& qp_res, int node);
-        double GetIDViolation(const vectorx_t& qp_res, int node);
+        double GetIDViolation(const vectorx_t& qp_res, int node, bool full_order);
         double GetFrictionViolation(const vectorx_t& qp_res, int node);
         double GetTorqueBoxViolation(const vectorx_t& qp_res, int node);
         double GetConfigurationBoxViolation(const vectorx_t& qp_res, int node);
@@ -196,7 +196,7 @@ namespace torc::mpc {
         void CreateConstraintSparsityPattern();
         void AddICPattern();
         void AddIntegrationPattern(int node);
-        void AddIDPattern(int node);
+        void AddIDPattern(int node, bool full_order);
         void AddFrictionConePattern(int node);
         void AddConfigurationBoxPattern(int node);
         void AddVelocityBoxPattern(int node);
@@ -213,6 +213,7 @@ namespace torc::mpc {
         int GetDecisionVarsPerNode() const;
         int GetDecisionIdx(int node, const DecisionType& var_type) const;
         int GetConstraintRow(int node, const ConstraintType& constraint) const;
+        int GetConstraintRowStartNode(int node) const;
 
         void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
         void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
@@ -236,6 +237,7 @@ namespace torc::mpc {
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
         [[nodiscard]] int NumIDConstraintsNode() const;
+        [[nodiscard]] int NumPartialIDConstraintsNode() const;
         [[nodiscard]] int NumFrictionConeConstraintsNode() const;
         [[nodiscard]] int NumConfigBoxConstraintsNode() const;
         [[nodiscard]] int NumVelocityBoxConstraintsNode() const;
@@ -322,6 +324,7 @@ namespace torc::mpc {
         double friction_coef_{};
         double max_grf_{};
         int nodes_{};
+        int nodes_full_dynamics_;
 
         // Contact settings
         int num_contact_locations_{};

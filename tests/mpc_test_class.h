@@ -364,22 +364,26 @@ namespace torc::mpc {
         void CheckConstraintIdx() {
             PrintTestHeader("Constraint Index");
             int row1 = 2*robot_model_->GetVelDim();
-            int row2 = GetConstraintRow(0, Integrator);
-            CHECK(row2 == row1);  // Starts after the initial condition constraint
-            row1 += NumIntegratorConstraintsNode();
+            int row2 = 0;
 
             for (int node = 0; node < nodes_; node++) {
 
-                if (node < nodes_ - 1) {
-                    if (node != 0) {
-                        row2 = GetConstraintRow(node, Integrator);
-                        CHECK(row2 == row1);
-                        row1 += NumIntegratorConstraintsNode();
-                    }
+                CHECK(GetConstraintRowStartNode(node) == row1);
 
+                if (node < nodes_ - 1) {
+                    row2 = GetConstraintRow(node, Integrator);
+                    CHECK(row2 == row1);
+                    row1 += NumIntegratorConstraintsNode();
+                }
+
+                if (node < nodes_full_dynamics_) {
                     row2 = GetConstraintRow(node, ID);
                     CHECK(row2 == row1);
                     row1 += NumIDConstraintsNode();
+                } else if (node < nodes_ - 1) {
+                    row2 = GetConstraintRow(node, ID);
+                    CHECK(row2 == row1);
+                    row1 += NumPartialIDConstraintsNode();
                 }
 
                 row2 = GetConstraintRow(node, FrictionCone);
@@ -398,9 +402,11 @@ namespace torc::mpc {
                     row1 += NumVelocityBoxConstraintsNode();
                 }
 
-                row2 = GetConstraintRow(node, TorqueBox);
-                CHECK(row2 == row1);
-                row1 += NumTorqueBoxConstraintsNode();
+                if (node < nodes_full_dynamics_) {
+                    row2 = GetConstraintRow(node, TorqueBox);
+                    CHECK(row2 == row1);
+                    row1 += NumTorqueBoxConstraintsNode();
+                }
 
                 if (node > 1) {
                     row2 = GetConstraintRow(node, SwingHeight);
@@ -414,6 +420,8 @@ namespace torc::mpc {
                     row1 += NumHolonomicConstraintsNode();
                 }
             }
+
+            CHECK(row1 == GetConstraintRowStartNode(nodes_));
         }
 
 

@@ -58,7 +58,7 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
 
     mpc.UpdateContactSchedule(cs);
 
-    mpc.Compute(q_rand, v_rand, traj);
+    mpc.ComputeNLP(q_rand, v_rand, traj);
 
     // for (int i = 0; i < traj.GetNumNodes(); i++) {
     //     std::cout << "Node: " << i << std::endl;
@@ -68,7 +68,7 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
     // }
 
     // random_state = a1.GetRandomState();
-    mpc.Compute(q_rand, v_rand, traj);
+    // mpc.Compute(q_rand, v_rand, traj);
 
     mpc.PrintStatistics();
     std::cout << std::endl << std::endl;
@@ -104,10 +104,12 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     double time = 0;
     for (int i = 0; i < 3; i++) {
         if (i % 2 != 0) {
-            cs.InsertContact("right_foot", time, time + contact_time);
+            cs.InsertContact("foot_front_right", time, time + contact_time);
+            cs.InsertContact("foot_rear_right", time, time + contact_time);
             // cs.InsertContact("right_hand", time, time + contact_time);
         } else {
-            cs.InsertContact("left_foot", time, time + contact_time);
+            cs.InsertContact("foot_front_left", time, time + contact_time);
+            cs.InsertContact("foot_rear_left", time, time + contact_time);
             // cs.InsertContact("left_hand", time, time + contact_time);
         }
         time += contact_time;

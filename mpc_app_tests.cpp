@@ -17,10 +17,14 @@ int main() {
     torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
 
     torc::mpc::ContactSchedule cs(mpc.GetContactFrames());
-    cs.InsertContact("right_foot", 0, 1);
-    // cs.InsertContact("left_foot", 0, 0.3);
-    cs.InsertContact("left_foot", 0.3, 0.7);
-    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.3, 0.02, 0.5);
+    // cs.InsertContact("right_foot", 0, 1);
+    cs.InsertContact("foot_front_right", 0, 1);
+    cs.InsertContact("foot_rear_right", 0, 1);
+
+    // cs.InsertContact("left_foot", 0.3, 0.7);
+    cs.InsertContact("foot_front_left", 0.3, 0.7);
+    cs.InsertContact("foot_rear_left", 0.3, 0.7);
+    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, -0.05, 0.5);
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
@@ -67,7 +71,7 @@ int main() {
         std::cout << "Node: " << i << std::endl;
         std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
         std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-        // std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+        std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
         achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
         for (const auto& frame : mpc.GetContactFrames()) {
             std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;

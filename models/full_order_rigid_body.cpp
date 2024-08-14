@@ -188,6 +188,7 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), contact_data_->ddq_dtau * act_mat_; //contact_data_->Minv * act_mat_;
     }
 
+    // TODO: when I have two contacts on the same link I seem to get a mismatch with the finite diff
     void FullOrderRigidBody::InverseDynamicsDerivative(const vectorx_t& q,
                                                        const vectorx_t& v,
                                                        const vectorx_t& a,
@@ -508,10 +509,10 @@ namespace torc::models {
 
             // Get the contact forces in the joint frame
             const vector3_t contact_force = rotationWorldToJoint * f.force_linear;
-            forces.at(jnt_idx).linear() = contact_force;
+            forces.at(jnt_idx).linear() += contact_force;
 
             // Calculate the angular (torque) forces
-            forces.at(jnt_idx).angular() = translationContactToJoint.cross(contact_force);
+            forces.at(jnt_idx).angular() += translationContactToJoint.cross(contact_force);
         }
         return forces;
     }
