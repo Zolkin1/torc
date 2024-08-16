@@ -8,7 +8,7 @@ int main() {
  using namespace torc::mpc;
     std::filesystem::path achilles_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/achilles.urdf";
 
-    std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/achilles_mpc_config.yaml";
+    std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/achilles_mpc_config_sim.yaml";
 
     FullOrderMpc mpc("achilles_mpc", mpc_config, achilles_urdf);
 
@@ -25,21 +25,21 @@ int main() {
     cs.InsertContact("foot_rear_right", 0, 1);
 
     // cs.InsertContact("left_foot", 0, 1);
-    cs.InsertContact("foot_front_left", 0.3, 0.7);
-    cs.InsertContact("foot_rear_left", 0.3, 0.7);
-    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, -0.05, 0.5);
+    cs.InsertContact("foot_front_left", 0, 1);
+    cs.InsertContact("foot_rear_left", 0, 1);
+    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, 0.01, 0.5);
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
-    q_target << 0, 0, 0.9, // 0.97
-                0, 0, 0, 1,
-                // 0.7071, 0, 0.7071, 0,
-                0, 0, -0.26,
-                0, 0.65, -0.43,
-                0, 0, 0,
-                0, 0, -0.26,
-                0.65, -0.43,
-                0, 0, 0;
+    q_target << 0., 0, 0.9,    // position
+            0, 0, 0, 1,     // quaternion
+            0, 0, -0.26,    // L hips joints
+            0.65, -0.43,    // L knee, ankle
+            0, 0, 0, 0,     // L shoulders and elbow
+            0, 0, -0.26,    // R hip joints
+            0.65, -0.43,    // R knee ankle
+            0, 0, 0, 0;     // R shoulders and elbow
+
     mpc.SetConstantConfigTarget(q_target);
     q_target(0) = 0;
 
@@ -80,36 +80,42 @@ int main() {
 
     mpc.SetWarmStartTrajectory(traj);
 
+    // std::cout << "press any key to start mpc... " << std::endl;
+    // std::cin.get();
+
     mpc.ComputeNLP(q_target, v_target, traj);
-    // mpc.Compute(q_target, v_target, traj);
-    // mpc.Compute(q_target, v_target, traj);
 
-    // mpc.Compute(q_target, v_target, traj);
-    //
-    // for (int i = 0; i < 10; i++) {
-    //     mpc.Compute(q_target, v_target, traj);
+    for (int i = 0; i < 20; i++) {
+        vectorx_t q_current;
+        traj.GetConfigInterp(0.01, q_current);
+        vectorx_t v_current;
+        traj.GetVelocityInterp(0.01, v_current);
+
+        mpc.Compute(q_current, v_current, traj);
+    }
+
+
+
+    // for (int i = 0; i < traj.GetNumNodes(); i++) {
+    //     std::cout << "Node: " << i << std::endl;
+    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+    //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+    //     achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
+    //     for (const auto& frame : mpc.GetContactFrames()) {
+    //         std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
+    //         std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
+    //         std::cout << "force: " << traj.GetForce(i, frame).transpose() << std::endl;
+    //     }
+    //     std::cout << std::endl;
     // }
-
-    for (int i = 0; i < traj.GetNumNodes(); i++) {
-        std::cout << "Node: " << i << std::endl;
-        std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-        std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
-        achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
-        for (const auto& frame : mpc.GetContactFrames()) {
-            std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
-            std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
-            std::cout << "force: " << traj.GetForce(i, frame).transpose() << std::endl;
-        }
-        std::cout << std::endl;
-    }
-
-    for (const auto& frame : mpc.GetContactFrames()) {
-        std::cout << "frame: " << std::endl;
-        for (int i = 0; i < traj.GetNumNodes(); i++) {
-            std::cout << "node: " << i << ", z: " << mpc.swing_traj_[frame][i] << std::endl;
-        }
-    }
+    //
+    // for (const auto& frame : mpc.GetContactFrames()) {
+    //     std::cout << "frame: " << std::endl;
+    //     for (int i = 0; i < traj.GetNumNodes(); i++) {
+    //         std::cout << "node: " << i << ", z: " << mpc.swing_traj_[frame][i] << std::endl;
+    //     }
+    // }
 
     mpc.PrintStatistics();
     std::cout << std::endl << std::endl;

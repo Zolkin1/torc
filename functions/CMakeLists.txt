@@ -18,8 +18,9 @@ target_include_directories(Functions PUBLIC
 
 #----------- Eigen ----------- #
 find_package(Eigen3 REQUIRED)
+target_link_libraries(Functions PUBLIC Eigen3::Eigen)
 
 # pinocchio
 list(APPEND CMAKE_PREFIX_PATH /opt/openrobots/)
 find_package(pinocchio 3.0.0 REQUIRED)
-target_link_libraries(Models PUBLIC pinocchio::pinocchio)
+target_link_libraries(Functions PUBLIC pinocchio::pinocchio)

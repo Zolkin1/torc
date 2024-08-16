@@ -22,3 +22,4 @@ costs:
 contacts:
   num_contact_locations: 4
   contact_frames: ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]
+line_search:

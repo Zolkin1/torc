@@ -172,9 +172,9 @@ namespace torc::fn {
                 const size_t dim  = this->dim_;
                 std::vector<scalar_t> hess = this->cg_model_->Hessian(x_std, 0);
                 matrixx_t grad_eigen(dim, dim);
+                grad_eigen.setZero();
                 for (size_t n_row=0; n_row < dim; n_row++) {
-                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t>, Eigen::Unaligned>(hess.data() + n_row * dim, (n_row + 1) * dim);
-                    grad_row_eigen.conservativeResize(dim);  // so row assignment doesn't complain
+                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t>, Eigen::Unaligned>(hess.data() + n_row * dim, dim);
                     grad_eigen.row(n_row) << grad_row_eigen;
                 }
                 return grad_eigen;

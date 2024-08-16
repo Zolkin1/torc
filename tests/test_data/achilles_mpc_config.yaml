@@ -64,3 +64,10 @@ contacts:
 #  contact_frames: ["right_foot", "foot_front_right", "foot_rear_right"] #"left_foot"]
 # contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]
 #  contact_frames: ["foot_rear_right", "foot_rear_left"]
+line_search:
+  alpha_min: 1e-3
+  large_constraint_vio: 1e-2
+  small_constraint_vio: 1e-6
+  constraint_reduction_mult: 1e-6
+  alpha_step: 0.5
+  armijo_constant: 1e-4

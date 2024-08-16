@@ -31,7 +31,7 @@ namespace torc::mpc {
         ForceReg,
     };
 
-    //  This can be convex with gauss-newton approx easily since it is in the form of a norm.
+    // TODO: Speed up - make the ones that have explicit formulas not use autodiff
     class CostFunction {
     public:
         explicit CostFunction(const std::string& name)

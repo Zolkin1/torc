@@ -14,6 +14,8 @@
 #include "cost_function.h"
 #include "contact_schedule.h"
 
+// TODO: Add a aggregate statistics print out (i.e. averages and standard deviations)
+
 namespace torc::mpc {
     namespace fs = std::filesystem;
 
@@ -26,8 +28,6 @@ namespace torc::mpc {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
-    // TODO:
-    //  - Setting swing trajectory
     enum LineSearchCondition {
         ConstraintViolation,
         CostReduction,
@@ -44,6 +44,7 @@ namespace torc::mpc {
         double total_compute_time;          // Time for the entire Compute function
         double constraint_time;             // Time to add the constraints
         double cost_time;                   // Time to add the costs
+        double ls_time;                     // Time to line search
         LineSearchCondition ls_condition;   // Condition for line search termination
         double constraint_violation;        // Constraint violation
     };
@@ -294,6 +295,14 @@ namespace torc::mpc {
         // Line search
         double alpha_;
         LineSearchCondition ls_condition_;
+
+        double ls_eta_;
+        double ls_theta_max_;
+        double ls_theta_min_;
+        double ls_gamma_theta_;
+        double ls_gamma_phi_;
+        double ls_gamma_alpha_;
+        double ls_alpha_min_;
 
         // Model
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;

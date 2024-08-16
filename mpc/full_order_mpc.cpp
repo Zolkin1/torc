@@ -217,9 +217,6 @@ namespace torc::mpc {
                "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
         }
 
-
-        std::cout << "vel tracking: " << torque_reg_weight_.transpose() << std::endl;
-        std::cout << "config tracking: " << config_tracking_weight_.transpose() << std::endl;
         // ---------- Contact Settings ---------- //
         if (!config["contacts"]) {
             throw std::runtime_error("No contact settings provided!");
@@ -235,6 +232,21 @@ namespace torc::mpc {
             // Set everything to not in contact
             in_contact_[frame] = std::vector<int>(nodes_);
         }
+
+        // ---------- Line Search Settings ---------- //
+        if (!config["line_search"]) {
+            throw std::runtime_error("No line search setting provided!");
+        } else {
+            YAML::Node ls_settings = config["line_search"];
+            ls_eta_ = (ls_settings["armijo_constant"] ? ls_settings["armijo_constant"].as<double>() : 1e-4);
+            ls_alpha_min_ = (ls_settings["alpha_min"] ? ls_settings["alpha_min"].as<double>() : 1e-4);
+            ls_theta_max_ = (ls_settings["large_constraint_vio"] ? ls_settings["large_constraint_vio"].as<double>() : 1e-2);
+            ls_theta_min_ = (ls_settings["small_constraint_vio"] ? ls_settings["small_constraint_vio"].as<double>() : 1e-6);
+            ls_gamma_theta_ = (ls_settings["constraint_reduction_mult"] ? ls_settings["constraint_reduction_mult"].as<double>() : 1e-6);
+            ls_gamma_alpha_ = (ls_settings["alpha_step"] ? ls_settings["alpha_step"].as<double>() : 0.5);
+            ls_gamma_phi_ = (ls_settings["cost_reduction_mult"] ? ls_settings["cost_reduction_mult"].as<double>() : 1e-6);
+        }
+
 
         if (verbose_) {
             using std::setw;
@@ -286,6 +298,15 @@ namespace torc::mpc {
                 std::cout << frame << " ";
             }
             std::cout << "]" << std::endl;
+
+            std::cout << "Line search:" << std::endl;
+            std::cout << "\tArmijo constant: " << ls_eta_ << std::endl;
+            std::cout << "\tLarge constraint violation: " << ls_theta_max_ << std::endl;
+            std::cout << "\tSmall constraint violation: " << ls_theta_min_ << std::endl;
+            std::cout << "\tConstraint reduction multiplier: " << ls_gamma_theta_ << std::endl;
+            std::cout << "\tCost reduction multiplier: " << ls_gamma_phi_ << std::endl;
+            std::cout << "\tLine search step: " << ls_gamma_alpha_ << std::endl;
+            std::cout << "\tSmallest step: " << ls_alpha_min_ << std::endl;
 
             std::cout << "Size: " << std::endl;
             std::cout << "\tDecision variables: " << GetNumDecisionVars() << std::endl;
@@ -504,7 +525,10 @@ namespace torc::mpc {
         }
 #endif
 
-         auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
+        utils::TORCTimer ls_timer;
+        ls_timer.Tic();
+        auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
+        ls_timer.Toc();
 
 #if NAN_CHECKS
         if (std::isnan(constraint_ls)) {
@@ -516,16 +540,19 @@ namespace torc::mpc {
         }
 #endif
 
-         ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
+        ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
         traj_out.SetDtVector(dt_);
          // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
 
-         compute_timer.Toc();
+        compute_timer.Toc();
+
+
          stats_.emplace_back(solve_status, osqp_solver_.objective_value(),
              cost_ls, alpha_, (alpha_*osqp_solver_.primal_solution()).norm(),
              compute_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              cost_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+             ls_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              ls_condition_, constraint_ls);
 
          traj_ = traj_out;
@@ -1382,12 +1409,17 @@ namespace torc::mpc {
 
             // ----- Torque ----- //
             decision_idx = GetDecisionIdx(node, Torque);
-            cost_.Linearize(traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()),
+            vectorx_t tau_target = vectorx_t::Zero(robot_model_->GetNumInputs());
+            if (node == 0) {
+                // Trying to minimize oscilliations
+                tau_target = traj_.GetTau(node);
+            }
+            cost_.Linearize(traj_.GetTau(node), tau_target,
                 CostTypes::TorqueReg, ws_->obj_tau_vector);
             osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
                 (scale_cost_ ? dt_[node] : 1) * ws_->obj_tau_vector;
 
-            cost_.Quadraticize(traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()),
+            cost_.Quadraticize(traj_.GetTau(node), tau_target,
                 CostTypes::TorqueReg, ws_->obj_tau_mat);
             MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_tau_mat,
                 decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
@@ -1419,45 +1451,39 @@ namespace torc::mpc {
     }
 
     std::pair<double, double> FullOrderMpc::LineSearch(const vectorx_t& qp_res) {
-        // Backtracing linesearch from ETH
-        alpha_ = 1;
-        // TODO: Make these parameter set in the yaml
-        const double eta = 1e-4;
-        const double theta_max = 1e-2;
-        const double theta_min = 1e-6;
-        const double gamma_theta = 1e-6;
-        const double gamma_phi = 1e-6;
-        const double gamma_alpha = 0.5;
-        const double alpha_min = 1e-4;
+        // Backtracing linesearch (see ETH paper)
+        // TODO: Speed up
 
-        std::cout << "------ alpha: " << 0 << " ------" << std::endl;
+        alpha_ = 1;
+
+        // std::cout << "------ alpha: " << 0 << " ------" << std::endl;
 
         // TODO: I think there is a bug with the constraint violation as sometimes it increases when alpha=0
         double theta_k = GetConstraintViolation(vectorx_t::Zero(qp_res.size()));
         double phi_k = GetFullCost(vectorx_t::Zero(qp_res.size()));
 
-        while (alpha_ > alpha_min) {
-            std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
+        while (alpha_ > ls_alpha_min_) {
+            // std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
             double theta_kp1 = GetConstraintViolation(alpha_*qp_res);
             double phi_kp1 = GetFullCost(alpha_*qp_res);
 
-            if (theta_kp1 >= theta_max) {
-                if (theta_kp1 < (1 - gamma_theta)*theta_k) {
+            if (theta_kp1 >= ls_theta_max_) {
+                if (theta_kp1 < (1 - ls_gamma_theta_)*theta_k) {
                     ls_condition_ = ConstraintViolation;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
-            } else if (std::max(theta_k, theta_kp1) < theta_min && osqp_instance_.objective_vector.dot(qp_res) < 0) {
-                if (phi_kp1 < (phi_k + eta*alpha_*osqp_instance_.objective_vector.dot(qp_res))) {
+            } else if (std::max(theta_k, theta_kp1) < ls_theta_min_ && osqp_instance_.objective_vector.dot(qp_res) < 0) {
+                if (phi_kp1 < (phi_k + ls_eta_*alpha_*osqp_instance_.objective_vector.dot(qp_res))) {
                     ls_condition_ = CostReduction;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             } else {
-                if (phi_kp1 < (1 - gamma_phi)*phi_k || theta_kp1 < (1 - gamma_theta)*theta_k) {
+                if (phi_kp1 < (1 - ls_gamma_phi_)*phi_k || theta_kp1 < (1 - ls_gamma_theta_)*theta_k) {
                     ls_condition_ = Both;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             }
-            alpha_ = gamma_alpha*alpha_;
+            alpha_ = ls_gamma_alpha_*alpha_;
         }
         ls_condition_ = MinAlpha;
         alpha_ = 0;
@@ -2056,7 +2082,7 @@ namespace torc::mpc {
         using std::setfill;
 
         const int col_width = 25;
-        const int total_width = 11*col_width;
+        const int total_width = 12*col_width;
 
 
         auto time_now = std::chrono::system_clock::now();
@@ -2069,6 +2095,7 @@ namespace torc::mpc {
                 << setw(col_width) << "Time (ms)"
                 << setw(col_width) << "Constr. Time (ms)"
                 << setw(col_width) << "Cost Time (ms)"
+                << setw(col_width) << "LS Time (ms)"
                 << setw(col_width) << "d-norm (post LS)"
                 << setw(col_width) << "Alpha"
                 << setw(col_width) << "LS Termination"
@@ -2136,6 +2163,7 @@ namespace torc::mpc {
                       << setw(col_width) << stats_[solve].total_compute_time
                       << setw(col_width) << stats_[solve].constraint_time
                       << setw(col_width) << stats_[solve].cost_time
+                      << setw(col_width) << stats_[solve].ls_time
                       << setw(col_width) << stats_[solve].qp_res_norm
                       << setw(col_width) << stats_[solve].alpha
                       << setw(col_width) << ls_termination_condition

@@ -1,0 +1,51 @@
+general_settings:
+  nodes: 32
+  verbose: True
+  node_dt: 0.02
+  compile_derivatives: True
+  base_frame: "torso"
+  scale_cost: False
+  max_initial_solves: 20
+  initial_constraint_tol: 5e-3
+  nodes_full_dynamics: 2    # Also determines how many nodes have torque constraints
+solver_settings:
+  rel_tol: 1e-6
+  abs_tol: 1e-6
+  verbose: True
+  polish: True
+  rho: 2e-3 # 0.02
+  alpha: 1.6 # 1.6
+  sigma: 1e-6 # 1e-10
+  adaptive_rho: False
+  max_iter: 25 # 500 is good
+  scaling: 10   # More scaling is only helpful when I use less iterations
+constraints:
+  friction_coef: 0.5
+  max_grf: 200
+costs:
+  configuration_tracking_weights: [ .01, .01, .1,
+                                    0.0, 0.0, 0.0,
+                                    0.01, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001, 0.001,
+                                    0.01, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001, 0.001 ]
+  velocity_tracking_weights: [1, 1, 1,
+                              .1, .1, .1,
+                              .01, .1, .1, .01, .5, .1, .1, .1, .1,
+                              .01, .1, .1, .01, .5, .1, .1, .1, .1]
+  torque_regularization_weights: [.001, .01, .01, .001, .02, .1, .1, .1, .1,
+                                  .001, .01, .01, .001, .02, .1, .1, .1, .1]
+contacts:
+  # For now, removing hands
+  # contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]
+  contact_frames: ["foot_front_right", "foot_rear_right", "foot_front_left", "foot_rear_left"]
+
+# Weights notes:
+# - More weight on keeping the arm velocity and torques down since for now they are unconstrained
+# - Slightly more weight on hip yaw torque to keep the feet straight
+
+line_search:
+  alpha_min: 1e-3
+  large_constraint_vio: 1e-2
+  small_constraint_vio: 1e-6
+  constraint_reduction_mult: 1e-6
+  alpha_step: 0.5
+  armijo_constant: 1e-4
