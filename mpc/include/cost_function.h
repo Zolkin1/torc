@@ -62,7 +62,6 @@ namespace torc::mpc {
                 weights_[cost_idxs_[cost_term]] = weights[idx];
                 idx++;
 
-
                 if (cost_term == Configuration) {
                     cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
                         CreateDefaultCost<adcg_t>(Configuration), 2*config_size_ + vel_size_,
@@ -314,7 +313,9 @@ namespace torc::mpc {
         int input_size_{};
         int nodes_{};
 
-        std::vector<std::unique_ptr<fn::ExplicitFn<double>>> cost_fcn_terms_;
+        // Using explicit function here seemed to cause memory leaks
+        // Also unclear if it is the memory leaks or the type here, but the MPC is notably quicker now
+        std::vector<std::unique_ptr<fn::AutodiffFn<double>>> cost_fcn_terms_;
         std::vector<vectorx_t> weights_;
         std::map<CostTypes, int> cost_idxs_;
 

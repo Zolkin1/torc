@@ -58,7 +58,6 @@ int main() {
     traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
     traj.SetDefault(q_target);
 
-    // TODO: Update the warm start trajectory forces
     std::cout << "robot mass: " << achilles.GetMass() << std::endl;
     double time = 0;
     for (int i = 0; i < traj.GetNumNodes(); i++) {
@@ -85,7 +84,7 @@ int main() {
 
     mpc.ComputeNLP(q_target, v_target, traj);
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 40; i++) {
         vectorx_t q_current;
         traj.GetConfigInterp(0.01, q_current);
         vectorx_t v_current;

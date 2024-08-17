@@ -83,8 +83,21 @@ namespace torc::mpc {
         void SetVerbosity(bool verbose);
         [[nodiscard]] std::vector<std::string> GetContactFrames() const;
         [[nodiscard]] int GetNumNodes() const;
+
+        [[nodiscard]] long GetTotalSolves() const;
+
+        // Statistics and printers
         void PrintStatistics() const;
         void PrintContactSchedule() const;
+        void PrintAggregateStats() const;
+
+        [[nodiscard]] std::pair<double, double> GetComputeTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetConstraintTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetCostTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetLineSearchTimeStats() const;
+
+        [[nodiscard]] std::pair<double, double> GetConstraintViolationStats() const;
+        [[nodiscard]] std::pair<double, double> GetCostStats() const;
 
         void SetWarmStartTrajectory(const Trajectory& traj);
 
@@ -95,6 +108,9 @@ namespace torc::mpc {
         void SetVelTarget(const std::vector<vectorx_t>& v_target);
 
         void SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj);
+
+
+        ~FullOrderMpc();
 
         // DEBUG
         //TODO: Make private again?
@@ -322,6 +338,7 @@ namespace torc::mpc {
 
         // Recording state
         std::vector<MpcStats> stats_;
+        long total_solves_;
 
         // General settings
         bool verbose_;

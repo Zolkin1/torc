@@ -22,7 +22,8 @@
 
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
-        : config_file_(config_file), verbose_(true), cost_(name), compile_derivatves_(true), scale_cost_(false) {
+        : config_file_(config_file), verbose_(true), cost_(name), compile_derivatves_(true), scale_cost_(false),
+            total_solves_(0) {
         // Verify the robot file exists
         if (!fs::exists(model_path)) {
             throw std::runtime_error("Robot file does not exist!");
@@ -42,6 +43,13 @@ namespace torc::mpc {
 
         // CreateDefaultCost();
     }
+
+    FullOrderMpc::~FullOrderMpc() {
+        if (verbose_) {
+            PrintAggregateStats();
+        }
+    }
+
 
     void FullOrderMpc::UpdateSettings() {
         // Read in the yaml file.
@@ -328,6 +336,8 @@ namespace torc::mpc {
         utils::TORCTimer config_timer;
         config_timer.Tic();
 
+        total_solves_ = 0;
+
         // Create the constraint matrix
         osqp_instance_.constraint_matrix.resize(GetNumConstraints(), GetNumDecisionVars());
         osqp_instance_.lower_bounds.resize(GetNumConstraints());
@@ -555,11 +565,12 @@ namespace torc::mpc {
              ls_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              ls_condition_, constraint_ls);
 
-         traj_ = traj_out;
+        traj_ = traj_out;
+        total_solves_++;
 
-         if (verbose_) {
+        if (verbose_) {
              std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
-         }
+        }
     }
 
     void FullOrderMpc::ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
@@ -2200,5 +2211,161 @@ namespace torc::mpc {
             std::cout.precision(6); // Default precision (usually 6)
         }
     }
+
+    void FullOrderMpc::PrintAggregateStats() const {
+        using std::setw;
+        using std::setfill;
+
+        const int col_width = 25;
+        const int total_width = 3*col_width;
+
+
+        auto time_now = std::chrono::system_clock::now();
+        std::time_t time1_now = std::chrono::system_clock::to_time_t(time_now);
+
+        std::cout << setfill('=') << setw(total_width/2 - 10) << "" << " MPC Aggregate Statistics " << setw(total_width/2 - 11) << "" << std::endl;
+        std::cout << setfill(' ');
+
+        std::cout << std::left << setw(15) << "Total solves: " << std::right << total_solves_ << std::endl;
+        std::cout << std::left << setw(col_width) << "" << std::right << "Average" << std::right << std::setw(col_width + 9) << "Standard deviation" << std::endl;
+        std::cout << setfill('-') << setw(3*col_width) << "" << setfill(' ') << std::endl;
+        const auto compute_times = GetComputeTimeStats();
+        const auto constraint_times = GetConstraintTimeStats();
+        const auto cost_times = GetCostTimeStats();
+        const auto ls_times = GetLineSearchTimeStats();
+
+        std::cout << std::fixed << std::setprecision(6);
+        std::cout << std::left << setw(col_width) << "Compute time (ms): " << std::right << compute_times.first <<
+            setw(col_width) << compute_times.second << std::endl;
+        std::cout << std::left << setw(col_width) << "Constraint time (ms): " << std::right << constraint_times.first <<
+            setw(col_width) << constraint_times.second << std::endl;
+        std::cout << std::left << setw(col_width) << "Cost time (ms): " << std::right << cost_times.first <<
+            setw(col_width) << cost_times.second << std::endl;
+        std::cout << std::left << setw(col_width) << "Line search time (ms): " << std::right << ls_times.first <<
+            setw(col_width) << ls_times.second << std::endl;
+
+        const auto constr_vio_stats = GetConstraintViolationStats();
+        std::cout << std::left << setw(col_width) << "Constraint violation: " << std::right << constr_vio_stats.first <<
+            setw(col_width) << constr_vio_stats.second << std::endl;
+
+        const auto cost_stats = GetCostStats();
+        std::cout << std::left << setw(col_width) << "Cost: " << std::right << cost_stats.first <<
+            setw(col_width) << cost_stats.second << std::endl;
+    }
+
+    std::pair<double, double> FullOrderMpc::GetComputeTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.total_compute_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.total_compute_time - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetConstraintTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.constraint_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.constraint_time - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetCostTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.cost_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.cost_time - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetLineSearchTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.ls_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.ls_time - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetConstraintViolationStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.constraint_violation;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.constraint_violation - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetCostStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.full_cost;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.full_cost - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    long FullOrderMpc::GetTotalSolves() const {
+        return total_solves_;
+    }
+
+
+
 
 } // namespace torc::mpc
