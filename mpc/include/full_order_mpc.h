@@ -224,13 +224,15 @@ namespace torc::mpc {
     // ----- Helper Functions ----- //
         void ConvertSolutionToTraj(const vectorx_t& qp_sol, Trajectory& traj);
 
+        [[nodiscard]] int GetNumDecisionVars() const;
+        // [[nodiscard]] int GetDecisionVarsPerNode() const;
+        [[nodiscard]] int GetDecisionIdx(int node, const DecisionType& var_type) const;
+        [[nodiscard]] int GetDecisionIdxStart(int node) const;
+
         [[nodiscard]] int GetNumConstraints() const;
         [[nodiscard]] int GetConstraintsPerNode() const;
-        [[nodiscard]] int GetNumDecisionVars() const;
-        int GetDecisionVarsPerNode() const;
-        int GetDecisionIdx(int node, const DecisionType& var_type) const;
-        int GetConstraintRow(int node, const ConstraintType& constraint) const;
-        int GetConstraintRowStartNode(int node) const;
+        [[nodiscard]] int GetConstraintRow(int node, const ConstraintType& constraint) const;
+        [[nodiscard]] int GetConstraintRowStartNode(int node) const;
 
         void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
         void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
