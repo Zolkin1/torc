@@ -228,6 +228,24 @@ namespace torc::mpc {
                "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
         }
 
+        if (cost_settings["force_regularization_weights"]) {
+            auto vel_tracking_weights = cost_settings["force_regularization_weights"].as<std::vector<double>>();
+            force_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
+        }
+
+        if (force_reg_weight_.size() < CONTACT_3DOF) {
+            std::cerr << "Torque regularization weight size is too small, adding zeros." <<
+               "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
+            int starting_size = force_reg_weight_.size();
+            force_reg_weight_.conservativeResize(CONTACT_3DOF);
+            for (int i = starting_size; i < CONTACT_3DOF; i++) {
+                force_reg_weight_(i) = 0;
+            }
+        } else if (force_reg_weight_.size() > CONTACT_3DOF) {
+            std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
+               "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
+        }
+
         // ---------- Contact Settings ---------- //
         if (!config["contacts"]) {
             throw std::runtime_error("No contact settings provided!");
@@ -301,6 +319,7 @@ namespace torc::mpc {
             std::cout << "\tConfiguration tracking weight: " << config_tracking_weight_.transpose() << std::endl;
             std::cout << "\tVelocity tracking weight: " << vel_tracking_weight_.transpose() << std::endl;
             std::cout << "\tTorque regularization weight: " << torque_reg_weight_.transpose() << std::endl;
+            std::cout << "\tForce regularization weight: " << force_reg_weight_.transpose() << std::endl;
 
             std::cout << "Contacts:" << std::endl;
             std::cout << "\tNumber of contact locations: " << num_contact_locations_ << std::endl;
@@ -383,11 +402,13 @@ namespace torc::mpc {
         weights.emplace_back(config_tracking_weight_);
         weights.emplace_back(vel_tracking_weight_);
         weights.emplace_back(torque_reg_weight_);
+        weights.emplace_back(force_reg_weight_);
 
         std::vector<CostTypes> costs;
         costs.emplace_back(CostTypes::Configuration);
         costs.emplace_back(CostTypes::VelocityTracking);
         costs.emplace_back(CostTypes::TorqueReg);
+        costs.emplace_back(ForceReg);
         cost_.Configure(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(),
             robot_model_->GetNumInputs(), compile_derivatves_, costs, weights);
 
@@ -1336,6 +1357,11 @@ namespace torc::mpc {
             ws_->obj_tau_mat.row(i) = ws_->obj_tau_mat.row(i)*((torque_reg_weight_(i) != 0) ? 1 : 0);
         }
 
+        ws_->obj_force_mat = matrixx_t::Identity(CONTACT_3DOF, CONTACT_3DOF);
+        for (int i = 0; i < force_reg_weight_.size(); i++) {
+            ws_->obj_force_mat.row(i) = ws_->obj_force_mat.row(i)*((force_reg_weight_(i) != 0) ? 1 : 0);
+        }
+
         for (int i = 0; i < nodes_; i++) {
             // Configuration Tracking
             int decision_idx = GetDecisionIdx(i, Configuration);
@@ -1349,6 +1375,13 @@ namespace torc::mpc {
                 // Torque regularization
                 decision_idx = GetDecisionIdx(i, Torque);
                 MatrixToNewTriplet(ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_);
+            }
+
+            // Force regularization
+            decision_idx = GetDecisionIdx(i, GroundForce);
+            for (const auto& frame : contact_frames_) {
+                MatrixToNewTriplet(ws_->obj_force_mat, decision_idx, decision_idx, objective_triplets_);
+                decision_idx += CONTACT_3DOF;
             }
         }
 
@@ -1436,6 +1469,22 @@ namespace torc::mpc {
                     decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
             }
 
+            // ----- Force ----- //
+            int force_idx = GetDecisionIdx(node, GroundForce);
+            for (const auto& frame : contact_frames_) {
+                cost_.Linearize(traj_.GetForce(node, frame), vector3_t::Zero(), CostTypes::ForceReg,
+                    ws_->obj_force_vector);
+                osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
+                    (scale_cost_ ? dt_[node] : 1) * ws_->obj_force_vector;
+
+                cost_.Quadraticize(traj_.GetForce(node, frame), vector3_t::Zero(), CostTypes::ForceReg,
+                    ws_->obj_force_mat);
+                MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_force_mat,
+                    force_idx, force_idx, objective_triplets_, objective_triplet_idx_, true);
+
+                force_idx += CONTACT_3DOF;
+            }
+
         }
 
         objective_mat_.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
@@ -1459,6 +1508,13 @@ namespace torc::mpc {
             if (node < nodes_full_dynamics_) {
                 cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
                     traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()), CostTypes::TorqueReg);
+            }
+
+            int force_idx = GetDecisionIdx(node, GroundForce);
+            for (const auto& frame : contact_frames_) {
+                cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(
+                    force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), vector3_t::Zero(), ForceReg);
+                force_idx += CONTACT_3DOF;
             }
         }
         return cost;

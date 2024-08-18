@@ -43,6 +43,7 @@ namespace torc::mpc {
             vel_size_ = vel_size;
             joint_size_ = joint_size;
             input_size_ = input_size;
+            force_size_ = 3; // For now assuming forces are point contacts
             compile_derivatives_ = compile_derivatives;
 
             if (costs.size() != weights.size()) {
@@ -75,6 +76,12 @@ namespace torc::mpc {
                     cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
                                             CreateDefaultCost<adcg_t>(TorqueReg), 3*input_size_,
                                             compile_derivatives_, false, name_ + "_mpc_torque_reg_cost"));
+                } else  if (cost_term == ForceReg) {
+                    cost_fcn_terms_.emplace_back(std::make_unique<torc::fn::AutodiffFn<double>>(
+                                                                CreateDefaultCost<adcg_t>(ForceReg), 3*force_size_,
+                                                                compile_derivatives_, false, name_ + "_mpc_force_reg_cost"));
+                } else {
+                    std::cerr << "Cost term is not recognized!" << std::endl;
                 }
                 // CppAD functions are slow to evaluate, so get the double function
                 cost_fcn_terms_[cost_idxs_[cost_term]]->func_ = CreateDefaultCost<double>(cost_term);
@@ -115,6 +122,14 @@ namespace torc::mpc {
                 FormCostFcnArg(vectorx_t::Zero(input_size_), reference, target, arg);
                 linear_term.resize(input_size_);
                 linear_term = cost_fcn_terms_[cost_idxs_[TorqueReg]]->Gradient(arg).head(input_size_);
+            } else if (type == ForceReg) {
+                if (reference.size() != force_size_ || target.size() != force_size_) {
+                    throw std::runtime_error("[Cost Function] force linearization reference or target has the wrong size!");
+                }
+                vectorx_t arg;
+                FormCostFcnArg(vectorx_t::Zero(force_size_), reference, target, arg);
+                linear_term.resize(force_size_);
+                linear_term = cost_fcn_terms_[cost_idxs_[ForceReg]]->Gradient(arg).head(force_size_);
             } else {
                 throw std::runtime_error("Provided cost type not supported yet!");
             }
@@ -149,12 +164,20 @@ namespace torc::mpc {
                 hessian_term = cost_fcn_terms_[cost_idxs_[VelocityTracking]]->Hessian(arg).topLeftCorner(vel_size_, vel_size_);
             } else if (type == TorqueReg) {
                 if (reference.size() != input_size_ || target.size() != input_size_) {
-                    throw std::runtime_error("[Cost Function] velocity quadratic reference or target has the wrong size!");
+                    throw std::runtime_error("[Cost Function] torque quadratic reference or target has the wrong size!");
                 }
                 vectorx_t arg;
                 FormCostFcnArg(vectorx_t::Zero(input_size_), reference, target, arg);
                 hessian_term.resize(input_size_, input_size_);
                 hessian_term = cost_fcn_terms_[cost_idxs_[TorqueReg]]->Hessian(arg).topLeftCorner(input_size_, input_size_);
+            } else if (type == ForceReg) {
+                if (reference.size() != force_size_ || target.size() != force_size_) {
+                    throw std::runtime_error("[Cost Function] force quadratic reference or target has the wrong size!");
+                }
+                vectorx_t arg;
+                FormCostFcnArg(vectorx_t::Zero(force_size_), reference, target, arg);
+                hessian_term.resize(force_size_, force_size_);
+                hessian_term = cost_fcn_terms_[cost_idxs_[ForceReg]]->Hessian(arg).topLeftCorner(force_size_, force_size_);
             } else {
                 throw std::runtime_error("Provided cost type not supported yet!");
             }
@@ -254,6 +277,21 @@ namespace torc::mpc {
                     }
                     return tau_diff.squaredNorm();
                 };
+            } else  if (type == ForceReg) {
+                if (weight.size() != force_size_) {
+                    throw std::runtime_error("Force regularization weight has wrong size!");
+                }
+                int force_size = force_size_;
+                // *** Note ** that this function takes a single 3 vector of forces, not all the contact forces
+                return [force_size, weight](const Eigen::VectorX<ScalarT>& dforce_forcebar_forcetarget) {
+                    Eigen::VectorX<ScalarT> force_diff = dforce_forcebar_forcetarget.head(force_size)
+                        + dforce_forcebar_forcetarget.segment(force_size, force_size);  // Get the current velocity
+                    force_diff = force_diff - dforce_forcebar_forcetarget.tail(force_size);    // Get the difference between the velocity and its target
+                    for (int i = 0; i < weight.size(); i++) {
+                        force_diff(i) = force_diff(i) * weight(i);
+                    }
+                    return force_diff.squaredNorm();
+                };
             }
             throw std::runtime_error("Unsupported cost type!");
         }
@@ -311,6 +349,7 @@ namespace torc::mpc {
         int vel_size_{};
         int joint_size_{};
         int input_size_{};
+        int force_size_{};
         int nodes_{};
 
         // Using explicit function here seemed to cause memory leaks

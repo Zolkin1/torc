@@ -149,10 +149,12 @@ namespace torc::mpc {
             matrixx_t obj_config_mat;
             matrixx_t obj_vel_mat;
             matrixx_t obj_tau_mat;
+            matrixx_t obj_force_mat;
             // TODO: Consider combining these two vectors
             vectorx_t obj_config_vector;
             vectorx_t obj_vel_vector;
             vectorx_t obj_tau_vector;
+            vectorx_t obj_force_vector;
             std::vector<models::ExternalForce> f_ext;
         };
 
@@ -298,6 +300,7 @@ namespace torc::mpc {
         vectorx_t vel_tracking_weight_;
         vectorx_t config_tracking_weight_;
         vectorx_t torque_reg_weight_;
+        vectorx_t force_reg_weight_;
 
         std::vector<Eigen::Triplet<double>> objective_triplets_;
         int objective_triplet_idx_{};
