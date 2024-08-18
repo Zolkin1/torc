@@ -31,14 +31,14 @@ int main() {
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
-    q_target << 0., 0, 0.9,    // position
-            0, 0, 0, 1,     // quaternion
-            0, 0, -0.26,    // L hips joints
-            0.65, -0.43,    // L knee, ankle
-            0, 0, 0, 0,     // L shoulders and elbow
-            0, 0, -0.26,    // R hip joints
-            0.65, -0.43,    // R knee ankle
-            0, 0, 0, 0;     // R shoulders and elbow
+    q_target << 0., 0, 0.97,    // position
+                0, 0, 0, 1,     // quaternion
+                0, 0, -0.26,    // L hips joints
+                0.65, -0.43,    // L knee, ankle
+                0, 0, 0, 0,     // L shoulders and elbow
+                0, 0, -0.26,    // R hip joints
+                0.65, -0.43,    // R knee ankle
+                0, 0, 0, 0;     // R shoulders and elbow
 
     mpc.SetConstantConfigTarget(q_target);
     q_target(0) = 0;

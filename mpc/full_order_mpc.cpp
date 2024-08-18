@@ -1139,7 +1139,7 @@ namespace torc::mpc {
             }
         }
 
-        return q.squaredNorm();
+        return q.tail(robot_model_->GetConfigDim() - FLOATING_BASE).squaredNorm();
     }
 
     double FullOrderMpc::GetVelocityBoxViolation(const vectorx_t &qp_res, int node) {
@@ -1154,7 +1154,7 @@ namespace torc::mpc {
             }
         }
 
-        return vel.squaredNorm();
+        return vel.tail(robot_model_->GetVelDim() - FLOATING_VEL).squaredNorm();
     }
 
     double FullOrderMpc::GetTorqueBoxViolation(const vectorx_t &qp_res, int node) {

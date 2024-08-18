@@ -1,7 +1,7 @@
 general_settings:
   nodes: 32
   verbose: True
-  node_dt: 0.02
+  node_dt: 0.025
   compile_derivatives: True
   base_frame: "torso"
   scale_cost: False
@@ -12,28 +12,32 @@ solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
   verbose: True
-  polish: True
-  rho: 2e-3 # 0.02
+  polish: False
+  rho: 2e-2 # 0.02
   alpha: 1.6 # 1.6
   sigma: 1e-6 # 1e-10
   adaptive_rho: False
-  max_iter: 25 # 500 is good
-  scaling: 10   # More scaling is only helpful when I use less iterations
+  max_iter: 20 # 500 is good
+  scaling: 10
 constraints:
-  friction_coef: 0.5
+  friction_coef: 0.5  # TODO: Tune this
   max_grf: 200
 costs:
-  configuration_tracking_weights: [ .01, .01, .1,
-                                    0.0, 0.0, 0.0,
-                                    0.01, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001, 0.001,
-                                    0.01, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001, 0.001 ]
-  velocity_tracking_weights: [1, 1, 1,
+  configuration_tracking_weights: [ .01, .01, .5,
+                                   0.0, 0.0, 0.0,
+                                   0.01, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
+                                   0.01, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001 ]
+#  configuration_tracking_weights: [ .01, .01, .5,
+#                                    0.0, 0.0, 0.0,
+#                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.001, 0.001, 0.001,
+#                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.001, 0.001, 0.001 ]
+  velocity_tracking_weights: [10, 10, 10,
                               .1, .1, .1,
-                              .01, .1, .1, .01, .5, .1, .1, .1, .1,
-                              .01, .1, .1, .01, .5, .1, .1, .1, .1]
-  torque_regularization_weights: [.001, .01, .01, .001, .02, .1, .1, .1, .1,
-                                  .001, .01, .01, .001, .02, .1, .1, .1, .1]
-  force_regularization_weights: [0.001, 0.001, 0.001] #[1, 1, 1]
+                              .01, .5, .01, .01, .5, .1, .1, .1, .1,
+                              .01, .5, .01, .01, .5, .1, .1, .1, .1]
+  torque_regularization_weights: [.001, .01, .01, .001, .02, .5, .5, .5, .1,
+                                  .001, .01, .01, .001, .02, .5, .5, .5, .1]
+  force_regularization_weights: [0.00001, 0.00001, 0.00001] # Note that these are small because the force in general is quite large
 contacts:
   # For now, removing hands
   # contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]
@@ -48,5 +52,5 @@ line_search:
   large_constraint_vio: 1e-2
   small_constraint_vio: 1e-6
   constraint_reduction_mult: 1e-6
-  alpha_step: 0.5
+  alpha_step: 0.5 # Since the line search is high variance, lowering this helps
   armijo_constant: 1e-4
