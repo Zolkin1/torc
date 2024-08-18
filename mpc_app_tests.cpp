@@ -21,12 +21,18 @@ int main() {
     // cs.InsertContact("left_hand", 0, 1);
 
     // cs.InsertContact("right_foot", 0, 1);
-    cs.InsertContact("foot_front_right", 0, 1);
-    cs.InsertContact("foot_rear_right", 0, 1);
+    // cs.InsertContact("foot_front_right", 0, 1);
+    // cs.InsertContact("foot_rear_right", 0, 1);
+
+    cs.InsertContact("foot_front_right", 0.6, 1000);
+    cs.InsertContact("foot_rear_right", 0.6, 1000);
+
+    cs.InsertContact("foot_front_right", 0, 0.3);
+    cs.InsertContact("foot_rear_right", 0, 0.3);
 
     // cs.InsertContact("left_foot", 0, 1);
-    cs.InsertContact("foot_front_left", 0, 1);
-    cs.InsertContact("foot_rear_left", 0, 1);
+    cs.InsertContact("foot_front_left", 0, 10);
+    cs.InsertContact("foot_rear_left", 0, 10);
     mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, 0.01, 0.5);
 
     vectorx_t q_target, v_target;
@@ -57,6 +63,8 @@ int main() {
     Trajectory traj;
     traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
     traj.SetDefault(q_target);
+
+    traj.SetDtVector(mpc.GetDtVector());
 
     std::cout << "robot mass: " << achilles.GetMass() << std::endl;
     double time = 0;

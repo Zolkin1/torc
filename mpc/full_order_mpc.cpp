@@ -179,6 +179,10 @@ namespace torc::mpc {
             config_tracking_weight_ = utils::StdToEigenVector(config_tracking_weights);
         }
 
+        if (config_tracking_weight_(3) != config_tracking_weight_(4) || config_tracking_weight_(4) != config_tracking_weight_(5)) {
+            throw std::runtime_error("For now all quaternion tracking weights must be equal!");
+        }
+
         if (config_tracking_weight_.size() < robot_model_->GetVelDim()) {
             std::cerr << "Configuration tracking weight size is too small, adding zeros." <<
                "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
@@ -496,9 +500,10 @@ namespace torc::mpc {
                 throw std::runtime_error("nan in constraint mat");
             }
 
-            if (objective_triplet.value() == 0) {
-                throw std::runtime_error("objective 0 in triplet!");
-            }
+            // if (objective_triplet.value() == 0) {
+                // std::cerr << "objective 0 in triplet!" << std::endl;
+                // throw std::runtime_error("objective 0 in triplet!");
+            // }
         }
 
         for (const auto& obj_vec : osqp_instance_.objective_vector) {
@@ -1347,6 +1352,8 @@ namespace torc::mpc {
             ws_->obj_config_mat.row(i) = ws_->obj_config_mat.row(i)*((config_tracking_weight_(i) != 0) ? 1 : 0);
         }
 
+        // std::cout << "obj config mat pattern: \n" << ws_->obj_config_mat << std::endl;
+
         ws_->obj_vel_mat = matrixx_t::Identity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
         for (int i = 0; i < vel_tracking_weight_.size(); i++) {
             ws_->obj_vel_mat.row(i) = ws_->obj_vel_mat.row(i)*((vel_tracking_weight_(i) != 0) ? 1 : 0);
@@ -1430,15 +1437,18 @@ namespace torc::mpc {
                 (scale_cost_ ? dt_[node] : 1) * ws_->obj_config_vector;
 
             cost_.Quadraticize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_mat);
-            // for (int i = 0; i < 3; i++) {
-            //     for (int j = 0; j < 3; j++) {
-            //         if (ws_->obj_config_mat(i+3, j+3) == 0 && config_tracking_weight_(i+3) != 0) {
-            //             ws_->obj_config_mat(i+3, j+3) += 1e-5; // TODO: Consider changing back to 1e-10
-            //         }
-            //     }
-            // }
-            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat,
+
+            // Positions
+            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat.topRows<POS_VARS>(),
                 decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+            // Orientations
+            if (config_tracking_weight_(3) > 0) {       // Only add these if they have a positive weight
+                MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat.block<3,3>(POS_VARS, POS_VARS),
+                    decision_idx + POS_VARS, decision_idx + POS_VARS, objective_triplets_, objective_triplet_idx_, false);
+            }
+            // Joints
+            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat.bottomRows(robot_model_->GetNumInputs()),
+                decision_idx + FLOATING_VEL, decision_idx, objective_triplets_, objective_triplet_idx_, true);
 
             // ----- Velocity ----- //
             decision_idx = GetDecisionIdx(node, Velocity);
@@ -2436,6 +2446,10 @@ namespace torc::mpc {
 
     long FullOrderMpc::GetTotalSolves() const {
         return total_solves_;
+    }
+
+    const std::vector<double>& FullOrderMpc::GetDtVector() const {
+        return dt_;
     }
 
 
