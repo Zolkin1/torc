@@ -95,6 +95,7 @@ int main() {
     for (int i = 0; i < 40; i++) {
         vectorx_t q_current;
         traj.GetConfigInterp(0.01, q_current);
+        std::cout << "q: " << q_current.transpose() << std::endl;
         vectorx_t v_current;
         traj.GetVelocityInterp(0.01, v_current);
 
@@ -103,20 +104,20 @@ int main() {
 
 
 
-    // for (int i = 0; i < traj.GetNumNodes(); i++) {
-    //     std::cout << "Node: " << i << std::endl;
-    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-    //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
-    //     achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
-    //     for (const auto& frame : mpc.GetContactFrames()) {
-    //         std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
-    //         std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
-    //         std::cout << "force: " << traj.GetForce(i, frame).transpose() << std::endl;
-    //     }
-    //     std::cout << std::endl;
-    // }
-    //
+    for (int i = 0; i < traj.GetNumNodes(); i++) {
+        std::cout << "Node: " << i << std::endl;
+        std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+        // std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+        // achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
+        // for (const auto& frame : mpc.GetContactFrames()) {
+        //     std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
+        //     std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
+        //     std::cout << "force: " << traj.GetForce(i, frame).transpose() << std::endl;
+        // }
+        std::cout << std::endl;
+    }
+
     // for (const auto& frame : mpc.GetContactFrames()) {
     //     std::cout << "frame: " << std::endl;
     //     for (int i = 0; i < traj.GetNumNodes(); i++) {

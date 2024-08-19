@@ -310,12 +310,14 @@ namespace torc::mpc {
             // Floating base orientation difference
             Eigen::Quaternion<ScalarT> qbar, q_target;
             qbar.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(vel_size_ + POS_VARS);
+
             q_target.coeffs() = dq_qbar_qtarget.template segment<QUAT_VARS>(config_size_ + vel_size_ + POS_VARS);
+
             // Eigen's inverse has an if statement, so we can't use it in codegen
-            qbar = Eigen::Quaternion<ScalarT>(qbar.conjugate().coeffs() / qbar.squaredNorm());   // Assumes norm > 0
+            q_target = Eigen::Quaternion<ScalarT>(q_target.conjugate().coeffs() / q_target.squaredNorm());   // Assumes norm > 0
 
             q_diff.template segment<3>(POS_VARS) = pinocchio::quaternion::log3(
-                qbar * q_target
+                q_target * qbar
                  * pinocchio::quaternion::exp3(dq_qbar_qtarget.template segment<3>(POS_VARS)));
 
             // Joint differences

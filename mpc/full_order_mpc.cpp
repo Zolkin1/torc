@@ -545,8 +545,7 @@ namespace torc::mpc {
              throw std::runtime_error("Could not update the objective vector.");
          }
 
-        // Set the warmstart to 0
-        // This seems to help, but not by a lot
+        // Set the warmstart to 0 -- appears to be very important
         status = osqp_solver_.SetWarmStart(vectorx_t::Zero(GetNumDecisionVars()),
             vectorx_t::Zero(GetNumConstraints()));
         if (!status.ok()) {

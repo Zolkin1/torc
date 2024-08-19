@@ -157,7 +157,7 @@ namespace torc::mpc {
                 q_out.tail(num_joints) = forward_weight*q_[i].tail(num_joints) + (1 - forward_weight)*q_[i-1].tail(num_joints);
 
                 // Quaternion
-                quat_t quat_out;
+                quat_t quat_out; // = GetQuat(i-1).slerp(forward_weight, GetQuat(i));
                 pinocchio::quaternion::slerp(forward_weight, GetQuat(i-1), GetQuat(i), quat_out);
                 q_out.segment<QUAT_VARS>(POS_VARS) = quat_out.coeffs();
                 return;
