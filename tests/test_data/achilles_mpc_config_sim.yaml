@@ -23,6 +23,7 @@ constraints:
   friction_coef: 0.5  # TODO: Tune this
   max_grf: 200
 costs:
+  terminal_cost_weight: 10
   configuration_tracking_weights: [ .01, .01, .5,
                                     0.01, 0.01, 0.01,
                                     0.0, 0.0, 0.0, 0.0, 0.0, 0.001, 0.001, 0.001, 0.001,

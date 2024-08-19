@@ -250,6 +250,12 @@ namespace torc::mpc {
                "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
         }
 
+        if (cost_settings["terminal_cost_weight"]) {
+            terminal_cost_weight_ = cost_settings["terminal_cost_weight"].as<double>();
+        } else {
+            terminal_cost_weight_ = 1;
+        }
+
         // ---------- Contact Settings ---------- //
         if (!config["contacts"]) {
             throw std::runtime_error("No contact settings provided!");
@@ -324,6 +330,7 @@ namespace torc::mpc {
             std::cout << "\tVelocity tracking weight: " << vel_tracking_weight_.transpose() << std::endl;
             std::cout << "\tTorque regularization weight: " << torque_reg_weight_.transpose() << std::endl;
             std::cout << "\tForce regularization weight: " << force_reg_weight_.transpose() << std::endl;
+            std::cout << "\tTerminal cost weight: " << terminal_cost_weight_ << std::endl;
 
             std::cout << "Contacts:" << std::endl;
             std::cout << "\tNumber of contact locations: " << num_contact_locations_ << std::endl;
@@ -647,16 +654,14 @@ namespace torc::mpc {
 
             AddFrictionConeConstraint(node);
 
-            // These could conflict with the initial condition constraints
-            if (node > 1) {
-                // Configuration is set for the initial condition and the next node, do not constrain it
-                AddConfigurationBoxConstraint(node);
-                AddSwingHeightConstraint(node);
-            }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
+
+                // The second configuration can be effected by the second velocity
+                AddConfigurationBoxConstraint(node);
+                AddSwingHeightConstraint(node);
             }
         }
 
@@ -719,7 +724,8 @@ namespace torc::mpc {
         // v^b_k dt*identity
         row_start = GetConstraintRow(node, Integrator);
         col_start = GetDecisionIdx(node, Velocity);
-        MatrixToTriplet(dt_[node]*R, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+        // For now, using the same R as for the first node
+        MatrixToTriplet(dt_[node]*R/2.0, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
         // DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, POS_VARS, constraint_triplets_, constraint_triplet_idx_);
 
         // v^q_k linearization
@@ -731,7 +737,25 @@ namespace torc::mpc {
         // v^j_k dt*identity
         row_start += 3;
         col_start += 3;
-        DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);   // TODO Should probably be num joints not inputs
+        DiagonalScalarMatrixToTriplet(dt_[node]/2.0, row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);   // TODO Should probably be num joints not inputs
+
+        // Now do the velocity at the next node in the same way
+        // v^b_k+1 dt*identity
+        row_start = GetConstraintRow(node, Integrator);
+        col_start = GetDecisionIdx(node+1, Velocity);
+        MatrixToTriplet(dt_[node]*R/2.0, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+        // DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, POS_VARS, constraint_triplets_, constraint_triplet_idx_);
+
+        // v^q_k+1 linearization
+        row_start += POS_VARS;
+        col_start += POS_VARS;
+        MatrixToTriplet(dv, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+
+        // v^j_k+1 dt*identity
+        row_start += 3;
+        col_start += 3;
+        DiagonalScalarMatrixToTriplet(dt_[node]/2.0, row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);   // TODO Should probably be num joints not inputs
+
 
         // Base position bounds
         row_start = GetConstraintRow(node, Integrator);
@@ -1024,15 +1048,13 @@ namespace torc::mpc {
             violation += dt_[node]*GetFrictionViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
-            if (node > 1) {
-                // Configuration is set for the initial condition and the next node, do not constrain it
-                violation += dt_[node]*GetConfigurationBoxViolation(qp_res, node);
-                violation += dt_[node]*GetSwingHeightViolation(qp_res, node);
-            }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 violation += dt_[node]*GetHolonomicViolation(qp_res, node);
                 violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
+
+                violation += dt_[node]*GetConfigurationBoxViolation(qp_res, node);
+                violation += dt_[node]*GetSwingHeightViolation(qp_res, node);
             }
         }
 
@@ -1229,7 +1251,12 @@ namespace torc::mpc {
         quat_t qbar_kp1 = traj_.GetQuat(node+1);
         quat_t qbar_k = traj_.GetQuat(node);
         vector3_t xi = vector3_t::Zero();
-        vector3_t w = traj_.GetVelocity(node).segment<3>(POS_VARS);
+
+        // Use the velocity from the current and next node
+        vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
+        vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
+        vector3_t w = 0.5*(wk + wkp1);
+
         const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
         matrix3_t update_fd = matrix3_t::Zero();
         for (int i = 0; i < 3; i++) {
@@ -1253,7 +1280,11 @@ namespace torc::mpc {
         quat_t qbar_k = traj_.GetQuat(node);
         vector3_t xi = vector3_t::Zero();
         // TODO: Verify that this is in the correct frame!
-        vector3_t w = traj_.GetVelocity(node).segment<3>(POS_VARS);
+        // Use the velocity from the current and next node
+        vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
+        vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
+        vector3_t w = 0.5*(wk + wkp1);
+
         const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
         matrix3_t update_fd = matrix3_t::Zero();
         for (int i = 0; i < 3; i++) {
@@ -1266,7 +1297,7 @@ namespace torc::mpc {
             w(i) -= FD_DELTA;
         }
 
-        return update_fd;
+        return 0.5*update_fd;
     }
 
     void FullOrderMpc::InverseDynamicsLinearization(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1,
@@ -1430,34 +1461,39 @@ namespace torc::mpc {
 
         // For now the target torque will always be 0
         for (int node = 0; node < nodes_; node++) {
+            double scaling = (scale_cost_ ? dt_[node] : 1);
+            if (node == nodes_ - 1) {
+                scaling *= terminal_cost_weight_;
+            }
+
             // ----- Configuration ----- //
             int decision_idx = GetDecisionIdx(node, Configuration);
             cost_.Linearize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_vector);
             osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
-                (scale_cost_ ? dt_[node] : 1) * ws_->obj_config_vector;
+                scaling * ws_->obj_config_vector;
 
             cost_.Quadraticize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_mat);
 
             // Positions
-            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat.topRows<POS_VARS>(),
+            MatrixToTriplet(scaling * ws_->obj_config_mat.topRows<POS_VARS>(),
                 decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
             // Orientations
             if (config_tracking_weight_(3) > 0) {       // Only add these if they have a positive weight
-                MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat.block<3,3>(POS_VARS, POS_VARS),
+                MatrixToTriplet(scaling * ws_->obj_config_mat.block<3,3>(POS_VARS, POS_VARS),
                     decision_idx + POS_VARS, decision_idx + POS_VARS, objective_triplets_, objective_triplet_idx_, false);
             }
             // Joints
-            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_config_mat.bottomRows(robot_model_->GetNumInputs()),
+            MatrixToTriplet(scaling * ws_->obj_config_mat.bottomRows(robot_model_->GetNumInputs()),
                 decision_idx + FLOATING_VEL, decision_idx, objective_triplets_, objective_triplet_idx_, true);
 
             // ----- Velocity ----- //
             decision_idx = GetDecisionIdx(node, Velocity);
             cost_.Linearize(traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking, ws_->obj_vel_vector);
             osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
-                (scale_cost_ ? dt_[node] : 1) * ws_->obj_vel_vector;
+                scaling * ws_->obj_vel_vector;
 
             cost_.Quadraticize(traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking, ws_->obj_vel_mat);
-            MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_vel_mat,
+            MatrixToTriplet(scaling * ws_->obj_vel_mat,
                 decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
 
             // ----- Torque ----- //
@@ -1471,11 +1507,11 @@ namespace torc::mpc {
                 cost_.Linearize(traj_.GetTau(node), tau_target,
                     CostTypes::TorqueReg, ws_->obj_tau_vector);
                 osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
-                    (scale_cost_ ? dt_[node] : 1) * ws_->obj_tau_vector;
+                    scaling * ws_->obj_tau_vector;
 
                 cost_.Quadraticize(traj_.GetTau(node), tau_target,
                     CostTypes::TorqueReg, ws_->obj_tau_mat);
-                MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_tau_mat,
+                MatrixToTriplet(scaling * ws_->obj_tau_mat,
                     decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
             }
 
@@ -1485,11 +1521,11 @@ namespace torc::mpc {
                 cost_.Linearize(traj_.GetForce(node, frame), vector3_t::Zero(), CostTypes::ForceReg,
                     ws_->obj_force_vector);
                 osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
-                    (scale_cost_ ? dt_[node] : 1) * ws_->obj_force_vector;
+                    scaling * ws_->obj_force_vector;
 
                 cost_.Quadraticize(traj_.GetForce(node, frame), vector3_t::Zero(), CostTypes::ForceReg,
                     ws_->obj_force_mat);
-                MatrixToTriplet((scale_cost_ ? dt_[node] : 1) * ws_->obj_force_mat,
+                MatrixToTriplet(scaling * ws_->obj_force_mat,
                     force_idx, force_idx, objective_triplets_, objective_triplet_idx_, true);
 
                 force_idx += CONTACT_3DOF;
@@ -1511,22 +1547,31 @@ namespace torc::mpc {
     double FullOrderMpc::GetFullCost(const vectorx_t& qp_res) {
         double cost = 0;
         for (int node = 0; node < nodes_; node++) {
-            cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+            double cost_node = 0;
+            cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
                 traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration);
-            cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
+            cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
                 traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking);
             if (node < nodes_full_dynamics_) {
-                cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
+                cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
                     traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()), CostTypes::TorqueReg);
             }
 
             int force_idx = GetDecisionIdx(node, GroundForce);
             for (const auto& frame : contact_frames_) {
-                cost += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(
+                cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(
                     force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), vector3_t::Zero(), ForceReg);
                 force_idx += CONTACT_3DOF;
             }
+
+            // Weight the terminal cost by a different amount
+            if (node == nodes_ - 1) {
+                cost_node *= terminal_cost_weight_;
+            }
+
+            cost += cost_node;
         }
+
         return cost;
     }
 
@@ -1596,15 +1641,14 @@ namespace torc::mpc {
 
             AddFrictionConePattern(node);
 
-            if (node > 1) {
-                // Configuration is set for the initial condition and the next node, do not constrain it
-                AddConfigurationBoxPattern(node);
-                AddSwingHeightPattern(node);
-            }
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
+
+                // The second configuration can be effected by the second velocity
+                AddConfigurationBoxPattern(node);
+                AddSwingHeightPattern(node);
             }
         }
 
@@ -1657,10 +1701,15 @@ namespace torc::mpc {
         ws_->int_mat.topLeftCorner<3,3>().setConstant(1);
         MatrixToNewTriplet(ws_->int_mat, row_start, col_start, constraint_triplets_);
 
+        // velocity at the next node contributes too by using the midpoint rule
+        col_start = GetDecisionIdx(node + 1, Velocity);
+        MatrixToNewTriplet(ws_->int_mat, row_start, col_start, constraint_triplets_);
+
         // q_k+1 negative identity
         col_start = GetDecisionIdx(node + 1, Configuration);
         ws_->int_mat.setIdentity();
         MatrixToNewTriplet(ws_->int_mat, row_start, col_start, constraint_triplets_);
+
     }
 
     void FullOrderMpc::AddIDPattern(int node, bool full_order) {
@@ -1911,14 +1960,12 @@ namespace torc::mpc {
 
             row += NumFrictionConeConstraintsNode();
 
-            if (i > 1) {
-                row += NumConfigBoxConstraintsNode();
-                row += NumSwingHeightConstraintsNode();
-            }
-
             if (i > 0) {
                 row += NumHolonomicConstraintsNode();
                 row += NumVelocityBoxConstraintsNode();
+
+                row += NumConfigBoxConstraintsNode();
+                row += NumSwingHeightConstraintsNode();
             }
         }
 
@@ -1930,7 +1977,7 @@ namespace torc::mpc {
         int row = GetConstraintRowStartNode(node);
         switch (constraint) {
             case Holonomic:
-                if (node > 1) {
+                if (node > 0) {
                     row += NumSwingHeightConstraintsNode();
                 }
             case SwingHeight:
@@ -1942,7 +1989,7 @@ namespace torc::mpc {
                     row += NumVelocityBoxConstraintsNode();
                 }
             case VelBox:
-                if (node > 1) {
+                if (node > 0) {
                     row += NumConfigBoxConstraintsNode();
                 }
             case ConfigBox:

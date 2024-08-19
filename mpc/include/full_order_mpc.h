@@ -303,6 +303,8 @@ namespace torc::mpc {
         vectorx_t torque_reg_weight_;
         vectorx_t force_reg_weight_;
 
+        double terminal_cost_weight_;
+
         std::vector<Eigen::Triplet<double>> objective_triplets_;
         int objective_triplet_idx_{};
 
