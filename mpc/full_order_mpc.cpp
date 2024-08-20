@@ -1041,7 +1041,7 @@ namespace torc::mpc {
                 violation += dt_[node]*GetIDViolation(qp_res, node, true);
                 violation += dt_[node]*GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                violation += dt_[node]*GetIDViolation(qp_res, node, false);
+                // violation += dt_[node]*GetIDViolation(qp_res, node, false);
             }
 
             violation += dt_[node]*GetFrictionViolation(qp_res, node);

@@ -173,6 +173,16 @@ namespace torc::mpc {
         return frame_schedule_map;
     }
 
+    double ContactSchedule::GetLastContactTime(const std::string& frame) {
+        double last_time = -1;
+        for (const auto& [start, end] : frame_schedule_map[frame]) {
+            if (end > last_time) {
+                last_time = end;
+            }
+        }
+
+        return last_time;
+    }
 
 
 } // namespace torc::mpc

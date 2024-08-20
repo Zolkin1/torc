@@ -74,6 +74,8 @@ namespace torc::mpc {
 
         const std::map<std::string, std::vector<std::pair<double, double>>>&  GetScheduleMap() const;
 
+     double GetLastContactTime(const std::string& frame);
+
     protected:
          static double GetTime(const std::vector<double>& dt_vec, int node);
 
