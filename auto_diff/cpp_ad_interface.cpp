@@ -106,6 +106,27 @@ namespace torc::ad {
         assert(hessian.allFinite());
     }
 
+    // ----- Get Sparsity Patterns ----- //
+    void CppADInterface::GetJacobianSparsityPattern(torc::ad::matrixx_t& J) const {
+        J = jac_sparsity_;
+    }
+
+    void CppADInterface::GetHessianSparsityPattern(torc::ad::matrixx_t& H) const {
+        H = hess_sparsity_;
+    }
+
+    void CppADInterface::GetGaussNewtonSparsityPattern(torc::ad::matrixx_t& H) const {
+        H = jac_sparsity_.transpose() * jac_sparsity_;
+        for (int row = 0; row < H.rows(); row++) {
+            for (int col = 0; col < H.cols(); col++) {
+                if (H(row, col) != 0) {
+                    H(row, col) = 1;
+                }
+            }
+        }
+    }
+
+    // ----- Get Sizes ----- //
     int CppADInterface::GetDomainSize() const {
         return x_size_;
     }
@@ -161,6 +182,8 @@ namespace torc::ad {
         ad_model_ = dynamic_lib_->model(this->name_);
 
         SetNonZeros();
+        UpdateJacobianSparsityPattern();
+        UpdateHessianSparsityPattern();
     }
 
     void CppADInterface::LoadModel() {
@@ -168,6 +191,8 @@ namespace torc::ad {
         ad_model_ = dynamic_lib_->model(lib_name_);
 
         SetNonZeros();
+        UpdateJacobianSparsityPattern();
+        UpdateHessianSparsityPattern();
     }
 
     // ----- Sparsity ----- //
@@ -223,6 +248,32 @@ namespace torc::ad {
                                   sp_2[row].end(), std::inserter(result[row], result[row].begin()));
         }
         return result;
+    }
+
+    void CppADInterface::UpdateJacobianSparsityPattern() {
+        auto jac_sparsity_set = ad_model_->JacobianSparsitySet();
+        jac_sparsity_.resize(y_size_, x_size_);
+        jac_sparsity_.setZero();
+        for (int row = 0; row < jac_sparsity_.rows(); row++) {
+            for (int col = 0; col < jac_sparsity_.cols(); col++) {
+                if(jac_sparsity_set[row].contains(col)) {
+                    jac_sparsity_(row, col) = 1;
+                }
+            }
+        }
+    }
+
+    void CppADInterface::UpdateHessianSparsityPattern() {
+        auto hess_sparsity_set = ad_model_->HessianSparsitySet();
+        hess_sparsity_.resize(y_size_, x_size_);
+        hess_sparsity_.setZero();
+        for (int row = 0; row < hess_sparsity_.rows(); row++) {
+            for (int col = 0; col < hess_sparsity_.cols(); col++) {
+                if(hess_sparsity_set[row].contains(col)) {
+                    hess_sparsity_(row, col) = 1;
+                }
+            }
+        }
     }
 
 }   // namespace torc::ad

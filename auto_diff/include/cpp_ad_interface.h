@@ -50,7 +50,7 @@ namespace torc::ad {
 
         void GetGaussNewtonSparsityPattern(matrixx_t& H) const;
 
-        void GetHessianSparsityPattern(int idx, matrixx_t& H) const;
+        void GetHessianSparsityPattern(matrixx_t& H) const;
 
         fs::path GetLibPath() const;
 
@@ -72,8 +72,10 @@ namespace torc::ad {
         static size_t NumNonZeros(const sparsity_pattern_t& sparsity);
 
         sparsity_pattern_t GetJacobianSparsity(AD::ADFun<cg_t>& ad_fn) const;
+        void UpdateJacobianSparsityPattern();
 
         sparsity_pattern_t GetHessianSparsity(AD::ADFun<cg_t>& ad_fn) const;
+        void UpdateHessianSparsityPattern();
 
         static sparsity_pattern_t GetIntersection(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2);
 
@@ -105,6 +107,8 @@ namespace torc::ad {
     size_t nnz_jac_;
     size_t nnz_hess_;
 
+    matrixx_t jac_sparsity_;
+    matrixx_t hess_sparsity_;
     };
 }   // namepsace torc::ad
 

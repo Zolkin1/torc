@@ -60,4 +60,17 @@ TEST_CASE("Basic AD Interface Tests", "[ad]") {
     function.GetGaussNewton(vectorx_t::Random(X_SIZE), p, jac, hess);
     CHECK(jac == p(0)*matrixx_t::Identity(Y_SIZE, X_SIZE));
     CHECK(hess == jac.transpose() * jac);
+
+    // Check sparsity patterns
+    jac.setZero();
+    function.GetJacobianSparsityPattern(jac);
+    CHECK(jac == matrixx_t::Identity(Y_SIZE, X_SIZE));
+
+    hess.setZero();
+    function.GetHessianSparsityPattern(hess);
+    CHECK(hess.isZero());
+
+    hess.setZero();
+    function.GetGaussNewtonSparsityPattern(hess);
+    CHECK(hess == matrixx_t::Identity(X_SIZE, X_SIZE));
 }
