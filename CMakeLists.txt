@@ -34,8 +34,9 @@ if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_EXAMPLES)
 endif()
 
 add_subdirectory(models)
+add_subdirectory(auto_diff)
 add_subdirectory(functions)
-add_subdirectory(constraints)
+#add_subdirectory(constraints)
 #add_subdirectory(solver_interfaces)
 add_subdirectory(mpc)
 add_subdirectory(sample_planner)
@@ -47,3 +48,4 @@ add_executable(mpc_app_test mpc_app_tests.cpp)
 target_link_libraries(mpc_app_test Mpc)
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library
+# TODO: Make all the targets torc:: namespaced

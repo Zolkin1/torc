@@ -85,6 +85,13 @@ target_link_libraries(sample_planner_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(sample_planner_tests PUBLIC SamplePlanner)
 catch_discover_tests(sample_planner_tests)
 
+# --------- AD Interface Tests --------- #
+add_executable(ad_tests ad_interface_tests.cpp)
+target_link_libraries(ad_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(ad_tests PUBLIC Autodiff)
+catch_discover_tests(ad_tests)
+
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 

@@ -31,7 +31,7 @@ target_include_directories(Mpc PUBLIC
 target_link_libraries(Mpc PUBLIC Models)
 
 # ------- Constraints ------ #
-target_link_libraries(Mpc PUBLIC Constraints)
+target_link_libraries(Mpc PUBLIC Functions)
 
 # ------- Solver ------ #
 #target_link_libraries(Mpc PUBLIC SolverInterfaces)

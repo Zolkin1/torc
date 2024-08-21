@@ -31,12 +31,12 @@ namespace torc::mpc {
         ForceReg,
     };
 
-    // TODO: Speed up - make the ones that have explicit formulas not use autodiff
     class CostFunction {
     public:
         explicit CostFunction(const std::string& name)
             : name_(name), configured_(false), compile_derivatives_(true) {}
 
+        // TODO: Accept a reference or copy of the robot model
         void Configure(int config_size, int vel_size, int joint_size, int input_size,
             bool compile_derivatives, const std::vector<CostTypes>& costs, const std::vector<vectorx_t>& weights) {
             config_size_ = config_size;
