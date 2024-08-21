@@ -912,6 +912,16 @@ namespace torc::mpc {
 
             row_start += FRICTION_CONE_SIZE;
             col_start += CONTACT_3DOF;
+
+            // z force bounds
+            DiagonalScalarMatrixToTriplet(1, row_start, col_start - 1, 1,
+                constraint_triplets_, constraint_triplet_idx_);
+
+            osqp_instance_.lower_bounds(row_start) = 0;
+            osqp_instance_.upper_bounds(row_start) = max_grf_;
+
+            row_start += 1;
+
         }
     }
 
@@ -1813,6 +1823,12 @@ namespace torc::mpc {
 
             row_start += FRICTION_CONE_SIZE;
             col_start += CONTACT_3DOF;
+
+            // Positive z force
+            MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
+
+            row_start += 1;
+
         }
     }
 
@@ -1900,10 +1916,6 @@ namespace torc::mpc {
             for (const auto& frame : contact_frames_) {
                 traj.SetForce(node, frame,
                     qp_sol.segment<3>(GetDecisionIdx(node, GroundForce) + 3*force_idx) + traj_.GetForce(node, frame));
-                if (traj.GetForce(node, frame)(2) < -1e-4) {
-                    std::cerr << "Producing negative ground reaction force" << std::endl;
-                    std::cerr << "Node: " << node << ", frame: " << frame << ", force: " << traj.GetForce(node, frame)(2) << std::endl;
-                }
                 force_idx++;
             }
         }
@@ -2124,7 +2136,7 @@ namespace torc::mpc {
 
 
     int FullOrderMpc::NumFrictionConeConstraintsNode() const {
-        return num_contact_locations_ * (FRICTION_CONE_SIZE + CONTACT_3DOF);
+        return num_contact_locations_ * (FRICTION_CONE_SIZE + CONTACT_3DOF + 1);
     }
 
     int FullOrderMpc::NumConfigBoxConstraintsNode() const {

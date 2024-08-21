@@ -38,7 +38,7 @@ costs:
                               0.001, .05, .001, .001, .5, .1, .1, .1, .1]
   torque_regularization_weights: [.0001, .001, .0001, .0001, .02, .5, .5, .5, .1,
                                   .0001, .001, .0001, .0001, .02, .5, .5, .5, .1]
-  force_regularization_weights: [0.0001, 0.0001, 0.0001] # Note that these are small because the force in general is quite large
+  force_regularization_weights: [0.0001, 0.0001, 0.1] # Note that these are small because the force in general is quite large
 contacts:
   # For now, removing hands
   # contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]
