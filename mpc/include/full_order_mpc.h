@@ -201,6 +201,8 @@ namespace torc::mpc {
         double GetFullCost(const vectorx_t& qp_res);
 
         std::pair<double, double> LineSearch(const vectorx_t& qp_res);
+
+        [[nodiscard]] int GetNumContacts(int node) const;
         // void CreateDefaultCost();
         // Helper function
         // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;

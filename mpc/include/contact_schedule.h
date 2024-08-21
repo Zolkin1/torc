@@ -44,9 +44,9 @@ namespace torc::mpc {
         void ShiftContacts(double shift);
 
         /**
-         * @brief Removes all contacts that end before time = 0
+         * @brief Removes all contacts that end before time = time_cutoff
          */
-        void CleanContacts();
+        void CleanContacts(double time_cutoff);
 
         /**
          * @brief Creates a default swing trajectory given the contact schedule and information provided.

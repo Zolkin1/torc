@@ -356,7 +356,7 @@
   </link>
   <joint name="right_hip_pitch_joint" type="revolute">
     <axis xyz="0 1 0"/>
-    <limit effort="35.0" lower="-1.5" upper="1.5" velocity="20"/>
+    <limit effort="35.0" lower="-1.5" upper="0.5" velocity="20"/>
     <dynamics damping="0.01"/>
     <origin rpy="0 0 0" xyz="0.055 -0.0395 0"/>
     <parent link="right_hip_roll"/>
@@ -436,7 +436,6 @@
   <!-- Right Foot Contact points -->
   <link name="foot_front_right"/>
   <joint name="foot_front_right_joint" type="fixed">
-<!--    <origin rpy="0 0 0" xyz="0.0 0 0.0"/>-->
     <origin rpy="0 0 0" xyz="0.088 0 -0.018"/>
     <parent link="right_ankle_pitch"/>
     <child link="foot_front_right"/>
@@ -444,7 +443,6 @@
 
   <link name="foot_rear_right"/>
   <joint name="foot_rear_right_joint" type="fixed">
-<!--    <origin rpy="0 0 0" xyz="0.0 0 0.0"/>-->
     <origin rpy="0 0 0" xyz="-0.02 0 -0.018"/>
     <parent link="right_ankle_pitch"/>
     <child link="foot_rear_right"/>

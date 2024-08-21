@@ -636,8 +636,6 @@ namespace torc::mpc {
 
         AddICConstraint();
         for (int node = 0; node < nodes_; node++) {
-            // TODO: Put back!
-
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
                 AddIntegrationConstraint(node);
@@ -1515,14 +1513,18 @@ namespace torc::mpc {
             }
 
             // ----- Force ----- //
+            int num_contacts = GetNumContacts(node);
             int force_idx = GetDecisionIdx(node, GroundForce);
+            vector3_t force_target;
             for (const auto& frame : contact_frames_) {
-                cost_.Linearize(traj_.GetForce(node, frame), vector3_t::Zero(), CostTypes::ForceReg,
+                force_target << 0, 0, in_contact_[frame][node] * 9.81*robot_model_->GetMass()/num_contacts;
+
+                cost_.Linearize(traj_.GetForce(node, frame), force_target, CostTypes::ForceReg,
                     ws_->obj_force_vector);
                 osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
                     scaling * ws_->obj_force_vector;
 
-                cost_.Quadraticize(traj_.GetForce(node, frame), vector3_t::Zero(), CostTypes::ForceReg,
+                cost_.Quadraticize(traj_.GetForce(node, frame), force_target, CostTypes::ForceReg,
                     ws_->obj_force_mat);
                 MatrixToTriplet(scaling * ws_->obj_force_mat,
                     force_idx, force_idx, objective_triplets_, objective_triplet_idx_, true);
@@ -1615,6 +1617,14 @@ namespace torc::mpc {
         return std::make_pair(theta_k, phi_k);
     }
 
+    int FullOrderMpc::GetNumContacts(int node) const {
+        int num_contacts = 0;
+        for (const auto& frame : contact_frames_) {
+            num_contacts += in_contact_.at(frame)[node];
+        }
+
+        return num_contacts;
+    }
 
 
     // ------------------------------------------------- //
@@ -1890,6 +1900,10 @@ namespace torc::mpc {
             for (const auto& frame : contact_frames_) {
                 traj.SetForce(node, frame,
                     qp_sol.segment<3>(GetDecisionIdx(node, GroundForce) + 3*force_idx) + traj_.GetForce(node, frame));
+                if (traj.GetForce(node, frame)(2) < -1e-4) {
+                    std::cerr << "Producing negative ground reaction force" << std::endl;
+                    std::cerr << "Node: " << node << ", frame: " << frame << ", force: " << traj.GetForce(node, frame)(2) << std::endl;
+                }
                 force_idx++;
             }
         }

@@ -46,9 +46,11 @@ namespace torc::mpc {
                 end += shift;
             }
         }
+
+        CleanContacts(-2);
     }
 
-    void ContactSchedule::CleanContacts() {
+    void ContactSchedule::CleanContacts(double time_cutoff) {
         for (auto& [frame, contacts] : frame_schedule_map) {
             std::erase_if(contacts, [](const std::pair<double, double>& contact_pair) {return contact_pair.second < 0;});
         }
