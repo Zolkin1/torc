@@ -6,7 +6,8 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/trajectory.h"
     "${MPC_INC}/full_order_mpc.h"
     "${MPC_INC}/cost_function.h"
-    "${MPC_INC}/contact_schedule.h")
+    "${MPC_INC}/contact_schedule.h"
+    "${MPC_INC}/configuration_tracking_cost.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -15,7 +16,8 @@ set(MPC_SOURCE_LIST
 #        mpc_contact.cpp
         trajectory.cpp
         cost_function.cpp
-        contact_schedule.cpp)
+        contact_schedule.cpp
+        configuration_tracking_cost.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}
@@ -30,8 +32,11 @@ target_include_directories(Mpc PUBLIC
 # ------- Model ------ #
 target_link_libraries(Mpc PUBLIC Models)
 
-# ------- Constraints ------ #
+# ------- Functions ------ #
 target_link_libraries(Mpc PUBLIC Functions)
+
+# ------- CppADInterface ------ #
+target_link_libraries(Mpc PUBLIC Autodiff)
 
 # ------- Solver ------ #
 #target_link_libraries(Mpc PUBLIC SolverInterfaces)

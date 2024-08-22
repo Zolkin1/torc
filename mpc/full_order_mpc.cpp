@@ -95,6 +95,13 @@ namespace torc::mpc {
                 compile_derivatves_ = general_settings["compile_derivatives"].as<bool>();
             }
 
+            if (general_settings["deriv_lib_path"]) {
+                deriv_lib_path_ = general_settings["deriv_lib_path"].as<std::string>();
+            } else {
+                deriv_lib_path_ = fs::current_path();
+                deriv_lib_path_ = deriv_lib_path_ / "deriv_libs";
+            }
+
             if (general_settings["base_frame"]) {
                 base_frame_ = general_settings["base_frame"].as<std::string>();
             } else {
@@ -174,80 +181,125 @@ namespace torc::mpc {
             throw std::runtime_error("No cost settings provided!");
         }
         YAML::Node cost_settings = config["costs"];
-        if (cost_settings["configuration_tracking_weights"]) {
-            auto config_tracking_weights = cost_settings["configuration_tracking_weights"].as<std::vector<double>>();
-            config_tracking_weight_ = utils::StdToEigenVector(config_tracking_weights);
-        }
 
-        if (config_tracking_weight_(3) != config_tracking_weight_(4) || config_tracking_weight_(4) != config_tracking_weight_(5)) {
-            throw std::runtime_error("For now all quaternion tracking weights must be equal!");
-        }
+        // ----- Configuration Tracking ----- //
+        if (cost_settings["using_config_tracking"] && cost_settings["using_config_tracking"].as<bool>()) {
+            cost_terms_.emplace_back(CostTypes::Configuration);
+            using_config_tracking_cost_ = true;
 
-        if (config_tracking_weight_.size() < robot_model_->GetVelDim()) {
-            std::cerr << "Configuration tracking weight size is too small, adding zeros." <<
-               "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
-            int starting_size = config_tracking_weight_.size();
-            config_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
-            for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
-                config_tracking_weight_(i) = 0;
+            if (cost_settings["configuration_tracking_weights"]) {
+                auto config_tracking_weights = cost_settings["configuration_tracking_weights"].as<std::vector<double>>();
+                config_tracking_weight_ = utils::StdToEigenVector(config_tracking_weights);
             }
-        } else if (config_tracking_weight_.size() > robot_model_->GetVelDim()) {
-            std::cerr << "Configuration tracking weight is too large. Ignoring end values." <<
-               "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
-        }
 
-        if (cost_settings["velocity_tracking_weights"]) {
-            auto vel_tracking_weights = cost_settings["velocity_tracking_weights"].as<std::vector<double>>();
-            vel_tracking_weight_ = utils::StdToEigenVector(vel_tracking_weights);
-        }
-
-        if (vel_tracking_weight_.size() < robot_model_->GetVelDim()) {
-            std::cerr << "Velocity tracking weight size is too small, adding zeros." <<
-               "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
-            int starting_size = vel_tracking_weight_.size();
-            vel_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
-            for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
-                vel_tracking_weight_(i) = 0;
+            if (config_tracking_weight_(3) != config_tracking_weight_(4) || config_tracking_weight_(4) != config_tracking_weight_(5)) {
+                throw std::runtime_error("For now all quaternion tracking weights must be equal!");
             }
-        } else if (vel_tracking_weight_.size() > robot_model_->GetVelDim()) {
-            std::cerr << "Velocity tracking weight is too large. Ignoring end values." <<
-               "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
-        }
 
-        if (cost_settings["torque_regularization_weights"]) {
-            auto vel_tracking_weights = cost_settings["torque_regularization_weights"].as<std::vector<double>>();
-            torque_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
-        }
-
-        if (torque_reg_weight_.size() < robot_model_->GetNumInputs()) {
-            std::cerr << "Torque regularization weight size is too small, adding zeros." <<
-               "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
-            int starting_size = torque_reg_weight_.size();
-            torque_reg_weight_.conservativeResize(robot_model_->GetNumInputs());
-            for (int i = starting_size; i < robot_model_->GetNumInputs(); i++) {
-                torque_reg_weight_(i) = 0;
+            if (config_tracking_weight_.size() < robot_model_->GetVelDim()) {
+                std::cerr << "Configuration tracking weight size is too small, adding zeros." <<
+                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
+                int starting_size = config_tracking_weight_.size();
+                config_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
+                for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
+                    config_tracking_weight_(i) = 0;
+                }
+            } else if (config_tracking_weight_.size() > robot_model_->GetVelDim()) {
+                std::cerr << "Configuration tracking weight is too large. Ignoring end values." <<
+                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
             }
-        } else if (torque_reg_weight_.size() > robot_model_->GetNumInputs()) {
-            std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
-               "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
+
+            cost_weights_.push_back(config_tracking_weight_);
+        } else {
+            using_config_tracking_cost_ = false;
         }
 
-        if (cost_settings["force_regularization_weights"]) {
-            auto vel_tracking_weights = cost_settings["force_regularization_weights"].as<std::vector<double>>();
-            force_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
-        }
+        // ----- Velocity Tracking ----- //
+        if (cost_settings["using_velocity_tracking"] && cost_settings["using_velocity_tracking"].as<bool>()) {
+            cost_terms_.emplace_back(CostTypes::VelocityTracking);
+            using_vel_tracking_cost_ = true;
 
-        if (force_reg_weight_.size() < CONTACT_3DOF) {
-            std::cerr << "Torque regularization weight size is too small, adding zeros." <<
-               "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
-            int starting_size = force_reg_weight_.size();
-            force_reg_weight_.conservativeResize(CONTACT_3DOF);
-            for (int i = starting_size; i < CONTACT_3DOF; i++) {
-                force_reg_weight_(i) = 0;
+            if (cost_settings["velocity_tracking_weights"]) {
+                auto vel_tracking_weights = cost_settings["velocity_tracking_weights"].as<std::vector<double>>();
+                vel_tracking_weight_ = utils::StdToEigenVector(vel_tracking_weights);
             }
-        } else if (force_reg_weight_.size() > CONTACT_3DOF) {
-            std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
-               "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
+
+            if (vel_tracking_weight_.size() < robot_model_->GetVelDim()) {
+                std::cerr << "Velocity tracking weight size is too small, adding zeros." <<
+                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
+                int starting_size = vel_tracking_weight_.size();
+                vel_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
+                for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
+                    vel_tracking_weight_(i) = 0;
+                }
+            } else if (vel_tracking_weight_.size() > robot_model_->GetVelDim()) {
+                std::cerr << "Velocity tracking weight is too large. Ignoring end values." <<
+                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
+            }
+
+            cost_weights_.push_back(vel_tracking_weight_);
+        } else {
+            using_vel_tracking_cost_ = false;
+        }
+
+        // ----- Torque Regularization ----- //
+        if (cost_settings["using_torque_regularization"] && cost_settings["using_torque_regularization"].as<bool>()) {
+            cost_terms_.emplace_back(CostTypes::TorqueReg);
+            using_torque_reg_cost_ = true;
+
+            if (cost_settings["torque_regularization_weights"]) {
+                auto vel_tracking_weights = cost_settings["torque_regularization_weights"].as<std::vector<double>>();
+                torque_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
+            }
+
+            if (torque_reg_weight_.size() < robot_model_->GetNumInputs()) {
+                std::cerr << "Torque regularization weight size is too small, adding zeros." <<
+                          "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
+                int starting_size = torque_reg_weight_.size();
+                torque_reg_weight_.conservativeResize(robot_model_->GetNumInputs());
+                for (int i = starting_size; i < robot_model_->GetNumInputs(); i++) {
+                    torque_reg_weight_(i) = 0;
+                }
+            } else if (torque_reg_weight_.size() > robot_model_->GetNumInputs()) {
+                std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
+                          "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
+            }
+
+            cost_weights_.push_back(torque_reg_weight_);
+        } else {
+            using_torque_reg_cost_ = false;
+        }
+
+        // ----- Force Regularization ----- //
+        if (cost_settings["using_force_regularization"] && cost_settings["using_force_regularization"].as<bool>()) {
+            cost_terms_.emplace_back(ForceReg);
+            using_force_reg_cost_ = true;
+
+            if (cost_settings["force_regularization_weights"]) {
+                auto vel_tracking_weights = cost_settings["force_regularization_weights"].as<std::vector<double>>();
+                force_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
+            }
+
+            if (force_reg_weight_.size() < CONTACT_3DOF) {
+                std::cerr << "Torque regularization weight size is too small, adding zeros." <<
+                          "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
+                int starting_size = force_reg_weight_.size();
+                force_reg_weight_.conservativeResize(CONTACT_3DOF);
+                for (int i = starting_size; i < CONTACT_3DOF; i++) {
+                    force_reg_weight_(i) = 0;
+                }
+            } else if (force_reg_weight_.size() > CONTACT_3DOF) {
+                std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
+                          "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
+            }
+
+            cost_weights_.push_back(force_reg_weight_);
+        } else {
+            using_force_reg_cost_ = false;
+        }
+
+        if (cost_terms_.size() == 0) {
+            throw std::runtime_error("No cost terms chosen!");
         }
 
         if (cost_settings["terminal_cost_weight"]) {
@@ -304,6 +356,7 @@ namespace torc::mpc {
             std::cout << "\tVerbose: " << (verbose_ ? "True" : "False") << std::endl;
             std::cout << "\tNodes: " << nodes_ << std::endl;
             std::cout << "\tCompile derivatives: " << (compile_derivatves_ ? "True" : "False") << std::endl;
+            std::cout << "\tDerivative library location: " << deriv_lib_path_.string() << std::endl;
             std::cout << "\tScale cost: " << (scale_cost_ ? "True" : "False") << std::endl;
             std::cout << "\tMax initial solves: " << max_initial_solves_ << std::endl;
             std::cout << "\tInitial constraint tolerance: " << initial_constraint_tol_ << std::endl;
@@ -408,20 +461,7 @@ namespace torc::mpc {
         ws_->frame_jacobian.resize(6, robot_model_->GetVelDim());
 
         // Setup cost function
-        // TODO: Move this
-        std::vector<vectorx_t> weights;
-        weights.emplace_back(config_tracking_weight_);
-        weights.emplace_back(vel_tracking_weight_);
-        weights.emplace_back(torque_reg_weight_);
-        weights.emplace_back(force_reg_weight_);
-
-        std::vector<CostTypes> costs;
-        costs.emplace_back(CostTypes::Configuration);
-        costs.emplace_back(CostTypes::VelocityTracking);
-        costs.emplace_back(CostTypes::TorqueReg);
-        costs.emplace_back(ForceReg);
-        cost_.Configure(robot_model_->GetConfigDim(), robot_model_->GetVelDim(), robot_model_->GetNumInputs(),
-            robot_model_->GetNumInputs(), compile_derivatves_, costs, weights);
+        cost_.Configure(robot_model_, compile_derivatves_, cost_terms_, cost_weights_, deriv_lib_path_);
 
         objective_mat_.resize(GetNumDecisionVars(), GetNumDecisionVars());
         CreateCostPattern();
@@ -1409,24 +1449,31 @@ namespace torc::mpc {
 
         for (int i = 0; i < nodes_; i++) {
             // Configuration Tracking
-            int decision_idx = GetDecisionIdx(i, Configuration);
-            MatrixToNewTriplet(ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_);
+            if (using_config_tracking_cost_) {
+                int decision_idx = GetDecisionIdx(i, Configuration);
+                MatrixToNewTriplet(ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_);
+            }
 
             // Velocity Tracking
-            decision_idx = GetDecisionIdx(i, Velocity);
-            MatrixToNewTriplet(ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_);
+            if (using_vel_tracking_cost_) {
+                int decision_idx = GetDecisionIdx(i, Velocity);
+                MatrixToNewTriplet(ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_);
+            }
 
-            if (i < nodes_full_dynamics_) {
-                // Torque regularization
-                decision_idx = GetDecisionIdx(i, Torque);
+
+            // Torque regularization
+            if (using_torque_reg_cost_ && i < nodes_full_dynamics_) {
+                int decision_idx = GetDecisionIdx(i, Torque);
                 MatrixToNewTriplet(ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_);
             }
 
             // Force regularization
-            decision_idx = GetDecisionIdx(i, GroundForce);
-            for (const auto& frame : contact_frames_) {
-                MatrixToNewTriplet(ws_->obj_force_mat, decision_idx, decision_idx, objective_triplets_);
-                decision_idx += CONTACT_3DOF;
+            if (using_force_reg_cost_) {
+                int decision_idx = GetDecisionIdx(i, GroundForce);
+                for (const auto& frame: contact_frames_) {
+                    MatrixToNewTriplet(ws_->obj_force_mat, decision_idx, decision_idx, objective_triplets_);
+                    decision_idx += CONTACT_3DOF;
+                }
             }
         }
 
@@ -1443,6 +1490,7 @@ namespace torc::mpc {
         objective_triplet_idx_ = 0;
         osqp_instance_.objective_vector.setZero();
 
+        // TODO: Remove these
         if (q_target_.size() != v_target_.size()) {
             std::cerr << "Configuration target and velocity target have mis-matched sizes. Filling with default values." << std::endl;
         }
@@ -1474,72 +1522,80 @@ namespace torc::mpc {
             }
 
             // ----- Configuration ----- //
-            int decision_idx = GetDecisionIdx(node, Configuration);
-            cost_.Linearize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_vector);
-            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
-                scaling * ws_->obj_config_vector;
+            if (using_config_tracking_cost_) {
+                int decision_idx = GetDecisionIdx(node, Configuration);
+                cost_.GetApproximation(traj_.GetConfiguration(node), q_target_[node],
+                                       ws_->obj_config_vector, ws_->obj_config_mat, CostTypes::Configuration);
+                osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                        scaling * ws_->obj_config_vector;
 
-            cost_.Quadraticize(traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration, ws_->obj_config_mat);
+                std::cout << "obj config mat: \n" << ws_->obj_config_mat << std::endl;
 
-            // Positions
-            MatrixToTriplet(scaling * ws_->obj_config_mat.topRows<POS_VARS>(),
-                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
-            // Orientations
-            if (config_tracking_weight_(3) > 0) {       // Only add these if they have a positive weight
-                MatrixToTriplet(scaling * ws_->obj_config_mat.block<3,3>(POS_VARS, POS_VARS),
-                    decision_idx + POS_VARS, decision_idx + POS_VARS, objective_triplets_, objective_triplet_idx_, false);
+                // TODO: I think I can do this in one call now (?)
+                // TODO: I think I can remove the restriction on the orientation weight trackings
+                // Positions
+                MatrixToTriplet(scaling * ws_->obj_config_mat.topRows<POS_VARS>(),
+                                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+                // Orientations
+                if (config_tracking_weight_(3) > 0) {       // Only add these if they have a positive weight
+                    MatrixToTriplet(scaling * ws_->obj_config_mat.block<3, 3>(POS_VARS, POS_VARS),
+                                    decision_idx + POS_VARS, decision_idx + POS_VARS, objective_triplets_,
+                                    objective_triplet_idx_, false);
+                }
+                // Joints
+                MatrixToTriplet(scaling * ws_->obj_config_mat.bottomRows(robot_model_->GetNumInputs()),
+                                decision_idx + FLOATING_VEL, decision_idx, objective_triplets_, objective_triplet_idx_,
+                                true);
             }
-            // Joints
-            MatrixToTriplet(scaling * ws_->obj_config_mat.bottomRows(robot_model_->GetNumInputs()),
-                decision_idx + FLOATING_VEL, decision_idx, objective_triplets_, objective_triplet_idx_, true);
 
             // ----- Velocity ----- //
-            decision_idx = GetDecisionIdx(node, Velocity);
-            cost_.Linearize(traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking, ws_->obj_vel_vector);
-            osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
-                scaling * ws_->obj_vel_vector;
+            if (using_vel_tracking_cost_) {
+                int decision_idx = GetDecisionIdx(node, Velocity);
+//                cost_.GetApproximation(traj_.GetVelocity(node), v_target_[node],
+//                                       ws_->obj_vel_vector, ws_->obj_vel_mat, CostTypes::VelocityTracking);
 
-            cost_.Quadraticize(traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking, ws_->obj_vel_mat);
-            MatrixToTriplet(scaling * ws_->obj_vel_mat,
-                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+                osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                        scaling * ws_->obj_vel_vector;
+                MatrixToTriplet(scaling * ws_->obj_vel_mat,
+                                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+            }
 
             // ----- Torque ----- //
-            if (node < nodes_full_dynamics_) {
-                decision_idx = GetDecisionIdx(node, Torque);
-                vectorx_t tau_target = vectorx_t::Zero(robot_model_->GetNumInputs());
-                if (node == 0) {
-                    // Trying to minimize oscilliations
-                    tau_target = traj_.GetTau(node);
-                }
-                cost_.Linearize(traj_.GetTau(node), tau_target,
-                    CostTypes::TorqueReg, ws_->obj_tau_vector);
-                osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
-                    scaling * ws_->obj_tau_vector;
+            if (using_torque_reg_cost_) {
+                if (node < nodes_full_dynamics_) {
+                    int decision_idx = GetDecisionIdx(node, Torque);
+                    vectorx_t tau_target = vectorx_t::Zero(robot_model_->GetNumInputs());
+                    if (node == 0) {
+                        // Trying to minimize oscilliations
+                        tau_target = traj_.GetTau(node);
+                    }
+                    cost_.GetApproximation(traj_.GetTau(node), tau_target,
+                                           ws_->obj_tau_vector, ws_->obj_tau_mat, CostTypes::TorqueReg);
 
-                cost_.Quadraticize(traj_.GetTau(node), tau_target,
-                    CostTypes::TorqueReg, ws_->obj_tau_mat);
-                MatrixToTriplet(scaling * ws_->obj_tau_mat,
-                    decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
+                            scaling * ws_->obj_tau_vector;
+                    MatrixToTriplet(scaling * ws_->obj_tau_mat,
+                                    decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+                }
             }
 
             // ----- Force ----- //
-            int num_contacts = GetNumContacts(node);
-            int force_idx = GetDecisionIdx(node, GroundForce);
-            vector3_t force_target;
-            for (const auto& frame : contact_frames_) {
-                force_target << 0, 0, in_contact_[frame][node] * 9.81*robot_model_->GetMass()/num_contacts;
+            if (using_force_reg_cost_) {
+                int num_contacts = GetNumContacts(node);
+                int force_idx = GetDecisionIdx(node, GroundForce);
+                vector3_t force_target;
+                for (const auto& frame: contact_frames_) {
+                    force_target << 0, 0, in_contact_[frame][node] * 9.81 * robot_model_->GetMass() / num_contacts;
 
-                cost_.Linearize(traj_.GetForce(node, frame), force_target, CostTypes::ForceReg,
-                    ws_->obj_force_vector);
-                osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
-                    scaling * ws_->obj_force_vector;
+                    cost_.GetApproximation(traj_.GetForce(node, frame), force_target,
+                                           ws_->obj_force_vector, ws_->obj_force_mat, CostTypes::ForceReg);
 
-                cost_.Quadraticize(traj_.GetForce(node, frame), force_target, CostTypes::ForceReg,
-                    ws_->obj_force_mat);
-                MatrixToTriplet(scaling * ws_->obj_force_mat,
-                    force_idx, force_idx, objective_triplets_, objective_triplet_idx_, true);
-
-                force_idx += CONTACT_3DOF;
+                    osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
+                            scaling * ws_->obj_force_vector;
+                    MatrixToTriplet(scaling * ws_->obj_force_mat,
+                                    force_idx, force_idx, objective_triplets_, objective_triplet_idx_, true);
+                    force_idx += CONTACT_3DOF;
+                }
             }
 
         }
@@ -1547,10 +1603,9 @@ namespace torc::mpc {
         objective_mat_.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
 
         // std::cout << "obj mat:\n" << objective_mat_ << std::endl;
-        //
-        // std::cout << "triplet idx: " << objective_triplet_idx_ << std::endl;
-        // std::cout << "triplet size: " << objective_triplets_.size() << std::endl;
         if (objective_triplet_idx_ != objective_triplets_.size()) {
+             std::cerr << "triplet idx: " << objective_triplet_idx_ << std::endl;
+             std::cerr << "triplet size: " << objective_triplets_.size() << std::endl;
             throw std::runtime_error("[Cost Function] Could not populate the cost function matrix correctly.");
         }
     }
@@ -1559,20 +1614,29 @@ namespace torc::mpc {
         double cost = 0;
         for (int node = 0; node < nodes_; node++) {
             double cost_node = 0;
-            cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
-                traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration);
-            cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
-                traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking);
-            if (node < nodes_full_dynamics_) {
+            if (using_config_tracking_cost_) {
+                cost_node += (scale_cost_ ? dt_[node] : 1) * cost_.GetTermCost(
+                        qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                        traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration);
+            }
+
+            if (using_vel_tracking_cost_) {
+                cost_node += (scale_cost_ ? dt_[node] : 1) * cost_.GetTermCost(
+                        qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
+                        traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking);
+            }
+            if (using_torque_reg_cost_ && node < nodes_full_dynamics_) {
                 cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
                     traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()), CostTypes::TorqueReg);
             }
 
-            int force_idx = GetDecisionIdx(node, GroundForce);
-            for (const auto& frame : contact_frames_) {
-                cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(
-                    force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), vector3_t::Zero(), ForceReg);
-                force_idx += CONTACT_3DOF;
+            if (using_force_reg_cost_) {
+                int force_idx = GetDecisionIdx(node, GroundForce);
+                for (const auto& frame: contact_frames_) {
+                    cost_node += (scale_cost_ ? dt_[node] : 1) * cost_.GetTermCost(qp_res.segment(
+                            force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), vector3_t::Zero(), ForceReg);
+                    force_idx += CONTACT_3DOF;
+                }
             }
 
             // Weight the terminal cost by a different amount

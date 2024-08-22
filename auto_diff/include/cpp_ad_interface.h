@@ -31,9 +31,7 @@ namespace torc::ad {
                        std::vector<std::string> compile_flags = {"-O3", "-shared", "-rdynamic"});
 
         void GetFunctionValue(const vectorx_t& x, const vectorx_t& p, vectorx_t& y) const;
-
         void GetJacobian(const vectorx_t& x, const vectorx_t& p, matrixx_t& jacobian) const;
-
         void GetGaussNewton(const vectorx_t& x, const vectorx_t& p, matrixx_t& jacobian, matrixx_t& hessian) const;
 
         /**
@@ -46,19 +44,19 @@ namespace torc::ad {
          */
         void GetHessian(const vectorx_t& x, const vectorx_t& p, const vectorx_t& w, matrixx_t& hessian) const;
 
+        void GetHessian(int idx, const vectorx_t& x, const vectorx_t& p, matrixx_t& hessian) const;
+
         void GetJacobianSparsityPattern(matrixx_t& J) const;
 
         void GetGaussNewtonSparsityPattern(matrixx_t& H) const;
 
         void GetHessianSparsityPattern(matrixx_t& H) const;
 
-        fs::path GetLibPath() const;
+        [[nodiscard]] fs::path GetLibPath() const;
 
-        int GetRangeSize() const;
-
-        int GetDomainSize() const;
-
-        int GetParameterSize() const;
+        [[nodiscard]] int GetRangeSize() const;
+        [[nodiscard]] int GetDomainSize() const;
+        [[nodiscard]] int GetParameterSize() const;
 
     protected:
         void CreateModel();

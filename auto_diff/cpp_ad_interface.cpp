@@ -35,6 +35,14 @@ namespace torc::ad {
 
     void CppADInterface::GetFunctionValue(const torc::ad::vectorx_t& x, const torc::ad::vectorx_t& p,
                                           torc::ad::vectorx_t& y) const {
+        if (p.size() != p_size_) {
+            throw std::runtime_error("[CppADInterface] Invalid parameter size!");
+        }
+
+        if (x.size() != x_size_) {
+            throw std::runtime_error("[CppADInterface] Invalid parameter size!");
+        }
+
         vectorx_t xp_combined(x_size_ + p_size_);
         xp_combined << x, p;
         ad_model_->ForwardZero(xp_combined, y);
@@ -56,7 +64,7 @@ namespace torc::ad {
 
         // Write sparse elements into Eigen type. Only jacobian w.r.t. variables was requested, so cols should not contain elements corresponding
         // to parameters.
-        jacobian = matrixx_t::Zero(ad_model_->Range(), x_size_);
+        jacobian.setZero(ad_model_->Range(), x_size_);
         for (size_t i = 0; i < nnz_jac_; i++) {
             jacobian(rows[i], cols[i]) = sparse_jac[i];
         }
@@ -89,13 +97,19 @@ namespace torc::ad {
         size_t const* rows;
         size_t const* cols;
 
+        if (w.size() != y_size_) {
+            std::cerr << "w size: " << w.size() << std::endl;
+            std::cerr << "y size: " << y_size_ << std::endl;
+            throw std::runtime_error("[CppADInterface] hessian weight vector of the wrong size!");
+        }
+
         CppAD::cg::ArrayView<const double> w_array_view(w.data(), w.size());
 
         // Call this particular SparseHessian. Other CppAd functions allocate internal vectors that are incompatible with multithreading.
         ad_model_->SparseHessian(xp_array_view, w_array_view, sparse_hess_array_view, &rows, &cols);
 
         // Fills upper triangular sparsity of hessian w.r.t variables.
-        hessian = matrixx_t::Zero(x_size_, x_size_);
+        hessian.setZero(x_size_, x_size_);
         for (size_t i = 0; i < nnz_hess_; i++) {
             hessian(rows[i], cols[i]) = sparse_hess[i];
         }
@@ -104,6 +118,13 @@ namespace torc::ad {
         hessian.template triangularView<Eigen::StrictlyLower>() = hessian.template triangularView<Eigen::StrictlyUpper>().transpose();
 
         assert(hessian.allFinite());
+    }
+
+    void CppADInterface::GetHessian(int idx, const torc::ad::vectorx_t& x, const torc::ad::vectorx_t& p,
+                                    torc::ad::matrixx_t& hessian) const {
+        vectorx_t w = vectorx_t::Zero(y_size_);
+        w(idx) = 1;
+        GetHessian(x, p, w, hessian);
     }
 
     // ----- Get Sparsity Patterns ----- //
@@ -139,6 +160,11 @@ namespace torc::ad {
         return p_size_;
     }
 
+    // ----- Library Path ----- //
+    fs::path CppADInterface::GetLibPath() const {
+        return lib_path_;
+    }
+
     // ----- Model Creation and Loading ----- //
     void CppADInterface::CreateModel() {
         // Need one vector to make independent
@@ -156,7 +182,7 @@ namespace torc::ad {
         AD::ADFun<cg_t> ad_fn(xp_combined, y);
         ad_fn.optimize();
 
-        y_size_ = y.rows();
+        y_size_ = y.size();
 
         // generate library source code
         ADCG::ModelCSourceGen<double> c_gen(ad_fn, this->name_);
@@ -251,26 +277,30 @@ namespace torc::ad {
     }
 
     void CppADInterface::UpdateJacobianSparsityPattern() {
-        auto jac_sparsity_set = ad_model_->JacobianSparsitySet();
-        jac_sparsity_.resize(y_size_, x_size_);
-        jac_sparsity_.setZero();
-        for (int row = 0; row < jac_sparsity_.rows(); row++) {
-            for (int col = 0; col < jac_sparsity_.cols(); col++) {
-                if(jac_sparsity_set[row].contains(col)) {
-                    jac_sparsity_(row, col) = 1;
+        if (ad_model_->isJacobianSparsityAvailable()) {
+            auto jac_sparsity_set = ad_model_->JacobianSparsitySet();
+            jac_sparsity_.resize(y_size_, x_size_);
+            jac_sparsity_.setZero();
+            for (int row = 0; row < jac_sparsity_.rows(); row++) {
+                for (int col = 0; col < jac_sparsity_.cols(); col++) {
+                    if (jac_sparsity_set[row].contains(col)) {
+                        jac_sparsity_(row, col) = 1;
+                    }
                 }
             }
         }
     }
 
     void CppADInterface::UpdateHessianSparsityPattern() {
-        auto hess_sparsity_set = ad_model_->HessianSparsitySet();
-        hess_sparsity_.resize(y_size_, x_size_);
-        hess_sparsity_.setZero();
-        for (int row = 0; row < hess_sparsity_.rows(); row++) {
-            for (int col = 0; col < hess_sparsity_.cols(); col++) {
-                if(hess_sparsity_set[row].contains(col)) {
-                    hess_sparsity_(row, col) = 1;
+        if (ad_model_->isHessianSparsityAvailable()) {
+            auto hess_sparsity_set = ad_model_->HessianSparsitySet();
+            hess_sparsity_.resize(y_size_, x_size_);
+            hess_sparsity_.setZero();
+            for (int row = 0; row < hess_sparsity_.rows(); row++) {
+                for (int col = 0; col < hess_sparsity_.cols(); col++) {
+                    if (hess_sparsity_set[row].contains(col)) {
+                        hess_sparsity_(row, col) = 1;
+                    }
                 }
             }
         }

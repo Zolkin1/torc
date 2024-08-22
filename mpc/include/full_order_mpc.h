@@ -296,6 +296,7 @@ namespace torc::mpc {
 
         // Codegen
         bool compile_derivatves_;
+        fs::path deriv_lib_path_;
 
         // Cost
         CostFunction cost_;
@@ -317,6 +318,14 @@ namespace torc::mpc {
         std::vector<vectorx_t> v_target_;
 
         bool scale_cost_;
+
+        std::vector<CostTypes> cost_terms_;
+        std::vector<vectorx_t> cost_weights_;
+
+        bool using_config_tracking_cost_;
+        bool using_vel_tracking_cost_;
+        bool using_torque_reg_cost_;
+        bool using_force_reg_cost_;
 
         // Line search
         double alpha_;
