@@ -20,6 +20,7 @@ namespace torc::ad {
     using cg_t = ADCG::CG<double>;
     using adcg_t = CppAD::AD<cg_t>;
 
+    using sparsity_pattern_t = std::vector<std::set<size_t>>;
     using ad_vector_t = Eigen::VectorX<adcg_t>;
     using ad_matrix_t = Eigen::MatrixX<adcg_t>;
 

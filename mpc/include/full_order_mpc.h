@@ -240,10 +240,12 @@ namespace torc::mpc {
         [[nodiscard]] int GetConstraintRowStartNode(int node) const;
 
         void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
+        void AddSparsitySet(const torc::ad::sparsity_pattern_t& sparsity, int row_start, int col_start,  std::vector<Eigen::Triplet<double>>& triplet);
         void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
         void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx, bool prune_zeros=false);
         void VectorToTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
         void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
+        void MatrixToTripletWithSparsitySet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx, const torc::ad::sparsity_pattern_t& sparsity);
         /**
          * @brief Assign a matrix that is diagonal and all of the same value to triplets. Assumes the matrix is square.
          * @param val

@@ -128,22 +128,39 @@ namespace torc::ad {
     }
 
     // ----- Get Sparsity Patterns ----- //
-    void CppADInterface::GetJacobianSparsityPattern(torc::ad::matrixx_t& J) const {
-        J = jac_sparsity_;
+    void CppADInterface::GetJacobianSparsityPatternMat(matrixx_t& J) const {
+        J = jac_sparsity_mat_;
     }
 
-    void CppADInterface::GetHessianSparsityPattern(torc::ad::matrixx_t& H) const {
-        H = hess_sparsity_;
+    void CppADInterface::GetHessianSparsityPatternMat(matrixx_t& H) const {
+        H = hess_sparsity_mat_;
     }
 
-    void CppADInterface::GetGaussNewtonSparsityPattern(torc::ad::matrixx_t& H) const {
-        H = jac_sparsity_.transpose() * jac_sparsity_;
-        for (int row = 0; row < H.rows(); row++) {
-            for (int col = 0; col < H.cols(); col++) {
-                if (H(row, col) != 0) {
-                    H(row, col) = 1;
-                }
-            }
+    void CppADInterface::GetGaussNewtonSparsityPatternMat(matrixx_t& H) const {
+        H = gauss_newton_sparsity_mat_;
+    }
+
+    sparsity_pattern_t CppADInterface::GetJacobianSparsityPatternSet() const {
+        if (ad_model_->isJacobianSparsityAvailable()) {
+            return jac_sparsity_set_;
+        } else {
+            throw std::runtime_error("[CppADInterface] Cannot get Jacobian sparsity pattern!");
+        }
+    }
+
+    sparsity_pattern_t CppADInterface::GetGaussNewtonSparsityPatternSet() const {
+        if (ad_model_->isJacobianSparsityAvailable()) {
+            return gauss_newton_sparsity_set_;
+        } else {
+            throw std::runtime_error("[CppADInterface] Cannot get Gauss Newton sparsity pattern!");
+        }
+    }
+
+    sparsity_pattern_t CppADInterface::GetHessianSparsityPatternSet() const {
+        if (ad_model_->isHessianSparsityAvailable()) {
+            return hess_sparsity_set_;
+        } else {
+            throw std::runtime_error("[CppADInterface] Cannot get Hessian sparsity pattern!");
         }
     }
 
@@ -210,15 +227,21 @@ namespace torc::ad {
         SetNonZeros();
         UpdateJacobianSparsityPattern();
         UpdateHessianSparsityPattern();
+        UpdateGaussNewtonSparsityPattern();
     }
 
+    // TODO: Debug this!
     void CppADInterface::LoadModel() {
-        dynamic_lib_ = std::make_unique<CppAD::cg::LinuxDynamicLib<double>>(lib_path_.string() + CppAD::cg::system::SystemInfo<>::DYNAMIC_LIB_EXTENSION);
+        throw std::runtime_error("[CppADInterface] Loading models is currently unsupported!");
+        dynamic_lib_ = std::make_unique<CppAD::cg::LinuxDynamicLib<double>>(lib_path_.string());
         ad_model_ = dynamic_lib_->model(lib_name_);
+
+        y_size_ = ad_model_->Range();
 
         SetNonZeros();
         UpdateJacobianSparsityPattern();
         UpdateHessianSparsityPattern();
+        UpdateGaussNewtonSparsityPattern();
     }
 
     // ----- Sparsity ----- //
@@ -231,7 +254,7 @@ namespace torc::ad {
         }
     }
 
-    size_t CppADInterface::NumNonZeros(const torc::ad::CppADInterface::sparsity_pattern_t& sparsity) {
+    size_t CppADInterface::NumNonZeros(const torc::ad::sparsity_pattern_t& sparsity) {
         size_t nnz = 0;
         for (const auto& row : sparsity) {
             nnz += row.size();
@@ -239,7 +262,7 @@ namespace torc::ad {
         return nnz;
     }
 
-    torc::ad::CppADInterface::sparsity_pattern_t CppADInterface::GetJacobianSparsity(AD::ADFun<cg_t>& ad_fn) const {
+    torc::ad::sparsity_pattern_t CppADInterface::GetJacobianSparsity(AD::ADFun<cg_t>& ad_fn) const {
         auto jac_sparsity = CppAD::cg::jacobianSparsitySet<sparsity_pattern_t>(ad_fn);
         sparsity_pattern_t x_vars(y_size_);
         for (auto& sparsity_row : x_vars) {
@@ -252,7 +275,7 @@ namespace torc::ad {
         return GetIntersection(jac_sparsity, x_vars);
     }
 
-    torc::ad::CppADInterface::sparsity_pattern_t CppADInterface::GetHessianSparsity(AD::ADFun<cg_t>& ad_fn) const {
+    torc::ad::sparsity_pattern_t CppADInterface::GetHessianSparsity(AD::ADFun<cg_t>& ad_fn) const {
         auto hess_sparsity = CppAD::cg::hessianSparsitySet<sparsity_pattern_t>(ad_fn);
         sparsity_pattern_t x_vars(x_size_ + p_size_);
         for (size_t i = 0; i < x_size_; i++) {
@@ -265,7 +288,7 @@ namespace torc::ad {
         return GetIntersection(hess_sparsity, x_vars);
     }
 
-    torc::ad::CppADInterface::sparsity_pattern_t CppADInterface::GetIntersection(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2) {
+    torc::ad::sparsity_pattern_t CppADInterface::GetIntersection(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2) {
         const auto numRows = sp_1.size();
 
         sparsity_pattern_t result(sp_1.size());
@@ -278,29 +301,76 @@ namespace torc::ad {
 
     void CppADInterface::UpdateJacobianSparsityPattern() {
         if (ad_model_->isJacobianSparsityAvailable()) {
+            // Update for the matrix
             auto jac_sparsity_set = ad_model_->JacobianSparsitySet();
-            jac_sparsity_.resize(y_size_, x_size_);
-            jac_sparsity_.setZero();
-            for (int row = 0; row < jac_sparsity_.rows(); row++) {
-                for (int col = 0; col < jac_sparsity_.cols(); col++) {
+            jac_sparsity_mat_.resize(y_size_, x_size_);
+            jac_sparsity_mat_.setZero();
+            for (int row = 0; row < jac_sparsity_mat_.rows(); row++) {
+                for (int col = 0; col < jac_sparsity_mat_.cols(); col++) {
                     if (jac_sparsity_set[row].contains(col)) {
-                        jac_sparsity_(row, col) = 1;
+                        jac_sparsity_mat_(row, col) = 1;
                     }
                 }
             }
+
+            // Update for the set
+            sparsity_pattern_t x_vars(y_size_);
+            for (auto& sparsity_row : x_vars) {
+                for (size_t i = 0; i < x_size_; i++) {
+                    sparsity_row.insert(i);
+                }
+            }
+
+            // Now grab the intersection
+            jac_sparsity_set_ = GetIntersection(jac_sparsity_set, x_vars);
         }
     }
 
     void CppADInterface::UpdateHessianSparsityPattern() {
         if (ad_model_->isHessianSparsityAvailable()) {
+            // Update for the matrix
             auto hess_sparsity_set = ad_model_->HessianSparsitySet();
-            hess_sparsity_.resize(y_size_, x_size_);
-            hess_sparsity_.setZero();
-            for (int row = 0; row < hess_sparsity_.rows(); row++) {
-                for (int col = 0; col < hess_sparsity_.cols(); col++) {
+            hess_sparsity_mat_.resize(y_size_, x_size_);
+            hess_sparsity_mat_.setZero();
+            for (int row = 0; row < hess_sparsity_mat_.rows(); row++) {
+                for (int col = 0; col < hess_sparsity_mat_.cols(); col++) {
                     if (hess_sparsity_set[row].contains(col)) {
-                        hess_sparsity_(row, col) = 1;
+                        hess_sparsity_mat_(row, col) = 1;
                     }
+                }
+            }
+
+            // Update for the set
+            sparsity_pattern_t x_vars(x_size_ + p_size_);
+            for (size_t i = 0; i < x_size_; i++) {
+                for (size_t j = 0; j < x_size_; j++) {
+                    x_vars[i].insert(j);
+                }
+            }
+
+            // Now grab the intersection
+            hess_sparsity_set_ = GetIntersection(hess_sparsity_set, x_vars);
+
+        }
+    }
+
+    void CppADInterface::UpdateGaussNewtonSparsityPattern() {
+        // Matrix
+        gauss_newton_sparsity_mat_ = jac_sparsity_mat_.transpose() * jac_sparsity_mat_;
+        for (int row = 0; row < gauss_newton_sparsity_mat_.rows(); row++) {
+            for (int col = 0; col < gauss_newton_sparsity_mat_.cols(); col++) {
+                if (gauss_newton_sparsity_mat_(row, col) != 0) {
+                    gauss_newton_sparsity_mat_(row, col) = 1;
+                }
+            }
+        }
+
+        // Set
+        gauss_newton_sparsity_set_.resize(gauss_newton_sparsity_mat_.rows());
+        for (int row = 0; row < gauss_newton_sparsity_mat_.rows(); row++) {
+            for (int col = 0; col < gauss_newton_sparsity_mat_.cols(); col++) {
+                if (gauss_newton_sparsity_mat_(row, col) != 0) {
+                    gauss_newton_sparsity_set_[row].insert(col);
                 }
             }
         }

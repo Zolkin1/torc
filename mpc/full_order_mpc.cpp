@@ -1423,63 +1423,41 @@ namespace torc::mpc {
     // ----------------- Cost Creation ----------------- //
     // ------------------------------------------------- //
     void FullOrderMpc::CreateCostPattern() {
-        ws_->obj_config_mat = matrixx_t::Identity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-        ws_->obj_config_mat.block<3, 3>(POS_VARS, POS_VARS) = matrix3_t::Constant(1);
-
-        for (int i = 0; i < config_tracking_weight_.size(); i++) {
-            ws_->obj_config_mat.row(i) = ws_->obj_config_mat.row(i)*((config_tracking_weight_(i) != 0) ? 1 : 0);
-        }
-
-        // std::cout << "obj config mat pattern: \n" << ws_->obj_config_mat << std::endl;
-
-        ws_->obj_vel_mat = matrixx_t::Identity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-        for (int i = 0; i < vel_tracking_weight_.size(); i++) {
-            ws_->obj_vel_mat.row(i) = ws_->obj_vel_mat.row(i)*((vel_tracking_weight_(i) != 0) ? 1 : 0);
-        }
-
-        ws_->obj_tau_mat = matrixx_t::Identity(robot_model_->GetNumInputs(), robot_model_->GetNumInputs());
-        for (int i = 0; i < torque_reg_weight_.size(); i++) {
-            ws_->obj_tau_mat.row(i) = ws_->obj_tau_mat.row(i)*((torque_reg_weight_(i) != 0) ? 1 : 0);
-        }
-
-        ws_->obj_force_mat = matrixx_t::Identity(CONTACT_3DOF, CONTACT_3DOF);
-        for (int i = 0; i < force_reg_weight_.size(); i++) {
-            ws_->obj_force_mat.row(i) = ws_->obj_force_mat.row(i)*((force_reg_weight_(i) != 0) ? 1 : 0);
-        }
-
         for (int i = 0; i < nodes_; i++) {
             // Configuration Tracking
             if (using_config_tracking_cost_) {
                 int decision_idx = GetDecisionIdx(i, Configuration);
-                MatrixToNewTriplet(ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_);
+                const auto config_sparsity = cost_.GetGaussNewtonSparsityPattern(CostTypes::Configuration);
+                AddSparsitySet(config_sparsity, decision_idx, decision_idx, objective_triplets_);
             }
 
             // Velocity Tracking
             if (using_vel_tracking_cost_) {
                 int decision_idx = GetDecisionIdx(i, Velocity);
-                MatrixToNewTriplet(ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_);
+                const auto vel_sparsity = cost_.GetHessianSparsityPattern(CostTypes::VelocityTracking);
+                AddSparsitySet(vel_sparsity, decision_idx, decision_idx, objective_triplets_);
             }
 
 
             // Torque regularization
             if (using_torque_reg_cost_ && i < nodes_full_dynamics_) {
                 int decision_idx = GetDecisionIdx(i, Torque);
-                MatrixToNewTriplet(ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_);
+                const auto torque_reg_sparsity = cost_.GetHessianSparsityPattern(CostTypes::TorqueReg);
+                AddSparsitySet(torque_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
             }
 
             // Force regularization
             if (using_force_reg_cost_) {
                 int decision_idx = GetDecisionIdx(i, GroundForce);
                 for (const auto& frame: contact_frames_) {
-                    MatrixToNewTriplet(ws_->obj_force_mat, decision_idx, decision_idx, objective_triplets_);
+                    const auto force_reg_sparsity = cost_.GetHessianSparsityPattern(CostTypes::ForceReg);
+                    AddSparsitySet(force_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
                     decision_idx += CONTACT_3DOF;
                 }
             }
         }
 
         osqp_instance_.objective_matrix.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
-
-        // std::cout << "obj pattern:\n" << osqp_instance_.objective_matrix << std::endl;
 
         ws_->obj_config_vector.resize(robot_model_->GetVelDim());
         ws_->obj_vel_vector.resize(robot_model_->GetVelDim());
@@ -1526,38 +1504,29 @@ namespace torc::mpc {
                 int decision_idx = GetDecisionIdx(node, Configuration);
                 cost_.GetApproximation(traj_.GetConfiguration(node), q_target_[node],
                                        ws_->obj_config_vector, ws_->obj_config_mat, CostTypes::Configuration);
+
                 osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                         scaling * ws_->obj_config_vector;
 
-                std::cout << "obj config mat: \n" << ws_->obj_config_mat << std::endl;
+                const auto sparsity = cost_.GetGaussNewtonSparsityPattern(CostTypes::Configuration);
 
-                // TODO: I think I can do this in one call now (?)
-                // TODO: I think I can remove the restriction on the orientation weight trackings
-                // Positions
-                MatrixToTriplet(scaling * ws_->obj_config_mat.topRows<POS_VARS>(),
-                                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
-                // Orientations
-                if (config_tracking_weight_(3) > 0) {       // Only add these if they have a positive weight
-                    MatrixToTriplet(scaling * ws_->obj_config_mat.block<3, 3>(POS_VARS, POS_VARS),
-                                    decision_idx + POS_VARS, decision_idx + POS_VARS, objective_triplets_,
-                                    objective_triplet_idx_, false);
-                }
-                // Joints
-                MatrixToTriplet(scaling * ws_->obj_config_mat.bottomRows(robot_model_->GetNumInputs()),
-                                decision_idx + FLOATING_VEL, decision_idx, objective_triplets_, objective_triplet_idx_,
-                                true);
+                MatrixToTripletWithSparsitySet(scaling * ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_,
+                                               objective_triplet_idx_, sparsity);
             }
 
             // ----- Velocity ----- //
             if (using_vel_tracking_cost_) {
                 int decision_idx = GetDecisionIdx(node, Velocity);
-//                cost_.GetApproximation(traj_.GetVelocity(node), v_target_[node],
-//                                       ws_->obj_vel_vector, ws_->obj_vel_mat, CostTypes::VelocityTracking);
+                cost_.GetApproximation(traj_.GetVelocity(node), v_target_[node],
+                                       ws_->obj_vel_vector, ws_->obj_vel_mat, CostTypes::VelocityTracking);
 
                 osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                         scaling * ws_->obj_vel_vector;
-                MatrixToTriplet(scaling * ws_->obj_vel_mat,
-                                decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+
+                const auto sparsity = cost_.GetHessianSparsityPattern(CostTypes::VelocityTracking);
+
+                MatrixToTripletWithSparsitySet(scaling * ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_,
+                                               objective_triplet_idx_, sparsity);
             }
 
             // ----- Torque ----- //
@@ -1574,8 +1543,11 @@ namespace torc::mpc {
 
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
                             scaling * ws_->obj_tau_vector;
-                    MatrixToTriplet(scaling * ws_->obj_tau_mat,
-                                    decision_idx, decision_idx, objective_triplets_, objective_triplet_idx_, true);
+
+                    const auto sparsity = cost_.GetHessianSparsityPattern(CostTypes::TorqueReg);
+
+                    MatrixToTripletWithSparsitySet(scaling * ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_,
+                                                   objective_triplet_idx_, sparsity);
                 }
             }
 
@@ -1592,8 +1564,12 @@ namespace torc::mpc {
 
                     osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
                             scaling * ws_->obj_force_vector;
-                    MatrixToTriplet(scaling * ws_->obj_force_mat,
-                                    force_idx, force_idx, objective_triplets_, objective_triplet_idx_, true);
+
+                    const auto sparsity = cost_.GetHessianSparsityPattern(CostTypes::ForceReg);
+
+                    MatrixToTripletWithSparsitySet(scaling * ws_->obj_force_mat, force_idx, force_idx, objective_triplets_,
+                                                   objective_triplet_idx_, sparsity);
+
                     force_idx += CONTACT_3DOF;
                 }
             }
@@ -2113,6 +2089,15 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::AddSparsitySet(const torc::ad::sparsity_pattern_t& sparsity, int row_start, int col_start,
+                                      std::vector<Eigen::Triplet<double>>& triplet) {
+        for (int row = 0; row < sparsity.size(); row++) {
+            for (const auto& col : sparsity[row]) {
+                triplet.emplace_back(row_start + row, col_start + col, 1);
+            }
+        }
+    }
+
     void FullOrderMpc::VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet) {
         for (int col = 0; col < vec.size(); col++) {
             // Only in this function do we want to filter out 0's because if they occur here then they are structural
@@ -2147,6 +2132,17 @@ namespace torc::mpc {
             // Don't filter zero's here as they aren't structural
             triplet[triplet_idx] = Eigen::Triplet<double>(row_start + idx, col_start + idx, mat(idx, idx));
             triplet_idx++;
+        }
+    }
+
+    void FullOrderMpc::MatrixToTripletWithSparsitySet(const torc::mpc::matrixx_t& mat, int row_start, int col_start,
+                                                      std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx,
+                                                      const torc::ad::sparsity_pattern_t& sparsity) {
+        for (int row = 0; row < sparsity.size(); row++) {
+            for (const auto& col : sparsity[row]) {
+                triplet[triplet_idx] = Eigen::Triplet<double>(row_start + row, col_start + col, mat(row, col));
+                triplet_idx++;
+            }
         }
     }
 

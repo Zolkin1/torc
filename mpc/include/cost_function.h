@@ -129,8 +129,7 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
-                std::cout << "jac: \n" << jac << std::endl;
-                linear_term = jac.col(0);
+                ConvertJacobianToVectorSum(jac, linear_term);
                 hessian_term = 2*hessian_term;
             } else if (type == VelocityTracking) {
                 if (reference.size() != vel_size_ || target.size() != vel_size_) {
@@ -139,7 +138,7 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(vel_size_), p, jac);
-                linear_term = jac.col(0);
+                ConvertJacobianToVectorSum(jac, linear_term);
 
                 vectorx_t w = vectorx_t::Constant(vel_size_, 1);
                 cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(vel_size_), p, w, hessian_term);
@@ -150,7 +149,7 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(input_size_), p, jac);
-                linear_term = jac.col(0);
+                ConvertJacobianToVectorSum(jac, linear_term);
 
                 vectorx_t w = vectorx_t::Constant(input_size_, 1);
                 cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(input_size_), p, w, hessian_term);
@@ -161,7 +160,7 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(force_size_), p, jac);
-                linear_term = jac.col(0);
+                ConvertJacobianToVectorSum(jac, linear_term);
 
                 vectorx_t w = vectorx_t::Constant(force_size_, 1);
                 cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(force_size_), p, w, hessian_term);
@@ -170,8 +169,17 @@ namespace torc::mpc {
             }
         }
 
-        // TODO: Add sparsity pattern getting
+        torc::ad::sparsity_pattern_t GetJacobianSparsityPattern(const CostTypes& type) {
+            return cost_fcn_terms_[cost_idxs_[type]]->GetJacobianSparsityPatternSet();
+        }
 
+        torc::ad::sparsity_pattern_t GetGaussNewtonSparsityPattern(const CostTypes& type) {
+            return cost_fcn_terms_[cost_idxs_[type]]->GetGaussNewtonSparsityPatternSet();
+        }
+
+        torc::ad::sparsity_pattern_t GetHessianSparsityPattern(const CostTypes& type) {
+            return cost_fcn_terms_[cost_idxs_[type]]->GetHessianSparsityPatternSet();
+        }
 
         [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const CostTypes& type) {
             if (!configured_) {
@@ -187,6 +195,16 @@ namespace torc::mpc {
 
 
     protected:
+        static void ConvertJacobianToVectorSum(matrixx_t& jac, vectorx_t& linear_term) {
+            jac.transposeInPlace();
+            linear_term.resize(jac.rows());
+            linear_term.setZero();
+
+            for (int col = 0; col < jac.cols(); col++) {
+                linear_term += jac.col(col);
+            }
+        }
+
         static constexpr int POS_VARS = 3;
         static constexpr int QUAT_VARS = 4;
         static constexpr int FLOATING_VEL = 6;
@@ -228,8 +246,7 @@ namespace torc::mpc {
                     - qref_qtarget_weight.segment(config_size_ + FLOATING_BASE, joint_size_);
 
             for (int i = 0; i < vel_size_; i++) {
-                // TODO: For some reason this pow causes the output to go to 0, only when n>=2
-                q_diff(i) = CppAD::pow(q_diff(i) * 1, 2); //qref_qtarget_weight(2*config_size_ + i)
+                q_diff(i) = CppAD::pow(q_diff(i) * qref_qtarget_weight(2*config_size_ + i), 2);
             }
         }
 

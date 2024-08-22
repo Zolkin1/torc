@@ -46,11 +46,16 @@ namespace torc::ad {
 
         void GetHessian(int idx, const vectorx_t& x, const vectorx_t& p, matrixx_t& hessian) const;
 
-        void GetJacobianSparsityPattern(matrixx_t& J) const;
+        // ----- Matrix Based Sparsity Pattern ----- //
+        void GetJacobianSparsityPatternMat(matrixx_t& J) const;
+        void GetGaussNewtonSparsityPatternMat(matrixx_t& H) const;
+        void GetHessianSparsityPatternMat(matrixx_t& H) const;
 
-        void GetGaussNewtonSparsityPattern(matrixx_t& H) const;
+        // ----- Set Based Sparsity Pattern ----- //
+        [[nodiscard]] sparsity_pattern_t GetJacobianSparsityPatternSet() const;
+        [[nodiscard]] sparsity_pattern_t GetGaussNewtonSparsityPatternSet() const;
+        [[nodiscard]] sparsity_pattern_t GetHessianSparsityPatternSet() const;
 
-        void GetHessianSparsityPattern(matrixx_t& H) const;
 
         [[nodiscard]] fs::path GetLibPath() const;
 
@@ -66,7 +71,6 @@ namespace torc::ad {
         void SetNonZeros();
 
         // ----- Sparsity ----- //
-        using sparsity_pattern_t = std::vector<std::set<size_t>>;
         static size_t NumNonZeros(const sparsity_pattern_t& sparsity);
 
         sparsity_pattern_t GetJacobianSparsity(AD::ADFun<cg_t>& ad_fn) const;
@@ -76,6 +80,8 @@ namespace torc::ad {
         void UpdateHessianSparsityPattern();
 
         static sparsity_pattern_t GetIntersection(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2);
+
+        void UpdateGaussNewtonSparsityPattern();
 
     private:
     std::string name_;
@@ -105,8 +111,13 @@ namespace torc::ad {
     size_t nnz_jac_;
     size_t nnz_hess_;
 
-    matrixx_t jac_sparsity_;
-    matrixx_t hess_sparsity_;
+    matrixx_t jac_sparsity_mat_;
+    matrixx_t gauss_newton_sparsity_mat_;
+    matrixx_t hess_sparsity_mat_;
+
+    sparsity_pattern_t jac_sparsity_set_;
+    sparsity_pattern_t gauss_newton_sparsity_set_;
+    sparsity_pattern_t hess_sparsity_set_;
     };
 }   // namepsace torc::ad
 

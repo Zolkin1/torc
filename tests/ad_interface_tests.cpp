@@ -13,6 +13,12 @@ void TestFunction(const torc::ad::ad_vector_t& x, const torc::ad::ad_vector_t& p
     y = p(0)*x;
 }
 
+void PowTestFunction(const torc::ad::ad_vector_t& x, const torc::ad::ad_vector_t& p, torc::ad::ad_vector_t& y) {
+    y.resize(2);
+    y(0) = CppAD::pow(x(0), 2);
+    y(1) = CppAD::pow(p(0)*x(0), 2);
+}
+
 TEST_CASE("Basic AD Interface Tests", "[ad]") {
     using namespace torc::ad;
 
@@ -63,14 +69,84 @@ TEST_CASE("Basic AD Interface Tests", "[ad]") {
 
     // Check sparsity patterns
     jac.setZero();
-    function.GetJacobianSparsityPattern(jac);
+    function.GetJacobianSparsityPatternMat(jac);
     CHECK(jac == matrixx_t::Identity(Y_SIZE, X_SIZE));
 
     hess.setZero();
-    function.GetHessianSparsityPattern(hess);
+    function.GetHessianSparsityPatternMat(hess);
     CHECK(hess.isZero());
 
     hess.setZero();
-    function.GetGaussNewtonSparsityPattern(hess);
+    function.GetGaussNewtonSparsityPatternMat(hess);
     CHECK(hess == matrixx_t::Identity(X_SIZE, X_SIZE));
 }
+
+TEST_CASE("Pow Test", "[ad]") {
+    using namespace torc::ad;
+
+    double constexpr MARGIN = 1e-8;
+
+    int constexpr X_SIZE = 1;
+    int constexpr P_SIZE = 1;
+    int constexpr Y_SIZE = 2;
+
+    auto curr_path = fs::current_path();
+    curr_path = curr_path / "deriv_libs";
+    CppADInterface function(&PowTestFunction, "pow_test_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, true);
+
+    CHECK(function.GetDomainSize() == X_SIZE);
+    CHECK(function.GetParameterSize() == P_SIZE);
+    CHECK(function.GetRangeSize() == Y_SIZE);
+
+    // Check the function value
+    vectorx_t p  = vectorx_t::Random(P_SIZE);
+    vectorx_t x = vectorx_t::Random(X_SIZE);
+
+    vectorx_t y(Y_SIZE);
+    y << x(0)*x(0), std::pow(p(0)*x(0),2);
+
+    vectorx_t y_test;
+    function.GetFunctionValue(x, p, y_test);
+    CHECK(y_test.size() == function.GetRangeSize());
+    CHECK(y_test == y);
+
+    // Check the jacobian
+    matrixx_t jac;
+    p  = vectorx_t::Random(P_SIZE);
+    x = vectorx_t::Random(X_SIZE);
+    function.GetJacobian(x, p, jac);
+    CHECK(jac.rows() == function.GetRangeSize());
+    CHECK(jac.cols() == function.GetDomainSize());
+
+    matrixx_t jac_analytic(Y_SIZE, X_SIZE);
+    jac_analytic(0, 0) = 2*x(0);
+    jac_analytic(1, 0) = 2*p(0)*p(0)*x(0);
+
+    CHECK(jac.isApprox(jac_analytic, MARGIN));
+}
+
+//TEST_CASE("Loading", "[ad]") {
+//    using namespace torc::ad;
+//
+//    double constexpr MARGIN = 1e-8;
+//
+//    int constexpr X_SIZE = 1;
+//    int constexpr P_SIZE = 1;
+//    int constexpr Y_SIZE = 2;
+//
+//    auto curr_path = fs::current_path();
+//    curr_path = curr_path / "deriv_libs";
+//    CppADInterface function(&PowTestFunction, "pow_test_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, true);
+//
+//    CHECK(function.GetDomainSize() == X_SIZE);
+//    CHECK(function.GetParameterSize() == P_SIZE);
+//    CHECK(function.GetRangeSize() == Y_SIZE);
+//
+    // TODO: Fix!
+    // Load
+//    CppADInterface function2(&PowTestFunction, "pow_test_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, false);
+//
+//    CHECK(function2.GetDomainSize() == X_SIZE);
+//    CHECK(function2.GetParameterSize() == P_SIZE);
+//    CHECK(function2.GetRangeSize() == Y_SIZE);
+//}
