@@ -23,6 +23,11 @@ constraints:
   friction_coef: 0.5
   max_grf: 200
 costs:
+  using_config_tracking: True
+  using_velocity_tracking: True
+  using_torque_regularization: True
+  using_force_regularization: False
+
 #  configuration_tracking_weights: [1, 1, 1,
 #                                   0, 0, 0,
 #                                   1, 1, 1, 1, 1, 1, 1, 1, 1,
