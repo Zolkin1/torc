@@ -518,7 +518,7 @@ namespace torc::mpc {
 
 
 
-    void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
+    void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
 
@@ -546,21 +546,28 @@ namespace torc::mpc {
 
 //            std::cout << "total_dt: " << total_dt << std::endl;
 
-            const int steps = 2;
-            double dt = total_dt / static_cast<double>(steps);
+            // TODO: Put back!
+//            const int steps = 2;
+//            double dt = total_dt / static_cast<double>(steps);
+//
+//            vectorx_t tau;
+//            for (int i = 0; i < steps; i++) {
+//                double curr_time = i * dt;
+//                traj_.GetTorqueInterp(delay_start_time + curr_time, tau);
+//                for (auto& f : ws_->f_ext) {
+//                    traj_.GetForceInterp(delay_start_time + curr_time, f.frame_name, f.force_linear);
+//                }
+//
+//                vectorx_t xdot = robot_model_->GetDynamics(q_new, v_new, tau, ws_->f_ext);
+//                q_new = robot_model_->IntegrateVelocity(q_new, dt*xdot.head(v.size()));
+//                v_new = v_new + dt*xdot.tail(v.size());
+//            }
 
-            vectorx_t tau;
-            for (int i = 0; i < steps; i++) {
-                double curr_time = i * dt;
-                traj_.GetTorqueInterp(curr_time, tau);
-                for (auto& f : ws_->f_ext) {
-                    traj_.GetForceInterp(curr_time, f.frame_name, f.force_linear);
-                }
+            // TODO: Measure the error between this and the measured one
 
-                vectorx_t xdot = robot_model_->GetDynamics(q_new, v_new, tau, ws_->f_ext);
-                q_new = robot_model_->IntegrateVelocity(q_new, dt*xdot.head(v.size()));
-                v_new = v_new + dt*xdot.tail(v.size());
-            }
+            // TODO: Remove
+            traj_.GetConfigInterp(delay_start_time + total_dt, q_new);
+            traj_.GetVelocityInterp(delay_start_time + total_dt, v_new);
 
 //            std::cout << "q delay: " << q_new.transpose() << std::endl;
 //            std::cout << "v delay: " << v_new.transpose() << std::endl;
@@ -1147,7 +1154,7 @@ namespace torc::mpc {
                 violation += dt_[node]*GetIDViolation(qp_res, node, true);
                 violation += dt_[node]*GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                // violation += dt_[node]*GetIDViolation(qp_res, node, false);
+                 violation += dt_[node]*GetIDViolation(qp_res, node, false);
             }
 
             violation += dt_[node]*GetFrictionViolation(qp_res, node);
@@ -1607,11 +1614,8 @@ namespace torc::mpc {
             if (using_torque_reg_cost_) {
                 if (node < nodes_full_dynamics_) {
                     int decision_idx = GetDecisionIdx(node, Torque);
-                    vectorx_t tau_target = vectorx_t::Zero(robot_model_->GetNumInputs());
-                    if (node == 0) {
-                        // Trying to minimize oscilliations
-                        tau_target = traj_.GetTau(node);
-                    }
+                    vectorx_t tau_target = GetTorqueTarget(node);
+
                     cost_.GetApproximation(traj_.GetTau(node), tau_target,
                                            ws_->obj_tau_vector, ws_->obj_tau_mat, CostTypes::TorqueReg);
 
@@ -1627,11 +1631,9 @@ namespace torc::mpc {
 
             // ----- Force ----- //
             if (using_force_reg_cost_) {
-                int num_contacts = GetNumContacts(node);
                 int force_idx = GetDecisionIdx(node, GroundForce);
-                vector3_t force_target;
                 for (const auto& frame: contact_frames_) {
-                    force_target << 0, 0, in_contact_[frame][node] * 9.81 * robot_model_->GetMass() / num_contacts;
+                    vector3_t force_target = GetForceTarget(node, frame);
 
                     cost_.GetApproximation(traj_.GetForce(node, frame), force_target,
                                            ws_->obj_force_vector, ws_->obj_force_mat, CostTypes::ForceReg);
@@ -1676,15 +1678,17 @@ namespace torc::mpc {
                         traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking);
             }
             if (using_torque_reg_cost_ && node < nodes_full_dynamics_) {
+                vectorx_t torque_target = GetTorqueTarget(node);
                 cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
-                    traj_.GetTau(node), vectorx_t::Zero(robot_model_->GetNumInputs()), CostTypes::TorqueReg);
+                    traj_.GetTau(node), torque_target, CostTypes::TorqueReg);
             }
 
             if (using_force_reg_cost_) {
                 int force_idx = GetDecisionIdx(node, GroundForce);
                 for (const auto& frame: contact_frames_) {
+                    vector3_t force_target = GetForceTarget(node, frame);
                     cost_node += (scale_cost_ ? dt_[node] : 1) * cost_.GetTermCost(qp_res.segment(
-                            force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), vector3_t::Zero(), ForceReg);
+                            force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), force_target, ForceReg);
                     force_idx += CONTACT_3DOF;
                 }
             }
@@ -1700,6 +1704,22 @@ namespace torc::mpc {
         return cost;
     }
 
+    vectorx_t FullOrderMpc::GetTorqueTarget(int node) {
+        if (node == 0) {
+            return traj_.GetTau(node);
+        }
+
+        return vectorx_t::Zero(robot_model_->GetNumInputs());
+    }
+
+    vector3_t FullOrderMpc::GetForceTarget(int node, const std::string& frame) {
+        int num_contacts = GetNumContacts(node);
+        vector3_t force_target;
+        force_target << 0, 0, in_contact_[frame][node] * 9.81 * robot_model_->GetMass() / num_contacts;
+
+        return force_target;
+    }
+
     std::pair<double, double> FullOrderMpc::LineSearch(const vectorx_t& qp_res) {
         // Backtracing linesearch (see ETH paper)
         // TODO: Speed up
@@ -1707,6 +1727,7 @@ namespace torc::mpc {
         alpha_ = 1;
 
         // std::cout << "------ alpha: " << 0 << " ------" << std::endl;
+        // TODO: Make sure there are no bugs because I feel like I reject a lot of steps
 
         // TODO: I think there is a bug with the constraint violation as sometimes it increases when alpha=0
         double theta_k = GetConstraintViolation(vectorx_t::Zero(qp_res.size()));
@@ -1715,19 +1736,21 @@ namespace torc::mpc {
         while (alpha_ > ls_alpha_min_) {
             // std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
             double theta_kp1 = GetConstraintViolation(alpha_*qp_res);
-            double phi_kp1 = GetFullCost(alpha_*qp_res);
 
             if (theta_kp1 >= ls_theta_max_) {
                 if (theta_kp1 < (1 - ls_gamma_theta_)*theta_k) {
                     ls_condition_ = ConstraintViolation;
+                    double phi_kp1 = GetFullCost(alpha_*qp_res);
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             } else if (std::max(theta_k, theta_kp1) < ls_theta_min_ && osqp_instance_.objective_vector.dot(qp_res) < 0) {
+                double phi_kp1 = GetFullCost(alpha_*qp_res);
                 if (phi_kp1 < (phi_k + ls_eta_*alpha_*osqp_instance_.objective_vector.dot(qp_res))) {
                     ls_condition_ = CostReduction;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             } else {
+                double phi_kp1 = GetFullCost(alpha_*qp_res);
                 if (phi_kp1 < (1 - ls_gamma_phi_)*phi_k || theta_kp1 < (1 - ls_gamma_theta_)*theta_k) {
                     ls_condition_ = Both;
                     return std::make_pair(theta_kp1, phi_kp1);

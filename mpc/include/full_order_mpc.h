@@ -76,7 +76,7 @@ namespace torc::mpc {
          *
          * @return
          */
-        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
+        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time = 0);
 
         void ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
 
@@ -203,6 +203,10 @@ namespace torc::mpc {
         std::pair<double, double> LineSearch(const vectorx_t& qp_res);
 
         [[nodiscard]] int GetNumContacts(int node) const;
+
+        vectorx_t GetTorqueTarget(int node);
+        vector3_t GetForceTarget(int node, const std::string& frame);
+
         // void CreateDefaultCost();
         // Helper function
         // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;

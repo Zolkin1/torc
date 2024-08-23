@@ -122,6 +122,14 @@ namespace torc::mpc {
             configured_ = true;
         }
 
+        /**
+         * @brief returns the approximation of the function at x = 0
+         * @param reference
+         * @param target
+         * @param linear_term
+         * @param hessian_term
+         * @param type
+         */
         void GetApproximation(const vectorx_t& reference, const vectorx_t& target, vectorx_t& linear_term,
                               matrixx_t& hessian_term, const CostTypes& type) {
             vectorx_t p(reference.size() + target.size() + weights_[cost_idxs_[type]].size());
@@ -134,8 +142,12 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
-                ConvertJacobianToVectorSum(jac, linear_term);
                 hessian_term = 2*hessian_term;
+
+                vectorx_t y;
+                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
+                linear_term = 2*jac.transpose()*y;
+
             } else if (type == VelocityTracking) {
                 if (reference.size() != vel_size_ || target.size() != vel_size_) {
                     throw std::runtime_error("[Cost Function] velocity approx reference or target has the wrong size!");
@@ -143,10 +155,14 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(vel_size_), p, jac);
-                ConvertJacobianToVectorSum(jac, linear_term);
 
-                vectorx_t w = vectorx_t::Constant(vel_size_, 1);
-                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(vel_size_), p, w, hessian_term);
+                vectorx_t y;
+                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
+                linear_term = 2*jac.transpose()*y;
+
+                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(vel_size_), p, 2*y, hessian_term);
+                hessian_term += 2*jac.transpose() * jac;
+
             } else if (type == TorqueReg) {
                 if (reference.size() != input_size_ || target.size() != input_size_) {
                     throw std::runtime_error("[Cost Function] torque approx reference or target has the wrong size!");
@@ -154,10 +170,13 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(input_size_), p, jac);
-                ConvertJacobianToVectorSum(jac, linear_term);
 
-                vectorx_t w = vectorx_t::Constant(input_size_, 1);
-                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(input_size_), p, w, hessian_term);
+                vectorx_t y;
+                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(input_size_), p, y);
+                linear_term = 2*jac.transpose()*y;
+
+                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(input_size_), p, 2*y, hessian_term);
+                hessian_term += 2*jac.transpose() * jac;
             } else if (type == ForceReg) {
                 if (reference.size() != force_size_ || target.size() != force_size_) {
                     throw std::runtime_error("[Cost Function] force approx reference or target has the wrong size!");
@@ -165,10 +184,13 @@ namespace torc::mpc {
 
                 matrixx_t jac;
                 cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(force_size_), p, jac);
-                ConvertJacobianToVectorSum(jac, linear_term);
 
-                vectorx_t w = vectorx_t::Constant(force_size_, 1);
-                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(force_size_), p, w, hessian_term);
+                vectorx_t y;
+                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(force_size_), p, y);
+                linear_term = 2*jac.transpose()*y;
+
+                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(force_size_), p, 2*y, hessian_term);
+                hessian_term += 2*jac.transpose() * jac;
             } else {
                 throw std::runtime_error("Provided cost type not supported yet!");
             }
@@ -195,20 +217,20 @@ namespace torc::mpc {
             p << reference, target, weights_[cost_idxs_[type]];
             vectorx_t y = vectorx_t::Zero(cost_fcn_terms_[cost_idxs_[type]]->GetRangeSize());
             cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(decision_var, p, y);
-            return y.sum();     // Assumes all the functions have the form of a norm
+            return y.squaredNorm();     // Assumes all the functions have the form of a norm
         }
 
 
     protected:
-        static void ConvertJacobianToVectorSum(matrixx_t& jac, vectorx_t& linear_term) {
-            jac.transposeInPlace();
-            linear_term.resize(jac.rows());
-            linear_term.setZero();
-
-            for (int col = 0; col < jac.cols(); col++) {
-                linear_term += jac.col(col);
-            }
-        }
+//        static void ConvertJacobianToVectorSum(matrixx_t& jac, vectorx_t& linear_term) {
+//            jac.transposeInPlace();
+//            linear_term.resize(jac.rows());
+//            linear_term.setZero();
+//
+//            for (int col = 0; col < jac.cols(); col++) {
+//                linear_term += jac.col(col);
+//            }
+//        }
 
         static constexpr int POS_VARS = 3;
         static constexpr int QUAT_VARS = 4;
@@ -251,7 +273,7 @@ namespace torc::mpc {
                     - qref_qtarget_weight.segment(config_size_ + FLOATING_BASE, joint_size_);
 
             for (int i = 0; i < vel_size_; i++) {
-                q_diff(i) = CppAD::pow(q_diff(i) * qref_qtarget_weight(2*config_size_ + i), 2);
+                q_diff(i) = q_diff(i) * qref_qtarget_weight(2*config_size_ + i);
             }
         }
 
@@ -266,7 +288,7 @@ namespace torc::mpc {
 
             // Multiply by the weights
             for (int i = 0; i < vel_size_; i++) {
-                v_diff(i) = CppAD::pow(v_diff(i) * vref_vtarget_weight(2*vel_size_ + i), 2);
+                v_diff(i) = v_diff(i) * vref_vtarget_weight(2*vel_size_ + i);
             }
         }
 
@@ -281,7 +303,7 @@ namespace torc::mpc {
 
             // Multiply by the weights
             for (int i = 0; i < input_size_; i++) {
-                tau_diff(i) = CppAD::pow(tau_diff(i) * tauref_tautarget_weight(2*input_size_ + i), 2);
+                tau_diff(i) = tau_diff(i) * tauref_tautarget_weight(2*input_size_ + i);
             }
         }
 
@@ -296,7 +318,7 @@ namespace torc::mpc {
 
             // Multiply by the weights
             for (int i = 0; i < force_size_; i++) {
-                force_diff(i) = CppAD::pow(force_diff(i) * fref_ftarget_weight(2 * force_size_ + i), 2);
+                force_diff(i) = force_diff(i) * fref_ftarget_weight(2 * force_size_ + i);
             }
         }
 
