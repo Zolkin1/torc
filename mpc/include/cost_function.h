@@ -9,9 +9,11 @@
 #include <stdexcept>
 #include <Eigen/Core>
 #include <filesystem>
+#include <pinocchio/algorithm/joint-configuration.hpp>
 
-#include "autodiff_fn.h"
-#include "quadratic_fn.h"
+//#include "autodiff_fn.h"
+//#include "quadratic_fn.h"
+#include "pinocchio/codegen/cppadcg.hpp"
 #include "pinocchio/spatial/explog-quaternion.hpp"
 #include "trajectory.h"
 #include "cpp_ad_interface.h"
@@ -42,6 +44,9 @@ namespace torc::mpc {
         void Configure(const std::unique_ptr<torc::models::FullOrderRigidBody>& model,
             bool compile_derivatives, const std::vector<CostTypes>& costs, const std::vector<vectorx_t>& weights,
             std::filesystem::path deriv_libs_path) {
+
+            ad_pin_model_ = model->GetADPinModel();
+            ad_pin_data_ = model->GetADPinData();
 
             config_size_ = model->GetConfigDim();
             vel_size_ = model->GetVelDim();
@@ -295,6 +300,30 @@ namespace torc::mpc {
             }
         }
 
+        /**
+         * @brief Calculates the error in the foot location relative to the Raibert heuristic
+         * @param dq_dv
+         * @param q_v_ts_z0
+         * @param foot_error
+         */
+//        void RaibertCost(const torc::ad::ad_vector_t& dq_dv,        // Change in configuration and velocity
+//                         const torc::ad::ad_vector_t& q_v_ts_z0,    // configuration, velocity, stance time, nominal height
+//                         torc::ad::ad_vector_t& foot_error) {       // Error on the foot location
+//            const torc::ad::ad_vector_t& dq = dq_dv.head(vel_size_);
+//            const torc::ad::ad_vector_t& dv = dq_dv.tail(vel_size_);
+//            const torc::ad::ad_vector_t& q = q_v_ts_z0.head(config_size_);
+//            const torc::ad::ad_vector_t& v = q_v_ts_z0.segment(config_size_, vel_size_);
+//            const torc::ad::adcg_t& ts = q_v_ts_z0(config_size_ + vel_size_);
+//            const torc::ad::adcg_t& z0 = q_v_ts_z0(config_size_ + vel_size_ + 1);
+//
+//            // TODO: Check this
+//            // ----- Determine the current foot position ----- //
+//            // Get the current configuration
+//            torc::ad::ad_vector_t q_new = pinocchio::integrate(ad_pin_model_, q, dq);
+//            torc::ad::ad_vector_t
+//
+//        }
+
         // ----------------------------------- //
         // --------- Member Variables -------- //
         // ----------------------------------- //
@@ -317,6 +346,9 @@ namespace torc::mpc {
 
         std::unique_ptr<CppAD::cg::DynamicLib<double>> config_jacobian_lib_;
         std::unique_ptr<CppAD::cg::GenericModel<double>> config_jacobian_model_;
+
+        torc::models::ad_pin_model_t ad_pin_model_;
+        std::shared_ptr<torc::models::ad_pin_data_t> ad_pin_data_;
     private:
     };
 }    // namespace torc::mpc

@@ -22,3 +22,7 @@ target_include_directories(Autodiff PUBLIC
 #----------- Eigen ----------- #
 find_package(Eigen3 REQUIRED)
 target_link_libraries(Autodiff PUBLIC Eigen3::Eigen)
+
+#----------- Pinocchio ----------- #
+find_package(pinocchio 3.0.0 REQUIRED)
+target_link_libraries(Autodiff PUBLIC pinocchio::pinocchio)

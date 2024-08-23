@@ -38,6 +38,10 @@ target_include_directories(Models PUBLIC
 find_package(Eigen3 REQUIRED)
 target_link_libraries(Models PUBLIC Eigen3::Eigen)
 
+#----------- Autodiff ----------- #
+find_package(Eigen3 REQUIRED)
+target_link_libraries(Models PUBLIC Autodiff)
+
 #----------- Pinocchio -----------#
 if (BUILD_WITH_PINOCCHIO)
     list(APPEND CMAKE_PREFIX_PATH /opt/openrobots/)

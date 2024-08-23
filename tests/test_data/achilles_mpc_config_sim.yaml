@@ -8,6 +8,8 @@ general_settings:
   max_initial_solves: 20
   initial_constraint_tol: 5e-3
   nodes_full_dynamics: 2    # Also determines how many nodes have torque constraints
+  integrate_velocity_targets: True
+  delay_prediction_dt: 0
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
@@ -43,7 +45,7 @@ costs:
                               0.001, .05, .001, .001, .5, .1, .1, .1, .1]
   torque_regularization_weights: [.0001, .001, .0001, .0001, .02, .5, .5, .5, .1,
                                   .0001, .001, .0001, .0001, .02, .5, .5, .5, .1]
-  force_regularization_weights: [0.0001, 0.0001, 0.1] # Note that these are small because the force in general is quite large
+  force_regularization_weights: [0.00001, 0.00001, 0.0005] # Note that these are small because the force in general is quite large
 contacts:
   # For now, removing hands
   # contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]

@@ -318,6 +318,7 @@ namespace torc::mpc {
 
         std::vector<vectorx_t> q_target_;
         std::vector<vectorx_t> v_target_;
+        bool integrate_vel_targets_;
 
         bool scale_cost_;
 
@@ -366,6 +367,8 @@ namespace torc::mpc {
         std::string base_frame_;
         int max_initial_solves_;
         double initial_constraint_tol_;
+        double delay_prediction_dt_;
+        bool enable_delay_prediction_;
 
         // Constraint settings
         double friction_coef_{};

@@ -44,9 +44,15 @@ namespace torc::models {
 
         [[nodiscard]] quat_t GetBaseOrientation(const vectorx_t& q) const override;
 
+        [[nodiscard]] vectorx_t IntegrateVelocity(const vectorx_t& q0, const vectorx_t& v) const;
+
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input) override;
+
+        [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& q, const vectorx_t& v,
+                                            const vectorx_t& input,
+                                            const std::vector<ExternalForce>& f_ext);
 
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input,

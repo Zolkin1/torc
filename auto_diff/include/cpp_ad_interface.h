@@ -10,6 +10,8 @@
 #include <filesystem>
 
 #include "auto_diff_types.h"
+#include "pinocchio/codegen/cppadcg.hpp" // TODO: Why do I need to have this to make the pinocchio autodiff stuff work?
+
 
 namespace torc::ad {
     namespace fs = std::filesystem;

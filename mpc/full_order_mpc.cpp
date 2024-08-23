@@ -26,7 +26,7 @@
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
         : config_file_(config_file), verbose_(true), cost_(name), compile_derivatves_(true), scale_cost_(false),
-            total_solves_(0) {
+            total_solves_(0), enable_delay_prediction_(true) {
         // Verify the robot file exists
         if (!fs::exists(model_path)) {
             throw std::runtime_error("Robot file does not exist!");
@@ -134,6 +134,14 @@ namespace torc::mpc {
             } else {
                 nodes_full_dynamics_ = std::min(5, nodes_ - 1);
             }
+
+            if (general_settings["integrate_velocity_targets"] && general_settings["integrate_velocity_targets"].as<bool>()) {
+                integrate_vel_targets_ = true;
+            } else {
+                integrate_vel_targets_ = false;
+            }
+
+            delay_prediction_dt_ = (general_settings["delay_prediction_dt"] ? general_settings["delay_prediction_dt"].as<double>() : 0);
         }
 
         // ---------- Solver Settings ---------- //
@@ -361,6 +369,8 @@ namespace torc::mpc {
             std::cout << "\tMax initial solves: " << max_initial_solves_ << std::endl;
             std::cout << "\tInitial constraint tolerance: " << initial_constraint_tol_ << std::endl;
             std::cout << "\tNodes with full dynamics: " << nodes_full_dynamics_ << std::endl;
+            std::cout << "\tIntegrate velocity targets: " << (integrate_vel_targets_ ? "True" : "False") << std::endl;
+            std::cout << "\tDelay prediction dt: " << (delay_prediction_dt_ < 0 ? "Adaptive" : std::to_string(delay_prediction_dt_)) << std::endl;
 
             std::cout << "Solver settings: " << std::endl;
             std::cout << "\tRelative tolerance: " << osqp_settings_.eps_rel << std::endl;
@@ -512,12 +522,56 @@ namespace torc::mpc {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
 
-        traj_.SetConfiguration(0, q);
-        traj_.SetVelocity(0, v);
-         utils::TORCTimer constraint_timer;
-         constraint_timer.Tic();
-         CreateConstraints();
-         constraint_timer.Toc();
+        // Delay prediction
+        vectorx_t q_new = q;
+        vectorx_t v_new = v;
+
+        // TODO: Unclear if this is working as desired. Might need to debug/change
+        if (delay_prediction_dt_ != 0 && enable_delay_prediction_) {
+            double total_dt;
+            if (delay_prediction_dt_ < 0) {
+                // Average the last 5 computation times
+                if (stats_.size() >= 5) {
+                    total_dt = 0;
+                    for (int i = 0; i < 5; i++) {
+                        total_dt += stats_[stats_.size() - (i + 1)].total_compute_time;
+                    }
+                    total_dt = total_dt / 5e3;
+                } else {
+                    total_dt = 1e-2;
+                }
+            } else {
+                total_dt = delay_prediction_dt_;
+            }
+
+//            std::cout << "total_dt: " << total_dt << std::endl;
+
+            const int steps = 2;
+            double dt = total_dt / static_cast<double>(steps);
+
+            vectorx_t tau;
+            for (int i = 0; i < steps; i++) {
+                double curr_time = i * dt;
+                traj_.GetTorqueInterp(curr_time, tau);
+                for (auto& f : ws_->f_ext) {
+                    traj_.GetForceInterp(curr_time, f.frame_name, f.force_linear);
+                }
+
+                vectorx_t xdot = robot_model_->GetDynamics(q_new, v_new, tau, ws_->f_ext);
+                q_new = robot_model_->IntegrateVelocity(q_new, dt*xdot.head(v.size()));
+                v_new = v_new + dt*xdot.tail(v.size());
+            }
+
+//            std::cout << "q delay: " << q_new.transpose() << std::endl;
+//            std::cout << "v delay: " << v_new.transpose() << std::endl;
+        }
+
+        traj_.SetConfiguration(0, q_new);
+        traj_.SetVelocity(0, v_new);
+        utils::TORCTimer constraint_timer;
+        constraint_timer.Tic();
+        CreateConstraints();
+        constraint_timer.Toc();
 
 #if NAN_CHECKS
          for (auto& constraint_triplet : constraint_triplets_) {
@@ -649,6 +703,8 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
+        // No delay compensation here as we are assumed to not be moving.
+        enable_delay_prediction_ = false;
         Compute(q, v, traj_out);
         for (int i = 0; i < max_initial_solves_; i++) {
             if (stats_[i].constraint_violation < initial_constraint_tol_) {
@@ -663,6 +719,8 @@ namespace torc::mpc {
         if (verbose_) {
             PrintStatistics();
         }
+
+        enable_delay_prediction_ = true;
     }
 
 
@@ -1467,6 +1525,22 @@ namespace torc::mpc {
     void FullOrderMpc::UpdateCost() {
         objective_triplet_idx_ = 0;
         osqp_instance_.objective_vector.setZero();
+
+        if (integrate_vel_targets_) {
+            for (int i = 0; i < nodes_; i++) {
+                if (i == 0) {
+                    q_target_[i].head<POS_VARS>() = traj_.GetConfiguration(0).head<POS_VARS>() + dt_[i]*v_target_[i].head<POS_VARS>();
+                    q_target_[i].segment<QUAT_VARS>(POS_VARS) = (traj_.GetQuat(0) * pinocchio::quaternion::exp3(dt_[i]*v_target_[i].segment<3>(POS_VARS))).coeffs();
+                    q_target_[i].segment<QUAT_VARS>(POS_VARS).normalize();
+                } else {
+                    q_target_[i].head<POS_VARS>() = q_target_[i-1].head<POS_VARS>() + dt_[i]*v_target_[i].head<POS_VARS>();
+
+                    quat_t current_quat(q_target_[i-1].segment<QUAT_VARS>(POS_VARS));
+                    q_target_[i].segment<QUAT_VARS>(POS_VARS) = (current_quat * pinocchio::quaternion::exp3(dt_[i]*v_target_[i].segment<3>(POS_VARS))).coeffs();
+                    q_target_[i].segment<QUAT_VARS>(POS_VARS).normalize();
+                }
+            }
+        }
 
         // TODO: Remove these
         if (q_target_.size() != v_target_.size()) {

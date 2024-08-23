@@ -61,11 +61,24 @@ namespace torc::models {
         return static_cast<quat_t>(q.segment<4>(3));
     }
 
+    vectorx_t FullOrderRigidBody::IntegrateVelocity(const torc::models::vectorx_t& q0,
+                                                    const torc::models::vectorx_t& v) const {
+        return pinocchio::integrate(pin_model_, q0, v);
+    }
+
     vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
         vectorx_t q, v;
         ParseState(state, q, v);
         const vectorx_t tau = InputsToTau(input);
         pinocchio::aba(pin_model_, *pin_data_, q, v, tau);
+        return BuildStateDerivative(v, pin_data_->ddq);
+    }
+
+    vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& input,
+                                              const std::vector<ExternalForce>& f_ext) {
+        const vectorx_t tau = InputsToTau(input);
+        pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
+        pinocchio::aba(pin_model_, *pin_data_, q, v, tau, forces);
         return BuildStateDerivative(v, pin_data_->ddq);
     }
 
