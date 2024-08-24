@@ -15,6 +15,7 @@ namespace torc::mpc {
     using vector3_t = Eigen::Vector3d;
     using quat_t = Eigen::Quaterniond;
 
+    // TODO: Add a start_time field
     class Trajectory {
     public:
         void UpdateSizes(int config_size, int vel_size, int tau_size, const std::vector<std::string>& force_frames, int nodes);

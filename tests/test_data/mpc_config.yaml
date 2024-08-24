@@ -3,6 +3,7 @@ general_settings:
   verbose: True
   node_dt: 0.02
   compile_derivatives: True
+  base_frame: "trunk"
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
@@ -16,8 +17,14 @@ constraints:
   friction_coef: 0.5
   max_grf: 200
 costs:
+  using_config_tracking: True
+  using_velocity_tracking: True
+  using_torque_regularization: False
+  using_force_regularization: False
+
   configuration_tracking_weights: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   velocity_tracking_weights: [1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0]
 contacts:
   num_contact_locations: 4
   contact_frames: ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]
+line_search:

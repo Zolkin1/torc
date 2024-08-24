@@ -44,9 +44,15 @@ namespace torc::models {
 
         [[nodiscard]] quat_t GetBaseOrientation(const vectorx_t& q) const override;
 
+        [[nodiscard]] vectorx_t IntegrateVelocity(const vectorx_t& q0, const vectorx_t& v) const;
+
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input) override;
+
+        [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& q, const vectorx_t& v,
+                                            const vectorx_t& input,
+                                            const std::vector<ExternalForce>& f_ext);
 
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input,
@@ -112,7 +118,8 @@ namespace torc::models {
             const vector3_t& w, double dt);
 
         void FrameVelDerivWrtConfiguration(const vectorx_t& q,
-            const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian);
+            const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian,
+            const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED);
 
         void PerturbConfiguration(vectorx_t& q, double delta, int idx);
 

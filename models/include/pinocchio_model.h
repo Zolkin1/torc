@@ -10,9 +10,12 @@
 #include "base_model.h"
 #include "robot_contact_info.h"
 #include "frame_state_types.h"
+#include "cpp_ad_interface.h"
 
 namespace torc::models {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
+    using ad_pin_model_t = pinocchio::ModelTpl<torc::ad::adcg_t>;
+    using ad_pin_data_t = pinocchio::DataTpl<torc::ad::adcg_t>;
 
     class PinocchioModel : public BaseModel {
     public:
@@ -104,6 +107,13 @@ namespace torc::models {
         [[nodiscard]] vectorx_t GetLowerConfigLimits() const;
         [[nodiscard]] vectorx_t GetVelocityJointLimits() const;
         [[nodiscard]] vectorx_t GetTorqueJointLimits() const;
+
+        // ------------------------------------ //
+        // ---------- Getters for AD ---------- //
+        // ------------------------------------ //
+        [[nodiscard]] const ad_pin_model_t& GetADPinModel() const;
+        std::shared_ptr<ad_pin_data_t> GetADPinData();
+
     protected:
 
         void MakePinocchioContacts(const RobotContactInfo& contact_info,
@@ -112,8 +122,13 @@ namespace torc::models {
 
         std::filesystem::path model_path_;
 
+        // Normal model and data
         pinocchio::Model pin_model_;
         std::unique_ptr<pinocchio::Data> pin_data_;
+
+        // Autodiff compatible model and data
+        ad_pin_model_t pin_ad_model_;
+        std::shared_ptr<ad_pin_data_t> pin_ad_data_;
 
         double mass_;
 

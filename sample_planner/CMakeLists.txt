@@ -67,9 +67,9 @@ if (NOT TARGET mujoco-lib)
     target_include_directories(mujoco-lib INTERFACE ${mujoco_SOURCE_DIR}/include/mujoco)
 
     set_property(TARGET mujoco-lib PROPERTY IMPORTED_LOCATION ${mujoco_SOURCE_DIR}/lib/libmujoco.so)
-
-    target_link_libraries(SamplePlanner PUBLIC mujoco-lib)
 endif ()
+target_link_libraries(SamplePlanner PUBLIC mujoco-lib)
+
 
 # ----------- Thread Pool ----------- #
 # For now use with CPM

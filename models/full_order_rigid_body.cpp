@@ -61,11 +61,24 @@ namespace torc::models {
         return static_cast<quat_t>(q.segment<4>(3));
     }
 
+    vectorx_t FullOrderRigidBody::IntegrateVelocity(const torc::models::vectorx_t& q0,
+                                                    const torc::models::vectorx_t& v) const {
+        return pinocchio::integrate(pin_model_, q0, v);
+    }
+
     vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& state, const vectorx_t& input) {
         vectorx_t q, v;
         ParseState(state, q, v);
         const vectorx_t tau = InputsToTau(input);
         pinocchio::aba(pin_model_, *pin_data_, q, v, tau);
+        return BuildStateDerivative(v, pin_data_->ddq);
+    }
+
+    vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& input,
+                                              const std::vector<ExternalForce>& f_ext) {
+        const vectorx_t tau = InputsToTau(input);
+        pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
+        pinocchio::aba(pin_model_, *pin_data_, q, v, tau, forces);
         return BuildStateDerivative(v, pin_data_->ddq);
     }
 
@@ -188,6 +201,7 @@ namespace torc::models {
         B << matrixx_t::Zero(pin_model_.nv, input.size()), contact_data_->ddq_dtau * act_mat_; //contact_data_->Minv * act_mat_;
     }
 
+    // TODO: when I have two contacts on the same link I seem to get a mismatch with the finite diff
     void FullOrderRigidBody::InverseDynamicsDerivative(const vectorx_t& q,
                                                        const vectorx_t& v,
                                                        const vectorx_t& a,
@@ -432,31 +446,51 @@ namespace torc::models {
     }
 
     void FullOrderRigidBody::FrameVelDerivWrtConfiguration(const vectorx_t& q,
-        const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian) {
-        // TODO: Consider swapping for auto diff
+        const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian,
+        const pinocchio::ReferenceFrame& ref) {
 
-        pinocchio::computeForwardKinematicsDerivatives(pin_model_, *pin_data_, q, v, a);
-
-        matrix6x_t j2(6, GetVelDim());
-
-        pinocchio::getFrameVelocityDerivatives(pin_model_, *pin_data_,
-            GetFrameIdx(frame), pinocchio::WORLD, jacobian, j2);
-
-        // TODO: The first 6 elements don't match because the jacobian is using local velocity vectors, I want perturbations in the global config
-        // So for now, we will use finite differencing on the first few elements
-        vector3_t frame_vel = GetFrameState(frame, q, v, pinocchio::WORLD).vel.linear();
-
-        static constexpr double FD_DELTA = 1e-8;
+        // --------- Finite Diff
+        constexpr double FD_DELTA = 1e-8;
+        jacobian.setZero();
         vectorx_t q_pert = q;
-        for (int i = 0; i < FLOATING_VEL; i++) {
+        vector3_t frame_vel = GetFrameState(frame, q, v, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
+        for (int i = 0; i < GetVelDim(); i++) {
             PerturbConfiguration(q_pert, FD_DELTA, i);
-            vector3_t frame_pos_pert = GetFrameState(frame, q_pert, v, pinocchio::WORLD).vel.linear();
+            vector3_t frame_pos_pert = GetFrameState(frame, q_pert, v, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
             q_pert = q;
 
-            for (int j = 0; j < frame_vel.size(); j++) {
-                jacobian(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
-            }
+            jacobian.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
         }
+        // ---------
+
+
+
+        // --------- Analytic
+        // TODO: Consider swapping for auto diff
+        // pinocchio::computeForwardKinematicsDerivatives(pin_model_, *pin_data_, q, v, a);
+        //
+        // matrix6x_t j2(6, GetVelDim());
+        //
+        // pinocchio::getFrameVelocityDerivatives(pin_model_, *pin_data_,
+        //     GetFrameIdx(frame), ref, jacobian, j2);
+        //
+        // // TODO: The first 6 elements don't match because the jacobian is using local velocity vectors, I want perturbations in the global config
+        // // So for now, we will use finite differencing on the first few elements
+        // // TODO: Put back
+        // vector3_t frame_vel = GetFrameState(frame, q, v, ref).vel.linear();
+        //
+        // static constexpr double FD_DELTA = 1e-8;
+        // vectorx_t q_pert = q;
+        // for (int i = 0; i < FLOATING_VEL; i++) {
+        //     PerturbConfiguration(q_pert, FD_DELTA, i);
+        //     vector3_t frame_pos_pert = GetFrameState(frame, q_pert, v, ref).vel.linear();
+        //     q_pert = q;
+        //
+        //     for (int j = 0; j < frame_vel.size(); j++) {
+        //         jacobian(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
+        //     }
+        // }
+        // ---------
     }
 
 
@@ -488,10 +522,10 @@ namespace torc::models {
 
             // Get the contact forces in the joint frame
             const vector3_t contact_force = rotationWorldToJoint * f.force_linear;
-            forces.at(jnt_idx).linear() = contact_force;
+            forces.at(jnt_idx).linear() += contact_force;
 
             // Calculate the angular (torque) forces
-            forces.at(jnt_idx).angular() = translationContactToJoint.cross(contact_force);
+            forces.at(jnt_idx).angular() += translationContactToJoint.cross(contact_force);
         }
         return forces;
     }

@@ -8,11 +8,14 @@
 
 #include <Eigen/Core>
 
+#include "yaml-cpp/yaml.h"
 #include "osqp++.h"
 #include "full_order_rigid_body.h"
 #include "trajectory.h"
 #include "cost_function.h"
 #include "contact_schedule.h"
+
+// TODO: Add a aggregate statistics print out (i.e. averages and standard deviations)
 
 namespace torc::mpc {
     namespace fs = std::filesystem;
@@ -26,8 +29,6 @@ namespace torc::mpc {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
-    // TODO:
-    //  - Setting swing trajectory
     enum LineSearchCondition {
         ConstraintViolation,
         CostReduction,
@@ -44,6 +45,7 @@ namespace torc::mpc {
         double total_compute_time;          // Time for the entire Compute function
         double constraint_time;             // Time to add the constraints
         double cost_time;                   // Time to add the costs
+        double ls_time;                     // Time to line search
         LineSearchCondition ls_condition;   // Condition for line search termination
         double constraint_violation;        // Constraint violation
     };
@@ -67,21 +69,37 @@ namespace torc::mpc {
          */
         void UpdateContactSchedule(const ContactSchedule& contact_schedule);
 
+        void UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
+            double end_height, double apex_time);
+
         /**
          * @brief Computes the trajectory given the current state.
          *
-         * TODO: needs to reset the triplet_idx_ at some point
-         *
-         * @param state
          * @return
          */
-        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
+        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time = 0);
+
+        void ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
 
         void SetVerbosity(bool verbose);
+
         [[nodiscard]] std::vector<std::string> GetContactFrames() const;
         [[nodiscard]] int GetNumNodes() const;
+        [[nodiscard]] long GetTotalSolves() const;
+        [[nodiscard]] const std::vector<double>& GetDtVector() const;
+
+        // Statistics and printers
         void PrintStatistics() const;
         void PrintContactSchedule() const;
+        void PrintAggregateStats() const;
+
+        [[nodiscard]] std::pair<double, double> GetComputeTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetConstraintTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetCostTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetLineSearchTimeStats() const;
+
+        [[nodiscard]] std::pair<double, double> GetConstraintViolationStats() const;
+        [[nodiscard]] std::pair<double, double> GetCostStats() const;
 
         void SetWarmStartTrajectory(const Trajectory& traj);
 
@@ -91,6 +109,15 @@ namespace torc::mpc {
         void SetConfigTarget(const std::vector<vectorx_t>& q_target);
         void SetVelTarget(const std::vector<vectorx_t>& v_target);
 
+        void SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj);
+
+
+        ~FullOrderMpc();
+
+        // DEBUG
+        //TODO: Make private again?
+        std::map<std::string, std::vector<double>> swing_traj_;
+        //DEBUG
     protected:
         enum ConstraintType {
         Integrator,
@@ -123,9 +150,13 @@ namespace torc::mpc {
             vectorx_t acc;
             matrixx_t obj_config_mat;
             matrixx_t obj_vel_mat;
+            matrixx_t obj_tau_mat;
+            matrixx_t obj_force_mat;
             // TODO: Consider combining these two vectors
             vectorx_t obj_config_vector;
             vectorx_t obj_vel_vector;
+            vectorx_t obj_tau_vector;
+            vectorx_t obj_force_vector;
             std::vector<models::ExternalForce> f_ext;
         };
 
@@ -133,7 +164,7 @@ namespace torc::mpc {
         void CreateConstraints();
         void AddICConstraint();
         void AddIntegrationConstraint(int node);
-        void AddIDConstraint(int node);
+        void AddIDConstraint(int node, bool full_order);
         void AddFrictionConeConstraint(int node);
         void AddConfigurationBoxConstraint(int node);
         void AddVelocityBoxConstraint(int node);
@@ -145,7 +176,7 @@ namespace torc::mpc {
         double GetConstraintViolation(const vectorx_t& qp_res);
         double GetICViolation(const vectorx_t& qp_res);
         double GetIntegrationViolation(const vectorx_t& qp_res, int node);
-        double GetIDViolation(const vectorx_t& qp_res, int node);
+        double GetIDViolation(const vectorx_t& qp_res, int node, bool full_order);
         double GetFrictionViolation(const vectorx_t& qp_res, int node);
         double GetTorqueBoxViolation(const vectorx_t& qp_res, int node);
         double GetConfigurationBoxViolation(const vectorx_t& qp_res, int node);
@@ -171,9 +202,14 @@ namespace torc::mpc {
         double GetFullCost(const vectorx_t& qp_res);
 
         std::pair<double, double> LineSearch(const vectorx_t& qp_res);
-        // void CreateDefaultCost();
-        // Helper function
-        // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;
+
+        [[nodiscard]] int GetNumContacts(int node) const;
+
+        vectorx_t GetTorqueTarget(int node);
+        vector3_t GetForceTarget(int node, const std::string& frame);
+        vector3_t GetDesiredFramePos(int node, std::string);
+
+        void ParseCostYaml(const YAML::Node& cost_settings);
 
     // ----- Sparsity Pattern Creation ----- //
         /**
@@ -186,7 +222,7 @@ namespace torc::mpc {
         void CreateConstraintSparsityPattern();
         void AddICPattern();
         void AddIntegrationPattern(int node);
-        void AddIDPattern(int node);
+        void AddIDPattern(int node, bool full_order);
         void AddFrictionConePattern(int node);
         void AddConfigurationBoxPattern(int node);
         void AddVelocityBoxPattern(int node);
@@ -197,18 +233,23 @@ namespace torc::mpc {
     // ----- Helper Functions ----- //
         void ConvertSolutionToTraj(const vectorx_t& qp_sol, Trajectory& traj);
 
+        [[nodiscard]] int GetNumDecisionVars() const;
+        // [[nodiscard]] int GetDecisionVarsPerNode() const;
+        [[nodiscard]] int GetDecisionIdx(int node, const DecisionType& var_type) const;
+        [[nodiscard]] int GetDecisionIdxStart(int node) const;
+
         [[nodiscard]] int GetNumConstraints() const;
         [[nodiscard]] int GetConstraintsPerNode() const;
-        [[nodiscard]] int GetNumDecisionVars() const;
-        int GetDecisionVarsPerNode() const;
-        int GetDecisionIdx(int node, const DecisionType& var_type) const;
-        int GetConstraintRow(int node, const ConstraintType& constraint) const;
+        [[nodiscard]] int GetConstraintRow(int node, const ConstraintType& constraint) const;
+        [[nodiscard]] int GetConstraintRowStartNode(int node) const;
 
         void MatrixToNewTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
+        void AddSparsitySet(const torc::ad::sparsity_pattern_t& sparsity, int row_start, int col_start,  std::vector<Eigen::Triplet<double>>& triplet);
         void VectorToNewTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet);
         void MatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx, bool prune_zeros=false);
         void VectorToTriplet(const vectorx_t& vec, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
         void DiagonalMatrixToTriplet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
+        void MatrixToTripletWithSparsitySet(const matrixx_t& mat, int row_start, int col_start, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx, const torc::ad::sparsity_pattern_t& sparsity);
         /**
          * @brief Assign a matrix that is diagonal and all of the same value to triplets. Assumes the matrix is square.
          * @param val
@@ -221,9 +262,12 @@ namespace torc::mpc {
         void DiagonalScalarMatrixToTriplet(double val, int row_start, int col_start, int size, std::vector<Eigen::Triplet<double>>& triplet, int& triplet_idx);
 
         void ConvertdqToq(const vectorx_t& dq, const vectorx_t& q_ref, vectorx_t& q) const;
+
+        double GetTime(int node) const;
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
         [[nodiscard]] int NumIDConstraintsNode() const;
+        [[nodiscard]] int NumPartialIDConstraintsNode() const;
         [[nodiscard]] int NumFrictionConeConstraintsNode() const;
         [[nodiscard]] int NumConfigBoxConstraintsNode() const;
         [[nodiscard]] int NumVelocityBoxConstraintsNode() const;
@@ -258,12 +302,19 @@ namespace torc::mpc {
 
         // Codegen
         bool compile_derivatves_;
+        fs::path deriv_lib_path_;
 
         // Cost
         CostFunction cost_;
 
-        vectorx_t vel_tracking_weight_;
-        vectorx_t config_tracking_weight_;
+//        vectorx_t vel_tracking_weight_;
+//        vectorx_t config_tracking_weight_;
+//        vectorx_t torque_reg_weight_;
+//        vectorx_t force_reg_weight_;
+
+        std::vector<CostData> cost_data_;
+
+        double terminal_cost_weight_;
 
         std::vector<Eigen::Triplet<double>> objective_triplets_;
         int objective_triplet_idx_{};
@@ -273,10 +324,23 @@ namespace torc::mpc {
 
         std::vector<vectorx_t> q_target_;
         std::vector<vectorx_t> v_target_;
+        bool integrate_vel_targets_;
+
+        bool scale_cost_;
+
+        std::vector<vectorx_t> cost_weights_;
 
         // Line search
         double alpha_;
         LineSearchCondition ls_condition_;
+
+        double ls_eta_;
+        double ls_theta_max_;
+        double ls_theta_min_;
+        double ls_gamma_theta_;
+        double ls_gamma_phi_;
+        double ls_gamma_alpha_;
+        double ls_alpha_min_;
 
         // Model
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;
@@ -296,21 +360,27 @@ namespace torc::mpc {
 
         // Recording state
         std::vector<MpcStats> stats_;
+        long total_solves_;
 
         // General settings
         bool verbose_;
+        std::string base_frame_;
+        int max_initial_solves_;
+        double initial_constraint_tol_;
+        double delay_prediction_dt_;
+        bool enable_delay_prediction_;
 
         // Constraint settings
         double friction_coef_{};
         double max_grf_{};
         int nodes_{};
+        int nodes_full_dynamics_;
 
         // Contact settings
         int num_contact_locations_{};
         std::vector<std::string> contact_frames_{};
 
-        // TODO: Populate
-        std::map<std::string, std::vector<double>> swing_traj_;
+        // std::map<std::string, std::vector<double>> swing_traj_;
 
     private:
     };

@@ -48,7 +48,11 @@ namespace torc::models {
             if (model_path_.extension() != ".urdf") {
                 throw std::runtime_error("Provided urdf does not end in a .urdf");
             }
+            // Normal model
             pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+
+            // AD Model
+            pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
         } else {
             // Verify that we are given a .xml
             if (model_path_.extension() != ".xml") {
@@ -58,7 +62,11 @@ namespace torc::models {
             pinocchio::mjcf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
         }
 
+        // Normal data
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
+
+        // AD data
+        pin_ad_data_ = std::make_shared<ad_pin_data_t>(pin_ad_model_);
     }
 
     long PinocchioModel::GetNumInputs() const {
@@ -214,6 +222,7 @@ namespace torc::models {
     }
 
     FrameState PinocchioModel::GetFrameState(const std::string& frame, const pinocchio::ReferenceFrame& ref) const {
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
         const long idx = GetFrameIdx(frame);
         if (idx != -1) {
             FrameState state(pin_data_->oMf.at(idx),
@@ -263,6 +272,17 @@ namespace torc::models {
 
     vectorx_t PinocchioModel::GetTorqueJointLimits() const {
         return pin_model_.effortLimit.tail(GetNumInputs());
+    }
+
+    // ------------------------------------ //
+    // ---------- Getters for AD ---------- //
+    // ------------------------------------ //
+    const ad_pin_model_t& PinocchioModel::GetADPinModel() const {
+        return pin_ad_model_;
+    }
+
+    std::shared_ptr<ad_pin_data_t> PinocchioModel::GetADPinData() {
+        return pin_ad_data_;
     }
 
 

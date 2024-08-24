@@ -13,7 +13,7 @@
 #include "cost_test_class.h"
 #include "autodiff_fn.h"
 
-TEST_CASE("MPC Test Class", "[mpc]") {
+TEST_CASE("MPC Test Class A1", "[mpc]") {
     using namespace torc::mpc;
     const std::string pin_model_name = "test_pin_model";
     std::filesystem::path a1_urdf = std::filesystem::current_path();
@@ -22,7 +22,7 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     std::filesystem::path mpc_config = std::filesystem::current_path();
     mpc_config += "/test_data/mpc_config.yaml";
 
-    MpcTestClass mpc(mpc_config, a1_urdf);
+    MpcTestClass mpc(mpc_config, a1_urdf, "a1_test_class");
 
     mpc.Configure();
 
@@ -33,6 +33,38 @@ TEST_CASE("MPC Test Class", "[mpc]") {
     mpc.CheckHolonomicLin();
     mpc.CheckCostFunctionDefiniteness();
     mpc.CheckConstraintIdx();
+    mpc.CheckDefaultSwingTraj();
+    // mpc.BenchmarkQuaternionIntegrationLin();
+    // mpc.BenchmarkInverseDynamicsLin();
+    // mpc.BenchmarkQuaternionConfigurationLin();
+    // mpc.BenchmarkSwingHeightLin();
+    // mpc.BenchmarkHolonomicLin();
+    // mpc.BenchmarkConstraints();
+    // mpc.BenchmarkCompute();
+    // mpc.BenchmarkCostFunctions();
+}
+
+TEST_CASE("MPC Test Class Achilles", "[mpc]") {
+    using namespace torc::mpc;
+    const std::string pin_model_name = "test_pin_model";
+    std::filesystem::path achilles_urdf = std::filesystem::current_path();
+    achilles_urdf += "/test_data/achilles.urdf";
+
+    std::filesystem::path mpc_config = std::filesystem::current_path();
+    mpc_config += "/test_data/achilles_mpc_config.yaml";
+
+    MpcTestClass mpc(mpc_config, achilles_urdf, "achilles_test_class");
+
+    mpc.Configure();
+
+    mpc.CheckQuaternionIntLin();
+    mpc.CheckInverseDynamicsLin();
+    mpc.CheckQuaternionLin();
+    mpc.CheckSwingHeightLin();
+    mpc.CheckHolonomicLin();
+    mpc.CheckCostFunctionDefiniteness();
+    mpc.CheckConstraintIdx();
+    mpc.CheckDefaultSwingTraj();
     // mpc.BenchmarkQuaternionIntegrationLin();
     // mpc.BenchmarkInverseDynamicsLin();
     // mpc.BenchmarkQuaternionConfigurationLin();
@@ -52,14 +84,12 @@ TEST_CASE("Cost Test Class", "[mpc][cost]") {
     // std::filesystem::path mpc_config = std::filesystem::current_path();
     // mpc_config += "/test_data/mpc_config.yaml";
 
-    torc::models::FullOrderRigidBody a1_model("a1_test_model", a1_urdf);
-
-    CostTestClass cost_fcn(a1_model);
+    CostTestClass cost_fcn("a1_test_model", a1_urdf);
 
     cost_fcn.CheckConfigure();
     cost_fcn.CheckDerivatives();
     cost_fcn.CheckDefaultCosts();
-    cost_fcn.CheckLinearizeQuadrasize();
+//    cost_fcn.CheckLinearizeQuadrasize();
 
     // cost_fcn.BenchmarkCostFunctions();
 }

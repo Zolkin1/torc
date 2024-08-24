@@ -2,28 +2,77 @@ general_settings:
   nodes: 32
   verbose: True
   node_dt: 0.02
-  compile_derivatives: True
+  compile_derivatives: True #True
+  base_frame: "torso"
+  scale_cost: False
+  max_initial_solves: 20
+  initial_constraint_tol: 5e-3
+  nodes_full_dynamics: 2   # Also determines how many nodes have torque constraints
 solver_settings:
   rel_tol: 1e-6
   abs_tol: 1e-6
   verbose: True
-  polish: False
-  rho: 0.02
-  #  alpha:
+  polish: True
+  rho: 2e-3
+  alpha: 1.6
+  sigma: 1e-6 # This seems to help when its larger
   adaptive_rho: True
-  max_iter: 25
+  max_iter: 2000
+  scaling: 1 # The scaling seems to have a large effect. Having more scaling can sometime make the problem infeasible
 constraints:
   friction_coef: 0.5
   max_grf: 200
 costs:
-  configuration_tracking_weights: [0, 0, 0,
-                                   0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0]
-  velocity_tracking_weights: [1, 1, 1,
-                              0, 1, 1,
-                              0, 0, 0, 0, 0, 0, 0, 0, 1,
-                              1, 0, 0, 0, 0, 0, 0, 0, 0]
+  using_config_tracking: True
+  using_velocity_tracking: True
+  using_torque_regularization: True
+  using_force_regularization: False
+
+#  configuration_tracking_weights: [1, 1, 1,
+#                                   0, 0, 0,
+#                                   1, 1, 1, 1, 1, 1, 1, 1, 1,
+#                                   1, 1, 1, 1, 1, 1, 1, 1, 1]
+#  configuration_tracking_weights: [ 1, 1, 10,
+#                                    0.0, 0.0, 0.0,
+#                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
+#                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 ]
+  configuration_tracking_weights: [ 1, 1, 10,
+                                    0.0, 0.0, 0.0,
+                                    0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                    0., 0., 0., 0., 0., 0., 0., 0., 0. ]
+#  velocity_tracking_weights: [10, 10, 10,
+#                              1, 1, 1,
+#                              .1, .1, .1, .1, .1, .1, .1, .1, .1,
+#                              .1, .1, .1, .1, .1, .1, .1, .1, .1]
+#  velocity_tracking_weights: [ 10, 10, 10,
+#                               1, 1, 1,
+#                               .01, .01, .01, .01, .01, .01, .01, .01, .01,
+#                               .01, .01, .01, .01, .01, .01, .01, .01, .01]
+  velocity_tracking_weights: [ 10, 10, 10,
+                               1, 1, 1,
+                               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
+                               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001 ]
+#  velocity_tracking_weights: [ 1, 1, 1,
+#                               1, 1, 1,
+#                               0, 0, 0, 0, 0, 0, 0, 0, 0,
+#                               0, 0, 0, 0, 0, 0, 0, 0, 0 ]
+
+  torque_regularization_weights: [.01, .01, .01, .01, .01, .01, .01, .01, .01,
+                                  .01, .01, .01, .01, .01, .01, .01, .01, .01]
+#  torque_regularization_weights: [ 1, 1, 1, 1, 1, 1, 1, 1, 1,
+#                                   1, 1, 1, 1, 1, 1, 1, 1, 1 ]
 contacts:
-  num_contact_locations: 4
-  contact_frames: ["right_foot", "left_foot", "right_hand", "left_hand"]
+# TODO: Verify that the ID works even when we have multiple forces on the same joint
+# TODO: Somehow the inverse dynamics floating base looks weird with these, it even looks sus just for the normal feet
+  contact_frames: ["foot_front_right", "foot_rear_right", "foot_front_left", "foot_rear_left"]#, "right_hand", "left_hand"]
+#  contact_frames: ["foot_front_right", "foot_front_left", "foot_rear_left"]  #
+#  contact_frames: ["right_foot", "foot_front_right", "foot_rear_right"] #"left_foot"]
+# contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]
+#  contact_frames: ["foot_rear_right", "foot_rear_left"]
+line_search:
+  alpha_min: 1e-3
+  large_constraint_vio: 1e-2
+  small_constraint_vio: 1e-6
+  constraint_reduction_mult: 1e-6
+  alpha_step: 0.5
+  armijo_constant: 1e-4

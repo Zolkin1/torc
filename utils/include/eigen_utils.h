@@ -36,10 +36,10 @@ namespace torc::utils {
      * @param vec the Eigen row vector
      * @return the std vector
      */
-    template <class scalar_t>
-    std::vector<scalar_t> EigenToStdVector(const Eigen::RowVectorX<scalar_t>& vec) {
-        return std::vector<scalar_t>(vec.data(), vec.data() + vec.cols());
-    }
+    // template <class scalar_t>
+    // std::vector<scalar_t> EigenToStdVector(const Eigen::RowVectorX<scalar_t>& vec) {
+    //     return std::vector<scalar_t>(vec.data(), vec.data() + vec.cols());
+    // }
 }
 
 #endif

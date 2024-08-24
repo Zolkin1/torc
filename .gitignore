@@ -37,5 +37,6 @@ cmake-*
 functions/adcg_sources/
 
 build/
+cmake/
 
 .gdbinit
