@@ -92,7 +92,7 @@ int main() {
 
     mpc.ComputeNLP(q_target, v_target, traj);
 
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < 100; i++) {
         vectorx_t q_current;
         traj.GetConfigInterp(0.01, q_current);
         std::cout << "q: " << q_current.transpose() << std::endl;
@@ -100,6 +100,7 @@ int main() {
         traj.GetVelocityInterp(0.01, v_current);
 
         mpc.Compute(q_current, v_current, traj);
+//        mpc.Compute(q_target, v_target, traj);
     }
 
 

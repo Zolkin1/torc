@@ -452,6 +452,9 @@ namespace torc::mpc {
 //            std::cout << "v delay: " << v_new.transpose() << std::endl;
         }
 
+//        std::cout << "Current traj config node 0: " << traj_.GetConfiguration(0).transpose() << std::endl;
+//        std::cout << "Current traj vel node 0: " << traj_.GetVelocity(0).transpose() << std::endl;
+
         traj_.SetConfiguration(0, q_new);
         traj_.SetVelocity(0, v_new);
         utils::TORCTimer constraint_timer;
@@ -583,6 +586,15 @@ namespace torc::mpc {
         traj_ = traj_out;
         total_solves_++;
 
+        // TODO: Remove
+//        double phi_k = GetConstraintViolation(vectorx_t::Zero(osqp_solver_.primal_solution().size()));
+//        if (std::abs(phi_k - constraint_ls) > 1e-5) {
+//            std::cerr << "--------- Trajectory conversion degraded constraint violation! --------- " << std::endl;
+//            std::cerr << "Line search violation: " << constraint_ls << std::endl;
+//            std::cerr << "New traj violation: " << phi_k << std::endl;
+//            throw std::runtime_error("Trajectory conversion degraded constraint violation!");
+//        }
+
         if (verbose_) {
              std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
         }
@@ -630,7 +642,6 @@ namespace torc::mpc {
                 AddTorqueBoxConstraint(node);
             } else if (node < nodes_ - 1) {
                 AddIDConstraint(node, false);
-                // TODO: Add max grf constraint
             }
 
             AddFrictionConeConstraint(node);
@@ -1021,35 +1032,38 @@ namespace torc::mpc {
     double FullOrderMpc::GetConstraintViolation(const vectorx_t &qp_res) {
         // Uses l2 norm!
 
+        // TODO: Put back!
+
         double violation = 0;
         violation += GetICViolation(qp_res);
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
-                violation += dt_[node]*GetIntegrationViolation(qp_res, node);
+                violation += GetIntegrationViolation(qp_res, node);
             }
 
             if (node < nodes_full_dynamics_) {
-                violation += dt_[node]*GetIDViolation(qp_res, node, true);
-                violation += dt_[node]*GetTorqueBoxViolation(qp_res, node);
+                violation += GetIDViolation(qp_res, node, true);
+                violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                 violation += dt_[node]*GetIDViolation(qp_res, node, false);
+                 violation += GetIDViolation(qp_res, node, false);
             }
 
-            violation += dt_[node]*GetFrictionViolation(qp_res, node);
+            violation += GetFrictionViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                violation += dt_[node]*GetHolonomicViolation(qp_res, node);
-                violation += dt_[node]*GetVelocityBoxViolation(qp_res, node);
+                violation += GetHolonomicViolation(qp_res, node);
+                violation += GetVelocityBoxViolation(qp_res, node);
 
-                violation += dt_[node]*GetConfigurationBoxViolation(qp_res, node);
-                violation += dt_[node]*GetSwingHeightViolation(qp_res, node);
+                violation += GetConfigurationBoxViolation(qp_res, node);
+                violation += GetSwingHeightViolation(qp_res, node);
             }
         }
 
-        return sqrt(violation);
+        // TODO: What node discretization do I want to use?
+        return dt_[1]*sqrt(violation);
     }
 
     double FullOrderMpc::GetICViolation(const vectorx_t &qp_res) {
@@ -1064,25 +1078,29 @@ namespace torc::mpc {
         ConvertdqToq(qp_res.segment(GetDecisionIdx(node+1, Configuration), robot_model_->GetVelDim()),
             traj_.GetConfiguration(node+1), q_kp1);
 
-        vectorx_t v_k = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim());
+        vectorx_t v_k = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
+        vectorx_t v_kp1 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
+
+        vectorx_t v_effective = 0.5*(v_k + v_kp1);
+
         // Rotate the floating base vels into the world frame
         robot_model_->FirstOrderFK(q_k);
-        v_k.head<POS_VARS>() = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_k.head<POS_VARS>();
-        v_k.segment<3>(POS_VARS) = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_k.segment<3>(POS_VARS);
+        v_effective.head<POS_VARS>() = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.head<POS_VARS>();
+        v_effective.segment<3>(POS_VARS) = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.segment<3>(POS_VARS);
 
         double violation = 0;
         // Position
-        violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>() - dt_[node]*v_k.head<POS_VARS>()).squaredNorm();
+        violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>() - dt_[node]*v_effective.head<POS_VARS>()).squaredNorm();
 
         // Orientation
         violation += (qp_res.segment(GetDecisionIdx(node + 1, Configuration) + POS_VARS, 3) -
             robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(node+1), traj_.GetQuat(node),
                 qp_res.segment(GetDecisionIdx(node, Configuration) + POS_VARS, 3),
-                v_k.segment<3>(POS_VARS), dt_[node])).squaredNorm();
+                v_effective.segment<3>(POS_VARS), dt_[node])).squaredNorm();
 
         // Joints
         violation += (q_kp1.tail(robot_model_->GetNumInputs()) - q_k.tail(robot_model_->GetNumInputs())
-            - dt_[node]*v_k.tail(robot_model_->GetNumInputs())).squaredNorm();
+            - dt_[node]*v_effective.tail(robot_model_->GetNumInputs())).squaredNorm();
 
         return violation;
     }
@@ -1135,7 +1153,15 @@ namespace torc::mpc {
             Eigen::Vector4d force_vio = ws_->fric_cone_mat*force;
             force_vio = force_vio.cwiseMax(0);  // Upper bound of 0, no lower bound
             violation += in_contact_[frame][node]*force_vio.squaredNorm();
+
+            if (force(2) < 0) {
+                violation += std::pow(force(2), 2);
+            } else if (force(2) > max_grf_) {
+                violation += std::pow(force(2) - max_grf_, 2);
+            }
+
             idx += 3;
+
         }
 
         // std::cout << "friction violation: " << violation << std::endl;
@@ -1678,13 +1704,31 @@ namespace torc::mpc {
         // std::cout << "------ alpha: " << 0 << " ------" << std::endl;
         // TODO: Make sure there are no bugs because I feel like I reject a lot of steps
 
-        // TODO: I think there is a bug with the constraint violation as sometimes it increases when alpha=0
+        // Print out QP violation
+//        vectorx_t constraint_vals = A_*qp_res;
+//
+//        double qp_constraint_violation = 0;
+//        for (int i = 0; i < constraint_vals.size(); i++) {
+//            if (constraint_vals(i) < osqp_instance_.lower_bounds(i)) {
+//                qp_constraint_violation += std::pow(constraint_vals(i) - osqp_instance_.lower_bounds(i), 2);
+//            } else if (constraint_vals(i) > osqp_instance_.upper_bounds(i)) {
+//                qp_constraint_violation += std::pow(constraint_vals(i) - osqp_instance_.upper_bounds(i), 2);
+//            }
+//        }
+//
+//        std::cout << "QP constraint violation (no scaling): " << std::sqrt(qp_constraint_violation) << std::endl;
+
         double theta_k = GetConstraintViolation(vectorx_t::Zero(qp_res.size()));
         double phi_k = GetFullCost(vectorx_t::Zero(qp_res.size()));
 
+//        std::cout << "Starting violation: " << theta_k << std::endl;
+
         while (alpha_ > ls_alpha_min_) {
-            // std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
             double theta_kp1 = GetConstraintViolation(alpha_*qp_res);
+
+//            std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
+//            std::cout << "violation: " << theta_kp1 << std::endl;
+
 
             if (theta_kp1 >= ls_theta_max_) {
                 if (theta_kp1 < (1 - ls_gamma_theta_)*theta_k) {
@@ -1732,7 +1776,6 @@ namespace torc::mpc {
 
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
-            // TODO: Put back!
             if (node < nodes_ - 1) {
                 AddIntegrationPattern(node);
             }
@@ -1741,7 +1784,6 @@ namespace torc::mpc {
                 AddTorqueBoxPattern(node);
             } else if (node < nodes_ - 1) {
                 AddIDPattern(node, false);
-                // TODO: Add max grf constraint
             }
 
             AddFrictionConePattern(node);
