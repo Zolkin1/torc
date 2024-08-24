@@ -109,7 +109,7 @@ int main() {
         std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
         std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
         // std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
-        // achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
+         achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
          for (const auto& frame : mpc.GetContactFrames()) {
              std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
 //             std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;

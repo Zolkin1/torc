@@ -3,8 +3,6 @@
 //
 #include <iostream>
 
-#include "yaml-cpp/yaml.h"
-
 #include "full_order_mpc.h"
 #include "autodiff_fn.h"
 
@@ -141,6 +139,8 @@ namespace torc::mpc {
                 integrate_vel_targets_ = false;
             }
 
+            terminal_cost_weight_ = (general_settings["terminal_cost_weight"] ? general_settings["terminal_cost_weight"].as<double>() : 1.0);
+
             delay_prediction_dt_ = (general_settings["delay_prediction_dt"] ? general_settings["delay_prediction_dt"].as<double>() : 0);
         }
 
@@ -190,131 +190,7 @@ namespace torc::mpc {
         }
         YAML::Node cost_settings = config["costs"];
 
-        // ----- Configuration Tracking ----- //
-        if (cost_settings["using_config_tracking"] && cost_settings["using_config_tracking"].as<bool>()) {
-            cost_terms_.emplace_back(CostTypes::Configuration);
-            using_config_tracking_cost_ = true;
-
-            if (cost_settings["configuration_tracking_weights"]) {
-                auto config_tracking_weights = cost_settings["configuration_tracking_weights"].as<std::vector<double>>();
-                config_tracking_weight_ = utils::StdToEigenVector(config_tracking_weights);
-            }
-
-            if (config_tracking_weight_(3) != config_tracking_weight_(4) || config_tracking_weight_(4) != config_tracking_weight_(5)) {
-                throw std::runtime_error("For now all quaternion tracking weights must be equal!");
-            }
-
-            if (config_tracking_weight_.size() < robot_model_->GetVelDim()) {
-                std::cerr << "Configuration tracking weight size is too small, adding zeros." <<
-                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
-                int starting_size = config_tracking_weight_.size();
-                config_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
-                for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
-                    config_tracking_weight_(i) = 0;
-                }
-            } else if (config_tracking_weight_.size() > robot_model_->GetVelDim()) {
-                std::cerr << "Configuration tracking weight is too large. Ignoring end values." <<
-                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << config_tracking_weight_.size() << std::endl;
-            }
-
-            cost_weights_.push_back(config_tracking_weight_);
-        } else {
-            using_config_tracking_cost_ = false;
-        }
-
-        // ----- Velocity Tracking ----- //
-        if (cost_settings["using_velocity_tracking"] && cost_settings["using_velocity_tracking"].as<bool>()) {
-            cost_terms_.emplace_back(CostTypes::VelocityTracking);
-            using_vel_tracking_cost_ = true;
-
-            if (cost_settings["velocity_tracking_weights"]) {
-                auto vel_tracking_weights = cost_settings["velocity_tracking_weights"].as<std::vector<double>>();
-                vel_tracking_weight_ = utils::StdToEigenVector(vel_tracking_weights);
-            }
-
-            if (vel_tracking_weight_.size() < robot_model_->GetVelDim()) {
-                std::cerr << "Velocity tracking weight size is too small, adding zeros." <<
-                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
-                int starting_size = vel_tracking_weight_.size();
-                vel_tracking_weight_.conservativeResize(robot_model_->GetVelDim());
-                for (int i = starting_size; i < robot_model_->GetVelDim(); i++) {
-                    vel_tracking_weight_(i) = 0;
-                }
-            } else if (vel_tracking_weight_.size() > robot_model_->GetVelDim()) {
-                std::cerr << "Velocity tracking weight is too large. Ignoring end values." <<
-                          "Expected size " << robot_model_->GetVelDim() << ", but got size " << vel_tracking_weight_.size() << std::endl;
-            }
-
-            cost_weights_.push_back(vel_tracking_weight_);
-        } else {
-            using_vel_tracking_cost_ = false;
-        }
-
-        // ----- Torque Regularization ----- //
-        if (cost_settings["using_torque_regularization"] && cost_settings["using_torque_regularization"].as<bool>()) {
-            cost_terms_.emplace_back(CostTypes::TorqueReg);
-            using_torque_reg_cost_ = true;
-
-            if (cost_settings["torque_regularization_weights"]) {
-                auto vel_tracking_weights = cost_settings["torque_regularization_weights"].as<std::vector<double>>();
-                torque_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
-            }
-
-            if (torque_reg_weight_.size() < robot_model_->GetNumInputs()) {
-                std::cerr << "Torque regularization weight size is too small, adding zeros." <<
-                          "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
-                int starting_size = torque_reg_weight_.size();
-                torque_reg_weight_.conservativeResize(robot_model_->GetNumInputs());
-                for (int i = starting_size; i < robot_model_->GetNumInputs(); i++) {
-                    torque_reg_weight_(i) = 0;
-                }
-            } else if (torque_reg_weight_.size() > robot_model_->GetNumInputs()) {
-                std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
-                          "Expected size " << robot_model_->GetNumInputs() << ", but got size " << torque_reg_weight_.size() << std::endl;
-            }
-
-            cost_weights_.push_back(torque_reg_weight_);
-        } else {
-            using_torque_reg_cost_ = false;
-        }
-
-        // ----- Force Regularization ----- //
-        if (cost_settings["using_force_regularization"] && cost_settings["using_force_regularization"].as<bool>()) {
-            cost_terms_.emplace_back(ForceReg);
-            using_force_reg_cost_ = true;
-
-            if (cost_settings["force_regularization_weights"]) {
-                auto vel_tracking_weights = cost_settings["force_regularization_weights"].as<std::vector<double>>();
-                force_reg_weight_ = utils::StdToEigenVector(vel_tracking_weights);
-            }
-
-            if (force_reg_weight_.size() < CONTACT_3DOF) {
-                std::cerr << "Torque regularization weight size is too small, adding zeros." <<
-                          "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
-                int starting_size = force_reg_weight_.size();
-                force_reg_weight_.conservativeResize(CONTACT_3DOF);
-                for (int i = starting_size; i < CONTACT_3DOF; i++) {
-                    force_reg_weight_(i) = 0;
-                }
-            } else if (force_reg_weight_.size() > CONTACT_3DOF) {
-                std::cerr << "Torque regularization weight is too large. Ignoring end values." <<
-                          "Expected size " << CONTACT_3DOF << ", but got size " << force_reg_weight_.size() << std::endl;
-            }
-
-            cost_weights_.push_back(force_reg_weight_);
-        } else {
-            using_force_reg_cost_ = false;
-        }
-
-        if (cost_terms_.size() == 0) {
-            throw std::runtime_error("No cost terms chosen!");
-        }
-
-        if (cost_settings["terminal_cost_weight"]) {
-            terminal_cost_weight_ = cost_settings["terminal_cost_weight"].as<double>();
-        } else {
-            terminal_cost_weight_ = 1;
-        }
+        ParseCostYaml(cost_settings);
 
         // ---------- Contact Settings ---------- //
         if (!config["contacts"]) {
@@ -389,10 +265,13 @@ namespace torc::mpc {
             std::cout << "\tMaximum ground reaction force: " << max_grf_ << std::endl;
 
             std::cout << "Costs:" << std::endl;
-            std::cout << "\tConfiguration tracking weight: " << config_tracking_weight_.transpose() << std::endl;
-            std::cout << "\tVelocity tracking weight: " << vel_tracking_weight_.transpose() << std::endl;
-            std::cout << "\tTorque regularization weight: " << torque_reg_weight_.transpose() << std::endl;
-            std::cout << "\tForce regularization weight: " << force_reg_weight_.transpose() << std::endl;
+            for (const auto& data : cost_data_) {
+                std::cout << "\tCost name: " << data.constraint_name << std::endl;
+                std::cout << "\t\tWeight: " << data.weight.transpose() << std::endl;
+                if (data.frame_name != "") {
+                    std::cout << "\t\tFrame name: " << data.frame_name << std::endl;
+                }
+            }
             std::cout << "\tTerminal cost weight: " << terminal_cost_weight_ << std::endl;
 
             std::cout << "Contacts:" << std::endl;
@@ -471,7 +350,7 @@ namespace torc::mpc {
         ws_->frame_jacobian.resize(6, robot_model_->GetVelDim());
 
         // Setup cost function
-        cost_.Configure(robot_model_, compile_derivatves_, cost_terms_, cost_weights_, deriv_lib_path_);
+        cost_.Configure(robot_model_, compile_derivatves_, cost_data_, deriv_lib_path_);
 
         objective_mat_.resize(GetNumDecisionVars(), GetNumDecisionVars());
         CreateCostPattern();
@@ -1489,35 +1368,30 @@ namespace torc::mpc {
     // ------------------------------------------------- //
     void FullOrderMpc::CreateCostPattern() {
         for (int i = 0; i < nodes_; i++) {
-            // Configuration Tracking
-            if (using_config_tracking_cost_) {
-                int decision_idx = GetDecisionIdx(i, Configuration);
-                const auto config_sparsity = cost_.GetGaussNewtonSparsityPattern(CostTypes::Configuration);
-                AddSparsitySet(config_sparsity, decision_idx, decision_idx, objective_triplets_);
-            }
-
-            // Velocity Tracking
-            if (using_vel_tracking_cost_) {
-                int decision_idx = GetDecisionIdx(i, Velocity);
-                const auto vel_sparsity = cost_.GetHessianSparsityPattern(CostTypes::VelocityTracking);
-                AddSparsitySet(vel_sparsity, decision_idx, decision_idx, objective_triplets_);
-            }
-
-
-            // Torque regularization
-            if (using_torque_reg_cost_ && i < nodes_full_dynamics_) {
-                int decision_idx = GetDecisionIdx(i, Torque);
-                const auto torque_reg_sparsity = cost_.GetHessianSparsityPattern(CostTypes::TorqueReg);
-                AddSparsitySet(torque_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
-            }
-
-            // Force regularization
-            if (using_force_reg_cost_) {
-                int decision_idx = GetDecisionIdx(i, GroundForce);
-                for (const auto& frame: contact_frames_) {
-                    const auto force_reg_sparsity = cost_.GetHessianSparsityPattern(CostTypes::ForceReg);
-                    AddSparsitySet(force_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
-                    decision_idx += CONTACT_3DOF;
+            for (const auto& data :  cost_data_) {
+                if (data.type == CostTypes::Configuration) {
+                    int decision_idx = GetDecisionIdx(i, Configuration);
+                    const auto config_sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    AddSparsitySet(config_sparsity, decision_idx, decision_idx, objective_triplets_);
+                } else if (data.type == CostTypes::VelocityTracking) {
+                    int decision_idx = GetDecisionIdx(i, Velocity);
+                    const auto vel_sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
+                    AddSparsitySet(vel_sparsity, decision_idx, decision_idx, objective_triplets_);
+                } else if (data.type == CostTypes::ForceReg) {
+                    int decision_idx = GetDecisionIdx(i, GroundForce);
+                    for (const auto& frame: contact_frames_) {
+                        const auto force_reg_sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
+                        AddSparsitySet(force_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
+                        decision_idx += CONTACT_3DOF;
+                    }
+                } else if (data.type == CostTypes::TorqueReg && i < nodes_full_dynamics_) {
+                    int decision_idx = GetDecisionIdx(i, Torque);
+                    const auto torque_reg_sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
+                    AddSparsitySet(torque_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
+                } else if (data.type == CostTypes::ForwardKinematics && i > 0) {
+                    int decision_idx = GetDecisionIdx(i, Configuration);
+                    const auto config_sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    AddSparsitySet(config_sparsity, decision_idx, decision_idx, objective_triplets_);
                 }
             }
         }
@@ -1580,76 +1454,84 @@ namespace torc::mpc {
                 scaling *= terminal_cost_weight_;
             }
 
-            // ----- Configuration ----- //
-            if (using_config_tracking_cost_) {
-                int decision_idx = GetDecisionIdx(node, Configuration);
-                cost_.GetApproximation(traj_.GetConfiguration(node), q_target_[node],
-                                       ws_->obj_config_vector, ws_->obj_config_mat, CostTypes::Configuration);
+            for (const auto& data : cost_data_) {
+                if (data.type == CostTypes::Configuration) {
+                    int decision_idx = GetDecisionIdx(node, Configuration);
 
-                osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
-                        scaling * ws_->obj_config_vector;
+                    cost_.GetApproximation(traj_.GetConfiguration(node), q_target_[node],
+                                           ws_->obj_config_vector, ws_->obj_config_mat, data.constraint_name);
 
-                const auto sparsity = cost_.GetGaussNewtonSparsityPattern(CostTypes::Configuration);
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                            scaling * ws_->obj_config_vector;
 
-                MatrixToTripletWithSparsitySet(scaling * ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_,
-                                               objective_triplet_idx_, sparsity);
-            }
+                    const auto sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    MatrixToTripletWithSparsitySet(scaling * ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_,
+                                                   objective_triplet_idx_, sparsity);
+                } else if (data.type == CostTypes::VelocityTracking) {
+                    int decision_idx = GetDecisionIdx(node, Velocity);
 
-            // ----- Velocity ----- //
-            if (using_vel_tracking_cost_) {
-                int decision_idx = GetDecisionIdx(node, Velocity);
-                cost_.GetApproximation(traj_.GetVelocity(node), v_target_[node],
-                                       ws_->obj_vel_vector, ws_->obj_vel_mat, CostTypes::VelocityTracking);
+                    cost_.GetApproximation(traj_.GetVelocity(node), v_target_[node],
+                                           ws_->obj_vel_vector, ws_->obj_vel_mat, data.constraint_name);
 
-                osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
-                        scaling * ws_->obj_vel_vector;
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                            scaling * ws_->obj_vel_vector;
 
-                const auto sparsity = cost_.GetHessianSparsityPattern(CostTypes::VelocityTracking);
+                    const auto sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
+                    MatrixToTripletWithSparsitySet(scaling * ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_,
+                                                   objective_triplet_idx_, sparsity);
+                } else if (data.type == CostTypes::ForceReg) {
+                    int force_idx = GetDecisionIdx(node, GroundForce);
+                    for (const auto& frame: contact_frames_) {
+                        vector3_t force_target = GetForceTarget(node, frame);
 
-                MatrixToTripletWithSparsitySet(scaling * ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_,
-                                               objective_triplet_idx_, sparsity);
-            }
+                        cost_.GetApproximation(traj_.GetForce(node, frame), force_target,
+                                               ws_->obj_force_vector, ws_->obj_force_mat, data.constraint_name);
 
-            // ----- Torque ----- //
-            if (using_torque_reg_cost_) {
-                if (node < nodes_full_dynamics_) {
+                        osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
+                                scaling * ws_->obj_force_vector;
+
+                        const auto sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
+
+                        MatrixToTripletWithSparsitySet(scaling * ws_->obj_force_mat, force_idx, force_idx, objective_triplets_,
+                                                       objective_triplet_idx_, sparsity);
+
+                        force_idx += CONTACT_3DOF;
+                    }
+
+                } else if (data.type == CostTypes::TorqueReg && node < nodes_full_dynamics_) {
                     int decision_idx = GetDecisionIdx(node, Torque);
                     vectorx_t tau_target = GetTorqueTarget(node);
 
                     cost_.GetApproximation(traj_.GetTau(node), tau_target,
-                                           ws_->obj_tau_vector, ws_->obj_tau_mat, CostTypes::TorqueReg);
+                                           ws_->obj_tau_vector, ws_->obj_tau_mat, data.constraint_name);
 
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
                             scaling * ws_->obj_tau_vector;
 
-                    const auto sparsity = cost_.GetHessianSparsityPattern(CostTypes::TorqueReg);
+                    const auto sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
 
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_,
                                                    objective_triplet_idx_, sparsity);
-                }
-            }
+                } else if (data.type == CostTypes::ForwardKinematics && node > 0) {
 
-            // ----- Force ----- //
-            if (using_force_reg_cost_) {
-                int force_idx = GetDecisionIdx(node, GroundForce);
-                for (const auto& frame: contact_frames_) {
-                    vector3_t force_target = GetForceTarget(node, frame);
+                    // TODO: Only activate for the first stance + swing (and possibly even second stance)
 
-                    cost_.GetApproximation(traj_.GetForce(node, frame), force_target,
-                                           ws_->obj_force_vector, ws_->obj_force_mat, CostTypes::ForceReg);
+                    int decision_idx = GetDecisionIdx(node, Configuration);
 
-                    osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
-                            scaling * ws_->obj_force_vector;
+                    vectorx_t linear_term;
+                    matrixx_t hess_term;
 
-                    const auto sparsity = cost_.GetHessianSparsityPattern(CostTypes::ForceReg);
+                    cost_.GetApproximation(traj_.GetConfiguration(node), GetDesiredFramePos(node, data.frame_name),
+                                           linear_term, hess_term, data.constraint_name);
 
-                    MatrixToTripletWithSparsitySet(scaling * ws_->obj_force_mat, force_idx, force_idx, objective_triplets_,
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
+                            scaling * linear_term;
+
+                    const auto sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    MatrixToTripletWithSparsitySet(scaling * hess_term, decision_idx, decision_idx, objective_triplets_,
                                                    objective_triplet_idx_, sparsity);
-
-                    force_idx += CONTACT_3DOF;
                 }
             }
-
         }
 
         objective_mat_.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
@@ -1664,32 +1546,38 @@ namespace torc::mpc {
 
     double FullOrderMpc::GetFullCost(const vectorx_t& qp_res) {
         double cost = 0;
+
+
         for (int node = 0; node < nodes_; node++) {
+            double scale = (scale_cost_ ? dt_[node] : 1);
+
             double cost_node = 0;
-            if (using_config_tracking_cost_) {
-                cost_node += (scale_cost_ ? dt_[node] : 1) * cost_.GetTermCost(
-                        qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
-                        traj_.GetConfiguration(node), q_target_[node], CostTypes::Configuration);
-            }
 
-            if (using_vel_tracking_cost_) {
-                cost_node += (scale_cost_ ? dt_[node] : 1) * cost_.GetTermCost(
-                        qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
-                        traj_.GetVelocity(node), v_target_[node], CostTypes::VelocityTracking);
-            }
-            if (using_torque_reg_cost_ && node < nodes_full_dynamics_) {
-                vectorx_t torque_target = GetTorqueTarget(node);
-                cost_node += (scale_cost_ ? dt_[node] :  1) * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
-                    traj_.GetTau(node), torque_target, CostTypes::TorqueReg);
-            }
-
-            if (using_force_reg_cost_) {
-                int force_idx = GetDecisionIdx(node, GroundForce);
-                for (const auto& frame: contact_frames_) {
-                    vector3_t force_target = GetForceTarget(node, frame);
-                    cost_node += (scale_cost_ ? dt_[node] : 1) * cost_.GetTermCost(qp_res.segment(
-                            force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), force_target, ForceReg);
-                    force_idx += CONTACT_3DOF;
+            for (const auto& data : cost_data_) {
+                if (data.type == CostTypes::Configuration) {
+                    cost_node += scale * cost_.GetTermCost(
+                            qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                            traj_.GetConfiguration(node), q_target_[node], data.constraint_name);
+                } else if (data.type == CostTypes::VelocityTracking) {
+                    cost_node += scale * cost_.GetTermCost(
+                            qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
+                            traj_.GetVelocity(node), v_target_[node], data.constraint_name);
+                } else if (data.type == CostTypes::TorqueReg && node < nodes_full_dynamics_) {
+                    vectorx_t torque_target = GetTorqueTarget(node);
+                    cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
+                                                                                    traj_.GetTau(node), torque_target, data.constraint_name);
+                } else if (data.type == CostTypes::ForceReg) {
+                    int force_idx = GetDecisionIdx(node, GroundForce);
+                    for (const auto& frame: contact_frames_) {
+                        vector3_t force_target = GetForceTarget(node, frame);
+                        cost_node += scale * cost_.GetTermCost(qp_res.segment(
+                                force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), force_target, data.constraint_name);
+                        force_idx += CONTACT_3DOF;
+                    }
+                } else if (data.type == CostTypes::ForwardKinematics) {
+                    vectorx_t pos_target = GetDesiredFramePos(node, data.frame_name);
+                    cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                                                           traj_.GetConfiguration(node), pos_target, data.constraint_name);
                 }
             }
 
@@ -1718,6 +1606,67 @@ namespace torc::mpc {
         force_target << 0, 0, in_contact_[frame][node] * 9.81 * robot_model_->GetMass() / num_contacts;
 
         return force_target;
+    }
+
+    vector3_t FullOrderMpc::GetDesiredFramePos(int node, std::string) {
+        vector3_t frame_pos;
+
+        // TODO: Implement raibert heuristic
+        frame_pos.setZero();
+
+        return frame_pos;
+    }
+
+    void FullOrderMpc::ParseCostYaml(const YAML::Node& cost_settings) {
+        if (!cost_settings.IsSequence()) {
+            throw std::runtime_error("costs must be a sequence!");
+        }
+
+        cost_data_.resize(cost_settings.size());
+        int idx = 0;
+        for (const auto& cost_term : cost_settings) {
+            if (cost_term["type"]) {
+                const std::string type = cost_term["type"].as<std::string>();
+                if (type == "ConfigurationTracking") {
+                    cost_data_[idx].type = CostTypes::Configuration;
+                } else if (type == "VelocityTracking") {
+                    cost_data_[idx].type = CostTypes::VelocityTracking;
+                } else if (type == "TorqueRegularization") {
+                    cost_data_[idx].type = CostTypes::TorqueReg;
+                } else if (type == "ForceRegularization") {
+                    cost_data_[idx].type = CostTypes::ForceReg;
+                } else if (type == "ForwardKinematics") {
+                    cost_data_[idx].type = CostTypes::ForwardKinematics;
+                } else {
+                    throw std::runtime_error("Provided cost type does not exist!");
+                }
+            } else {
+                throw std::runtime_error("Cost term must include a type!");
+            }
+
+            if (cost_term["name"]) {
+                cost_data_[idx].constraint_name = cost_term["name"].as<std::string>();
+            } else {
+                throw std::runtime_error("Cost term must include a name!");
+            }
+
+            if (cost_term["weight"]) {
+                std::vector<double> weight = cost_term["weight"].as<std::vector<double>>();
+                cost_data_[idx].weight = utils::StdToEigenVector(weight);
+            } else {
+                throw std::runtime_error("Cost term must include a weight!");
+            }
+
+            if (cost_term["frame"] && cost_data_[idx].type == ForwardKinematics) {
+                cost_data_[idx].frame_name = cost_term["frame"].as<std::string>();
+            }
+
+            idx++;
+        }
+
+        if (cost_data_.size() == 0) {
+            throw std::runtime_error("No cost terms chosen!");
+        }
     }
 
     std::pair<double, double> FullOrderMpc::LineSearch(const vectorx_t& qp_res) {

@@ -10,6 +10,7 @@
 #include <Eigen/Core>
 #include <filesystem>
 #include <pinocchio/algorithm/joint-configuration.hpp>
+#include <pinocchio/algorithm/frames.hpp>
 
 //#include "autodiff_fn.h"
 //#include "quadratic_fn.h"
@@ -34,6 +35,21 @@ namespace torc::mpc {
         VelocityTracking,
         TorqueReg,
         ForceReg,
+        ForwardKinematics
+    };
+
+    /**
+     * A struct to hold all of the constants associated with costs.
+     * Only the fields that the constraint uses need to be filled, the others can be
+     * left empty.
+     *
+     * Constraint name, weight, and type MUST always be populated.
+     */
+    struct CostData {
+        CostTypes type;
+        vectorx_t weight;
+        std::string frame_name;
+        std::string constraint_name;
     };
 
     class CostFunction {
@@ -41,9 +57,12 @@ namespace torc::mpc {
         explicit CostFunction(const std::string& name)
             : name_(name), configured_(false), compile_derivatives_(true) {}
 
+            // TODO: Make the costs mapped by name
         void Configure(const std::unique_ptr<torc::models::FullOrderRigidBody>& model,
-            bool compile_derivatives, const std::vector<CostTypes>& costs, const std::vector<vectorx_t>& weights,
+            bool compile_derivatives, std::vector<CostData> cost_data,
             std::filesystem::path deriv_libs_path) {
+
+            cost_data_ = std::move(cost_data);
 
             ad_pin_model_ = model->GetADPinModel();
             ad_pin_data_ = model->GetADPinData();
@@ -56,67 +75,69 @@ namespace torc::mpc {
 
             compile_derivatives_ = compile_derivatives;
 
-            if (costs.size() != weights.size()) {
-                throw std::runtime_error("Cost terms and weights must be the same size!");
-            }
-
-            weights_.resize(costs.size());
             int idx = 0;
-            for (const auto& cost_term : costs) {
-                cost_idxs_.insert(std::pair<CostTypes, int>(cost_term, idx));
-                weights_[cost_idxs_[cost_term]] = weights[idx];
+            for (const auto& data : cost_data_) {
                 idx++;
 
-                if (cost_term == Configuration) {
-                    if (weights_[cost_idxs_[cost_term]].size() != vel_size_) {
+                if (data.type == Configuration) {
+                    if (data.weight.size() != vel_size_) {
                         throw std::runtime_error("Configuration tracking weight has wrong size!");
                     }
 
-                    cost_fcn_terms_.emplace_back(std::make_unique<torc::ad::CppADInterface>(
+                    cost_fcn_terms_.emplace(data.constraint_name, std::make_unique<torc::ad::CppADInterface>(
                             std::bind(&CostFunction::ConfigurationTrackingCost, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
-                            name_ + "_config_tracking_cost",
+                            name_ + data.constraint_name + "_config_tracking_cost",
                             deriv_libs_path,
                             torc::ad::DerivativeOrder::FirstOrder, vel_size_, 2*config_size_ + vel_size_,
                             compile_derivatives_));
                 }
-                else if (cost_term == VelocityTracking) {
-                    if (weights_[cost_idxs_[cost_term]].size() != vel_size_) {
+                else if (data.type == VelocityTracking) {
+                    if (data.weight.size() != vel_size_) {
                         throw std::runtime_error("Velocity tracking weight has wrong size!");
                     }
 
-                    cost_fcn_terms_.emplace_back(std::make_unique<torc::ad::CppADInterface>(
+                    cost_fcn_terms_.emplace(data.constraint_name, std::make_unique<torc::ad::CppADInterface>(
                             std::bind(&CostFunction::VelocityTrackingCost, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
-                            name_ + "_mpc_vel_cost",
+                            name_ + data.constraint_name + "_mpc_vel_cost",
                             deriv_libs_path,
                             torc::ad::DerivativeOrder::SecondOrder, vel_size_, 3*vel_size_,
                             compile_derivatives_));
-                } else if (cost_term == TorqueReg) {
-                    if (weights_[cost_idxs_[cost_term]].size() != input_size_) {
+                } else if (data.type == TorqueReg) {
+                    if (data.weight.size()!= input_size_) {
                         throw std::runtime_error("Torque regularization weight has wrong size!");
                     }
 
-                    cost_fcn_terms_.emplace_back(std::make_unique<torc::ad::CppADInterface>(
+                    cost_fcn_terms_.emplace(data.constraint_name, std::make_unique<torc::ad::CppADInterface>(
                             std::bind(&CostFunction::TorqueTrackingCost, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
-                            name_ + "_mpc_torque_reg_cost",
+                            name_ + data.constraint_name + "_mpc_torque_reg_cost",
                             deriv_libs_path,
                             torc::ad::DerivativeOrder::SecondOrder, input_size_, 3*input_size_,
                             compile_derivatives_));
-                } else  if (cost_term == ForceReg) {
-                    if (weights_[cost_idxs_[cost_term]].size() != force_size_) {
+                } else  if (data.type == ForceReg) {
+                    if (data.weight.size() != force_size_) {
                         throw std::runtime_error("Force regularization weight has wrong size!");
                     }
 
-                    cost_fcn_terms_.emplace_back(std::make_unique<torc::ad::CppADInterface>(
+                    cost_fcn_terms_.emplace(data.constraint_name, std::make_unique<torc::ad::CppADInterface>(
                             std::bind(&CostFunction::ForceTrackingCost, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
-                            name_ + "_mpc_force_reg_cost",
+                            name_ + data.constraint_name + "_mpc_force_reg_cost",
                             deriv_libs_path,
                             torc::ad::DerivativeOrder::SecondOrder, force_size_, 3*force_size_,
+                            compile_derivatives_));
+                } else if (data.type == ForwardKinematics) {
+                    if (data.weight.size() != POS_VARS) {
+                        throw std::runtime_error("Force regularization weight has wrong size!");
+                    }
+
+                    cost_fcn_terms_.emplace(data.constraint_name, std::make_unique<torc::ad::CppADInterface>(
+                            std::bind(&CostFunction::FkCost, this, model->GetFrameIdx(data.frame_name), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+                            name_ + data.constraint_name + "_mpc_force_reg_cost",
+                            deriv_libs_path,
+                            torc::ad::DerivativeOrder::FirstOrder, vel_size_, config_size_ + 2*POS_VARS,
                             compile_derivatives_));
                 } else {
                     std::cerr << "Cost term is not recognized!" << std::endl;
                 }
-                // CppAD functions are slow to evaluate, so get the double function
-//                cost_fcn_terms_[cost_idxs_[cost_term]]->func_ = CreateDefaultCost<double>(cost_term);
             }
 
             configured_ = true;
@@ -131,92 +152,120 @@ namespace torc::mpc {
          * @param type
          */
         void GetApproximation(const vectorx_t& reference, const vectorx_t& target, vectorx_t& linear_term,
-                              matrixx_t& hessian_term, const CostTypes& type) {
-            vectorx_t p(reference.size() + target.size() + weights_[cost_idxs_[type]].size());
-            p << reference, target, weights_[cost_idxs_[type]];
+                              matrixx_t& hessian_term, const std::string& name) {
+            CostData* data;
+            for (int i = 0; i < cost_data_.size(); i++) {
+                if (cost_data_[i].constraint_name == name) {
+                    data = &cost_data_[i];
+                    break;
+                }
+            }
 
-            if (type == Configuration) {
+            vectorx_t p(reference.size() + target.size() + data->weight.size());
+            p << reference, target, data->weight;
+
+            if (data->type == Configuration) {
                 if (reference.size() != config_size_ || target.size() != config_size_) {
                     throw std::runtime_error("[Cost Function] configuration approx reference or target has the wrong size!");
                 }
 
                 matrixx_t jac;
-                cost_fcn_terms_[cost_idxs_[type]]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
+                cost_fcn_terms_[name]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
                 hessian_term = 2*hessian_term;
 
                 vectorx_t y;
-                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
+                cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
                 linear_term = 2*jac.transpose()*y;
 
-            } else if (type == VelocityTracking) {
+            } else if (data->type == VelocityTracking) {
                 if (reference.size() != vel_size_ || target.size() != vel_size_) {
                     throw std::runtime_error("[Cost Function] velocity approx reference or target has the wrong size!");
                 }
 
                 matrixx_t jac;
-                cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(vel_size_), p, jac);
+                cost_fcn_terms_[name]->GetJacobian(vectorx_t::Zero(vel_size_), p, jac);
 
                 vectorx_t y;
-                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
+                cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
                 linear_term = 2*jac.transpose()*y;
 
-                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(vel_size_), p, 2*y, hessian_term);
+                cost_fcn_terms_[name]->GetHessian(vectorx_t::Zero(vel_size_), p, 2*y, hessian_term);
                 hessian_term += 2*jac.transpose() * jac;
 
-            } else if (type == TorqueReg) {
+            } else if (data->type == TorqueReg) {
                 if (reference.size() != input_size_ || target.size() != input_size_) {
                     throw std::runtime_error("[Cost Function] torque approx reference or target has the wrong size!");
                 }
 
                 matrixx_t jac;
-                cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(input_size_), p, jac);
+                cost_fcn_terms_[name]->GetJacobian(vectorx_t::Zero(input_size_), p, jac);
 
                 vectorx_t y;
-                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(input_size_), p, y);
+                cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(input_size_), p, y);
                 linear_term = 2*jac.transpose()*y;
 
-                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(input_size_), p, 2*y, hessian_term);
+                cost_fcn_terms_[name]->GetHessian(vectorx_t::Zero(input_size_), p, 2*y, hessian_term);
                 hessian_term += 2*jac.transpose() * jac;
-            } else if (type == ForceReg) {
+            } else if (data->type == ForceReg) {
                 if (reference.size() != force_size_ || target.size() != force_size_) {
                     throw std::runtime_error("[Cost Function] force approx reference or target has the wrong size!");
                 }
 
                 matrixx_t jac;
-                cost_fcn_terms_[cost_idxs_[type]]->GetJacobian(vectorx_t::Zero(force_size_), p, jac);
+                cost_fcn_terms_[name]->GetJacobian(vectorx_t::Zero(force_size_), p, jac);
 
                 vectorx_t y;
-                cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(vectorx_t::Zero(force_size_), p, y);
+                cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(force_size_), p, y);
                 linear_term = 2*jac.transpose()*y;
 
-                cost_fcn_terms_[cost_idxs_[type]]->GetHessian(vectorx_t::Zero(force_size_), p, 2*y, hessian_term);
+                cost_fcn_terms_[name]->GetHessian(vectorx_t::Zero(force_size_), p, 2*y, hessian_term);
                 hessian_term += 2*jac.transpose() * jac;
+            } else if (data->type == ForwardKinematics) {
+                if (reference.size() != config_size_ || target.size() != POS_VARS) {
+                    throw std::runtime_error("[Cost Function] fk approx reference or target has the wrong size!");
+                }
+
+                matrixx_t jac;
+                cost_fcn_terms_[name]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
+                hessian_term = 2*hessian_term;
+
+                vectorx_t y;
+                cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
+                linear_term = 2*jac.transpose()*y;
             } else {
-                throw std::runtime_error("Provided cost type not supported yet!");
+                throw std::runtime_error("[Cost Function] Provided cost type not supported yet!");
             }
         }
 
-        torc::ad::sparsity_pattern_t GetJacobianSparsityPattern(const CostTypes& type) {
-            return cost_fcn_terms_[cost_idxs_[type]]->GetJacobianSparsityPatternSet();
+        torc::ad::sparsity_pattern_t GetJacobianSparsityPattern(const std::string& name) {
+            return cost_fcn_terms_[name]->GetJacobianSparsityPatternSet();
         }
 
-        torc::ad::sparsity_pattern_t GetGaussNewtonSparsityPattern(const CostTypes& type) {
-            return cost_fcn_terms_[cost_idxs_[type]]->GetGaussNewtonSparsityPatternSet();
+        torc::ad::sparsity_pattern_t GetGaussNewtonSparsityPattern(const std::string& name) {
+            return cost_fcn_terms_[name]->GetGaussNewtonSparsityPatternSet();
         }
 
-        torc::ad::sparsity_pattern_t GetHessianSparsityPattern(const CostTypes& type) {
-            return cost_fcn_terms_[cost_idxs_[type]]->GetHessianSparsityPatternSet();
+        torc::ad::sparsity_pattern_t GetHessianSparsityPattern(const std::string& name) {
+            return cost_fcn_terms_[name]->GetHessianSparsityPatternSet();
         }
 
-        [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const CostTypes& type) {
+        [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const std::string& name) {
             if (!configured_) {
                 throw std::runtime_error("Cost function not configured yet!");
             }
 
-            vectorx_t p(reference.size() + target.size() + weights_[cost_idxs_[type]].size());
-            p << reference, target, weights_[cost_idxs_[type]];
-            vectorx_t y = vectorx_t::Zero(cost_fcn_terms_[cost_idxs_[type]]->GetRangeSize());
-            cost_fcn_terms_[cost_idxs_[type]]->GetFunctionValue(decision_var, p, y);
+            CostData* data;
+            for (int i = 0; i < cost_data_.size(); i++) {
+                if (cost_data_[i].constraint_name == name) {
+                    data = &cost_data_[i];
+                    break;
+                }
+            }
+
+            vectorx_t p(reference.size() + target.size() + data->weight.size());
+            p << reference, target, data->weight;
+            vectorx_t y = vectorx_t::Zero(cost_fcn_terms_[name]->GetRangeSize());
+            cost_fcn_terms_[name]->GetFunctionValue(decision_var, p, y);
             return y.squaredNorm();     // Assumes all the functions have the form of a norm
         }
 
@@ -323,28 +372,33 @@ namespace torc::mpc {
         }
 
         /**
-         * @brief Calculates the error in the foot location relative to the Raibert heuristic
-         * @param dq_dv
-         * @param q_v_ts_z0
-         * @param foot_error
+         * @brief Calculates the error frame location relative to a given location
+         * @param dq
+         * @param q_xyzdes
+         * @param frame_error
          */
-//        void RaibertCost(const torc::ad::ad_vector_t& dq_dv,        // Change in configuration and velocity
-//                         const torc::ad::ad_vector_t& q_v_ts_z0,    // configuration, velocity, stance time, nominal height
-//                         torc::ad::ad_vector_t& foot_error) {       // Error on the foot location
-//            const torc::ad::ad_vector_t& dq = dq_dv.head(vel_size_);
-//            const torc::ad::ad_vector_t& dv = dq_dv.tail(vel_size_);
-//            const torc::ad::ad_vector_t& q = q_v_ts_z0.head(config_size_);
-//            const torc::ad::ad_vector_t& v = q_v_ts_z0.segment(config_size_, vel_size_);
-//            const torc::ad::adcg_t& ts = q_v_ts_z0(config_size_ + vel_size_);
-//            const torc::ad::adcg_t& z0 = q_v_ts_z0(config_size_ + vel_size_ + 1);
-//
-//            // TODO: Check this
-//            // ----- Determine the current foot position ----- //
-//            // Get the current configuration
-//            torc::ad::ad_vector_t q_new = pinocchio::integrate(ad_pin_model_, q, dq);
-//            torc::ad::ad_vector_t
-//
-//        }
+        void FkCost(int frame_idx,
+                    const torc::ad::ad_vector_t& dq,        // Change in configuration and velocity
+                    const torc::ad::ad_vector_t& q_xyzdes_weight,    // configuration, velocity, stance time, nominal height
+                    torc::ad::ad_vector_t& frame_error) {       // Error on the foot location
+            const torc::ad::ad_vector_t& q = q_xyzdes_weight.head(config_size_);
+            const Eigen::Vector3<torc::ad::adcg_t>& des_pos = q_xyzdes_weight.segment<3>(config_size_);
+
+            // Get the current configuration
+            torc::ad::ad_vector_t q_curr = pinocchio::integrate(ad_pin_model_, q, dq);
+
+            // Get the frame location
+            pinocchio::forwardKinematics(ad_pin_model_, *ad_pin_data_, q_curr);
+            pinocchio::updateFramePlacement(ad_pin_model_, *ad_pin_data_, frame_idx);
+            const Eigen::Vector3<torc::ad::adcg_t>& frame_pos = ad_pin_data_->oMf[frame_idx].translation();
+
+            frame_error = frame_pos - des_pos;
+
+            // Multiply by the weights
+            for (int i = 0; i < POS_VARS; i++) {
+                frame_error(i) = frame_error(i) * q_xyzdes_weight(config_size_ + POS_VARS + i);
+            }
+        }
 
         // ----------------------------------- //
         // --------- Member Variables -------- //
@@ -362,8 +416,13 @@ namespace torc::mpc {
 
         // Using explicit function here seemed to cause memory leaks
         // Also unclear if it is the memory leaks or the type here, but the MPC is notably quicker now
-        std::vector<std::unique_ptr<torc::ad::CppADInterface>> cost_fcn_terms_;
+        std::map<std::string, std::unique_ptr<torc::ad::CppADInterface>> cost_fcn_terms_;
+
+        // TODO: Delete weights
         std::vector<vectorx_t> weights_;
+
+        std::vector<CostData> cost_data_;
+
         std::map<CostTypes, int> cost_idxs_;
 
         std::unique_ptr<CppAD::cg::DynamicLib<double>> config_jacobian_lib_;

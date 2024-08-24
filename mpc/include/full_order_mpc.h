@@ -8,6 +8,7 @@
 
 #include <Eigen/Core>
 
+#include "yaml-cpp/yaml.h"
 #include "osqp++.h"
 #include "full_order_rigid_body.h"
 #include "trajectory.h"
@@ -206,10 +207,9 @@ namespace torc::mpc {
 
         vectorx_t GetTorqueTarget(int node);
         vector3_t GetForceTarget(int node, const std::string& frame);
+        vector3_t GetDesiredFramePos(int node, std::string);
 
-        // void CreateDefaultCost();
-        // Helper function
-        // void FormCostFcnArg(const vectorx_t& delta, const vectorx_t& bar, const vectorx_t& target, vectorx_t& arg) const;
+        void ParseCostYaml(const YAML::Node& cost_settings);
 
     // ----- Sparsity Pattern Creation ----- //
         /**
@@ -307,10 +307,12 @@ namespace torc::mpc {
         // Cost
         CostFunction cost_;
 
-        vectorx_t vel_tracking_weight_;
-        vectorx_t config_tracking_weight_;
-        vectorx_t torque_reg_weight_;
-        vectorx_t force_reg_weight_;
+//        vectorx_t vel_tracking_weight_;
+//        vectorx_t config_tracking_weight_;
+//        vectorx_t torque_reg_weight_;
+//        vectorx_t force_reg_weight_;
+
+        std::vector<CostData> cost_data_;
 
         double terminal_cost_weight_;
 
@@ -326,13 +328,7 @@ namespace torc::mpc {
 
         bool scale_cost_;
 
-        std::vector<CostTypes> cost_terms_;
         std::vector<vectorx_t> cost_weights_;
-
-        bool using_config_tracking_cost_;
-        bool using_vel_tracking_cost_;
-        bool using_torque_reg_cost_;
-        bool using_force_reg_cost_;
 
         // Line search
         double alpha_;
