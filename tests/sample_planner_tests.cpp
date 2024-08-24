@@ -23,13 +23,47 @@ TEST_CASE("Basic Sample Planner Test", "[sample_planner]") {
     std::filesystem::path cem_config = std::filesystem::current_path();
     cem_config += "/test_data/cem_config.yaml";
 
-    // CEM
-    CrossEntropy cem(achilles_xml, 10, cem_config);
-
     // Robot Model
     std::filesystem::path achilles_urdf = std::filesystem::current_path();
     achilles_urdf += "/test_data/achilles.urdf";
+
     torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
+
+    // MPC
+    std::filesystem::path mpc_config = std::filesystem::current_path();
+    mpc_config += "/test_data/achilles_mpc_config_sim.yaml";
+
+    torc::mpc::FullOrderMpc mpc("achilles_test_class_cem", mpc_config, achilles_urdf);
+
+    mpc.Configure();
+
+    vectorx_t q_target, v_target;
+    q_target.resize(achilles.GetConfigDim());
+    q_target << 0., 0, 0.97,    // position
+            0, 0, 0, 1,     // quaternion
+            0, 0, -0.26,    // L hips joints
+            0.65, -0.43,    // L knee, ankle
+            0, 0, 0, 0,     // L shoulders and elbow
+            0, 0, -0.26,    // R hip joints
+            0.65, -0.43,    // R knee ankle
+            0, 0, 0, 0;     // R shoulders and elbow
+
+    mpc.SetConstantConfigTarget(q_target);
+    q_target(0) = 0;
+
+    v_target.resize(achilles.GetVelDim());
+    v_target << 0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0;
+    mpc.SetConstantVelTarget(v_target);
+
+    // CEM
+    CrossEntropy cem(achilles_xml, 10, 3, cem_config, mpc);
 
     // Reference trajectory
     torc::mpc::Trajectory traj_ref;
@@ -42,11 +76,13 @@ TEST_CASE("Basic Sample Planner Test", "[sample_planner]") {
     torc::mpc::Trajectory traj_out;
 
     traj_ref.SetDtVector(dt_vec);
-    cem.Plan(traj_ref, traj_out);
 
-    BENCHMARK("cem plan") {
-        cem.Plan(traj_ref, traj_out);
-    };
+    torc::mpc::ContactSchedule cs_out;
+    cem.Plan(traj_ref, traj_out, cs_out);
+
+//    BENCHMARK("cem plan") {
+//        cem.Plan(traj_ref, traj_out, cs_out);
+//    };
 }
 
 TEST_CASE("Simulation Dispatcher Class Test", "[sample_planner]") {

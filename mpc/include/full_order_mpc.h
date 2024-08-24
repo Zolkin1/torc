@@ -50,6 +50,18 @@ namespace torc::mpc {
         double constraint_violation;        // Constraint violation
     };
 
+    // TODO: Clean up these data structures
+    struct CostTargets {
+        std::map<std::string, std::vector<vectorx_t>> q_targets;
+        std::map<std::string, std::vector<vectorx_t>> v_targets;
+        std::map<std::string, std::vector<vectorx_t>> tau_targets;
+        std::map<std::string, std::map<std::string, std::vector<vector3_t>>> force_targets;
+        std::map<std::string, std::vector<vector3_t>> fk_targets;
+        std::vector<CostData> cost_data;
+    };
+
+    // TODO: Should move cost target functions to a "CostTargetGenerator" class
+
     class FullOrderMpc {
     public:
         FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path);
@@ -80,6 +92,21 @@ namespace torc::mpc {
         void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time = 0);
 
         void ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
+
+        /**
+         * @brief Compute the cost associated with a trajectory.
+         * Thread safe.
+         * @param traj
+         * @return
+         */
+        [[nodiscard]] double GetTrajCost(const Trajectory& traj, const CostTargets& targets) const;
+
+        /**
+         * @brief return the current parameters that define the cost.
+         * Thread safe.
+         * @return
+         */
+        [[nodiscard]] CostTargets GetCostSnapShot();
 
         void SetVerbosity(bool verbose);
 
@@ -208,6 +235,8 @@ namespace torc::mpc {
         vectorx_t GetTorqueTarget(int node);
         vector3_t GetForceTarget(int node, const std::string& frame);
         vector3_t GetDesiredFramePos(int node, std::string);
+        vectorx_t GetConfigTarget(int node);
+        vectorx_t GetVelTarget(int node);
 
         void ParseCostYaml(const YAML::Node& cost_settings);
 
@@ -329,6 +358,9 @@ namespace torc::mpc {
         bool scale_cost_;
 
         std::vector<vectorx_t> cost_weights_;
+
+        // Cost Mutexes
+        std::mutex target_mut_;
 
         // Line search
         double alpha_;

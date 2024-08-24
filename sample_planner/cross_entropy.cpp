@@ -6,9 +6,9 @@
 #include "cross_entropy.h"
 
 namespace torc::sample {
-    CrossEntropy::CrossEntropy(const std::filesystem::path& xml_path, int num_samples,
-        const std::filesystem::path& config_path)
-        : dispatcher_(xml_path, num_samples), num_samples_(num_samples) {
+    CrossEntropy::CrossEntropy(const std::filesystem::path& xml_path, int num_samples, int num_finalists,
+        const std::filesystem::path& config_path, torc::mpc::FullOrderMpc& mpc)
+        : dispatcher_(xml_path, num_samples), num_samples_(num_samples), num_finalists_(num_finalists), mpc_(mpc) {
         // Read in the configs
         YAML::Node config;
         try {
@@ -60,7 +60,8 @@ namespace torc::sample {
         samples_.resize(num_samples);
     }
 
-    void CrossEntropy::Plan(const mpc::Trajectory &traj_ref, mpc::Trajectory &traj_out) {
+    void CrossEntropy::Plan(const mpc::Trajectory &traj_ref, mpc::Trajectory &traj_out,
+                            mpc::ContactSchedule& cs_out) {
         for (int i = 0; i < num_samples_; i++) {
             trajectories_[i].UpdateSizes(traj_ref.GetConfiguration(0).size(),
                 traj_ref.GetVelocity(0).size(), traj_ref.GetTau(0).size(),
@@ -78,10 +79,62 @@ namespace torc::sample {
             }
         }
 
-        // TODO: Look into making sure this is called correctly.
+        sum_traj_.UpdateSizes(traj_ref.GetConfiguration(0).size(),
+                               traj_ref.GetVelocity(0).size(), traj_ref.GetTau(0).size(),
+                    traj_ref.GetContactFrames(), traj_ref.GetNumNodes());
+
+
+        const auto cost_targets = mpc_.GetCostSnapShot();
+
         dispatcher_.BatchSimulation(samples_, traj_ref, trajectories_, contact_schedules_);
 
-        // TODO: Analyze the results
+        std::map<double, int> costs;
+        // TODO: Get the costs in the seperate thread each
+        for (int i = 0; i < num_samples_; i++) {
+            std::cout << "Cost: " << mpc_.GetTrajCost(trajectories_[i], cost_targets) << std::endl;
+            costs.emplace(mpc_.GetTrajCost(trajectories_[i], cost_targets), i);
+        }
+
+        // Now get the top N and average them
+        for (int i = 0; i < traj_ref.GetNumNodes(); i++) {
+            vectorx_t q = vectorx_t::Zero(traj_ref.GetConfiguration(0).size());
+            vectorx_t v = vectorx_t::Zero(traj_ref.GetVelocity(0).size());
+            vectorx_t tau = vectorx_t::Zero(traj_ref.GetTau(0).size());
+            std::map<std::string, vector3_t> f;
+            for (const auto& frame : traj_ref.GetContactFrames()) {
+                f.emplace(frame, vector3_t::Zero());
+            }
+
+            int count = 0;
+
+            for (const auto& [cost, idx]: costs) {
+                if (count == num_finalists_) {
+                    break;
+                }
+
+                q = q + trajectories_[idx].GetConfiguration(i);
+                v = v + trajectories_[idx].GetVelocity(i);
+                tau = tau + trajectories_[idx].GetTau(i);
+
+                for (const auto& frame : traj_ref.GetContactFrames()) {
+                    f[frame] += trajectories_[idx].GetForce(i, frame);
+                }
+
+                count++;
+            }
+
+            sum_traj_.SetConfiguration(i, q/count);
+            sum_traj_.SetVelocity(i, v/count);
+            sum_traj_.SetTau(i, tau/count);
+            for (const auto& frame : traj_ref.GetContactFrames()) {
+                sum_traj_.SetForce(i, frame, f[frame]/count);
+            }
+        }
+
+        samples_[0].samples.setZero();
+
+        // TODO: Fix
+//        dispatcher_.SingleSimulation(samples_[0], sum_traj_, traj_out, cs_out);
     }
 
     void CrossEntropy::GetActuatorSamples(vectorx_t &actuator_sample) {

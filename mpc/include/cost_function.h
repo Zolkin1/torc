@@ -249,23 +249,23 @@ namespace torc::mpc {
             return cost_fcn_terms_[name]->GetHessianSparsityPatternSet();
         }
 
-        [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const std::string& name) {
+        [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const std::string& name) const {
             if (!configured_) {
                 throw std::runtime_error("Cost function not configured yet!");
             }
 
-            CostData* data;
-            for (int i = 0; i < cost_data_.size(); i++) {
-                if (cost_data_[i].constraint_name == name) {
-                    data = &cost_data_[i];
+            CostData data;
+            for (const auto & i : cost_data_) {
+                if (i.constraint_name == name) {
+                    data = i;
                     break;
                 }
             }
 
-            vectorx_t p(reference.size() + target.size() + data->weight.size());
-            p << reference, target, data->weight;
-            vectorx_t y = vectorx_t::Zero(cost_fcn_terms_[name]->GetRangeSize());
-            cost_fcn_terms_[name]->GetFunctionValue(decision_var, p, y);
+            vectorx_t p(reference.size() + target.size() + data.weight.size());
+            p << reference, target, data.weight;
+            vectorx_t y = vectorx_t::Zero(cost_fcn_terms_.at(name)->GetRangeSize());
+            cost_fcn_terms_.at(name)->GetFunctionValue(decision_var, p, y);
             return y.squaredNorm();     // Assumes all the functions have the form of a norm
         }
 

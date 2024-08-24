@@ -8,6 +8,7 @@
 #include <filesystem>
 #include "absl/random/random.h"
 
+#include "full_order_mpc.h"
 #include "simulation_dispatcher.h"
 
 namespace torc::sample {
@@ -23,9 +24,10 @@ namespace torc::sample {
         // Weight top N
         // Take weighted average
         // Re-simulate average to get the final contact schedule
-        CrossEntropy(const std::filesystem::path& xml_path, int num_samples, const std::filesystem::path& config_path);
+        CrossEntropy(const std::filesystem::path& xml_path, int num_samples, int num_finalists, const std::filesystem::path& config_path,
+                     torc::mpc::FullOrderMpc& mpc);
 
-        void Plan(const mpc::Trajectory& traj_ref, mpc::Trajectory& traj_out);
+        void Plan(const mpc::Trajectory& traj_ref, mpc::Trajectory& traj_out, mpc::ContactSchedule& cs_out);
     protected:
         void GetActuatorSamples(vectorx_t& actuator_sample);
 
@@ -43,8 +45,13 @@ namespace torc::sample {
         std::vector<mpc::ContactSchedule> contact_schedules_;
         std::vector<InputSamples> samples_;
 
+        mpc::Trajectory sum_traj_;
+
         // Random library
         absl::BitGen bit_gen_;
+
+        // Cost function
+        torc::mpc::FullOrderMpc& mpc_;
     };
 } // namespace torc::sample
 
