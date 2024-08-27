@@ -1,5 +1,33 @@
 cem_settings:
   sample_variance: 0.1
   num_finalists: 10
-  actuator_names: ["a", "b", "c"]
+#*** Note *** These must be in the same order!
+  pos_actuator_names: ["left_hip_yaw_pos", "left_hip_roll_pos", "left_hip_pitch_pos",
+                       "left_knee_pitch_pos", "left_ankle_pitch_pos",
+                       "left_shoulder_pitch_pos", "left_shoulder_roll_pos", "left_shoulder_yaw_pos",
+                       "left_elbow_pitch_pos",
+                       "right_hip_yaw_pos", "right_hip_roll_pos", "right_hip_pitch_pos",
+                       "right_knee_pitch_pos", "right_ankle_pitch_pos",
+                       "right_shoulder_pitch_pos", "right_shoulder_roll_pos", "right_shoulder_yaw_pos",
+                       "right_elbow_pitch_pos"
+  ]
+  vel_actuator_names: ["left_hip_yaw_vel", "left_hip_roll_vel", "left_hip_pitch_vel",
+                       "left_knee_pitch_vel", "left_ankle_pitch_vel",
+                       "left_shoulder_pitch_vel", "left_shoulder_roll_vel", "left_shoulder_yaw_vel",
+                       "left_elbow_pitch_vel",
+                       "right_hip_yaw_vel", "right_hip_roll_vel", "right_hip_pitch_vel",
+                       "right_knee_pitch_vel", "right_ankle_pitch_vel",
+                       "right_shoulder_pitch_vel", "right_shoulder_roll_vel", "right_shoulder_yaw_vel",
+                       "right_elbow_pitch_vel"
+  ]
+  torque_actuator_names: ["left_hip_yaw_tor", "left_hip_roll_tor", "left_hip_pitch_tor",
+                          "left_knee_pitch_tor", "left_ankle_pitch_tor",
+                          "left_shoulder_pitch_tor", "left_shoulder_roll_tor", "left_shoulder_yaw_tor",
+                          "left_elbow_pitch_tor",
+                          "right_hip_yaw_tor", "right_hip_roll_tor", "right_hip_pitch_tor",
+                          "right_knee_pitch_tor", "right_ankle_pitch_tor",
+                          "right_shoulder_pitch_tor", "right_shoulder_roll_tor", "right_shoulder_yaw_tor",
+                          "right_elbow_pitch_tor"
+  ]
+  actuator_idxs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]          # Indexes into the trajectory configuration vector
   sample_type: "Position"

@@ -6,18 +6,41 @@
 #include <iostream>
 #include <unordered_set>
 
-// TODO: Do I want to use these?
-#include "absl/log/absl_log.h"
-#include "absl/log/absl_check.h"
-#include "absl/log/initialize.h"
-
 #include "simulation_dispatcher.h"
 
 
 
 namespace torc::sample {
     void InputSamples::InsertSample(int sample_node, const vectorx_t& actuator_sample) {
-        samples.row(sample_node) = actuator_sample;
+        samples.row(sample_node) = actuator_sample.transpose();
+    }
+
+    double InputSamples::GetSplineInterp(double time, int idx) const {
+        // Determine which nodes to use as control points
+        double node_time = 0;
+        int upper_dt_idx = -1;
+        for (int i = 0; i < dt.size(); i++) {
+            if (time >= node_time && time < node_time + dt[i]) {
+                upper_dt_idx = i;
+                break;
+            }
+            node_time += dt[i];
+        }
+
+        if (upper_dt_idx == -1) {
+            std::cerr << "Time: " << time << std::endl;
+            std::cerr << "[Sample] Trajectory interpolation not at a valid time!" << std::endl;
+            throw std::runtime_error("[Sample] Trajectory interpolation not at a valid time!");
+        }
+
+        // Interpolate between them - linear
+        double tau = (time - node_time)/(dt[upper_dt_idx]);
+
+        if (upper_dt_idx == 0) {
+            return tau*samples(upper_dt_idx, idx);
+        } else {
+            return samples(upper_dt_idx - 1, idx)*(1-tau) + tau*samples(upper_dt_idx, idx);
+        }
     }
 
     // TODO: How to deal with errors without throwing?
@@ -34,19 +57,40 @@ namespace torc::sample {
 
     void SimulationDispatcher::SingleSimulation(const InputSamples &samples, const mpc::Trajectory &traj_ref, mpc::Trajectory& traj_out, mpc::ContactSchedule& cs_out) {
         VerifyTrajectory(traj_ref);
+
+        if (samples.idx_to_actuator.size() != samples.samples.cols()) {
+            std::cerr << "actuator to idx map size: " << samples.idx_to_actuator.size() << std::endl;
+            std::cerr << "sample cols: " << samples.samples.cols() << std::endl;
+            throw std::runtime_error("[Simulation Dispatcher] Number of named actuators does not match the number of actuator samples!");
+        }
+
+
         Simulate(samples, traj_ref, traj_out, cs_out, 0);
     }
 
     void SimulationDispatcher::BatchSimulation(const std::vector<InputSamples> &samples, const mpc::Trajectory& traj_ref,
-        std::vector<mpc::Trajectory> &trajectories, std::vector<mpc::ContactSchedule>& contact_schedules) {
+        std::vector<mpc::Trajectory>& trajectories, std::vector<mpc::ContactSchedule>& contact_schedules) {
         VerifyTrajectory(traj_ref);
 
         if (samples.size() != trajectories.size() || samples.size() != contact_schedules.size()) {
             throw std::invalid_argument("[Simulation Dispatcher] Sample, trajectory, and contact schedule sizes don't match!");
         }
 
+        for (const auto& sample : samples) {
+            if (sample.idx_to_actuator.size() != sample.samples.cols()) {
+                std::cerr << "number of actuators: " << sample.idx_to_actuator.size() << std::endl;
+                std::cerr << "sample cols: " << sample.samples.cols() << std::endl;
+                throw std::runtime_error("[Simulation Dispatcher] Number of named actuators does not match the number of actuator samples!");
+            }
+        }
+
+        if (traj_ref.GetNumNodes() <= 0) {
+            throw std::runtime_error("[Simulation Dispatcher] Provided trajectory must have a positive number of nodes!");
+        }
+
+        // TODO: Fix it so errors being thrown in the other threads are still visible
         BS::multi_future<void> loop_future = pool.submit_loop<size_t>(0, samples.size(),
-            [this, samples, &trajectories, &contact_schedules, &traj_ref](size_t i) {
+            [this, &samples, &trajectories, &contact_schedules, &traj_ref](size_t i) {
             this->Simulate(samples[i], traj_ref, trajectories[i], contact_schedules[i], i);
         });
 
@@ -59,29 +103,34 @@ namespace torc::sample {
 
 
     void SimulationDispatcher::Simulate(const InputSamples &samples, const mpc::Trajectory &traj_ref, mpc::Trajectory& traj_out, mpc::ContactSchedule& cs_out, int robot_num) {
-        // ABSL_LOG(INFO) << "Simulating...";
+
+        // TODO:
+        //  - Move samples to a spline interpolation (non zero)
+        //  - Calculate derivative based on the spline interpolation
+        //  - Project sampled values into reasonable bounds (maybe)
+        //  - Make sure the initial condition stays constant (i.e. is not modified by the sampling and sim)
+
         double total_time = 0;
         for (const auto& delta : samples.dt) {
             total_time += delta;
         }
 
-        total_time = std::max(total_time, traj_ref.GetTotalTime());
-
-        if (traj_ref.GetNumNodes() <= 0) {
-            throw std::runtime_error("[Simulation Dispatcher] Provided trajectory must have a positive number of nodes!");
-        }
-
-        if (samples.actuator_to_idx.size() != samples.samples.cols()) {
-            throw std::runtime_error("[Simulation Dispatcher] Number of named actuators does not match the number of actuator samples!");
-        }
+        total_time = std::min(total_time, traj_ref.GetTotalTime());
 
         // Setup the output trajectory
         if (traj_out.GetNumNodes() != traj_ref.GetNumNodes()) {
             traj_out.SetNumNodes(traj_ref.GetNumNodes());
         }
         traj_out.SetDtVector(traj_ref.GetDtVec());
+        // Assign initial condition
+        traj_out.SetConfiguration(0, traj_ref.GetConfiguration(0));
+        traj_out.SetVelocity(0, traj_ref.GetVelocity(0));
+        traj_out.SetTau(0, traj_ref.GetTau(0));
+        for (const auto& frame : traj_ref.GetContactFrames()) {
+            traj_out.SetForce(0, frame, traj_ref.GetForce(0, frame));
+        }
 
-        // Setup the contact schedule
+        // Set up the contact schedule
         cs_out.SetFrames(traj_ref.GetContactFrames());
         cs_out.Reset();
 
@@ -91,7 +140,6 @@ namespace torc::sample {
         std::vector<double> contact_start_times(traj_ref.GetContactFrames().size());
         std::fill(contact_start_times.begin(), contact_start_times.end(), -1);
 
-        // TODO: Potentially remove this as it might be causing slow downs
         std::map<std::string, vector3_t> f_avg;
         vectorx_t q_total = vectorx_t::Zero(model_->nq);
         vectorx_t v_total = vectorx_t::Zero(model_->nv);
@@ -99,26 +147,36 @@ namespace torc::sample {
         for (const auto& frame : traj_ref.GetContactFrames()) {
             f_avg[frame] = vector3_t::Zero();
         }
-        int current_node = 0;
+        int current_node = 1;
         int num_time_steps = 0;
 
         // Simulate
         while (data_[robot_num]->time < total_time) {
-            int sample_node = GetNode(samples.dt, data_[robot_num]->time);
-            if (sample_node == -1) {
-                std::cerr << "Sample node limit hit early. Breaking." << std::endl;
-                break;
-            }
-
             int traj_node = GetNode(traj_ref.GetDtVec(), data_[robot_num]->time);
             if (traj_node == -1) {
                 std::cerr << "Trajectory node limit hit early. Breaking." << std::endl;
                 break;
             }
 
-            if (traj_node != current_node) {
+            if (traj_node != current_node && traj_node > 0) {
+                if (current_node == 0 ) {
+                    std::cerr << "CURRENT NODE = 0" << std::endl;
+                }
+                // TODO: Deal with quaternion convention!
                 traj_out.SetConfiguration(current_node, q_total/num_time_steps);
-                traj_out.SetVelocity(current_node, v_total/num_time_steps);
+
+//                std::cerr << "-------- Current node: " << current_node << std::endl;
+//                std::cerr << "traj ref node 0: " << traj_ref.GetConfiguration(0).transpose() << std::endl;
+//                std::cerr << "q total: " << q_total.transpose()/num_time_steps << std::endl;
+//                std::cerr << "num time steps: " << num_time_steps << std::endl;
+
+                // Rotate into the local frame
+                matrix3_t R = static_cast<torc::mpc::quat_t>((q_total/num_time_steps).segment<4>(3)).toRotationMatrix();
+                vectorx_t v = v_total/num_time_steps;
+                v.head<3>() = R*v.head<3>();
+                v.segment<3>(3) = R*v.segment<3>(3);
+
+                traj_out.SetVelocity(current_node, v);
                 traj_out.SetTau(current_node, tau_total/num_time_steps);
                 for (const auto& frame : traj_ref.GetContactFrames()) {
                     traj_out.SetForce(current_node, frame, f_avg[frame]/num_time_steps);
@@ -130,7 +188,6 @@ namespace torc::sample {
                 q_total.setZero();
                 v_total.setZero();
                 tau_total.setZero();
-
             }
 
             // Check and update contact status
@@ -159,27 +216,48 @@ namespace torc::sample {
             }
 
             int sample_col = 0;
-            for (const auto& [actuator, idx] : samples.actuator_to_idx) {
-                int actuator_id = mj_name2id(model_, mjOBJ_ACTUATOR, actuator.c_str());
-                if (actuator_id != -1) {
-                    data_[robot_num]->ctrl[actuator_id] = samples.samples(sample_node, sample_col);
-                    if (samples.type == Position) {
-                        // TODO: Add velocity targets for position too
-                        data_[robot_num]->ctrl[actuator_id] += traj_ref.GetConfiguration(traj_node)(idx);
-                    } else if (samples.type == Torque) {
-                        data_[robot_num]->ctrl[actuator_id] += traj_ref.GetTau(traj_node)(idx);
+
+            if (samples.type == Position) {
+                // Sample positions, finite difference velocities
+                for (const auto& [idx, names] : samples.idx_to_actuator) {
+                    int pos_actuator_id = mj_name2id(model_, mjOBJ_ACTUATOR, names[0].c_str());
+                    int vel_actuator_id = mj_name2id(model_, mjOBJ_ACTUATOR, names[1].c_str());
+
+                    if (pos_actuator_id != -1) {
+                        double curr_targ_pos = samples.GetSplineInterp(data_[robot_num]->time, sample_col) +
+                                traj_ref.GetConfiguration(traj_node)(idx);
+
+                        // Always assume that at the next instant we are on the same traj node, not exactly true, but a good approx.
+                        constexpr double FD_DELTA = 1e-8;
+                        double next_targ_pos = samples.GetSplineInterp(data_[robot_num]->time, sample_col) +
+                                traj_ref.GetConfiguration(traj_node)(idx); // + FD_DELTA
+
+                        data_[robot_num]->ctrl[pos_actuator_id] = curr_targ_pos;
+                        data_[robot_num]->ctrl[vel_actuator_id] = (next_targ_pos - curr_targ_pos)/FD_DELTA;
+                    } else {
+                        throw std::runtime_error("[Simulation Dispatcher] Provided actuator is not a valid Mujoco actuator.");
                     }
-                } else {
-                    throw std::runtime_error("[Simulation Dispatcher] Provided actuator is not a valid Mujoco actuator.");
+                    sample_col++;
                 }
-                sample_col++;
+            } else if (samples.type == Torque) {
+                // Sample torques
+                for (const auto& [idx, names] : samples.idx_to_actuator) {
+                    int actuator_id = mj_name2id(model_, mjOBJ_ACTUATOR, names[2].c_str());
+                    if (actuator_id != -1) {
+                        data_[robot_num]->ctrl[actuator_id] = samples.GetSplineInterp(data_[robot_num]->time, sample_col) + traj_ref.GetTau(traj_node)(idx);
+                    } else {
+                        throw std::runtime_error("[Simulation Dispatcher] Provided actuator is not a valid Mujoco actuator.");
+                    }
+                    sample_col++;
+                }
             }
 
             mj_step(model_, data_[robot_num]);
-            num_time_steps++;
 
             // Here we only add to the average
-            if (traj_node == current_node) {
+            if (traj_node == current_node && traj_node > 0) {
+                num_time_steps++;
+
                 Eigen::Map<Eigen::VectorXd> mj_vec_q(data_[robot_num]->qpos, model_->nq);
                 q_total += mj_vec_q;
 
@@ -201,16 +279,40 @@ namespace torc::sample {
             }
 
         }
+
+        // Assign to last node
+        traj_out.SetConfiguration(current_node, q_total/num_time_steps);
+
+        // TODO: Rotate the velocities into the local frame!
+        traj_out.SetVelocity(current_node, v_total/num_time_steps);
+        traj_out.SetTau(current_node, tau_total/num_time_steps);
+        for (const auto& frame : traj_ref.GetContactFrames()) {
+            traj_out.SetForce(current_node, frame, f_avg[frame]/num_time_steps);
+            f_avg[frame].setZero();
+        }
+
+        if (traj_out.GetConfiguration(0) != traj_ref.GetConfiguration(0) || traj_out.GetVelocity(0) != traj_ref.GetVelocity(0)) {
+            std::cerr << "Trajectory IC modified!" << std::endl;
+        }
+
     }
 
     void SimulationDispatcher::ResetData(mjData *data, const mpc::Trajectory& traj) const {
         data->time = 0;
+        // TODO: Deal with quaternion convention!
+        vectorx_t q =  traj.GetConfiguration(0);
         for (int i = 0; i < model_->nq; i++) {
-            data->qpos[i] = traj.GetConfiguration(0)[i];
+            data->qpos[i] = q(i);
         }
 
+        // Rotate into the world frame
+        matrix3_t R = static_cast<torc::mpc::quat_t>(q.segment<4>(3)).inverse().toRotationMatrix();
+        vectorx_t v = traj.GetVelocity(0);
+        v.head<3>() = R*v.head<3>();
+        v.segment<3>(3) = R*v.segment<3>(3);
+
         for (int i = 0; i < model_->nv; i++) {
-            data->qvel[i] = traj.GetVelocity(0)[i];
+            data->qvel[i] = v(i);
         }
 
         // For now, set the acceleration to 0

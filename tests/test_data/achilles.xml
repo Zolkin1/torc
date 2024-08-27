@@ -15,16 +15,17 @@
 
   <!-- Fix simulation options -->
   <!-- Note: Using RK4 causes weird simulation instability when also using the PD controller. Suggesting implicfast.  -->
-  <option timestep="0.002" integrator = "implicitfast"/>
+  <!-- TODO: How fine of a time step can I get? -->
+  <option timestep="0.001" integrator = "implicitfast"/>
 
   <!-- Specify the light settings -->
   <visual>
-      <headlight diffuse="0.5 0.5 0.5" ambient="0.3 0.3 0.3" specular="0 0 0"/>
-      <rgba haze="0.15 0.25 0.35 1"/>
-      <global elevation="-35"/>
+    <headlight diffuse="0.5 0.5 0.5" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global elevation="-35"/>
   </visual>
 
-  <default> 
+  <default>
     <!-- <equality solimp="0.9 0.95 0.001 0.4 2" solref="0.02 1"/> -->
 
     <!-- Note that position and velocity defaults don't work together! -->
@@ -32,22 +33,23 @@
     <!-- Hip Pitch Settings -->
     <default class="hip_pitch">
       <default class="hip_pitch_pos">
-        <position kp="50" ctrllimited="true" ctrlrange="-35 35"/>
+        <position kp="680" ctrllimited="true" ctrlrange="-35 35"/>
       </default>
       <default class="hip_pitch_vel">
-        <velocity kv="10" ctrllimited="true" ctrlrange="-35 35"/>
+        <velocity kv="70" ctrllimited="true" ctrlrange="-35 35"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-35 35"/>
+      <!-- TODO: The right joint in the URDF had the wrong joint limit, it had a max of 1.5, which is right? -->
       <joint axis="0 1 0" pos="0 0 0" range="-1.5 0.5" damping="0.1" frictionloss="0.3"/> <!-- limited="true"-->
     </default>
 
     <!-- Hip Yaw Settings  -->
     <default class="hip_yaw">
       <default class="hip_yaw_pos">
-        <position kp="25" ctrllimited="true" ctrlrange="-35 35"/>
+        <position kp="580" ctrllimited="true" ctrlrange="-35 35"/>
       </default>
       <default class="hip_yaw_vel">
-        <velocity kv="8" ctrllimited="true" ctrlrange="-35 35"/>
+        <velocity kv="30" ctrllimited="true" ctrlrange="-35 35"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-35 35"/>
       <joint axis="0 0 1" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3"/>
@@ -56,10 +58,10 @@
     <!-- Hip Roll Settings  -->
     <default class="hip_roll">
       <default class="hip_roll_pos">
-        <position kp="25" ctrllimited="true" ctrlrange="-70  70"/>
+        <position kp="680" ctrllimited="true" ctrlrange="-70  70"/>
       </default>
       <default class="hip_roll_vel">
-        <velocity kv="8" ctrllimited="true" ctrlrange="-70  70"/>
+        <velocity kv="70" ctrllimited="true" ctrlrange="-70  70"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-70  70"/>
       <joint axis="1 0 0" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3"/>
@@ -68,10 +70,12 @@
     <!-- Knee Pitch Settings  -->
     <default class="knee_pitch">
       <default class="knee_pitch_pos">
-        <position kp="50" ctrllimited="true" ctrlrange="-70  70"/>
+        <!-- TODO: Bring this gain back down -->
+        <!-- 120, 35 -->
+        <position kp="370" ctrllimited="true" ctrlrange="-70  70"/>
       </default>
       <default class="knee_pitch_vel">
-        <velocity kv="10" ctrllimited="true" ctrlrange="-70  70"/>
+        <velocity kv="40" ctrllimited="true" ctrlrange="-70  70"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-70  70"/>
       <joint axis="0 1 0" pos="0 0 0" range="0 2.0" damping="0.1" frictionloss="0.3"/>
@@ -80,10 +84,12 @@
     <!-- Ankle Pitch Settings  -->
     <default class="ankle_pitch">
       <default class="ankle_pitch_pos">
-        <position kp="50" ctrllimited="true" ctrlrange="-35 35"/>
+        <position kp="75" kv="2.0" ctrllimited="true" ctrlrange="-35 35" forcelimited="true" forcerange="-35 35"/>
       </default>
       <default class="ankle_pitch_vel">
-        <velocity kv="10" ctrllimited="true" ctrlrange="-35 35"/>
+        <!-- NOTE: The kv here causes weird issues with the contact dynamcis -->
+        <!-- TODO: Be careful with this! -->
+        <velocity kv="3.0" forcelimited="true" forcerange="0 5"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-35 35"/>
       <joint axis="0 1 0" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3"/>
@@ -92,10 +98,10 @@
     <!-- Shoulder Pitch Settings  -->
     <default class="shoulder_pitch">
       <default class="shoulder_pitch_pos">
-        <position kp="25" ctrllimited="true" ctrlrange="-35 35"/>
+        <position kp="100" ctrllimited="true" ctrlrange="-35 35"/>
       </default>
       <default class="shoulder_pitch_vel">
-        <velocity kv="8" ctrllimited="true" ctrlrange="-35 35"/>
+        <velocity kv="20" ctrllimited="true" ctrlrange="-35 35"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-35 35"/>
       <joint axis="0 1 0" pos="0 0 0" range="-1.58 1.58" damping="0.1" frictionloss="0.3"/>
@@ -104,10 +110,10 @@
     <!-- Shoulder Roll Settings  -->
     <default class="shoulder_roll">
       <default class="shoulder_roll_pos">
-        <position kp="25" ctrllimited="true" ctrlrange="-12  12"/>
+        <position kp="150" ctrllimited="true" ctrlrange="-12  12"/>
       </default>
       <default class="shoulder_roll_vel">
-        <velocity kv="8" ctrllimited="true" ctrlrange="-12  12"/>
+        <velocity kv="20" ctrllimited="true" ctrlrange="-12  12"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-12  12"/>
       <joint axis="1 0 0" pos="0 0 0" range="0 3.14" damping="0.1" frictionloss="0.3"/>
@@ -116,10 +122,10 @@
     <!-- Shoulder Yaw Settings  -->
     <default class="shoulder_yaw">
       <default class="shoulder_yaw_pos">
-        <position kp="25" ctrllimited="true" ctrlrange="-12  12"/>
+        <position kp="150" ctrllimited="true" ctrlrange="-12  12"/>
       </default>
       <default class="shoulder_yaw_vel">
-        <velocity kv="8" ctrllimited="true" ctrlrange="-12  12"/>
+        <velocity kv="20" ctrllimited="true" ctrlrange="-12  12"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-12  12"/>
       <joint axis="0 0 1" pos="0 0 0" range="-1.58 1.58" damping="0.1" frictionloss="0.3"/>
@@ -128,10 +134,10 @@
     <!-- Elbow Pitch Settings  -->
     <default class="elbow_pitch">
       <default class="elbow_pitch_pos">
-        <position kp="25" ctrllimited="true" ctrlrange="-24  24"/>
+        <position kp="150" ctrllimited="true" ctrlrange="-24  24"/>
       </default>
       <default class="elbow_pitch_vel">
-        <velocity kv="8" ctrllimited="true" ctrlrange="-24  24"/>
+        <velocity kv="20" ctrllimited="true" ctrlrange="-24  24"/>
       </default>
       <motor ctrllimited="true" ctrlrange="-24  24"/>
       <joint axis="0 1 0" pos="0 0 0" range="-1.58 0" damping="0.1" frictionloss="0.3"/>
@@ -183,175 +189,175 @@
     <mesh file="ankle_pitch.STL" name="ankle_pitch"/>
   </asset>
 
-   <worldbody>
-      <!-- Light -->
-      <!-- <light pos="0 0 1.5" dir="0 0 -1" directional="true"/> -->
-      <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".7 .7 .7" specular="0.3 0.3 0.3" pos="1.5 -6 4" cutoff="30"/>
+  <worldbody>
+    <!-- Light -->
+    <!-- <light pos="0 0 1.5" dir="0 0 -1" directional="true"/> -->
+    <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".7 .7 .7" specular="0.3 0.3 0.3" pos="1.5 -6 4" cutoff="30"/>
 
-      <!-- Ground -->
-      <geom material="plane" name="plane" rgba=".9 .9 .9 1" size="100 100 0.1" type="plane" euler="0 0 0"/>
+    <!-- Ground -->
+    <geom material="plane" name="plane" rgba=".9 .9 .9 1" size="100 100 0.1" type="plane" euler="0 0 0"/>
 
-      <!-- Achilles -->
-      <body name="torso" pos="0 0 1.002">
-        <!-- ixx iyy izz ixy ixz iyz-->
-        <inertial mass="8.300000" fullinertia=" 0.172676 0.102985 0.087971 0.000000 0.000000 0.000000" pos="0 0 -0.107903" />
-        <geom name="torso_mesh" mesh="torso" type="mesh" class="visual"/>
-        <geom name="torso_collision_box" density="0" group="2" class="collision" mesh="torso" type="mesh"/>
-        <site name="torso_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
-        <site name="torso_mocap_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
-        <freejoint name="root"/>
+    <!-- Achilles -->
+    <body name="torso" pos="0 0 1.002">
+      <!-- ixx iyy izz ixy ixz iyz-->
+      <inertial mass="8.300000" fullinertia=" 0.172676 0.102985 0.087971 0.000000 0.000000 0.000000" pos="0 0 -0.107903" />
+      <geom name="torso_mesh" mesh="torso" type="mesh" class="visual"/>
+      <geom name="torso_collision_box" density="0" group="2" class="collision" mesh="torso" type="mesh"/>
+      <site name="torso_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
+      <site name="torso_mocap_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
+      <!-- TODO: Put back -->
+      <freejoint name="root"/>
 
-        <body name="left_hip_yaw" pos="0 0.090 -0.334">
-          <inertial mass="1.0" fullinertia="0.001907 0.002034 0.001175 -0.000030 0.000635 -0.000056" pos="-0.066483 -0.001451 -0.062589" />
-          <joint name="left_hip_yaw_joint" class="hip_yaw"/>
-          <geom mesh="left_hip_yaw" type="mesh" class="visual"/>
+      <body name="left_hip_yaw" pos="0 0.090 -0.334">
+        <inertial mass="1.0" fullinertia="0.001907 0.002034 0.001175 -0.000030 0.000635 -0.000056" pos="-0.066483 -0.001451 -0.062589" />
+        <joint name="left_hip_yaw_joint" class="hip_yaw"/>
+        <geom mesh="left_hip_yaw" type="mesh" class="visual"/>
 
-            <body name="left_hip_roll" pos="-0.055 0 -0.083">
-                <inertial mass="0.843444" fullinertia="0.000867 0.001086 0.001082 0 0 0" pos="0.0465 0.055 0.000784" />
-                <joint  name="left_hip_roll_joint" class="hip_roll"/>
-                <geom mesh="left_hip_roll" type="mesh" class="visual"/>
+        <body name="left_hip_roll" pos="-0.055 0 -0.083">
+          <inertial mass="0.843444" fullinertia="0.000867 0.001086 0.001082 0 0 0" pos="0.0465 0.055 0.000784" />
+          <joint  name="left_hip_roll_joint" class="hip_roll"/>
+          <geom mesh="left_hip_roll" type="mesh" class="visual"/>
 
-                <body name="left_hip_pitch" pos="0.055 0.0395 0">
-                    <inertial mass="2.42" fullinertia="0.0206 0.0173 0.00594 0 0 0" pos="0.0139 -0.0336 -0.076" />
-                    <joint name="left_hip_pitch_joint" class="hip_pitch" />
-                    <geom mesh="left_hip_pitch" type="mesh" class="visual"/>
-                    <geom name="left_hip_collition" mesh="left_hip_pitch" type="mesh" density="0" group="2" class="collision"/>
+          <body name="left_hip_pitch" pos="0.055 0.0395 0">
+            <inertial mass="2.42" fullinertia="0.0206 0.0173 0.00594 0 0 0" pos="0.0139 -0.0336 -0.076" />
+            <joint name="left_hip_pitch_joint" class="hip_pitch" />
+            <geom mesh="left_hip_pitch" type="mesh" class="visual"/>
+            <geom name="left_hip_collition" mesh="left_hip_pitch" type="mesh" density="0" group="2" class="collision"/>
 
-                    <body name="left_knee_pitch" pos="0 -0.0395 -0.275">
-                      <!-- Correct inertia from CAD Model -->
-                      <!-- <inertial mass="0.510" fullinertia="0.0666 0.006613 0.000187 0 0 0" pos="0.001 0.003 -0.131" /> -->
+            <body name="left_knee_pitch" pos="0 -0.0395 -0.275">
+              <!-- Correct inertia from CAD Model -->
+              <!-- <inertial mass="0.510" fullinertia="0.0666 0.006613 0.000187 0 0 0" pos="0.001 0.003 -0.131" /> -->
 
-                      <!-- Adjusted inertia to avoid sim artifacts -->
-                      <inertial mass="0.556" fullinertia="0.00666 0.006613 0.001 0 0 0" pos="0.001 0.003 -0.131" />
+              <!-- Adjusted inertia to avoid sim artifacts -->
+              <inertial mass="0.556" fullinertia="0.00666 0.006613 0.001 0 0 0" pos="0.001 0.003 -0.131" />
 
 
-                      <joint name="left_knee_pitch_joint" class="knee_pitch" />
-                      <geom mesh="left_knee_pitch" type="mesh" class="visual"/>
-                      <geom name="left_knee_collision" mesh="left_knee_pitch" type="mesh" density="0" group="2" class="collision"/>
+              <joint name="left_knee_pitch_joint" class="knee_pitch" />
+              <geom mesh="left_knee_pitch" type="mesh" class="visual"/>
+              <geom name="left_knee_collision" mesh="left_knee_pitch" type="mesh" density="0" group="2" class="collision"/>
 
-                      <body name="left_ankle_pitch" pos="0 0 -0.275">
-                        <!-- Correct inertia from CAD Model -->
-                        <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" />
+              <body name="left_ankle_pitch" pos="0 0 -0.275">
+                <!-- Correct inertia from CAD Model -->
+                <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" />
 
-                        <!-- Adjusted inertia to avoid sim artifacts -->
-                        <!-- <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" /> -->
+                <!-- Adjusted inertia to avoid sim artifacts -->
+                <!-- <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" /> -->
 
-                        <joint name="left_ankle_pitch_joint" class="ankle_pitch"/>
-                        <geom name="left_foot" mesh="ankle_pitch" type="mesh" class="visual"/>
+                <joint name="left_ankle_pitch_joint" class="ankle_pitch"/>
+                <geom name="left_foot" mesh="ankle_pitch" type="mesh" class="visual"/>
 
-                        <geom name="foot_front_left" pos="0.088 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision" group="2"/>
-                        <geom name="foot_rear_left" pos="-0.02 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision" group="2"/>
+                <geom name="foot_front_left" pos="0.088 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision" group="2"/>
+                <geom name="foot_rear_left" pos="-0.02 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision" group="2"/>
 
-                        <site name="left_foot_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
-                      </body>
-                    </body>
-                </body>
-            </body>
-        </body>
-
-        <body name="left_shoulder_pitch" pos="0 0.159 0">
-          <inertial mass="0.796" fullinertia="0.000943 0.00056 0.000675 0 0 0" pos="0 0.05 0" />
-          <joint name="left_shoulder_pitch_joint" class="shoulder_pitch"/>
-          <geom mesh="left_shoulder_pitch" type="mesh" class="visual"/>
-
-          <body name="left_shoulder_roll" pos="0 0.063 0">
-            <inertial mass="0.484" fullinertia="0.000498 0.000458 0.000384 0 0 0" pos="0 0 -0.0708" />
-            <joint name="left_shoulder_roll_joint" class="shoulder_roll"/>
-            <geom mesh="left_shoulder_roll" type="mesh" class="visual"/>
-
-            <body name="left_shoulder_yaw" pos="0 0 -0.0986">
-              <inertial mass="0.5847" fullinertia="0.0007 0.000796 0.000348 0 0 0" pos="0 0 -0.059" />
-              <joint name="left_shoulder_yaw_joint" class="shoulder_yaw"/>
-              <geom mesh="left_shoulder_yaw" type="mesh" class="visual"/>
-              <geom name="left_shoulder_collision" type="mesh" mesh="left_shoulder_yaw" class="collision" group="2"/>
-
-              <body name="left_elbow_pitch" pos="0 0 -0.133">
-                <inertial mass="0.297" fullinertia="0.0018 0.0018 0.0001 0 0 0" pos="0 0 -0.1284" />
-                <joint name="left_elbow_pitch_joint" class="elbow_pitch"/>
-                <geom mesh="left_elbow_pitch" type="mesh" class="visual"/>
-                <geom name="left_hand_collision" type="sphere" size="0.03" pos="0 0 -0.192" class="collision" group="2"/>
+                <site name="left_foot_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
               </body>
             </body>
           </body>
         </body>
-
-        <body name="right_hip_yaw" pos="0 -0.090 -0.334">
-          <inertial mass="1.0" fullinertia="0.001907 0.002034 0.001175 0.000030 0.000635 0.000056" pos="-0.066483 0.001451 -0.062589" />
-          <joint name="right_hip_yaw_joint" class="hip_yaw"/>
-          <geom mesh="right_hip_yaw" type="mesh" class="visual"/>
-
-            <body name="right_hip_roll" pos="-0.055 0 -0.083">
-                <inertial mass="0.843444" fullinertia="0.000867 0.001086 0.001082 0 0 0" pos="0.0465 -0.055 0.000784" />
-                <joint name="right_hip_roll_joint" class="hip_roll"/>
-                <geom mesh="right_hip_roll" type="mesh" class="visual"/>
-
-                <body name="right_hip_pitch" pos="0.055 -0.0395 0">
-                    <inertial mass="2.42" fullinertia="0.0206 0.0173 0.00594 0 0 0" pos="0.0139 0.0336 -0.076" />
-                    <joint name="right_hip_pitch_joint" class="hip_pitch"/>
-                    <geom mesh="right_hip_pitch" type="mesh" class="visual"/>
-                    <geom name="right_hip_collition" mesh="right_hip_pitch" type="mesh" density="0" group="2" class="collision"/>
-
-                    <body name="right_knee_pitch" pos="0 0.0395 -0.275">
-                      <!-- Correct inertia from CAD Model -->
-                      <!-- <inertial mass="0.510" fullinertia="0.0666 0.006613 0.000187 0 0 0" pos="0.001 -0.003 -0.131" /> -->
-
-                      <!-- Adjusted inertia to avoid sim artifacts -->
-                      <inertial mass="0.556" fullinertia="0.00666 0.006613 0.001 0 0 0" pos="0.001 -0.003 -0.131" />
-
-                      <joint name="right_knee_pitch_joint" class="knee_pitch" />
-                      <geom mesh="right_knee_pitch" type="mesh" class="visual"/>
-                      <geom name="right_knee_collision" mesh="right_knee_pitch" type="mesh" density="0" group="2" class="collision"/>
-
-
-                      <body name="right_ankle_pitch" pos="0 0 -0.275">
-                        <!-- Correct inertia from CAD Model -->
-                        <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" />
-
-                        <!-- Adjusted inertia to avoid sim artifacts -->
-                        <!-- <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" /> -->
-
-                        <joint name="right_ankle_pitch_joint" class="ankle_pitch" />
-                        <geom name="right_foot" mesh="ankle_pitch" type="mesh" class="visual"/>
-
-                        <geom name="foot_front_right" pos="0.088 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision"/>
-                        <geom name="foot_rear_right" pos="-0.02 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision"/>
-
-                        <site name="right_foot_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
-                      </body>
-                    </body>
-                </body>
-            </body>
-        </body>
-
-        <body name="right_shoulder_pitch" pos="0 -0.159 0">
-          <inertial mass="0.796" fullinertia="0.000943 0.00056 0.000675 0 0 0" pos="0 -0.05 0" />
-          <joint name="right_shoulder_pitch_joint" class="shoulder_pitch" />
-          <geom mesh="right_shoulder_pitch" type="mesh" class="visual"/>
-
-          <body name="right_shoulder_roll" pos="0 -0.063 0">
-            <inertial mass="0.484" fullinertia="0.000498 0.000458 0.000384 0 0 0" pos="0 0 -0.0708" />
-            <joint name="right_shoulder_roll_joint" class="shoulder_roll"/>
-            <geom mesh="right_shoulder_roll" type="mesh" class="visual"/>
-
-            <body name="right_shoulder_yaw" pos="0 0 -0.0986">
-              <inertial mass="0.5847" fullinertia="0.0007 0.000796 0.000348 0 0 0" pos="0 0 -0.059" />
-              <joint name="right_shoulder_yaw_joint" class="shoulder_yaw"/>
-              <geom mesh="right_shoulder_yaw" type="mesh" class="visual"/>
-              <geom name="right_shoulder_collision" type="mesh" mesh="right_shoulder_yaw" class="collision" group="2"/>
-
-              <body name="right_elbow_pitch" pos="0 0 -0.133">
-                <inertial mass="0.297" fullinertia="0.0018 0.0018 0.0001 0 0 0" pos="0 0 -0.1284" />
-                <joint name="right_elbow_pitch_joint" class="elbow_pitch"/>
-                <geom mesh="right_elbow_pitch" type="mesh" class="visual"/>
-                <geom name="right_hand_collision" type="sphere" size="0.03" pos="0 0 -0.192" class="collision" group="2"/>
-              </body>
-            </body>
-          </body>
-        </body>
-
       </body>
 
-   </worldbody>
+      <body name="left_shoulder_pitch" pos="0 0.159 0">
+        <inertial mass="0.796" fullinertia="0.000943 0.00056 0.000675 0 0 0" pos="0 0.05 0" />
+        <joint name="left_shoulder_pitch_joint" class="shoulder_pitch"/>
+        <geom mesh="left_shoulder_pitch" type="mesh" class="visual"/>
+
+        <body name="left_shoulder_roll" pos="0 0.063 0">
+          <inertial mass="0.484" fullinertia="0.000498 0.000458 0.000384 0 0 0" pos="0 0 -0.0708" />
+          <joint name="left_shoulder_roll_joint" class="shoulder_roll"/>
+          <geom mesh="left_shoulder_roll" type="mesh" class="visual"/>
+
+          <body name="left_shoulder_yaw" pos="0 0 -0.0986">
+            <inertial mass="0.5847" fullinertia="0.0007 0.000796 0.000348 0 0 0" pos="0 0 -0.059" />
+            <joint name="left_shoulder_yaw_joint" class="shoulder_yaw"/>
+            <geom mesh="left_shoulder_yaw" type="mesh" class="visual"/>
+            <geom name="left_shoulder_collision" type="mesh" mesh="left_shoulder_yaw" class="collision" group="2"/>
+
+            <body name="left_elbow_pitch" pos="0 0 -0.133">
+              <inertial mass="0.297" fullinertia="0.0018 0.0018 0.0001 0 0 0" pos="0 0 -0.1284" />
+              <joint name="left_elbow_pitch_joint" class="elbow_pitch"/>
+              <geom mesh="left_elbow_pitch" type="mesh" class="visual"/>
+              <geom name="left_hand_collision" type="sphere" size="0.03" pos="0 0 -0.192" class="collision" group="2"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <body name="right_hip_yaw" pos="0 -0.090 -0.334">
+        <inertial mass="1.0" fullinertia="0.001907 0.002034 0.001175 0.000030 0.000635 0.000056" pos="-0.066483 0.001451 -0.062589" />
+        <joint name="right_hip_yaw_joint" class="hip_yaw"/>
+        <geom mesh="right_hip_yaw" type="mesh" class="visual"/>
+
+        <body name="right_hip_roll" pos="-0.055 0 -0.083">
+          <inertial mass="0.843444" fullinertia="0.000867 0.001086 0.001082 0 0 0" pos="0.0465 -0.055 0.000784" />
+          <joint name="right_hip_roll_joint" class="hip_roll"/>
+          <geom mesh="right_hip_roll" type="mesh" class="visual"/>
+
+          <body name="right_hip_pitch" pos="0.055 -0.0395 0">
+            <inertial mass="2.42" fullinertia="0.0206 0.0173 0.00594 0 0 0" pos="0.0139 0.0336 -0.076" />
+            <joint name="right_hip_pitch_joint" class="hip_pitch"/>
+            <geom mesh="right_hip_pitch" type="mesh" class="visual"/>
+            <geom name="right_hip_collition" mesh="right_hip_pitch" type="mesh" density="0" group="2" class="collision"/>
+
+            <body name="right_knee_pitch" pos="0 0.0395 -0.275">
+              <!-- Correct inertia from CAD Model -->
+              <!-- <inertial mass="0.510" fullinertia="0.0666 0.006613 0.000187 0 0 0" pos="0.001 -0.003 -0.131" /> -->
+
+              <!-- Adjusted inertia to avoid sim artifacts -->
+              <inertial mass="0.556" fullinertia="0.00666 0.006613 0.001 0 0 0" pos="0.001 -0.003 -0.131" />
+
+              <joint name="right_knee_pitch_joint" class="knee_pitch" />
+              <geom mesh="right_knee_pitch" type="mesh" class="visual"/>
+              <geom name="right_knee_collision" mesh="right_knee_pitch" type="mesh" density="0" group="2" class="collision"/>
+
+
+              <body name="right_ankle_pitch" pos="0 0 -0.275">
+                <!-- Correct inertia from CAD Model -->
+                <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" />
+
+                <!-- Adjusted inertia to avoid sim artifacts -->
+                <!-- <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" /> -->
+
+                <joint name="right_ankle_pitch_joint" class="ankle_pitch" />
+                <geom name="right_foot" mesh="ankle_pitch" type="mesh" class="visual"/>
+
+                <geom name="foot_front_right" pos="0.088 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision"/>
+                <geom name="foot_rear_right" pos="-0.02 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision"/>
+
+                <site name="right_foot_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <body name="right_shoulder_pitch" pos="0 -0.159 0">
+        <inertial mass="0.796" fullinertia="0.000943 0.00056 0.000675 0 0 0" pos="0 -0.05 0" />
+        <joint name="right_shoulder_pitch_joint" class="shoulder_pitch" />
+        <geom mesh="right_shoulder_pitch" type="mesh" class="visual"/>
+
+        <body name="right_shoulder_roll" pos="0 -0.063 0">
+          <inertial mass="0.484" fullinertia="0.000498 0.000458 0.000384 0 0 0" pos="0 0 -0.0708" />
+          <joint name="right_shoulder_roll_joint" class="shoulder_roll"/>
+          <geom mesh="right_shoulder_roll" type="mesh" class="visual"/>
+
+          <body name="right_shoulder_yaw" pos="0 0 -0.0986">
+            <inertial mass="0.5847" fullinertia="0.0007 0.000796 0.000348 0 0 0" pos="0 0 -0.059" />
+            <joint name="right_shoulder_yaw_joint" class="shoulder_yaw"/>
+            <geom mesh="right_shoulder_yaw" type="mesh" class="visual"/>
+            <geom name="right_shoulder_collision" type="mesh" mesh="right_shoulder_yaw" class="collision" group="2"/>
+
+            <body name="right_elbow_pitch" pos="0 0 -0.133">
+              <inertial mass="0.297" fullinertia="0.0018 0.0018 0.0001 0 0 0" pos="0 0 -0.1284" />
+              <joint name="right_elbow_pitch_joint" class="elbow_pitch"/>
+              <geom mesh="right_elbow_pitch" type="mesh" class="visual"/>
+              <geom name="right_hand_collision" type="sphere" size="0.03" pos="0 0 -0.192" class="collision" group="2"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+    </body>
+  </worldbody>
 
   <actuator>
     <!-- Position Control -->
@@ -375,7 +381,7 @@
     <position name="right_shoulder_yaw_pos"  joint="right_shoulder_yaw_joint" class="shoulder_yaw_pos" />
     <position name="right_elbow_pitch_pos"  joint="right_elbow_pitch_joint" class="elbow_pitch_pos" />
 
-  <!-- Velocity Control -->
+    <!-- Velocity Control -->
     <velocity name="left_hip_yaw_vel"  joint="left_hip_yaw_joint" class="hip_yaw_vel" />
     <velocity name="left_hip_roll_vel"  joint="left_hip_roll_joint" class="hip_roll_vel" />
     <velocity name="left_hip_pitch_vel"  joint="left_hip_pitch_joint" class="hip_pitch_vel" />
@@ -427,10 +433,10 @@
     <pair name="torso_to_plane" geom1="torso_collision_box" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
 
     <!-- Contacts using sphere approximations -->
-    <pair name="foot_front_left_to_plane" geom1="foot_front_left" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
-    <pair name="foot_rear_left_to_plane" geom1="foot_rear_left" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
-    <pair name="foot_front_right_to_plane" geom1="foot_front_right" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
-    <pair name="foot_rear_right_to_plane" geom1="foot_rear_right" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
+    <pair name="foot_front_left_to_plane" geom1="foot_front_left" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
+    <pair name="foot_rear_left_to_plane" geom1="foot_rear_left" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
+    <pair name="foot_front_right_to_plane" geom1="foot_front_right" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
+    <pair name="foot_rear_right_to_plane" geom1="foot_rear_right" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
   </contact>
 
   <sensor>
@@ -501,41 +507,37 @@
 
   <!-- Keyframes -->
   <keyframe>
-      <!-- qpos:
-      x y z
-      qw qx qy qz
-      l_hip_yaw l_hip_roll l_hip_pitch
-      l_knee_pitch l_ankle_pitch
-      l_shoulder_pitch l_shoulder_roll l_shoulder_yaw
-      l_elbow_pitch
-      r_hip_yaw r_hip_roll r_hip_pitch
-      r_knee_pitch r_ankle_pitch
-      r_shoulder_pitch r_shoulder_roll r_shoulder_yaw
-      r_elbow_pitch -->
+    <!-- qpos:
+    x y z
+    qw qx qy qz
+    l_hip_yaw l_hip_roll l_hip_pitch
+    l_knee_pitch l_ankle_pitch
+    l_shoulder_pitch l_shoulder_roll l_shoulder_yaw
+    l_elbow_pitch
+    r_hip_yaw r_hip_roll r_hip_pitch
+    r_knee_pitch r_ankle_pitch
+    r_shoulder_pitch r_shoulder_roll r_shoulder_yaw
+    r_elbow_pitch -->
     <key name="ic"
-      qpos="
-      0 0 0.97
+         qpos="
+      0 0 0.975
       0 0 0 0
       0 0 -0.26
-      0.65 -0.43 
+      0.65 -0.43
       0 0 0
       0
       0 0 -0.26
       0.65 -0.43
       0 0 0
       0"
-      
-      ctrl="
-      0 0 -0.39
-      0.65 -0.33 
+
+         ctrl="
+      0 0 -0.26
+      0.65 -0.43
       0 0 0
       0
-      0 0 -0.39
-      0.65 -0.33
-      0 0 0
-      0
-      0 0 0
-      0 0 
+      0 0 -0.26
+      0.65 -0.43
       0 0 0
       0
       0 0 0
@@ -543,7 +545,11 @@
       0 0 0
       0
       0 0 0
-      0 0 
+      0 0
+      0 0 0
+      0
+      0 0 0
+      0 0
       0 0 0
       0
       0 0 0
@@ -551,4 +557,42 @@
       0 0 0
       0"/>
   </keyframe>
+  <!-- For a fixed base debugging version -->
+  <!-- <key name="ic"
+  qpos="
+  0 0 -0.26
+  0.65 -0.43
+  0 0 0
+  0
+  0 0 -0.26
+  0.65 -0.43
+  0 0 0
+  0"
+
+  ctrl="
+  0 0 -0.39
+  0.65 -0.33
+  0 0 0
+  0
+  0 0 -0.39
+  0.65 -0.33
+  0 0 0
+  0
+  0 0 0
+  0 0
+  0 0 0
+  0
+  0 0 0
+  0 0
+  0 0 0
+  0
+  0 0 0
+  0 0
+  0 0 0
+  0
+  0 0 0
+  0 0
+  0 0 0
+  0"/>
+</keyframe> -->
 </mujoco>

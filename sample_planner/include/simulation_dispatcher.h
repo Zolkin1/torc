@@ -34,9 +34,12 @@ namespace torc::sample {
         std::vector<double> dt; // dt associated with the samples - can be different from the reference trajectory
         matrixx_t samples;      // sample node x actuator
         SampleType type;        // Type of sample
-        std::map<std::string, int> actuator_to_idx; // TODO: Do this better: Maps the actuator name into the trajectory vectors
+
+        std::vector<std::pair<int, std::array<std::string, 3>>> idx_to_actuator;    // Holds the index into the trajectory and the names of the actuators (pos, vel, torque)
 
         void InsertSample(int sample_node, const vectorx_t& actuator_sample);
+
+        double GetSplineInterp(double time, int idx) const;   // Linear for now
     };
 
     class SimulationDispatcher {

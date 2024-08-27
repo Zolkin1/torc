@@ -1605,7 +1605,7 @@ namespace torc::mpc {
         const vectorx_t tau_zero = vectorx_t::Zero(robot_model_->GetNumInputs());
         const vector3_t force_zero = vector3_t::Zero();
 
-        for (int node = 0; node < nodes_; node++) {
+        for (int node = 0; node < traj.GetNumNodes(); node++) {
             double scale = (scale_cost_ ? dt_[node] : 1);
 
             double cost_node = 0;
@@ -1623,14 +1623,13 @@ namespace torc::mpc {
                     cost_node += scale * cost_.GetTermCost(
                             tau_zero,
                             traj.GetTau(node), targets.tau_targets.at(data.constraint_name)[node], data.constraint_name);
-                } else if (data.type == CostTypes::ForceReg) {
-                    int force_idx = GetDecisionIdx(node, GroundForce);
-                    for (const auto& frame: contact_frames_) {
-                        cost_node += scale * cost_.GetTermCost(force_zero, traj.GetForce(node, frame),
-                                                               targets.force_targets.at(data.constraint_name).at(frame)[node],
-                                                               data.constraint_name);
-                        force_idx += CONTACT_3DOF;
-                    }
+//                } else if (data.type == CostTypes::ForceReg) {
+//                    for (const auto& frame: contact_frames_) {
+                        // TODO: Put back when we have forces from the mujoco sim
+//                        cost_node += scale * cost_.GetTermCost(force_zero, traj.GetForce(node, frame),
+//                                                               targets.force_targets.at(data.constraint_name).at(frame)[node],
+//                                                               data.constraint_name);
+//                    }
                 } else if (data.type == CostTypes::ForwardKinematics) {
                     cost_node += scale * cost_.GetTermCost(
                             q_zero,
@@ -1689,6 +1688,8 @@ namespace torc::mpc {
                 }
             }
         }
+
+        targets.cost_data = cost_data_;
 
         return targets;
     }
