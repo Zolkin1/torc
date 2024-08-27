@@ -7,8 +7,8 @@
 
 namespace torc::sample {
     CrossEntropy::CrossEntropy(const std::filesystem::path& xml_path, int num_samples,
-        const std::filesystem::path& config_path, std::shared_ptr<torc::mpc::FullOrderMpc> mpc)
-        : dispatcher_(xml_path, num_samples), num_samples_(num_samples), mpc_(mpc),
+        const std::filesystem::path& config_path, std::shared_ptr<torc::mpc::FullOrderMpc> mpc, unsigned int num_threads)
+        : dispatcher_(xml_path, num_samples, num_threads), num_samples_(num_samples), mpc_(mpc),
         cost_avg_(0) {
         // Read in the configs
         YAML::Node config;
@@ -248,11 +248,12 @@ namespace torc::sample {
     }
 
     void CrossEntropy::GetActuatorSamples(vectorx_t& actuator_sample) {
+        std::normal_distribution<double> normal_distr(0.0, std::sqrt(sample_variance_));
         actuator_sample.resize(idx_to_actuator_.size());
         // *** Note *** if I multithread this function then each thread will need a bit_gen bc its not thread safe!
         for (int i = 0; i < idx_to_actuator_.size(); i++) {
             // Get a normally distrubted value (taken with mean 0 since it will be applied about the reference trajectory)
-            actuator_sample(i) = absl::Gaussian(bit_gen_, 0.0, std::sqrt(sample_variance_));
+            actuator_sample(i) = normal_distr(generator_);
         }
     }
 

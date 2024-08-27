@@ -25,7 +25,7 @@ namespace torc::sample {
         // Take weighted average
         // Re-simulate average to get the final contact schedule
         CrossEntropy(const std::filesystem::path& xml_path, int num_samples, const std::filesystem::path& config_path,
-                     std::shared_ptr<torc::mpc::FullOrderMpc> mpc);
+                     std::shared_ptr<torc::mpc::FullOrderMpc> mpc, unsigned int num_threads = std::thread::hardware_concurrency());
 
         /**
          * @brief uses CEM to plan a trajectory about a reference trajectory
@@ -65,7 +65,7 @@ namespace torc::sample {
         mpc::Trajectory sum_traj_;
 
         // Random library
-        absl::BitGen bit_gen_;
+        std::default_random_engine generator_;
 
         // Cost function
         std::shared_ptr<torc::mpc::FullOrderMpc> mpc_;

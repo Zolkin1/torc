@@ -16,7 +16,7 @@
   <!-- Fix simulation options -->
   <!-- Note: Using RK4 causes weird simulation instability when also using the PD controller. Suggesting implicfast.  -->
   <!-- TODO: How fine of a time step can I get? -->
-  <option timestep="0.001" integrator = "implicitfast"/>
+  <option timestep="0.004" integrator = "implicitfast"/>
 
   <!-- Specify the light settings -->
   <visual>

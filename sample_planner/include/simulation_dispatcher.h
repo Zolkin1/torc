@@ -60,6 +60,11 @@ namespace torc::sample {
          * @return the list of actuated joint names as used in all the torque vectors
          */
         std::vector<std::string> GetJointOrder() const;
+
+        static vectorx_t ChangeQuaternionConventionFromMujoco(const vectorx_t& config);
+        static vectorx_t ChangeQuaternionConventionToMujoco(const vectorx_t& config);
+
+        ~SimulationDispatcher();
     protected:
         void CreateMJModelData(const std::string& xml_path, int num_samples);
 

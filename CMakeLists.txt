@@ -44,8 +44,13 @@ add_subdirectory(sample_planner)
 add_subdirectory(utils)
 
 
+#  TODO: Remove these
 add_executable(mpc_app_test mpc_app_tests.cpp)
 target_link_libraries(mpc_app_test Mpc)
+
+add_executable(sample_app_test sample_app_tests.cpp)
+target_link_libraries(sample_app_test SamplePlanner)
+
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library
 # TODO: Make all the targets torc:: namespaced

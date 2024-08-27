@@ -78,6 +78,19 @@ namespace torc::sample {
             BatchSimulation(samples_vec, traj_ref, trajectories, contact_schedules);
         }
 
+        void CheckQuaternionConversions() {
+            torc::mpc::vectorx_t q_nom(7), q_mujoco(7);
+            q_nom << 1, 2, 3, 4, 5, 6, 7;
+            q_mujoco << 1, 2, 3, 7, 4, 5, 6;
+
+            vectorx_t q_out = ChangeQuaternionConventionToMujoco(q_nom);
+            CHECK(q_out == q_mujoco);
+
+            vectorx_t q_out2 = ChangeQuaternionConventionFromMujoco(q_out);
+            CHECK(q_out2 == q_nom);
+
+        }
+
         void BenchmarkSims(const torc::mpc::Trajectory& traj_ref) {
             mpc::Trajectory traj_out;
             traj_out.UpdateSizes(traj_ref.GetConfiguration(0).size(),

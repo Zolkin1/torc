@@ -141,7 +141,7 @@ namespace torc::sample {
         std::fill(contact_start_times.begin(), contact_start_times.end(), -1);
 
         std::map<std::string, vector3_t> f_avg;
-        vectorx_t q_total = vectorx_t::Zero(model_->nq);
+        vectorx_t q_total = vectorx_t::Zero(model_->nq);        // Mujoco quaternion ordering
         vectorx_t v_total = vectorx_t::Zero(model_->nv);
         vectorx_t tau_total = vectorx_t::Zero(act_joint_id_.size());
         for (const auto& frame : traj_ref.GetContactFrames()) {
@@ -162,8 +162,10 @@ namespace torc::sample {
                 if (current_node == 0 ) {
                     std::cerr << "CURRENT NODE = 0" << std::endl;
                 }
-                // TODO: Deal with quaternion convention!
-                traj_out.SetConfiguration(current_node, q_total/num_time_steps);
+                // Change quaternion convention coming out of Mujoco
+                vectorx_t q = ChangeQuaternionConventionFromMujoco(q_total / num_time_steps);
+                traj_out.SetConfiguration(current_node, q);
+
 
 //                std::cerr << "-------- Current node: " << current_node << std::endl;
 //                std::cerr << "traj ref node 0: " << traj_ref.GetConfiguration(0).transpose() << std::endl;
@@ -171,7 +173,7 @@ namespace torc::sample {
 //                std::cerr << "num time steps: " << num_time_steps << std::endl;
 
                 // Rotate into the local frame
-                matrix3_t R = static_cast<torc::mpc::quat_t>((q_total/num_time_steps).segment<4>(3)).toRotationMatrix();
+                matrix3_t R = static_cast<torc::mpc::quat_t>((q).segment<4>(3)).toRotationMatrix();
                 vectorx_t v = v_total/num_time_steps;
                 v.head<3>() = R*v.head<3>();
                 v.segment<3>(3) = R*v.segment<3>(3);
@@ -281,10 +283,17 @@ namespace torc::sample {
         }
 
         // Assign to last node
-        traj_out.SetConfiguration(current_node, q_total/num_time_steps);
+        // Change quaternion convention coming out of Mujoco
+        vectorx_t q = ChangeQuaternionConventionFromMujoco(q_total / num_time_steps);
+        traj_out.SetConfiguration(current_node, q);
 
-        // TODO: Rotate the velocities into the local frame!
-        traj_out.SetVelocity(current_node, v_total/num_time_steps);
+        // Rotate into the local frame
+        matrix3_t R = static_cast<torc::mpc::quat_t>((q).segment<4>(3)).toRotationMatrix();
+        vectorx_t v = v_total/num_time_steps;
+        v.head<3>() = R*v.head<3>();
+        v.segment<3>(3) = R*v.segment<3>(3);
+        traj_out.SetVelocity(current_node, v);
+
         traj_out.SetTau(current_node, tau_total/num_time_steps);
         for (const auto& frame : traj_ref.GetContactFrames()) {
             traj_out.SetForce(current_node, frame, f_avg[frame]/num_time_steps);
@@ -299,14 +308,14 @@ namespace torc::sample {
 
     void SimulationDispatcher::ResetData(mjData *data, const mpc::Trajectory& traj) const {
         data->time = 0;
-        // TODO: Deal with quaternion convention!
-        vectorx_t q =  traj.GetConfiguration(0);
+
+        vectorx_t q = ChangeQuaternionConventionToMujoco(traj.GetConfiguration(0));
         for (int i = 0; i < model_->nq; i++) {
             data->qpos[i] = q(i);
         }
 
         // Rotate into the world frame
-        matrix3_t R = static_cast<torc::mpc::quat_t>(q.segment<4>(3)).inverse().toRotationMatrix();
+        matrix3_t R = static_cast<torc::mpc::quat_t>(traj.GetConfiguration(0).segment<4>(3)).inverse().toRotationMatrix();
         vectorx_t v = traj.GetVelocity(0);
         v.head<3>() = R*v.head<3>();
         v.segment<3>(3) = R*v.segment<3>(3);
@@ -378,7 +387,27 @@ namespace torc::sample {
         }
     }
 
+    vectorx_t SimulationDispatcher::ChangeQuaternionConventionFromMujoco(const vectorx_t& config) {
+        vectorx_t q = config;
+        double w = q(3);
+        q(3) = q(4);
+        q(4) = q(5);
+        q(5) = q(6);
+        q(6) = w;
 
+        return q;
+    }
+
+    vectorx_t SimulationDispatcher::ChangeQuaternionConventionToMujoco(const torc::sample::vectorx_t& config) {
+        vectorx_t q = config;
+        double w = q(6);
+        q(6) = q(5);
+        q(5) = q(4);
+        q(4) = q(3);
+        q(3) = w;
+
+        return q;
+    }
 
     void SimulationDispatcher::CreateMJModelData(const std::string &xml_path, int num_samples) {
         // load the mujoco model
@@ -411,6 +440,17 @@ namespace torc::sample {
 
         // Convert the set to a vector
         act_joint_id_ = std::vector<int>(joint_ids.begin(), joint_ids.end());
+    }
+
+    // Destructor
+    SimulationDispatcher::~SimulationDispatcher() {
+        // free MuJoCo model and data
+        for (auto& data : data_) {
+            if (data) {
+                mj_deleteData(data);
+            }
+        }
+        mj_deleteModel(model_);
     }
 
 

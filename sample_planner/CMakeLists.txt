@@ -30,21 +30,6 @@ endif ()
 
 target_link_libraries(SamplePlanner PRIVATE yaml-cpp::yaml-cpp)
 
-# ----------- ABSL -----------
-if (NOT TARGET absl::log OR NOT TARGET absl::random_random)
-    message(STATUS "SamplePlanner: `absl` targets not found. Attempting to fetch contents...")
-    FetchContent_Declare(
-            abseil-cpp
-            GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-            GIT_TAG        origin/master
-    )
-    FetchContent_MakeAvailable(abseil-cpp)
-else()
-    message(STATUS "SamplePlanner: `absl` targets found.")
-endif()
-
-target_link_libraries(SamplePlanner PRIVATE absl::log absl::log_initialize absl::random_random)
-
 # ------- Mujoco ------- #
 if (NOT TARGET mujoco-lib)
     include(FetchContent)
