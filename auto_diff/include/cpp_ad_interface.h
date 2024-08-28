@@ -65,6 +65,8 @@ namespace torc::ad {
         [[nodiscard]] int GetDomainSize() const;
         [[nodiscard]] int GetParameterSize() const;
 
+        static sparsity_pattern_t GetSparsityPatternCols(const sparsity_pattern_t& sparsity, int start_col, int last_col);
+
     protected:
         void CreateModel();
 

@@ -777,93 +777,46 @@ namespace torc::mpc {
 
         int row_start = GetConstraintRow(node, Integrator);
 
-        // Account for the velocity being in the local frame
-        robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
-        const matrix3_t R = robot_model_->GetFrameState(base_frame_).placement.rotation();
-        // std::cout << "R: \n" << R << std::endl;
 
-        // TODO: Add in linearization of R wrt q.
+        const vectorx_t x_zero = vectorx_t::Zero(integration_constraint_->GetDomainSize());
+        vectorx_t p(integration_constraint_->GetParameterSize());
+        p << dt_[node], traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node), traj_.GetVelocity(node + 1);
 
-        // q^b_k identity
+        matrixx_t jac;
+        integration_constraint_->GetJacobian(x_zero, p, jac);
+
+        const auto full_sparsity = integration_constraint_->GetJacobianSparsityPatternSet();
+        const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
+        const auto dqkp1_sparisty = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
+        const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 2*vel_dim_, vel_dim_);
+        const auto dvkp1_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 3*vel_dim_, vel_dim_);
+
+
+        // dqk
         int col_start = GetDecisionIdx(node, Configuration);
-        DiagonalScalarMatrixToTriplet(1, row_start, col_start, POS_VARS, constraint_triplets_, constraint_triplet_idx_);
+        MatrixToTripletWithSparsitySet(jac.middleCols(0, vel_dim_), row_start, col_start,
+            constraint_triplets_, constraint_triplet_idx_, dqk_sparsity);
 
-        // q^q_k linearization
-        row_start += POS_VARS;
-        col_start += POS_VARS;
-        matrix3_t dxi = QuatIntegrationLinearizationXi(node);
-        MatrixToTriplet(dxi, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
-
-        // q^j_k identity
-        row_start += 3;
-        col_start += 3;
-        DiagonalScalarMatrixToTriplet(1, row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);   // TODO Should probably be num joints not inputs
-
-        // q_k+1 negative identity
-        row_start = GetConstraintRow(node, Integrator);
+        // dqkp1
         col_start = GetDecisionIdx(node + 1, Configuration);
-        DiagonalScalarMatrixToTriplet(-1, row_start, col_start, robot_model_->GetVelDim(), constraint_triplets_, constraint_triplet_idx_);
+        MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
+            constraint_triplets_, constraint_triplet_idx_, dqkp1_sparisty);
 
-        // v^b_k dt*identity
-        row_start = GetConstraintRow(node, Integrator);
+        // dvk
         col_start = GetDecisionIdx(node, Velocity);
-        // For now, using the same R as for the first node
-        MatrixToTriplet(dt_[node]*R/2.0, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
-        // DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, POS_VARS, constraint_triplets_, constraint_triplet_idx_);
+        MatrixToTripletWithSparsitySet(jac.middleCols(2*vel_dim_, vel_dim_), row_start, col_start,
+            constraint_triplets_, constraint_triplet_idx_, dvk_sparsity);
 
-        // v^q_k linearization
-        row_start += POS_VARS;
-        col_start += POS_VARS;
-        matrix3_t dv = QuatIntegrationLinearizationW(node);
-        MatrixToTriplet(dv, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+        // dvkp1
+        col_start = GetDecisionIdx(node + 1, Velocity);
+        MatrixToTripletWithSparsitySet(jac.middleCols(3*vel_dim_, vel_dim_), row_start, col_start,
+            constraint_triplets_, constraint_triplet_idx_, dvkp1_sparsity);
 
-        // v^j_k dt*identity
-        row_start += 3;
-        col_start += 3;
-        DiagonalScalarMatrixToTriplet(dt_[node]/2.0, row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);   // TODO Should probably be num joints not inputs
-
-        // Now do the velocity at the next node in the same way
-        // v^b_k+1 dt*identity
-        row_start = GetConstraintRow(node, Integrator);
-        col_start = GetDecisionIdx(node+1, Velocity);
-        MatrixToTriplet(dt_[node]*R/2.0, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
-        // DiagonalScalarMatrixToTriplet(dt_[node], row_start, col_start, POS_VARS, constraint_triplets_, constraint_triplet_idx_);
-
-        // v^q_k+1 linearization
-        row_start += POS_VARS;
-        col_start += POS_VARS;
-        MatrixToTriplet(dv, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
-
-        // v^j_k+1 dt*identity
-        row_start += 3;
-        col_start += 3;
-        DiagonalScalarMatrixToTriplet(dt_[node]/2.0, row_start, col_start, robot_model_->GetNumInputs(), constraint_triplets_, constraint_triplet_idx_);   // TODO Should probably be num joints not inputs
-
-
-        // Base position bounds
-        row_start = GetConstraintRow(node, Integrator);
-
-        const vector3_t pos_constant = traj_.GetConfiguration(node + 1).head<POS_VARS>()
-            - traj_.GetConfiguration(node).head<POS_VARS>() - dt_[node]*R*traj_.GetVelocity(node).head<POS_VARS>();
-        osqp_instance_.lower_bounds.segment<POS_VARS>(row_start) = pos_constant;
-        osqp_instance_.upper_bounds.segment<POS_VARS>(row_start) = pos_constant;
-        row_start += POS_VARS;
-
-        // TODO: Verify that the frames are ok here
-        // Base orientation bounds
-        osqp_instance_.lower_bounds.segment<3>(row_start).setZero();
-        osqp_instance_.upper_bounds.segment<3>(row_start).setZero();
-        row_start += 3;
-
-        // Joint bounds
-        osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs()) = // TODO Should probably be num joints not inputs
-             traj_.GetConfiguration(node+1).tail(robot_model_->GetNumInputs())
-            - traj_.GetConfiguration(node).tail(robot_model_->GetNumInputs())
-            - dt_[node]*traj_.GetVelocity(node).tail(robot_model_->GetNumInputs());
-        osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs()) =
-            osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs());
-
-        row_start = GetConstraintRow(node, Integrator);
+        // Lower and upper bounds
+        vectorx_t y;
+        integration_constraint_->GetFunctionValue(x_zero, p, y);
+        osqp_instance_.lower_bounds.segment(row_start, integration_constraint_->GetRangeSize()) = -y;
+        osqp_instance_.upper_bounds.segment(row_start, integration_constraint_->GetRangeSize()) = -y;
     }
 
     void FullOrderMpc::AddIDConstraint(int node, bool full_order) {
@@ -2009,25 +1962,27 @@ namespace torc::mpc {
 
         const int row_start = GetConstraintRow(node, Integrator);
 
-        // q_k identity, except the quaternion values which are blocks
+        const auto full_sparsity = integration_constraint_->GetJacobianSparsityPatternSet();
+        const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
+        const auto dqkp1_sparisty = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
+        const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 2*vel_dim_, vel_dim_);
+        const auto dvkp1_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 3*vel_dim_, vel_dim_);
+
+        // dqk pattern
         int col_start = GetDecisionIdx(node, Configuration);
-        ws_->int_mat.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-        ws_->int_mat.block<3,3>(POS_VARS, POS_VARS).setConstant(1);
-        MatrixToNewTriplet(ws_->int_mat, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(dqk_sparsity, row_start, col_start, constraint_triplets_);
 
-        // velocity identity except the quaternion values which are blocks and base velocity due to the rotation matrix
+        // dvk pattern
         col_start = GetDecisionIdx(node, Velocity);
-        ws_->int_mat.topLeftCorner<3,3>().setConstant(1);
-        MatrixToNewTriplet(ws_->int_mat, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(dvk_sparsity, row_start, col_start, constraint_triplets_);
 
-        // velocity at the next node contributes too by using the midpoint rule
+        // dvkp1
         col_start = GetDecisionIdx(node + 1, Velocity);
-        MatrixToNewTriplet(ws_->int_mat, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(dvkp1_sparsity, row_start, col_start, constraint_triplets_);
 
-        // q_k+1 negative identity
+        // q_kp1
         col_start = GetDecisionIdx(node + 1, Configuration);
-        ws_->int_mat.setIdentity();
-        MatrixToNewTriplet(ws_->int_mat, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(dqkp1_sparisty, row_start, col_start, constraint_triplets_);
 
     }
 
@@ -2441,7 +2396,7 @@ namespace torc::mpc {
     // ----- Getters for Sizes of Individual nodes ----- //
     // ------------------------------------------------- //
     int FullOrderMpc::NumIntegratorConstraintsNode() const {
-        return robot_model_->GetVelDim();
+        return config_dim_;
     }
 
     int FullOrderMpc::NumIDConstraintsNode() const {

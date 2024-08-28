@@ -185,6 +185,21 @@ namespace torc::ad {
         return p_size_;
     }
 
+    sparsity_pattern_t CppADInterface::GetSparsityPatternCols(const sparsity_pattern_t& sparsity, int start_col, int num_cols) {
+        sparsity_pattern_t sparsity_set;
+        sparsity_set.resize(sparsity.size());
+        for (int row = 0; row < sparsity.size(); row++) {
+            for (const auto& col : sparsity[row]) {
+                if (col >= start_col && col < start_col + num_cols) {
+                    sparsity_set[row].insert(col - start_col);
+                }
+            }
+        }
+
+        return sparsity_set;
+    }
+
+
     // ----- Library Path ----- //
     fs::path CppADInterface::GetLibPath() const {
         return lib_path_;

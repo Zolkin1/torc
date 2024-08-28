@@ -17,6 +17,10 @@ namespace torc::mpc {
         MpcTestClass(const fs::path& config_file, const fs::path& model_path, const std::string& name)
             : FullOrderMpc(name, config_file, model_path) {
             CHECK(dt_.size() == nodes_);
+
+            // TODO: Add checks for the sizes of all the constraints and the sizes returned in in the indexing functions,
+            //  or, just make them the same function (i.e. call the same function)
+            CHECK(0 == 1);
         }
 
         // TODO: Fix for ad derivative
