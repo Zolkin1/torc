@@ -22,7 +22,8 @@ if (BUILD_WITH_PINOCCHIO)
             "${MODELS_INC}/pinocchio_model.h"
             "${MODELS_INC}/full_order_rigid_body.h"
             "${MODELS_INC}/frame_state_types.h"
-            "${MODELS_INC}/single_rigid_body.h")
+            "${MODELS_INC}/single_rigid_body.h"
+            "${MODELS_INC}/pinocchio_interface.h")
 endif ()
 
 # -------  Create Library -------- #

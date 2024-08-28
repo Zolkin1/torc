@@ -49,7 +49,7 @@ namespace torc::mpc {
         CostTypes type;
         vectorx_t weight;
         std::string frame_name;
-        std::string constraint_name;
+        std::string constraint_name;        // TODO: Change to cost name!
     };
 
     class CostFunction {

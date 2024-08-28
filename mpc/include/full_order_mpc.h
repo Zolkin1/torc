@@ -14,6 +14,7 @@
 #include "trajectory.h"
 #include "cost_function.h"
 #include "contact_schedule.h"
+#include "cpp_ad_interface.h"
 
 // TODO: Add a aggregate statistics print out (i.e. averages and standard deviations)
 
@@ -186,6 +187,8 @@ namespace torc::mpc {
             vectorx_t obj_force_vector;
             std::vector<models::ExternalForce> f_ext;
         };
+    // -------- Constraints -------- //
+        void IntegrationConstraint(const ad::ad_vector_t& q_vk_vkp1, const ad::ad_vector_t& dt, ad::ad_vector_t& q_kp1) const;
 
     // -------- Constraint Creation -------- //
         void CreateConstraints();
@@ -336,11 +339,6 @@ namespace torc::mpc {
         // Cost
         CostFunction cost_;
 
-//        vectorx_t vel_tracking_weight_;
-//        vectorx_t config_tracking_weight_;
-//        vectorx_t torque_reg_weight_;
-//        vectorx_t force_reg_weight_;
-
         std::vector<CostData> cost_data_;
 
         double terminal_cost_weight_;
@@ -376,6 +374,9 @@ namespace torc::mpc {
 
         // Model
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;
+        int vel_dim_;
+        int config_dim_;
+        int input_dim_;
 
         // Warm start trajectory
         Trajectory traj_;
@@ -407,6 +408,12 @@ namespace torc::mpc {
         double max_grf_{};
         int nodes_{};
         int nodes_full_dynamics_;
+
+        // Constraint functions
+        std::unique_ptr<ad::CppADInterface> integration_constraint_;
+        std::unique_ptr<ad::CppADInterface> holonomic_constraint_;
+        std::unique_ptr<ad::CppADInterface> swing_height_constraint_;
+        std::unique_ptr<ad::CppADInterface> inverse_dynamics_constraint_;
 
         // Contact settings
         int num_contact_locations_{};

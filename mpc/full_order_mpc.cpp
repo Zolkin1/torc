@@ -31,6 +31,10 @@ namespace torc::mpc {
         }
         robot_model_ = std::make_unique<models::FullOrderRigidBody>("mpc_robot", model_path);
 
+        vel_dim_ = robot_model_->GetVelDim();
+        config_dim_ = robot_model_->GetConfigDim();
+        input_dim_ = robot_model_->GetNumInputs();
+
         // Verify the config file exists
         if (!fs::exists(config_file_)) {
             throw std::runtime_error("Configuration file does not exist!");
@@ -42,7 +46,15 @@ namespace torc::mpc {
                           robot_model_->GetNumInputs(), contact_frames_, nodes_);
         traj_.SetDtVector(dt_);
 
-        // CreateDefaultCost();
+        // ---------- Create the ad functions ---------- //
+        integration_constraint_ = std::make_unique<ad::CppADInterface>(
+            std::bind(&FullOrderMpc::IntegrationConstraint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+            name + "_integration_constraint",
+            deriv_lib_path_,
+            ad::DerivativeOrder::FirstOrder, 4*vel_dim_, 1 + 2*config_dim_,
+            compile_derivatves_
+        );
+
     }
 
     FullOrderMpc::~FullOrderMpc() {
@@ -450,6 +462,9 @@ namespace torc::mpc {
 //        std::cout << "Current traj config node 0: " << traj_.GetConfiguration(0).transpose() << std::endl;
 //        std::cout << "Current traj vel node 0: " << traj_.GetVelocity(0).transpose() << std::endl;
 
+        // Normalize quaternion to be safe
+        q_new.segment<QUAT_VARS>(POS_VARS).normalize();
+
         traj_.SetConfiguration(0, q_new);
         traj_.SetVelocity(0, v_new);
         utils::TORCTimer constraint_timer;
@@ -650,6 +665,25 @@ namespace torc::mpc {
 
         A_.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
     }
+
+    void FullOrderMpc::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar, ad::ad_vector_t& violation) const {
+        // From the reference trajectory
+        const ad::ad_vector_t& qkbar = dt_qkbar_qkp1bar.segment(1, config_dim_);
+        const ad::ad_vector_t& qkp1bar = dt_qkbar_qkp1bar.segment(1 + config_dim_, config_dim_);
+
+        // Get the current configuration
+        const ad::ad_vector_t qk = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dqk_dqkp1_vk_vkp1.head(vel_dim_));
+        const ad::ad_vector_t qkp1 = pinocchio::integrate(robot_model_->GetADPinModel(), qkp1bar, dqk_dqkp1_vk_vkp1.segment(vel_dim_, vel_dim_));
+
+        // Velocity
+        const ad::ad_vector_t& vk = dqk_dqkp1_vk_vkp1.segment(2*vel_dim_, vel_dim_);
+        const ad::ad_vector_t& vkp1 = dqk_dqkp1_vk_vkp1.tail(vel_dim_);
+
+        const ad::ad_vector_t v = dt_qkbar_qkp1bar(0)*0.5*(vk + vkp1);
+
+        violation = qkp1 - pinocchio::integrate(robot_model_->GetADPinModel(), qk, v);
+    }
+
 
     void FullOrderMpc::AddICConstraint() {
         // Set constraint matrix

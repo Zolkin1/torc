@@ -36,6 +36,15 @@ namespace torc::mpc {
                 traj_.SetConfiguration(1, q2_rand);
                 traj_.SetVelocity(1, v2_rand);
 
+                vectorx_t x(config_dim_ + 2*vel_dim_);
+                x << traj_.GetConfiguration(0), traj_.GetVelocity(0), traj_.GetVelocity(1);
+                vectorx_t p(1);
+                p(0) = dt_[0];
+                matrixx_t jac_analytic;
+                integration_constraint_->GetJacobian(x, p, jac_analytic);
+
+                matrix3_t dxi_ad = jac_analytic.block<3,3>(3, 3);
+
                 // xi
                 // Analytic
                 matrix3_t dxi = QuatIntegrationLinearizationXi(0);
@@ -56,7 +65,8 @@ namespace torc::mpc {
                 }
                 std::cout << "fd: " << fd << std::endl;
                 std::cout << "dxi: " << dxi << std::endl;
-                CHECK(fd.isApprox(dxi, sqrt(FD_DELTA)));
+                std::cout << "cpp ad: " << dxi_ad << std::endl;
+                CHECK(fd.isApprox(dxi_ad, sqrt(FD_DELTA)));
 
                 // w
                 // Analytic
