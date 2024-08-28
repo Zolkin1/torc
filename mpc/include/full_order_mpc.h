@@ -188,7 +188,9 @@ namespace torc::mpc {
             std::vector<models::ExternalForce> f_ext;
         };
     // -------- Constraints -------- //
-        void IntegrationConstraint(const ad::ad_vector_t& q_vk_vkp1, const ad::ad_vector_t& dt, ad::ad_vector_t& q_kp1) const;
+        void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1,
+            ad::ad_vector_t& violation) const;
+        void HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation);
 
     // -------- Constraint Creation -------- //
         void CreateConstraints();

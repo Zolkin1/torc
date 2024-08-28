@@ -50,6 +50,14 @@ namespace torc::ad {
 
     void CppADInterface::GetJacobian(const torc::ad::vectorx_t& x, const torc::ad::vectorx_t& p,
                                      torc::ad::matrixx_t& jacobian) const {
+         if (x.size() != x_size_) {
+            throw std::runtime_error("[CppADInterface] Invalid x size!");
+         }
+
+        if (p.size() != p_size_) {
+            throw std::runtime_error("[CppADInterface] Invalid p size!");
+        }
+
         vectorx_t xp_combined(x_size_ + p_size_);
         xp_combined << x, p;
         CppAD::cg::ArrayView<double> xp_array_view(xp_combined.data(), xp_combined.size());

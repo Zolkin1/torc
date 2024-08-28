@@ -51,7 +51,7 @@ namespace torc::mpc {
             std::bind(&FullOrderMpc::IntegrationConstraint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
             name + "_integration_constraint",
             deriv_lib_path_,
-            ad::DerivativeOrder::FirstOrder, 4*vel_dim_, 1 + 2*config_dim_,
+            ad::DerivativeOrder::FirstOrder, 4*vel_dim_, 1 + 2*config_dim_ + 2*vel_dim_,
             compile_derivatves_
         );
 
@@ -666,10 +666,11 @@ namespace torc::mpc {
         A_.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
     }
 
-    void FullOrderMpc::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar, ad::ad_vector_t& violation) const {
+    void FullOrderMpc::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation) const {
         // From the reference trajectory
-        const ad::ad_vector_t& qkbar = dt_qkbar_qkp1bar.segment(1, config_dim_);
-        const ad::ad_vector_t& qkp1bar = dt_qkbar_qkp1bar.segment(1 + config_dim_, config_dim_);
+        const ad::adcg_t& dt = dt_qkbar_qkp1bar_vk_vkp1(0);
+        const ad::ad_vector_t& qkbar = dt_qkbar_qkp1bar_vk_vkp1.segment(1, config_dim_);
+        const ad::ad_vector_t& qkp1bar = dt_qkbar_qkp1bar_vk_vkp1.segment(1 + config_dim_, config_dim_);
 
         // Get the current configuration
         const ad::ad_vector_t qk = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dqk_dqkp1_vk_vkp1.head(vel_dim_));
@@ -679,9 +680,16 @@ namespace torc::mpc {
         const ad::ad_vector_t& vk = dqk_dqkp1_vk_vkp1.segment(2*vel_dim_, vel_dim_);
         const ad::ad_vector_t& vkp1 = dqk_dqkp1_vk_vkp1.tail(vel_dim_);
 
-        const ad::ad_vector_t v = dt_qkbar_qkp1bar(0)*0.5*(vk + vkp1);
+        const ad::ad_vector_t v = dt*0.5*(vk + vkp1);
 
-        violation = qkp1 - pinocchio::integrate(robot_model_->GetADPinModel(), qk, v);
+        violation = pinocchio::integrate(robot_model_->GetADPinModel(), qk, v) - qkp1;
+    }
+
+    void FullOrderMpc::HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation) {
+        const ad::ad_vector_t& dq = dqk_dvk.head(vel_dim_);
+        const ad::ad_vector_t& dv = dqk_dvk.tail(vel_dim_);
+
+        const ad::ad_vector_t& qk =
     }
 
 
