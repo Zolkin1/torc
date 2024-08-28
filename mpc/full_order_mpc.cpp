@@ -751,9 +751,8 @@ namespace torc::mpc {
         ad::ad_vector_t frame_pos = robot_model_->GetADPinData()->oMf.at(frame_idx).translation();
 
         violation.resize(1);
-        violation(0) = frame_pos(0) - des_height;
+        violation(0) = frame_pos(2) - des_height;
     }
-
 
 
     void FullOrderMpc::AddICConstraint() {
@@ -1014,24 +1013,44 @@ namespace torc::mpc {
         // TODO: Consider adding a little feedback controller in the constraint to bring the foot back if it off the trajectory
         //  Could also choose to track velocity instead of position.
         for (const auto& frame : contact_frames_) {
-            SwingHeightLinearization(node, frame, ws_->frame_jacobian);
+            // Linearization
+            matrixx_t jac;
+            vectorx_t x_zero(swing_height_constraint_[frame]->GetDomainSize());
+            vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
+            p << traj_.GetConfiguration(node), swing_traj_[frame][node];
+            swing_height_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
-            // Grab just the z-height element
-            ws_->swing_vec = ws_->frame_jacobian.row(2);
+            const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
 
-            VectorToTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            // dqk
+            MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
 
-            // Get the frame position on the warm start trajectory
-            robot_model_->FirstOrderFK(traj_.GetConfiguration(node));   // TODO: Move to outside the loop
-            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
-
-            // Set bounds
-            osqp_instance_.lower_bounds(row_start)
-                = -frame_pos(2) + swing_traj_[frame][node];
-            osqp_instance_.upper_bounds(row_start)
-                = -frame_pos(2) + swing_traj_[frame][node];
+            // Lower and upper bounds
+            vectorx_t y;
+            swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y);
+            osqp_instance_.lower_bounds(row_start) = -y(0);
+            osqp_instance_.upper_bounds(row_start) = -y(0);
 
             row_start++;
+
+            // SwingHeightLinearization(node, frame, ws_->frame_jacobian);
+            //
+            // // Grab just the z-height element
+            // ws_->swing_vec = ws_->frame_jacobian.row(2);
+            //
+            // VectorToTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            //
+            // // Get the frame position on the warm start trajectory
+            // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));   // TODO: Move to outside the loop
+            // vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
+            //
+            // // Set bounds
+            // osqp_instance_.lower_bounds(row_start)
+            //     = -frame_pos(2) + swing_traj_[frame][node];
+            // osqp_instance_.upper_bounds(row_start)
+            //     = -frame_pos(2) + swing_traj_[frame][node];
+            //
+            // row_start++;
         }
     }
 
@@ -2122,8 +2141,14 @@ namespace torc::mpc {
 
         ws_->swing_vec.setConstant(robot_model_->GetVelDim(), 1);
 
-        for (int contact = 0; contact < num_contact_locations_; contact++) {
-            VectorToNewTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_);
+        for (const auto& frame : contact_frames_) {
+            const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
+
+            // dqk
+            AddSparsitySet(sparsity, row_start, col_start, constraint_triplets_);
+
+            // VectorToNewTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_);
+
             row_start++;
         }
     }
