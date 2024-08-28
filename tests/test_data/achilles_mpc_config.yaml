@@ -23,44 +23,41 @@ constraints:
   friction_coef: 0.5
   max_grf: 200
 costs:
-  using_config_tracking: True
-  using_velocity_tracking: True
-  using_torque_regularization: True
-  using_force_regularization: False
-
-#  configuration_tracking_weights: [1, 1, 1,
-#                                   0, 0, 0,
-#                                   1, 1, 1, 1, 1, 1, 1, 1, 1,
-#                                   1, 1, 1, 1, 1, 1, 1, 1, 1]
-#  configuration_tracking_weights: [ 1, 1, 10,
-#                                    0.0, 0.0, 0.0,
-#                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-#                                    0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 ]
-  configuration_tracking_weights: [ 1, 1, 10,
-                                    0.0, 0.0, 0.0,
-                                    0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                    0., 0., 0., 0., 0., 0., 0., 0., 0. ]
-#  velocity_tracking_weights: [10, 10, 10,
-#                              1, 1, 1,
-#                              .1, .1, .1, .1, .1, .1, .1, .1, .1,
-#                              .1, .1, .1, .1, .1, .1, .1, .1, .1]
-#  velocity_tracking_weights: [ 10, 10, 10,
-#                               1, 1, 1,
-#                               .01, .01, .01, .01, .01, .01, .01, .01, .01,
-#                               .01, .01, .01, .01, .01, .01, .01, .01, .01]
-  velocity_tracking_weights: [ 10, 10, 10,
-                               1, 1, 1,
-                               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001,
-                               0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001 ]
-#  velocity_tracking_weights: [ 1, 1, 1,
-#                               1, 1, 1,
-#                               0, 0, 0, 0, 0, 0, 0, 0, 0,
-#                               0, 0, 0, 0, 0, 0, 0, 0, 0 ]
-
-  torque_regularization_weights: [.01, .01, .01, .01, .01, .01, .01, .01, .01,
-                                  .01, .01, .01, .01, .01, .01, .01, .01, .01]
-#  torque_regularization_weights: [ 1, 1, 1, 1, 1, 1, 1, 1, 1,
-#                                   1, 1, 1, 1, 1, 1, 1, 1, 1 ]
+  - type: ConfigurationTracking
+    name: "ConfigTracking"
+    weight: [ 0.0, 0.0, 1,  # Having x and y weights appears to be bad
+              .01, .01, .01,
+              0.01, 1, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001,
+              0.01, 1, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001 ]
+  - type: VelocityTracking
+    name: "VelocityTracking"
+    weight: [5, 2, 5,
+             0.5, 0.5, 0.5,
+             1, 1, 0.05, .002, .05, 4, 4, 4, 1,
+             1, 1, 0.05, .002, .05, 4, 4, 4, 1]
+  - type: TorqueRegularization
+    name: "TorqueReg"
+    weight: [.000, .000, .000, .000, .001, .5, .5, .5, .1,
+             .000, .000, .000, .000, .001, .5, .5, .5, .1]
+  - type: ForceRegularization
+    name: "ForceReg"
+    weight: [0.0001, 0.0001, 0.01]
+  - type: ForwardKinematics
+    name: "LeftToe"
+    weight: [0.0001, 0.0001, 0.0]
+    frame: "foot_front_left"
+  - type: ForwardKinematics
+    name: "LeftHeel"
+    weight: [0.0001, 0.0001, 0.0 ]
+    frame: "foot_rear_left"
+  - type: ForwardKinematics
+    name: "RightToe"
+    weight: [0.0001, 0.0001, 0.0 ]
+    frame: "foot_front_right"
+  - type: ForwardKinematics
+    name: "RightHeel"
+    weight: [0.0001, 0.0001, 0.0 ]
+    frame: "foot_rear_right"
 contacts:
 # TODO: Verify that the ID works even when we have multiple forces on the same joint
 # TODO: Somehow the inverse dynamics floating base looks weird with these, it even looks sus just for the normal feet

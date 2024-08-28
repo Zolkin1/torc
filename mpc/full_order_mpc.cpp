@@ -424,6 +424,8 @@ namespace torc::mpc {
                 total_dt = delay_prediction_dt_;
             }
 
+            throw std::runtime_error("Delay prediction not implemented yet!");
+
 //            std::cout << "total_dt: " << total_dt << std::endl;
 
             // TODO: Put back!
@@ -586,15 +588,6 @@ namespace torc::mpc {
 
         traj_ = traj_out;
         total_solves_++;
-
-        // TODO: Remove
-//        double phi_k = GetConstraintViolation(vectorx_t::Zero(osqp_solver_.primal_solution().size()));
-//        if (std::abs(phi_k - constraint_ls) > 1e-5) {
-//            std::cerr << "--------- Trajectory conversion degraded constraint violation! --------- " << std::endl;
-//            std::cerr << "Line search violation: " << constraint_ls << std::endl;
-//            std::cerr << "New traj violation: " << phi_k << std::endl;
-//            throw std::runtime_error("Trajectory conversion degraded constraint violation!");
-//        }
 
         if (verbose_) {
              std::cout << "MPC compute took " << compute_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
@@ -1033,8 +1026,6 @@ namespace torc::mpc {
     double FullOrderMpc::GetConstraintViolation(const vectorx_t &qp_res) {
         // Uses l2 norm!
 
-        // TODO: Put back!
-
         double violation = 0;
         violation += GetICViolation(qp_res);
         for (int node = 0; node < nodes_; node++) {
@@ -1280,10 +1271,7 @@ namespace torc::mpc {
         for (int i = 0; i < 3; i++) {
             xi(i) += DELTA;
             vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-            for (int j = 0; j < 3; j++) {
-                update_fd(j, i) = (xi2_kp1(j) - xi1_kp1(j))/DELTA;
-            }
-
+            update_fd.col(i) = (xi2_kp1 - xi1_kp1)/DELTA;
             xi(i) -= DELTA;
         }
 
@@ -1501,7 +1489,6 @@ namespace torc::mpc {
 
                         force_idx += CONTACT_3DOF;
                     }
-
                 } else if (data.type == CostTypes::TorqueReg && node < nodes_full_dynamics_) {
                     int decision_idx = GetDecisionIdx(node, Torque);
                     vectorx_t tau_target = GetTorqueTarget(node);
@@ -1528,7 +1515,7 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetConfiguration(node), GetDesiredFramePos(node, data.frame_name),
                                            linear_term, hess_term, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                             scaling * linear_term;
 
                     const auto sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
@@ -1707,7 +1694,11 @@ namespace torc::mpc {
         std::lock_guard<std::mutex> lock(target_mut_);
         int num_contacts = GetNumContacts(node);
         vector3_t force_target;
-        force_target << 0, 0, in_contact_.at(frame)[node] * 9.81 * robot_model_->GetMass() / num_contacts;
+        if (num_contacts != 0) {
+            force_target << 0, 0, in_contact_.at(frame)[node] * 9.81 * robot_model_->GetMass() / num_contacts;
+        } else {
+            force_target = vector3_t::Zero();
+        }
 
         return force_target;
     }

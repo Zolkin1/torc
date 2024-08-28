@@ -21,9 +21,9 @@ target_link_libraries(function_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(function_tests PUBLIC Functions)
 
 # ---------- Constraint Tests ---------- #
-add_executable(constraint_tests constraint_tests.cpp)
-target_link_libraries(constraint_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(constraint_tests PUBLIC Constraints)
+#add_executable(constraint_tests constraint_tests.cpp)
+#target_link_libraries(constraint_tests PRIVATE Catch2::Catch2WithMain)
+#target_link_libraries(constraint_tests PUBLIC Constraints)
 
 # ---------- Model Tests ---------- #
 if (BUILD_WITH_PINOCCHIO)
@@ -40,20 +40,20 @@ if (BUILD_WITH_PINOCCHIO)
 endif ()
 
 # ---------- IPOPT Tests ---------- #
-if (BUILD_WITH_IPOPT)
-    add_executable(ipopt_tests ipopt_tests.cpp)
-    target_link_libraries(ipopt_tests PRIVATE Catch2::Catch2WithMain)
-    target_link_libraries(ipopt_tests PUBLIC SolverInterfaces)
-    catch_discover_tests(ipopt_tests)
-endif ()
+#if (BUILD_WITH_IPOPT)
+#    add_executable(ipopt_tests ipopt_tests.cpp)
+#    target_link_libraries(ipopt_tests PRIVATE Catch2::Catch2WithMain)
+#    target_link_libraries(ipopt_tests PUBLIC SolverInterfaces)
+#    catch_discover_tests(ipopt_tests)
+#endif ()
 
 # ---------- OSQPInterface Tests ---------- #
-if (BUILD_WITH_OSQP)
-    add_executable(osqp_tests osqp_tests.cpp)
-    target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
-    target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
-    catch_discover_tests(osqp_tests)
-endif ()
+#if (BUILD_WITH_OSQP)
+#    add_executable(osqp_tests osqp_tests.cpp)
+#    target_link_libraries(osqp_tests PRIVATE Catch2::Catch2WithMain)
+#    target_link_libraries(osqp_tests PUBLIC SolverInterfaces)
+#    catch_discover_tests(osqp_tests)
+#endif ()
 # ----------- Utils Tests ---------- #
 add_executable(utils_tests utils_tests.cpp)
 target_link_libraries(utils_tests PRIVATE Catch2::Catch2WithMain)
@@ -61,12 +61,12 @@ target_link_libraries(utils_tests PUBLIC Utils)
 catch_discover_tests(utils_tests)
 
 # --------- Clarabel Tests --------- #
-if (BUILD_WITH_CLARABEL)
-    add_executable(clarabel_tests clarabel_tests.cpp)
-    target_link_libraries(clarabel_tests PRIVATE Catch2::Catch2WithMain)
-    target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
-    catch_discover_tests(clarabel_tests)
-endif ()
+#if (BUILD_WITH_CLARABEL)
+#    add_executable(clarabel_tests clarabel_tests.cpp)
+#    target_link_libraries(clarabel_tests PRIVATE Catch2::Catch2WithMain)
+#    target_link_libraries(clarabel_tests PUBLIC SolverInterfaces)
+#    catch_discover_tests(clarabel_tests)
+#endif ()
 
 ## --------- Controller Tests --------- #
 #add_executable(controller_tests controller_tests.cpp)

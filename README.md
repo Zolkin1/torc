@@ -59,6 +59,11 @@ Note that we rely on Pinocchio 3.0, which as of 6/18/24 is only available as a b
 ### CppAD and CppAD Codegen
 When installing CppAD, make sure you use the following cmake flags: `cmake -DCMAKE_BUILD_TYPE=Release -Dcppad_cxx_flags=-std=c++17`
 
+# Running Code
+Create the build folder. Then run
+```
+cmake --build . --config <Release/Debug/RelWithDebug>  --target <target> -- -j 30
+```
 
 # Profiling:
 I personally like cachegrind more than perf.

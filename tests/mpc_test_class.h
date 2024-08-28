@@ -45,15 +45,17 @@ namespace torc::mpc {
                 vector3_t xi = vector3_t::Zero();
                 vector3_t w = 0.5*(traj_.GetVelocity(0).segment<3>(3) + traj_.GetVelocity(1).segment<3>(3));
                 vector3_t xi1 = robot_model_->QuaternionIntegrationRelative( traj_.GetQuat(1),
-                    traj_.GetQuat(0), xi, w, 0.02);
+                    traj_.GetQuat(0), xi, w, dt_[0]);
                 for (int i = 0; i < 3; i++) {
                     xi(i) += FD_DELTA;
                     vector3_t xi2 = robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(1),
-                        traj_.GetQuat(0), xi, w, 0.02);
+                        traj_.GetQuat(0), xi, w, dt_[0]);
                     fd.col(i) = (xi2 - xi1)/FD_DELTA;
 
                     xi(i) -= FD_DELTA;
                 }
+                std::cout << "fd: " << fd << std::endl;
+                std::cout << "dxi: " << dxi << std::endl;
                 CHECK(fd.isApprox(dxi, sqrt(FD_DELTA)));
 
                 // w
@@ -67,7 +69,7 @@ namespace torc::mpc {
                 for (int i = 0; i < 3; i++) {
                     w(i) += FD_DELTA;
                     vector3_t xi2 = robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(1),
-                        traj_.GetQuat(0), xi, w, 0.02);
+                        traj_.GetQuat(0), xi, w, dt_[0]);
                     fd.col(i) = 0.5*(xi2 - xi1)/FD_DELTA;
 
                     w(i) -= FD_DELTA;

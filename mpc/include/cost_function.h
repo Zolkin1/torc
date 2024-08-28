@@ -57,7 +57,6 @@ namespace torc::mpc {
         explicit CostFunction(const std::string& name)
             : name_(name), configured_(false), compile_derivatives_(true) {}
 
-            // TODO: Make the costs mapped by name
         void Configure(const std::unique_ptr<torc::models::FullOrderRigidBody>& model,
             bool compile_derivatives, std::vector<CostData> cost_data,
             std::filesystem::path deriv_libs_path) {
@@ -418,12 +417,7 @@ namespace torc::mpc {
         // Also unclear if it is the memory leaks or the type here, but the MPC is notably quicker now
         std::map<std::string, std::unique_ptr<torc::ad::CppADInterface>> cost_fcn_terms_;
 
-        // TODO: Delete weights
-        std::vector<vectorx_t> weights_;
-
         std::vector<CostData> cost_data_;
-
-        std::map<CostTypes, int> cost_idxs_;
 
         std::unique_ptr<CppAD::cg::DynamicLib<double>> config_jacobian_lib_;
         std::unique_ptr<CppAD::cg::GenericModel<double>> config_jacobian_model_;

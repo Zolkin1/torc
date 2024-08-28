@@ -41,6 +41,8 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
     traj.SetDefault(q_neutral);
 
     mpc.SetWarmStartTrajectory(traj);
+    mpc.SetConstantConfigTarget(q_neutral);
+    mpc.SetConstantVelTarget(vectorx_t::Zero(a1.GetVelDim()));
 
     ContactSchedule cs(mpc.GetContactFrames());
     const double contact_time = 0.3;
@@ -60,12 +62,12 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
 
     mpc.ComputeNLP(q_rand, v_rand, traj);
 
-    // for (int i = 0; i < traj.GetNumNodes(); i++) {
-    //     std::cout << "Node: " << i << std::endl;
-    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-    //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
-    // }
+    for (int i = 0; i < traj.GetNumNodes(); i++) {
+        std::cout << "Node: " << i << std::endl;
+        std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+        std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+        std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+    }
 
     // random_state = a1.GetRandomState();
     // mpc.Compute(q_rand, v_rand, traj);
@@ -137,6 +139,9 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     traj.SetDefault(q_neutral);
 
     mpc.SetWarmStartTrajectory(traj);
+
+    mpc.SetConstantConfigTarget(q_neutral);
+    mpc.SetConstantVelTarget(vectorx_t::Zero(achilles.GetVelDim()));
 
     mpc.Compute(q_rand, v_rand, traj);
 
