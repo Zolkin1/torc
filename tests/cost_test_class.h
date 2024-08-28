@@ -12,30 +12,30 @@ namespace torc::mpc {
     // TODO: Update for new costs!
     class CostTestClass : public CostFunction {
     public:
-        explicit CostTestClass(const std::string& name, const fs::path& urdf_path)
+        explicit CostTestClass(const std::string& name, const std::filesystem::path& urdf_path)
             : CostFunction("test_cost") {
             robot_model_ = std::make_unique<models::FullOrderRigidBody>(name, urdf_path);
         }
 
         void CheckConfigure() {
             PrintTestHeader("Cost function configure");
-            std::vector<vectorx_t> weights;
-            weights.emplace_back(vectorx_t::Constant(robot_model_->GetVelDim(), 1));
-            weights.emplace_back(vectorx_t::Constant(robot_model_->GetVelDim(), 1));
-            weights.emplace_back(vectorx_t::Constant(robot_model_->GetNumInputs(), 1));
 
-            std::vector<CostTypes> costs;
-            costs.emplace_back(Configuration);
-            costs.emplace_back(VelocityTracking);
-            costs.emplace_back(TorqueReg);
+            data_.resize(3);
+            data_[0].type = Configuration;
+            data_[1].type = VelocityTracking;
+            data_[2].type = TorqueReg;
 
-            Configure(robot_model_, true, costs, weights, std::filesystem::current_path()/"cost_test_deriv_libs");
+            data_[0].weight = vectorx_t::Constant(robot_model_->GetVelDim(), 1);
+            data_[1].weight = vectorx_t::Constant(robot_model_->GetVelDim(), 1);
+            data_[2].weight = vectorx_t::Constant(robot_model_->GetNumInputs(), 1);
+
+            data_[0].constraint_name = "config_tracking";
+            data_[1].constraint_name = "vel_tracking";
+            data_[2].constraint_name = "torque_reg";
+
+            Configure(robot_model_, true, data_, std::filesystem::current_path()/"cost_test_deriv_libs");
             REQUIRE(configured_);
-            REQUIRE(cost_idxs_.size() == costs.size());
-            REQUIRE(cost_fcn_terms_.size() == costs.size());
-            for (const auto& term : cost_fcn_terms_) {
-                REQUIRE(term != nullptr);
-            }
+            REQUIRE(cost_fcn_terms_.size() == data_.size());
         }
 
         void CheckDerivatives() {
@@ -52,14 +52,14 @@ namespace torc::mpc {
                 // Analytic
                 vectorx_t grad_c;
                 matrixx_t hess_c;
-                GetApproximation(bar_rand, target_rand, grad_c, hess_c, CostTypes::Configuration);
+                GetApproximation(bar_rand, target_rand, grad_c, hess_c, data_[0].constraint_name);
 
                 // Finite difference
                 vectorx_t fd_grad_c(grad_c.size());
-                double val = GetTermCost(d_zero, bar_rand, target_rand, CostTypes::Configuration);
+                double val = GetTermCost(d_zero, bar_rand, target_rand, data_[0].constraint_name);
                 for (int i = 0; i < d_rand.size(); i++) {
                     d_zero(i) += FD_DELTA;
-                    fd_grad_c(i) = (GetTermCost(d_zero, bar_rand, target_rand, CostTypes::Configuration) - val)/FD_DELTA;
+                    fd_grad_c(i) = (GetTermCost(d_zero, bar_rand, target_rand, data_[0].constraint_name) - val)/FD_DELTA;
                     d_zero(i) -= FD_DELTA;
                 }
 
@@ -72,14 +72,14 @@ namespace torc::mpc {
                 // Analytic
                 vectorx_t grad_v;
                 matrixx_t hess_v;
-                GetApproximation(vbar_rand, vtarget_rand, grad_v, hess_v, CostTypes::VelocityTracking);
+                GetApproximation(vbar_rand, vtarget_rand, grad_v, hess_v, data_[1].constraint_name);
 
                 // Finite difference
                 vectorx_t fd_grad_v(grad_v.size());
-                val = GetTermCost(d_zero, vbar_rand, vtarget_rand, CostTypes::VelocityTracking);
+                val = GetTermCost(d_zero, vbar_rand, vtarget_rand,  data_[1].constraint_name);
                 for (int i = 0; i < d_rand.size(); i++) {
                     d_zero(i) += FD_DELTA;
-                    fd_grad_v(i) = (GetTermCost(d_zero, vbar_rand, vtarget_rand, CostTypes::VelocityTracking) - val)/FD_DELTA;
+                    fd_grad_v(i) = (GetTermCost(d_zero, vbar_rand, vtarget_rand,  data_[1].constraint_name) - val)/FD_DELTA;
                     d_zero(i) -= FD_DELTA;
                 }
 
@@ -91,11 +91,11 @@ namespace torc::mpc {
                 for (int i = 0; i < d_rand.size(); i++) {
                     matrixx_t jac_temp;
                     vectorx_t p(3*robot_model_->GetVelDim());
-                    p << vbar_rand, vtarget_rand, weights_[cost_idxs_[CostTypes::VelocityTracking]];
+                    p << vbar_rand, vtarget_rand, data_[1].weight;
                     d_zero(i) += FD_DELTA;
-                    cost_fcn_terms_[cost_idxs_[CostTypes::VelocityTracking]]->GetJacobian(d_zero, p, jac_temp);
+                    cost_fcn_terms_[data_[1].constraint_name]->GetJacobian(d_zero, p, jac_temp);
                     vectorx_t y;
-                    cost_fcn_terms_[cost_idxs_[CostTypes::VelocityTracking]]->GetFunctionValue(d_zero, p, y);
+                    cost_fcn_terms_[data_[1].constraint_name]->GetFunctionValue(d_zero, p, y);
                     grad_v_temp= 2*jac_temp.transpose()*y;
 
                     fd_hess_v.col(i) = (grad_v_temp - grad_v)/FD_DELTA;
@@ -111,11 +111,11 @@ namespace torc::mpc {
                 // ----- Check values with approximations ----- //
                 // Velocity tracking, force reg and torque reg should be exact
                 vectorx_t dv_rand = robot_model_->GetRandomVel();
-                double vel_error = GetTermCost(dv_rand, vbar_rand, vtarget_rand, CostTypes::VelocityTracking);
+                double vel_error = GetTermCost(dv_rand, vbar_rand, vtarget_rand, data_[1].constraint_name);
 
-                GetApproximation(vbar_rand, vtarget_rand, grad_v, hess_v, CostTypes::VelocityTracking);
+                GetApproximation(vbar_rand, vtarget_rand, grad_v, hess_v, data_[1].constraint_name);
                 double vel_error_approx = 0.5*dv_rand.transpose()*hess_v*dv_rand + grad_v.dot(dv_rand) +
-                        GetTermCost(vectorx_t::Zero(robot_model_->GetVelDim()), vbar_rand, vtarget_rand, CostTypes::VelocityTracking);
+                        GetTermCost(vectorx_t::Zero(robot_model_->GetVelDim()), vbar_rand, vtarget_rand, data_[1].constraint_name);
 
                 CHECK(std::abs(vel_error - vel_error_approx) < 1e-8);
 
@@ -192,15 +192,15 @@ namespace torc::mpc {
             vectorx_t bar_rand = robot_model_->GetRandomConfig();
             vectorx_t target = bar_rand;
 
-            double cost = GetTermCost(d, bar_rand, target, Configuration);
+            double cost = GetTermCost(d, bar_rand, target, data_[0].constraint_name);
             CHECK(cost > 0);
 
             d.setZero();
-            cost = GetTermCost(d, bar_rand, target, Configuration);
+            cost = GetTermCost(d, bar_rand, target, data_[0].constraint_name);
             CHECK(std::abs(cost) < 1e-8);
 
             d.setRandom();
-            cost = GetTermCost(d, bar_rand, target, Configuration);
+            cost = GetTermCost(d, bar_rand, target, data_[0].constraint_name);
             CHECK(cost >= 0);
 
             // ----- Veloctiy cost ----- //
@@ -208,15 +208,15 @@ namespace torc::mpc {
             vectorx_t vtarget = vbar_rand;
 
             d.setConstant(1);
-            cost = GetTermCost(d, vbar_rand, vtarget, VelocityTracking);
+            cost = GetTermCost(d, vbar_rand, vtarget, data_[1].constraint_name);
             CHECK(cost > 0);
 
             d.setZero();
-            cost = GetTermCost(d, vbar_rand, vtarget, VelocityTracking);
+            cost = GetTermCost(d, vbar_rand, vtarget, data_[1].constraint_name);
             CHECK(cost == 0);
 
             d.setRandom();
-            cost = GetTermCost(d, vbar_rand, vtarget, VelocityTracking);
+            cost = GetTermCost(d, vbar_rand, vtarget, data_[1].constraint_name);
             CHECK(cost >= 0);
         }
 //
@@ -257,6 +257,9 @@ namespace torc::mpc {
 //        }
     protected:
         std::unique_ptr<models::FullOrderRigidBody> robot_model_;
+
+        std::vector<CostData> data_;
+
     private:
         static constexpr double FD_DELTA = 1e-8;
 
