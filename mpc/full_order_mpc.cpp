@@ -15,7 +15,6 @@
 
 #define NAN_CHECKS 1
 
-// TODO: Add max GRF forces for all the nodes without dynamics constraints!
 //  Can make the max force different for each contact, so I make sure the toe force is small (i.e. proportional to the ankle torque)
 // TODO: Consider removing the last torque and force variables (i.e. in the last node) - would make the problem slightly smaller
 // TODO: If I compute the linearization about the trajectory (except the first node) before I recieve the state estimate
@@ -406,8 +405,10 @@ namespace torc::mpc {
         vectorx_t q_new = q;
         vectorx_t v_new = v;
 
-        // TODO: Unclear if this is working as desired. Might need to debug/change
         if (delay_prediction_dt_ != 0 && enable_delay_prediction_) {
+            // TODO: Fix!
+            throw std::runtime_error("Delay prediction not implemented yet!");
+
             double total_dt;
             if (delay_prediction_dt_ < 0) {
                 // Average the last 5 computation times
@@ -424,32 +425,23 @@ namespace torc::mpc {
                 total_dt = delay_prediction_dt_;
             }
 
-            throw std::runtime_error("Delay prediction not implemented yet!");
+            const int steps = 2;
+            double dt = total_dt / static_cast<double>(steps);
 
-//            std::cout << "total_dt: " << total_dt << std::endl;
+            vectorx_t tau;
+            for (int i = 0; i < steps; i++) {
+                double curr_time = i * dt;
+                traj_.GetTorqueInterp(delay_start_time + curr_time, tau);
+                for (auto& f : ws_->f_ext) {
+                    traj_.GetForceInterp(delay_start_time + curr_time, f.frame_name, f.force_linear);
+                }
 
-            // TODO: Put back!
-//            const int steps = 2;
-//            double dt = total_dt / static_cast<double>(steps);
-//
-//            vectorx_t tau;
-//            for (int i = 0; i < steps; i++) {
-//                double curr_time = i * dt;
-//                traj_.GetTorqueInterp(delay_start_time + curr_time, tau);
-//                for (auto& f : ws_->f_ext) {
-//                    traj_.GetForceInterp(delay_start_time + curr_time, f.frame_name, f.force_linear);
-//                }
-//
-//                vectorx_t xdot = robot_model_->GetDynamics(q_new, v_new, tau, ws_->f_ext);
-//                q_new = robot_model_->IntegrateVelocity(q_new, dt*xdot.head(v.size()));
-//                v_new = v_new + dt*xdot.tail(v.size());
-//            }
+                vectorx_t xdot = robot_model_->GetDynamics(q_new, v_new, tau, ws_->f_ext);
+                q_new = robot_model_->IntegrateVelocity(q_new, dt*xdot.head(v.size()));
+                v_new = v_new + dt*xdot.tail(v.size());
+            }
 
             // TODO: Measure the error between this and the measured one
-
-            // TODO: Remove
-            traj_.GetConfigInterp(delay_start_time + total_dt, q_new);
-            traj_.GetVelocityInterp(delay_start_time + total_dt, v_new);
 
 //            std::cout << "q delay: " << q_new.transpose() << std::endl;
 //            std::cout << "v delay: " << v_new.transpose() << std::endl;
@@ -767,11 +759,6 @@ namespace torc::mpc {
             osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs());
 
         row_start = GetConstraintRow(node, Integrator);
-        // std::cout << "velocity traj tail: " << traj_.GetVelocity(node).tail(robot_model_->GetNumInputs()).transpose() << std::endl;
-        // std::cout << "next node traj tail: " << traj_.GetConfiguration(node+1).tail(robot_model_->GetNumInputs()).transpose() << std::endl;
-        // std::cout << "lb integration: " << osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).transpose() << std::endl;
-        // std::cout << "lb integration: " << osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetVelDim()).transpose() << std::endl;
-        // std::cout << "ub integration: " << osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetVelDim()).transpose() << std::endl;
     }
 
     void FullOrderMpc::AddIDConstraint(int node, bool full_order) {
@@ -1374,7 +1361,7 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
-        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED); // TODO: Change frames
+        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
     }
 
 
@@ -2188,7 +2175,6 @@ namespace torc::mpc {
                 row += NumTorqueBoxConstraintsNode();
             } else if (i < nodes_ - 1) {
                 row += NumPartialIDConstraintsNode();
-                // TODO: add max grf constraint
             }
 
             row += NumFrictionConeConstraintsNode();
