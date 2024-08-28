@@ -1058,29 +1058,52 @@ namespace torc::mpc {
         int row_start = GetConstraintRow(node, Holonomic);
 
         for (const auto& frame : contact_frames_) {
-            // Get velocity linearization
-            HolonomicLinearizationv(node, frame, ws_->frame_jacobian);
-            int col_start = GetDecisionIdx(node, Velocity);
-            MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_);
+            matrixx_t jac;
+            vectorx_t x_zero(holonomic_constraint_[frame]->GetDomainSize());
+            vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
+            p << traj_.GetConfiguration(node), traj_.GetVelocity(node);
 
-            // Get configuration linearization
-            // TODO: Consider putting back!
-            // ws_->frame_jacobian.setZero();
-            // HolonomicLinearizationq(node, frame, ws_->frame_jacobian);
-            // col_start = GetDecisionIdx(node, Configuration);
-            // MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
-            // constraint_triplets_, constraint_triplet_idx_);
+            holonomic_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
-            // Get the frame vel on the warm start trajectory
-            vector3_t frame_vel = in_contact_[frame][node]*robot_model_->GetFrameState(frame,
-                traj_.GetConfiguration(node), traj_.GetVelocity(node)).vel.linear();
+            const auto full_sparsity = holonomic_constraint_[frame]->GetJacobianSparsityPatternSet();
+            const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
+            const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
 
+            // dqk
+            int col_start = GetDecisionIdx(node, Configuration);
+            MatrixToTripletWithSparsitySet(jac.middleCols(0, vel_dim_), row_start, col_start,
+                constraint_triplets_, constraint_triplet_idx_, dqk_sparsity);
 
-            osqp_instance_.lower_bounds.segment<2>(row_start) = -frame_vel.head<2>();
-            osqp_instance_.upper_bounds.segment<2>(row_start) = -frame_vel.head<2>();
+            // dvk
+            col_start = GetDecisionIdx(node, Velocity);
+            MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
+                constraint_triplets_, constraint_triplet_idx_, dvk_sparsity);
 
             row_start+=2;
+
+            // // Get velocity linearization
+            // HolonomicLinearizationv(node, frame, ws_->frame_jacobian);
+            // int col_start = GetDecisionIdx(node, Velocity);
+            // MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
+            //     constraint_triplets_, constraint_triplet_idx_);
+            //
+            // // Get configuration linearization
+            // // TODO: Consider putting back!
+            // // ws_->frame_jacobian.setZero();
+            // // HolonomicLinearizationq(node, frame, ws_->frame_jacobian);
+            // // col_start = GetDecisionIdx(node, Configuration);
+            // // MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
+            // // constraint_triplets_, constraint_triplet_idx_);
+            //
+            // // Get the frame vel on the warm start trajectory
+            // vector3_t frame_vel = in_contact_[frame][node]*robot_model_->GetFrameState(frame,
+            //     traj_.GetConfiguration(node), traj_.GetVelocity(node)).vel.linear();
+            //
+            //
+            // osqp_instance_.lower_bounds.segment<2>(row_start) = -frame_vel.head<2>();
+            // osqp_instance_.upper_bounds.segment<2>(row_start) = -frame_vel.head<2>();
+            //
+            // row_start+=2;
         }
     }
 
@@ -2158,15 +2181,27 @@ namespace torc::mpc {
 
         ws_->holo_mat.setConstant(2, robot_model_->GetVelDim(), 1);
 
-        for (int contact = 0; contact < num_contact_locations_; contact++) {
-            int col_start = GetDecisionIdx(node, Velocity);
-            MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
+        for (const auto& frame : contact_frames_) {
+            const auto full_sparsity = holonomic_constraint_[frame]->GetJacobianSparsityPatternSet();
+            const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
+            const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
 
-            // TODO: Consider putting back!
-            // col_start = GetDecisionIdx(node, Configuration);
-            // MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
+            int col_start = GetDecisionIdx(node, Configuration);
+            AddSparsitySet(dqk_sparsity, row_start, col_start, constraint_triplets_);
+
+            col_start = GetDecisionIdx(node, Velocity);
+            AddSparsitySet(dvk_sparsity, row_start, col_start, constraint_triplets_);
 
             row_start += 2;
+
+            // int col_start = GetDecisionIdx(node, Velocity);
+            // MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
+            //
+            // // TODO: Consider putting back!
+            // // col_start = GetDecisionIdx(node, Configuration);
+            // // MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
+            //
+            // row_start += 2;
         }
     }
 
