@@ -190,7 +190,7 @@ namespace torc::mpc {
     // -------- Constraints -------- //
         void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1,
             ad::ad_vector_t& violation) const;
-        void HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation);
+        void HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation) const;
 
     // -------- Constraint Creation -------- //
         void CreateConstraints();
@@ -413,8 +413,8 @@ namespace torc::mpc {
 
         // Constraint functions
         std::unique_ptr<ad::CppADInterface> integration_constraint_;
-        std::unique_ptr<ad::CppADInterface> holonomic_constraint_;
-        std::unique_ptr<ad::CppADInterface> swing_height_constraint_;
+        std::map<std::string, std::unique_ptr<ad::CppADInterface>> holonomic_constraint_;
+        std::map<std::string, std::unique_ptr<ad::CppADInterface>> swing_height_constraint_;
         std::unique_ptr<ad::CppADInterface> inverse_dynamics_constraint_;
 
         // Contact settings

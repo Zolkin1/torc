@@ -55,6 +55,17 @@ namespace torc::mpc {
             compile_derivatves_
         );
 
+        for (const auto& frame : contact_frames_) {
+            holonomic_constraint_.emplace(frame,
+                std::make_unique<ad::CppADInterface>(
+                    std::bind(&FullOrderMpc::HolonomicConstraint, this, frame, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+                    name + "_" + frame + "_holonomic_constraint",
+                    deriv_lib_path_,
+                    ad::DerivativeOrder::FirstOrder, 2*vel_dim_,  config_dim_ + vel_dim_,
+                    compile_derivatves_
+                ));
+        }
+
     }
 
     FullOrderMpc::~FullOrderMpc() {
@@ -666,30 +677,54 @@ namespace torc::mpc {
         A_.setFromTriplets(constraint_triplets_.begin(), constraint_triplets_.end());
     }
 
-    void FullOrderMpc::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation) const {
+    void FullOrderMpc::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk_dvkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation) const {
         // From the reference trajectory
         const ad::adcg_t& dt = dt_qkbar_qkp1bar_vk_vkp1(0);
         const ad::ad_vector_t& qkbar = dt_qkbar_qkp1bar_vk_vkp1.segment(1, config_dim_);
         const ad::ad_vector_t& qkp1bar = dt_qkbar_qkp1bar_vk_vkp1.segment(1 + config_dim_, config_dim_);
+        const ad::ad_vector_t& vkbar = dt_qkbar_qkp1bar_vk_vkp1.segment(1 + 2*config_dim_, vel_dim_);
+        const ad::ad_vector_t& vkp1bar = dt_qkbar_qkp1bar_vk_vkp1.segment(1 + 2*config_dim_ + vel_dim_, vel_dim_);
+
+        // Changes from decision variables
+        const ad::ad_vector_t& dqk = dqk_dqkp1_dvk_dvkp1.head(vel_dim_);
+        const ad::ad_vector_t& dqkp1 = dqk_dqkp1_dvk_dvkp1.segment(vel_dim_, vel_dim_);
+        const ad::ad_vector_t& dvk = dqk_dqkp1_dvk_dvkp1.segment(2*vel_dim_, vel_dim_);
+        const ad::ad_vector_t& dvkp1 = dqk_dqkp1_dvk_dvkp1.tail(vel_dim_);
 
         // Get the current configuration
-        const ad::ad_vector_t qk = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dqk_dqkp1_vk_vkp1.head(vel_dim_));
-        const ad::ad_vector_t qkp1 = pinocchio::integrate(robot_model_->GetADPinModel(), qkp1bar, dqk_dqkp1_vk_vkp1.segment(vel_dim_, vel_dim_));
+        const ad::ad_vector_t qk = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dqk);
+        const ad::ad_vector_t qkp1 = pinocchio::integrate(robot_model_->GetADPinModel(), qkp1bar, dqkp1);
 
         // Velocity
-        const ad::ad_vector_t& vk = dqk_dqkp1_vk_vkp1.segment(2*vel_dim_, vel_dim_);
-        const ad::ad_vector_t& vkp1 = dqk_dqkp1_vk_vkp1.tail(vel_dim_);
+        const ad::ad_vector_t& vk = vkbar + dvk;
+        const ad::ad_vector_t& vkp1 = vkp1bar + dvkp1;
 
         const ad::ad_vector_t v = dt*0.5*(vk + vkp1);
 
         violation = pinocchio::integrate(robot_model_->GetADPinModel(), qk, v) - qkp1;
     }
 
-    void FullOrderMpc::HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation) {
+    void FullOrderMpc::HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation) const {
         const ad::ad_vector_t& dq = dqk_dvk.head(vel_dim_);
         const ad::ad_vector_t& dv = dqk_dvk.tail(vel_dim_);
 
-        const ad::ad_vector_t& qk =
+        const ad::ad_vector_t& qkbar = qk_vk.head(config_dim_);
+        const ad::ad_vector_t& vkbar = qk_vk.tail(vel_dim_);
+
+        ad::ad_vector_t q = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dq);
+        ad::ad_vector_t v = vkbar + dv;
+
+        // forward kinematics
+        pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q, v);
+
+        // Get the frame velocity
+        const int frame_idx = robot_model_->GetFrameIdx(frame);
+        const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
+
+        // TODO: In the future we will want to rotate this into the ground frame so the constraint is always tangential to the terrain
+
+        // Violation is the velocity as we want to drive it to 0
+        violation = vel.head<2>();
     }
 
 
