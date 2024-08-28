@@ -64,6 +64,15 @@ namespace torc::mpc {
                     ad::DerivativeOrder::FirstOrder, 2*vel_dim_,  config_dim_ + vel_dim_,
                     compile_derivatves_
                 ));
+
+            swing_height_constraint_.emplace(frame,
+            std::make_unique<ad::CppADInterface>(
+                std::bind(&FullOrderMpc::SwingHeightConstraint, this, frame, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+               name + "_" + frame + "_swing_height_constraint",
+               deriv_lib_path_,
+               ad::DerivativeOrder::FirstOrder, vel_dim_,  config_dim_ + 1,
+               compile_derivatves_
+            ));
         }
 
     }
@@ -718,7 +727,7 @@ namespace torc::mpc {
         pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q, v);
 
         // Get the frame velocity
-        const int frame_idx = robot_model_->GetFrameIdx(frame);
+        const long frame_idx = robot_model_->GetFrameIdx(frame);
         const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
 
         // TODO: In the future we will want to rotate this into the ground frame so the constraint is always tangential to the terrain
@@ -726,6 +735,25 @@ namespace torc::mpc {
         // Violation is the velocity as we want to drive it to 0
         violation = vel.head<2>();
     }
+
+    void FullOrderMpc::SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_desheight, ad::ad_vector_t& violation) const {
+        const ad::ad_vector_t& qkbar = qk_desheight.head(config_dim_);
+        const ad::adcg_t& des_height = qk_desheight(config_dim_);
+
+        ad::ad_vector_t q = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dqk);
+
+        // Forward kinematics
+        pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q);
+        const long frame_idx = robot_model_->GetFrameIdx(frame);
+        pinocchio::updateFramePlacement(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx);
+
+        // Get frame position in world frame (data oMf)
+        ad::ad_vector_t frame_pos = robot_model_->GetADPinData()->oMf.at(frame_idx).translation();
+
+        violation.resize(1);
+        violation(0) = frame_pos(0) - des_height;
+    }
+
 
 
     void FullOrderMpc::AddICConstraint() {
