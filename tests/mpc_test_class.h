@@ -6,6 +6,7 @@
 #define MPC_TEST_CLASS_H
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "pinocchio/algorithm/joint-configuration.hpp"
 
@@ -18,9 +19,82 @@ namespace torc::mpc {
             : FullOrderMpc(name, config_file, model_path) {
             CHECK(dt_.size() == nodes_);
 
-            // TODO: Add checks for the sizes of all the constraints and the sizes returned in in the indexing functions,
-            //  or, just make them the same function (i.e. call the same function)
-            CHECK(0 == 1);
+            CHECK(NumIntegratorConstraintsNode() == integration_constraint_->GetRangeSize());
+            CHECK(NumHolonomicConstraintsNode() == holonomic_constraint_[contact_frames_[0]]->GetRangeSize()*num_contact_locations_);
+            CHECK(NumSwingHeightConstraintsNode() == swing_height_constraint_[contact_frames_[0]]->GetRangeSize()*num_contact_locations_);
+        }
+
+        // TODO: Understand!
+        void CheckPinIntegrate() {
+        // TODO: Understand!!
+            PrintTestHeader("Pinocchio Integrate");
+            vectorx_t q_rand = robot_model_->GetRandomConfig();
+            vectorx_t v_rand = robot_model_->GetRandomVel();
+            v_rand.segment<3>(POS_VARS).setZero();
+            // v_rand.head<3>().setZero();
+
+            std::cout << "q_rand floating base: " << q_rand.head<FLOATING_BASE>().transpose() << std::endl;
+            std::cout << "v_rand floating base: " << v_rand.head<FLOATING_VEL>().transpose() << std::endl;
+
+            vectorx_t q = pinocchio::integrate(robot_model_->GetModel(), q_rand, v_rand);
+
+            std::cout << "q_pin floating base: " << q.head<FLOATING_BASE>().transpose() << std::endl;
+
+            vector3_t virtual_pos = q_rand.head<POS_VARS>() + v_rand.head<POS_VARS>();
+            matrix3_t T = matrix3_t::Zero();
+            T(0, 1) = -virtual_pos(2);
+            T(0, 2) = virtual_pos(1);
+            T(1, 0) = virtual_pos(2);
+            T(1, 2) = -virtual_pos(0);
+            T(2, 0) = -virtual_pos(1);
+            T(2, 1) = virtual_pos(0);
+
+            // std::cout << "T: \n" << T << std::endl;
+
+            Eigen::Quaterniond quat(q_rand.segment<QUAT_VARS>(POS_VARS));
+            Eigen::Quaterniond quat2(q_rand.segment<QUAT_VARS>(POS_VARS));
+            matrix3_t R = quat2.toRotationMatrix();     // Maps from the body frame to the world frame
+            vectorx_t q_manual(FLOATING_BASE);
+            q_manual << q_rand.head<POS_VARS>() + R*v_rand.head<POS_VARS>(), // + T*R*v_rand.segment<3>(POS_VARS),
+                            (quat * pinocchio::quaternion::exp3(v_rand.segment<3>(POS_VARS))).coeffs();
+
+            std::cout << "q_man floating base: " << q_manual.transpose() << std::endl;
+
+            std::cout << "R: \n" << R << std::endl;
+        }
+
+        void CheckSwingHeightConstraint() {
+            PrintTestHeader("Swing Height Constraint");
+            static constexpr double MARGIN = 1e-6;
+            const int node = 0;
+
+            for (int k = 0; k < 5; k++) {
+                vectorx_t q_rand = robot_model_->GetRandomConfig();
+
+                traj_.SetConfiguration(node, q_rand);
+
+                robot_model_->FirstOrderFK(q_rand);
+                for (const auto& frame : contact_frames_) {
+                    std::cout << "Frame " << frame << std::endl;
+                    swing_traj_[frame][node] = 0.1;
+                    std::cout << "Desired swing height: " << swing_traj_[frame][node] << std::endl;
+
+                    vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
+                    vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
+                    p << traj_.GetConfiguration(node), swing_traj_[frame][node];
+
+                    vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
+                    std::cout << "frame pos: " << frame_pos.transpose() << std::endl;
+
+                    vectorx_t y;
+                    swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y);
+                    std::cout << "constraint violation: " << y(0) << std::endl;
+
+                    CHECK_THAT(frame_pos(2) - swing_traj_[frame][node], Catch::Matchers::WithinAbs(y(0), MARGIN));
+
+                    std::cout << std::endl;
+                }
+            }
         }
 
         // TODO: Fix for ad derivative

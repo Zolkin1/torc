@@ -125,6 +125,47 @@ TEST_CASE("Pow Test", "[ad]") {
     CHECK(jac.isApprox(jac_analytic, MARGIN));
 }
 
+TEST_CASE("Sparsity", "[ad]") {
+    using namespace torc::ad;
+
+    double constexpr MARGIN = 1e-8;
+
+    int constexpr X_SIZE = 1;
+    int constexpr P_SIZE = 1;
+    int constexpr Y_SIZE = 2;
+
+    auto curr_path = fs::current_path();
+    curr_path = curr_path / "deriv_libs";
+    CppADInterface function(&PowTestFunction, "sparsity_test_ad_function", curr_path, SecondOrder, X_SIZE, P_SIZE, true);
+
+    CHECK(function.GetDomainSize() == X_SIZE);
+    CHECK(function.GetParameterSize() == P_SIZE);
+    CHECK(function.GetRangeSize() == Y_SIZE);
+
+    // Get the sparsity pattern
+    const auto sp_set = function.GetHessianSparsityPatternSet();
+    matrixx_t sp_mat;
+    function.GetHessianSparsityPatternMat(sp_mat);
+
+    // Get the hessian
+    vectorx_t p  = vectorx_t::Random(P_SIZE);
+    vectorx_t x = vectorx_t::Random(X_SIZE);
+
+    matrixx_t hess;
+    vectorx_t w = vectorx_t::Ones(Y_SIZE);
+    function.GetHessian(x, p, w, hess);
+
+     // Confirm sparsity pattern
+     for (int row = 0 ; row < hess.rows(); ++row) {
+        for (int col = 0 ; col < hess.cols(); ++col) {
+            if (hess(row, col) != 0) {
+                CHECK(sp_mat(row, col) == 1);
+                CHECK(sp_set.at(row).contains(col));
+            }
+        }
+     }
+}
+
 //TEST_CASE("Loading", "[ad]") {
 //    using namespace torc::ad;
 //

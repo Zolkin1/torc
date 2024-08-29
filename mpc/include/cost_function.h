@@ -189,6 +189,7 @@ namespace torc::mpc {
                 linear_term = 2*jac.transpose()*y;
 
                 cost_fcn_terms_[name]->GetHessian(vectorx_t::Zero(vel_size_), p, 2*y, hessian_term);
+                // TODO: Deal with sparsity from jacobain!
                 hessian_term += 2*jac.transpose() * jac;
 
             } else if (data->type == TorqueReg) {
@@ -245,7 +246,8 @@ namespace torc::mpc {
         }
 
         torc::ad::sparsity_pattern_t GetHessianSparsityPattern(const std::string& name) {
-            return cost_fcn_terms_[name]->GetHessianSparsityPatternSet();
+            return ad::CppADInterface::GetUnion(cost_fcn_terms_[name]->GetHessianSparsityPatternSet(),
+                cost_fcn_terms_[name]->GetGaussNewtonSparsityPatternSet());
         }
 
         [[nodiscard]] double GetTermCost(const vectorx_t& decision_var, const vectorx_t& reference, const vectorx_t& target, const std::string& name) const {

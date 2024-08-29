@@ -122,6 +122,32 @@ namespace torc::mpc {
             }
         }
 
+        void CheckSparsityPatterns() {
+            PrintTestHeader("Sparsity Patterns");
+            matrixx_t v_hess;
+            vectorx_t v_vec;
+
+            vectorx_t x_rand = vectorx_t::Random(cost_fcn_terms_[data_[1].constraint_name]->GetDomainSize());
+            vectorx_t p_rand = vectorx_t::Random(cost_fcn_terms_[data_[1].constraint_name]->GetParameterSize());
+            vectorx_t w = vectorx_t::Ones(cost_fcn_terms_[data_[1].constraint_name]->GetRangeSize());
+
+            cost_fcn_terms_[data_[1].constraint_name]->GetHessian(x_rand, p_rand, w, v_hess);
+
+            const auto sparsity = cost_fcn_terms_[data_[1].constraint_name]->GetHessianSparsityPatternSet();
+
+            std::cout << "v hess: \n" << v_hess << std::endl;
+
+            for (int row = 0; row < v_hess.rows(); ++row) {
+                for (int col = 0; col < v_hess.cols(); ++col) {
+                    if (v_hess(row, col) != 0) {
+                        CHECK(sparsity[row].contains(col));
+                    }
+                }
+            }
+
+
+        }
+
 //        void CheckLinearizeQuadrasize() {
 //            PrintTestHeader("Linearization and Quadratasize");
 //            // ------------------------- //

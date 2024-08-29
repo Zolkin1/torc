@@ -16,6 +16,7 @@ int main() {
 
     torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
 
+
     torc::mpc::ContactSchedule cs(mpc.GetContactFrames());
     // cs.InsertContact("right_hand", 0, 1);
     // cs.InsertContact("left_hand", 0, 1);
@@ -33,7 +34,7 @@ int main() {
     // cs.InsertContact("left_foot", 0, 1);
     cs.InsertContact("foot_front_left", 0, 10);
     cs.InsertContact("foot_rear_left", 0, 10);
-    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, 0.01, 0.5);
+    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, 0.015, 0.5);
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
@@ -90,17 +91,27 @@ int main() {
     // std::cout << "press any key to start mpc... " << std::endl;
     // std::cin.get();
 
+    achilles.SecondOrderFK(q_target, v_target);
+    for (const auto& frame : mpc.GetContactFrames()) {
+        std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
+        std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
+    }
+
+    // mpc.Compute(q_target, v_target, traj);
+
+    q_target(0) += 0.2;
     mpc.ComputeNLP(q_target, v_target, traj);
 
-    for (int i = 0; i < 100; i++) {
-        vectorx_t q_current;
-        traj.GetConfigInterp(0.01, q_current);
-        std::cout << "q: " << q_current.transpose() << std::endl;
-        vectorx_t v_current;
-        traj.GetVelocityInterp(0.01, v_current);
-
-        mpc.Compute(q_current, v_current, traj);
-//        mpc.Compute(q_target, v_target, traj);
+    for (int i = 0; i < 20; i++) {
+    // TODO: put back!
+        // vectorx_t q_current;
+        // traj.GetConfigInterp(0.01, q_current);
+        // std::cout << "q: " << q_current.transpose() << std::endl;
+        // vectorx_t v_current;
+        // traj.GetVelocityInterp(0.01, v_current);
+        //
+        // mpc.Compute(q_current, v_current, traj);
+        mpc.Compute(q_target, v_target, traj);
     }
 
 
@@ -113,7 +124,7 @@ int main() {
          achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
          for (const auto& frame : mpc.GetContactFrames()) {
              std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
-//             std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
+             std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
              std::cout << "force: " << traj.GetForce(i, frame).transpose() << std::endl;
          }
         std::cout << std::endl;

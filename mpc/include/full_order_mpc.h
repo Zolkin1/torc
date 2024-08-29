@@ -208,7 +208,7 @@ namespace torc::mpc {
     // -------- Constraint Violation -------- //
         double GetConstraintViolation(const vectorx_t& qp_res);
         double GetICViolation(const vectorx_t& qp_res);
-        double GetIntegrationViolation(const vectorx_t& qp_res, int node);
+        double GetIntegrationViolation(const vectorx_t& qp_res, int node) const;
         double GetIDViolation(const vectorx_t& qp_res, int node, bool full_order);
         double GetFrictionViolation(const vectorx_t& qp_res, int node);
         double GetTorqueBoxViolation(const vectorx_t& qp_res, int node);

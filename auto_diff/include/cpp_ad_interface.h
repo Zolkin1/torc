@@ -30,7 +30,7 @@ namespace torc::ad {
                        DerivativeOrder deriv_order,
                        int x_size, int p_size,
                        const bool& force_compile = false,
-                       std::vector<std::string> compile_flags = {"-O3", "-shared", "-rdynamic"});
+                       std::vector<std::string> compile_flags = {"-O3", "-march=native", "-shared", "-rdynamic"});
 
         void GetFunctionValue(const vectorx_t& x, const vectorx_t& p, vectorx_t& y) const;
         void GetJacobian(const vectorx_t& x, const vectorx_t& p, matrixx_t& jacobian) const;
@@ -67,6 +67,9 @@ namespace torc::ad {
 
         static sparsity_pattern_t GetSparsityPatternCols(const sparsity_pattern_t& sparsity, int start_col, int last_col);
 
+        static sparsity_pattern_t GetIntersection(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2);
+        static sparsity_pattern_t GetUnion(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2);
+
     protected:
         void CreateModel();
 
@@ -80,10 +83,9 @@ namespace torc::ad {
         sparsity_pattern_t GetJacobianSparsity(AD::ADFun<cg_t>& ad_fn) const;
         void UpdateJacobianSparsityPattern();
 
-        sparsity_pattern_t GetHessianSparsity(AD::ADFun<cg_t>& ad_fn) const;
+        sparsity_pattern_t GetHessianSparsity(AD::ADFun<cg_t>& ad_fn);
         void UpdateHessianSparsityPattern();
 
-        static sparsity_pattern_t GetIntersection(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2);
 
         void UpdateGaussNewtonSparsityPattern();
 

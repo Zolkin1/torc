@@ -12,6 +12,7 @@
 
 #include "eigen_utils.h"
 #include "torc_timer.h"
+#include "pinocchio_interface.h"
 
 #define NAN_CHECKS 1
 
@@ -569,6 +570,10 @@ namespace torc::mpc {
         // Solve
         auto solve_status = osqp_solver_.Solve();
 
+        if (solve_status == osqp::OsqpExitCode::kPrimalInfeasible || solve_status == osqp::OsqpExitCode::kPrimalInfeasibleInaccurate) {
+            std::cerr << "Bad solve!" << std::endl;
+        }
+
 #if NAN_CHECKS
         for (const auto& res : osqp_solver_.primal_solution()) {
             if (std::isnan(res)) {
@@ -585,8 +590,24 @@ namespace torc::mpc {
 
         utils::TORCTimer ls_timer;
         ls_timer.Tic();
-        auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
+        // TODO: Put back
+        // auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
+        double cost_ls = GetFullCost(osqp_solver_.primal_solution());
+        double constraint_ls = GetConstraintViolation(osqp_solver_.primal_solution());  // TODO: Fix this function!
+        alpha_ = 1;
         ls_timer.Toc();
+
+        // for (const auto& frame : contact_frames_) {
+        //     int node = 1;
+        //     vectorx_t x(swing_height_constraint_[frame]->GetDomainSize());
+        //     x << osqp_solver_.primal_solution().segment(GetDecisionIdx(node, Configuration), vel_dim_);
+        //     vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
+        //     p << traj_.GetConfiguration(node), swing_traj_[frame][node];
+        //     vectorx_t y;
+        //     swing_height_constraint_[frame]->GetFunctionValue(x, p, y);
+        //     std::cout << "swing height error for frame " << frame << " is " << y << std::endl;
+        //     std::cout << "desired height: " << swing_traj_[frame][node] << std::endl << std::endl;
+        // }
 
 #if NAN_CHECKS
         if (std::isnan(constraint_ls)) {
@@ -598,6 +619,7 @@ namespace torc::mpc {
         }
 #endif
 
+        // TODO: Check that this function has no effect on constraint violation
         ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
         traj_out.SetDtVector(dt_);
          // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
@@ -701,16 +723,31 @@ namespace torc::mpc {
         const ad::ad_vector_t& dvkp1 = dqk_dqkp1_dvk_dvkp1.tail(vel_dim_);
 
         // Get the current configuration
-        const ad::ad_vector_t qk = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dqk);
-        const ad::ad_vector_t qkp1 = pinocchio::integrate(robot_model_->GetADPinModel(), qkp1bar, dqkp1);
+        const ad::ad_vector_t qk = torc::models::ConvertdqToq(dqk, qkbar);
+        const ad::ad_vector_t qkp1 = torc::models::ConvertdqToq(dqkp1, qkp1bar);
 
         // Velocity
-        const ad::ad_vector_t& vk = vkbar + dvk;
-        const ad::ad_vector_t& vkp1 = vkp1bar + dvkp1;
+        const ad::ad_vector_t vk = vkbar + dvk;
+        const ad::ad_vector_t vkp1 = vkp1bar + dvkp1;
 
         const ad::ad_vector_t v = dt*0.5*(vk + vkp1);
 
-        violation = pinocchio::integrate(robot_model_->GetADPinModel(), qk, v) - qkp1;
+        const ad::ad_vector_t qkp1_new = pinocchio::integrate(robot_model_->GetADPinModel(), qk, v);
+
+        // Floating base position differences
+        violation.resize(v.size());
+        violation.head<POS_VARS>() = qkp1_new.head<POS_VARS>() - qkp1.head<POS_VARS>();
+
+        // Quaternion difference in the tangent space
+        Eigen::Quaternion<ad::adcg_t> quat_kp1(qkp1.segment<QUAT_VARS>(POS_VARS));
+        Eigen::Quaternion<ad::adcg_t> quat_kp1_new(qkp1_new.segment<QUAT_VARS>(POS_VARS));
+
+        // Eigen's inverse has an if statement, so we can't use it in codegen
+        quat_kp1 = Eigen::Quaternion<torc::ad::adcg_t>(quat_kp1.conjugate().coeffs() / quat_kp1.squaredNorm());   // Assumes norm > 0
+        violation.segment<3>(POS_VARS) = pinocchio::quaternion::log3(quat_kp1 * quat_kp1_new);
+
+        // Joint differences
+        violation.tail(v.size() - FLOATING_VEL) = qkp1_new.tail(qk.size() - FLOATING_BASE) - qkp1.tail(qk.size() - FLOATING_BASE);
     }
 
     void FullOrderMpc::HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation) const {
@@ -720,7 +757,7 @@ namespace torc::mpc {
         const ad::ad_vector_t& qkbar = qk_vk.head(config_dim_);
         const ad::ad_vector_t& vkbar = qk_vk.tail(vel_dim_);
 
-        ad::ad_vector_t q = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dq);
+        ad::ad_vector_t q = torc::models::ConvertdqToq(dq, qkbar);
         ad::ad_vector_t v = vkbar + dv;
 
         // forward kinematics
@@ -736,11 +773,12 @@ namespace torc::mpc {
         violation = vel.head<2>();
     }
 
+// TODO: Fix!
     void FullOrderMpc::SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_desheight, ad::ad_vector_t& violation) const {
         const ad::ad_vector_t& qkbar = qk_desheight.head(config_dim_);
         const ad::adcg_t& des_height = qk_desheight(config_dim_);
 
-        ad::ad_vector_t q = pinocchio::integrate(robot_model_->GetADPinModel(), qkbar, dqk);
+        const ad::ad_vector_t q = torc::models::ConvertdqToq(dqk, qkbar);
 
         // Forward kinematics
         pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q);
@@ -774,7 +812,7 @@ namespace torc::mpc {
     void FullOrderMpc::AddIntegrationConstraint(int node) {
         assert(node != nodes_ - 1);
 
-        int row_start = GetConstraintRow(node, Integrator);
+        const int row_start = GetConstraintRow(node, Integrator);
 
 
         const vectorx_t x_zero = vectorx_t::Zero(integration_constraint_->GetDomainSize());
@@ -789,7 +827,6 @@ namespace torc::mpc {
         const auto dqkp1_sparisty = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
         const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 2*vel_dim_, vel_dim_);
         const auto dvkp1_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 3*vel_dim_, vel_dim_);
-
 
         // dqk
         int col_start = GetDecisionIdx(node, Configuration);
@@ -1015,7 +1052,7 @@ namespace torc::mpc {
         for (const auto& frame : contact_frames_) {
             // Linearization
             matrixx_t jac;
-            vectorx_t x_zero(swing_height_constraint_[frame]->GetDomainSize());
+            vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
             vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
             p << traj_.GetConfiguration(node), swing_traj_[frame][node];
             swing_height_constraint_[frame]->GetJacobian(x_zero, p, jac);
@@ -1033,24 +1070,12 @@ namespace torc::mpc {
 
             row_start++;
 
-            // SwingHeightLinearization(node, frame, ws_->frame_jacobian);
-            //
-            // // Grab just the z-height element
-            // ws_->swing_vec = ws_->frame_jacobian.row(2);
-            //
-            // VectorToTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
-            //
-            // // Get the frame position on the warm start trajectory
-            // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));   // TODO: Move to outside the loop
+            // std::cout << "Frame " << frame << " jac: \n" << jac << std::endl;
+            // std::cout << "y: " << y << std::endl;
+            // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
             // vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
-            //
-            // // Set bounds
-            // osqp_instance_.lower_bounds(row_start)
-            //     = -frame_pos(2) + swing_traj_[frame][node];
-            // osqp_instance_.upper_bounds(row_start)
-            //     = -frame_pos(2) + swing_traj_[frame][node];
-            //
-            // row_start++;
+            // std::cout << "frame z: " << frame_pos(2) << std::endl;
+            // std::cout << "des swing height: " << swing_traj_[frame][node] << std::endl;
         }
     }
 
@@ -1059,7 +1084,7 @@ namespace torc::mpc {
 
         for (const auto& frame : contact_frames_) {
             matrixx_t jac;
-            vectorx_t x_zero(holonomic_constraint_[frame]->GetDomainSize());
+            vectorx_t x_zero = vectorx_t::Zero(holonomic_constraint_[frame]->GetDomainSize());
             vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
             p << traj_.GetConfiguration(node), traj_.GetVelocity(node);
 
@@ -1079,31 +1104,13 @@ namespace torc::mpc {
             MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
                 constraint_triplets_, constraint_triplet_idx_, dvk_sparsity);
 
-            row_start+=2;
+            // Lower and upper bounds
+            vectorx_t y;
+            holonomic_constraint_[frame]->GetFunctionValue(x_zero, p, y);
+            osqp_instance_.lower_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -y;
+            osqp_instance_.upper_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -y;
 
-            // // Get velocity linearization
-            // HolonomicLinearizationv(node, frame, ws_->frame_jacobian);
-            // int col_start = GetDecisionIdx(node, Velocity);
-            // MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
-            //     constraint_triplets_, constraint_triplet_idx_);
-            //
-            // // Get configuration linearization
-            // // TODO: Consider putting back!
-            // // ws_->frame_jacobian.setZero();
-            // // HolonomicLinearizationq(node, frame, ws_->frame_jacobian);
-            // // col_start = GetDecisionIdx(node, Configuration);
-            // // MatrixToTriplet(in_contact_[frame][node]*ws_->frame_jacobian.topRows<2>(), row_start, col_start,
-            // // constraint_triplets_, constraint_triplet_idx_);
-            //
-            // // Get the frame vel on the warm start trajectory
-            // vector3_t frame_vel = in_contact_[frame][node]*robot_model_->GetFrameState(frame,
-            //     traj_.GetConfiguration(node), traj_.GetVelocity(node)).vel.linear();
-            //
-            //
-            // osqp_instance_.lower_bounds.segment<2>(row_start) = -frame_vel.head<2>();
-            // osqp_instance_.upper_bounds.segment<2>(row_start) = -frame_vel.head<2>();
-            //
-            // row_start+=2;
+            row_start+=2;
         }
     }
 
@@ -1149,39 +1156,57 @@ namespace torc::mpc {
         return qp_res.head(robot_model_->GetVelDim()*2).squaredNorm();
     }
 
-    double FullOrderMpc::GetIntegrationViolation(const vectorx_t &qp_res, int node) {
-        vectorx_t q_k;
-        ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
-            traj_.GetConfiguration(node), q_k);
-        vectorx_t q_kp1;
-        ConvertdqToq(qp_res.segment(GetDecisionIdx(node+1, Configuration), robot_model_->GetVelDim()),
-            traj_.GetConfiguration(node+1), q_kp1);
+    double FullOrderMpc::GetIntegrationViolation(const vectorx_t &qp_res, int node) const {
 
-        vectorx_t v_k = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
-        vectorx_t v_kp1 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
+        const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
+        const vectorx_t& dqkp1 = qp_res.segment(GetDecisionIdx(node + 1, Configuration), vel_dim_);
 
-        vectorx_t v_effective = 0.5*(v_k + v_kp1);
+        const vectorx_t& dvk = qp_res.segment(GetDecisionIdx(node, Velocity), vel_dim_);
+        const vectorx_t& dvkp1 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), vel_dim_);
 
-        // Rotate the floating base vels into the world frame
-        robot_model_->FirstOrderFK(q_k);
-        v_effective.head<POS_VARS>() = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.head<POS_VARS>();
-        v_effective.segment<3>(POS_VARS) = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.segment<3>(POS_VARS);
+        vectorx_t x(integration_constraint_->GetDomainSize());
+        x << dqk, dqkp1, dvk, dvkp1;
 
-        double violation = 0;
-        // Position
-        violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>() - dt_[node]*v_effective.head<POS_VARS>()).squaredNorm();
+        vectorx_t p(integration_constraint_->GetParameterSize());
+        p << dt_[node], traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node), traj_.GetVelocity(node + 1);
 
-        // Orientation
-        violation += (qp_res.segment(GetDecisionIdx(node + 1, Configuration) + POS_VARS, 3) -
-            robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(node+1), traj_.GetQuat(node),
-                qp_res.segment(GetDecisionIdx(node, Configuration) + POS_VARS, 3),
-                v_effective.segment<3>(POS_VARS), dt_[node])).squaredNorm();
+        vectorx_t y;
+        integration_constraint_->GetFunctionValue(x, p, y);
 
-        // Joints
-        violation += (q_kp1.tail(robot_model_->GetNumInputs()) - q_k.tail(robot_model_->GetNumInputs())
-            - dt_[node]*v_effective.tail(robot_model_->GetNumInputs())).squaredNorm();
+        return y.squaredNorm();
 
-        return violation;
+        // vectorx_t q_k;
+        // ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+        //     traj_.GetConfiguration(node), q_k);
+        // vectorx_t q_kp1;
+        // ConvertdqToq(qp_res.segment(GetDecisionIdx(node+1, Configuration), robot_model_->GetVelDim()),
+        //     traj_.GetConfiguration(node+1), q_kp1);
+        //
+        // vectorx_t v_k = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
+        // vectorx_t v_kp1 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
+        //
+        // vectorx_t v_effective = 0.5*(v_k + v_kp1);
+        //
+        // // Rotate the floating base vels into the world frame
+        // robot_model_->FirstOrderFK(q_k);
+        // v_effective.head<POS_VARS>() = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.head<POS_VARS>();
+        // v_effective.segment<3>(POS_VARS) = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.segment<3>(POS_VARS);
+        //
+        // double violation = 0;
+        // // Position
+        // violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>() - dt_[node]*v_effective.head<POS_VARS>()).squaredNorm();
+        //
+        // // Orientation
+        // violation += (qp_res.segment(GetDecisionIdx(node + 1, Configuration) + POS_VARS, 3) -
+        //     robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(node+1), traj_.GetQuat(node),
+        //         qp_res.segment(GetDecisionIdx(node, Configuration) + POS_VARS, 3),
+        //         v_effective.segment<3>(POS_VARS), dt_[node])).squaredNorm();
+        //
+        // // Joints
+        // violation += (q_kp1.tail(robot_model_->GetNumInputs()) - q_k.tail(robot_model_->GetNumInputs())
+        //     - dt_[node]*v_effective.tail(robot_model_->GetNumInputs())).squaredNorm();
+        //
+        // return violation;
     }
 
     double FullOrderMpc::GetIDViolation(const vectorx_t &qp_res, int node, bool full_order) {
@@ -1297,39 +1322,41 @@ namespace torc::mpc {
     }
 
     double FullOrderMpc::GetHolonomicViolation(const vectorx_t &qp_res, int node) {
+
         double violation = 0;
-        vectorx_t q;
-        ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration),
-            robot_model_->GetVelDim()), traj_.GetConfiguration(node), q);
 
-        const vectorx_t v = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) +
-            traj_.GetVelocity(node);
-
-        robot_model_->SecondOrderFK(q, v);
         for (const auto& frame : contact_frames_) {
-            vector3_t frame_vel = robot_model_->GetFrameState(frame).vel.linear();
-            violation += in_contact_[frame][node]*frame_vel.head<2>().squaredNorm();
+            vectorx_t x(holonomic_constraint_[frame]->GetDomainSize());
+            vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
+            vectorx_t y;
+
+            const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
+            const vectorx_t& dvk = qp_res.segment(GetDecisionIdx(node, Velocity), vel_dim_);
+            x << dqk, dvk;
+
+            p << traj_.GetConfiguration(node), traj_.GetVelocity(node);
+
+            holonomic_constraint_[frame]->GetFunctionValue(x, p, y);
+            violation += y.squaredNorm();
         }
 
-        // std::cout << "holonomic violation: " << violation << std::endl;
         return violation;
     }
 
     double FullOrderMpc::GetSwingHeightViolation(const vectorx_t &qp_res, int node) {
-        const int idx = GetDecisionIdx(node, Configuration);
-        // Convert to a configuration
-        vectorx_t q_new;
-        ConvertdqToq(qp_res.segment(idx, robot_model_->GetVelDim()), traj_.GetConfiguration(node), q_new);
-        robot_model_->FirstOrderFK(q_new);
-
         double violation = 0;
-
         for (const auto& frame : contact_frames_) {
-            // Get the frame position on the warm start trajectory
-            vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
+            vectorx_t x(swing_height_constraint_[frame]->GetDomainSize());
+            vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
+            vectorx_t y;
 
-            // For now, assuming this is an equality constraint
-            violation += std::pow((frame_pos(2) - swing_traj_[frame][node]), 2);
+            const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
+            x << dqk;
+
+            p << traj_.GetConfiguration(node), swing_traj_[frame][node];
+
+            swing_height_constraint_[frame]->GetFunctionValue(x, p, y);
+            violation += y.squaredNorm();
         }
 
         return violation;
@@ -1556,6 +1583,7 @@ namespace torc::mpc {
                             scaling * ws_->obj_vel_vector;
 
                     const auto sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
+
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_,
                                                    objective_triplet_idx_, sparsity);
                 } else if (data.type == CostTypes::ForceReg) {
@@ -1863,6 +1891,7 @@ namespace torc::mpc {
     }
 
     std::pair<double, double> FullOrderMpc::LineSearch(const vectorx_t& qp_res) {
+    // TODO: Fix with the new constraint violation functions
         // Backtracing linesearch (see ETH paper)
         // TODO: Speed up
 
@@ -2170,8 +2199,6 @@ namespace torc::mpc {
             // dqk
             AddSparsitySet(sparsity, row_start, col_start, constraint_triplets_);
 
-            // VectorToNewTriplet(ws_->swing_vec, row_start, col_start, constraint_triplets_);
-
             row_start++;
         }
     }
@@ -2193,15 +2220,6 @@ namespace torc::mpc {
             AddSparsitySet(dvk_sparsity, row_start, col_start, constraint_triplets_);
 
             row_start += 2;
-
-            // int col_start = GetDecisionIdx(node, Velocity);
-            // MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
-            //
-            // // TODO: Consider putting back!
-            // // col_start = GetDecisionIdx(node, Configuration);
-            // // MatrixToNewTriplet(ws_->holo_mat, row_start, col_start, constraint_triplets_);
-            //
-            // row_start += 2;
         }
     }
 
@@ -2427,7 +2445,7 @@ namespace torc::mpc {
         }
     }
 
-    // TODO: Is this just pinocchio::integrate()?
+    // TODO: Merge with the one in pinocchio_interface.h
     void FullOrderMpc::ConvertdqToq(const vectorx_t& dq, const vectorx_t& q_ref, vectorx_t& q) const {
         q.resize(robot_model_->GetConfigDim());
         q = q_ref;
@@ -2456,7 +2474,7 @@ namespace torc::mpc {
     // ----- Getters for Sizes of Individual nodes ----- //
     // ------------------------------------------------- //
     int FullOrderMpc::NumIntegratorConstraintsNode() const {
-        return config_dim_;
+        return vel_dim_;
     }
 
     int FullOrderMpc::NumIDConstraintsNode() const {

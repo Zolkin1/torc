@@ -298,7 +298,7 @@ namespace torc::ad {
         return GetIntersection(jac_sparsity, x_vars);
     }
 
-    torc::ad::sparsity_pattern_t CppADInterface::GetHessianSparsity(AD::ADFun<cg_t>& ad_fn) const {
+    torc::ad::sparsity_pattern_t CppADInterface::GetHessianSparsity(AD::ADFun<cg_t>& ad_fn) {
         auto hess_sparsity = CppAD::cg::hessianSparsitySet<sparsity_pattern_t>(ad_fn);
         sparsity_pattern_t x_vars(x_size_ + p_size_);
         for (size_t i = 0; i < x_size_; i++) {
@@ -319,6 +319,23 @@ namespace torc::ad {
             std::set_intersection(sp_1[row].begin(), sp_1[row].end(), sp_2[row].begin(),
                                   sp_2[row].end(), std::inserter(result[row], result[row].begin()));
         }
+        return result;
+    }
+
+    torc::ad::sparsity_pattern_t CppADInterface::GetUnion(const sparsity_pattern_t& sp_1, const sparsity_pattern_t& sp_2) {
+        const int num_rows = std::min(sp_1.size(), sp_2.size());
+
+        sparsity_pattern_t result(num_rows);
+        for (int row = 0; row < num_rows; row++) {
+            for (const auto& col : sp_1[row]) {
+                result[row].insert(col);
+            }
+
+            for (const auto& col : sp_2[row]) {
+                result[row].insert(col);
+            }
+        }
+
         return result;
     }
 
@@ -353,7 +370,7 @@ namespace torc::ad {
         if (ad_model_->isHessianSparsityAvailable()) {
             // Update for the matrix
             auto hess_sparsity_set = ad_model_->HessianSparsitySet();
-            hess_sparsity_mat_.resize(y_size_, x_size_);
+            hess_sparsity_mat_.resize(y_size_, x_size_);    // TODO: Is this size correct?
             hess_sparsity_mat_.setZero();
             for (int row = 0; row < hess_sparsity_mat_.rows(); row++) {
                 for (int col = 0; col < hess_sparsity_mat_.cols(); col++) {
@@ -374,6 +391,11 @@ namespace torc::ad {
             // Now grab the intersection
             hess_sparsity_set_ = GetIntersection(hess_sparsity_set, x_vars);
 
+            // if (hess_sparsity_set.size() != x_size_) {
+            //     std::cerr << "Hess sparsity set size: " << hess_sparsity_set.size() << std::endl;
+            //     std::cerr << "Domain size: " << x_size_ << std::endl;
+            //     throw std::logic_error("[CppADInterface] Generated hessian pattern sizes don't match!");
+            // }
         }
     }
 
