@@ -104,14 +104,14 @@ int main() {
 
     for (int i = 0; i < 20; i++) {
     // TODO: put back!
-        // vectorx_t q_current;
-        // traj.GetConfigInterp(0.01, q_current);
-        // std::cout << "q: " << q_current.transpose() << std::endl;
-        // vectorx_t v_current;
-        // traj.GetVelocityInterp(0.01, v_current);
-        //
-        // mpc.Compute(q_current, v_current, traj);
-        mpc.Compute(q_target, v_target, traj);
+        vectorx_t q_current;
+        traj.GetConfigInterp(0.01, q_current);
+        std::cout << "q: " << q_current.transpose() << std::endl;
+        vectorx_t v_current;
+        traj.GetVelocityInterp(0.01, v_current);
+
+        mpc.Compute(q_current, v_current, traj);
+        // mpc.Compute(q_target, v_target, traj);
     }
 
 

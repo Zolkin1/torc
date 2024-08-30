@@ -1,7 +1,9 @@
 general_settings:
   nodes: 32
   verbose: True
+  node_dt_type: SmallFirst # Even, SmallFirst, Adaptive
   node_dt: 0.025
+  first_node_dt: 0.01
   compile_derivatives: True
   base_frame: "torso"
   scale_cost: False
@@ -45,6 +47,7 @@ costs:
   - type: ForceRegularization
     name: "ForceReg"
     weight: [0.0001, 0.0001, 0.01]
+
 #  - type: ForwardKinematics
 #    name: "LeftToe"
 #    weight: [0.0001, 0.0001, 0.0]

@@ -112,14 +112,43 @@ namespace torc::mpc {
                 verbose_ = general_settings["verbose"].as<bool>();
             }
 
-            if (general_settings["node_dt"]) {
-                const auto dt = general_settings["node_dt"].as<double>();
-                dt_.resize(nodes_);
-                for (double & it : dt_) {
-                    it = dt;
+            int node_type = 0;
+            if (general_settings["node_dt_type"]) {
+                if (general_settings["node_dt_type"].as<std::string>() == "SmallFirst") {
+                    node_type = 1;
+                } else if (general_settings["node_dt_type"].as<std::string>() == "Adaptive") {
+                    throw std::runtime_error("Adaptive node dt not implemented yet!");
+                } else if (general_settings["node_dt_type"].as<std::string>() == "Even") {
+                    node_type = 0;
+                } else {
+                    throw std::runtime_error("Node dt type not supported!");
                 }
-            } else {
-                throw std::runtime_error("Node dt not specified!");
+            }
+            if (node_type == 0) {
+                if (general_settings["node_dt"]) {
+                    const auto dt = general_settings["node_dt"].as<double>();
+                    dt_.resize(nodes_);
+                    for (double & it : dt_) {
+                        it = dt;
+                    }
+                } else {
+                    throw std::runtime_error("Node dt not specified!");
+                }
+            } else if (node_type == 1) {
+                if (general_settings["node_dt"]) {
+                    const auto dt = general_settings["node_dt"].as<double>();
+                    dt_.resize(nodes_);
+                    for (double & it : dt_) {
+                        it = dt;
+                    }
+                } else {
+                    throw std::runtime_error("Node dt not specified!");
+                }
+                if (general_settings["first_node_dt"]) {
+                    dt_[0] = general_settings["first_node_dt"].as<double>();
+                } else {
+                    throw std::runtime_error("You selected node dt type as 'SmallFirst' but did not provide a first node dt!");
+                }
             }
 
             if (general_settings["compile_derivatives"]) {
@@ -428,8 +457,6 @@ namespace torc::mpc {
         }
     }
 
-
-
     void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
@@ -619,7 +646,6 @@ namespace torc::mpc {
         }
 #endif
 
-        // TODO: Check that this function has no effect on constraint violation
         ConvertSolutionToTraj(alpha_*osqp_solver_.primal_solution(), traj_out);
         traj_out.SetDtVector(dt_);
          // std::cout << "solve result: \n" << osqp_solver_.primal_solution() << std::endl;
@@ -636,6 +662,19 @@ namespace torc::mpc {
              ls_condition_, constraint_ls);
 
         traj_ = traj_out;
+
+        // double post_cost = GetFullCost(vectorx_t::Zero(GetNumDecisionVars()));
+        // double post_constraint = GetConstraintViolation(vectorx_t::Zero(GetNumDecisionVars()));
+        // if (std::abs(cost_ls - post_cost) > 1e-8) {
+        //     std::cerr << "Cost Difference: " << std::abs(cost_ls - post_cost) << std::endl;
+        //     // throw std::runtime_error("Traj conversion effected cost!");
+        // }
+        //
+        // if (std::abs(constraint_ls - post_constraint) > 1e-8) {
+        //     std::cerr << "Constraint Difference: " << std::abs(constraint_ls - post_constraint) << std::endl;
+        //     // throw std::runtime_error("Traj conversion effected constraint violation!");
+        // }
+
         total_solves_++;
 
         if (verbose_) {
@@ -966,6 +1005,10 @@ namespace torc::mpc {
             if (in_contact_[frame][node]) {
                 MatrixToTriplet(in_contact_[frame][node]*ws_->fric_cone_mat, row_start, col_start,
                    constraint_triplets_, constraint_triplet_idx_, true);
+
+                osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setConstant(-std::numeric_limits<double>::max());
+                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
+                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE) -= in_contact_[frame][node]*ws_->fric_cone_mat*traj_.GetForce(node, frame);
             } else {
                 for (int i = 0; i < ws_->fric_cone_mat.rows(); i++) {
                     for (int j = 0; j < ws_->fric_cone_mat.cols(); j++) {
@@ -975,10 +1018,11 @@ namespace torc::mpc {
                         }
                     }
                 }
+
+                osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
+                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
             }
-            osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setConstant(-std::numeric_limits<double>::max());
-            osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
-            osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE) -= in_contact_[frame][node]*ws_->fric_cone_mat*traj_.GetForce(node, frame);
+
 
             row_start += FRICTION_CONE_SIZE;
             col_start += CONTACT_3DOF;
@@ -1174,39 +1218,6 @@ namespace torc::mpc {
         integration_constraint_->GetFunctionValue(x, p, y);
 
         return y.squaredNorm();
-
-        // vectorx_t q_k;
-        // ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
-        //     traj_.GetConfiguration(node), q_k);
-        // vectorx_t q_kp1;
-        // ConvertdqToq(qp_res.segment(GetDecisionIdx(node+1, Configuration), robot_model_->GetVelDim()),
-        //     traj_.GetConfiguration(node+1), q_kp1);
-        //
-        // vectorx_t v_k = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
-        // vectorx_t v_kp1 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
-        //
-        // vectorx_t v_effective = 0.5*(v_k + v_kp1);
-        //
-        // // Rotate the floating base vels into the world frame
-        // robot_model_->FirstOrderFK(q_k);
-        // v_effective.head<POS_VARS>() = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.head<POS_VARS>();
-        // v_effective.segment<3>(POS_VARS) = robot_model_->GetFrameState(base_frame_).placement.rotation()*v_effective.segment<3>(POS_VARS);
-        //
-        // double violation = 0;
-        // // Position
-        // violation += (q_kp1.head<POS_VARS>() - q_k.head<POS_VARS>() - dt_[node]*v_effective.head<POS_VARS>()).squaredNorm();
-        //
-        // // Orientation
-        // violation += (qp_res.segment(GetDecisionIdx(node + 1, Configuration) + POS_VARS, 3) -
-        //     robot_model_->QuaternionIntegrationRelative(traj_.GetQuat(node+1), traj_.GetQuat(node),
-        //         qp_res.segment(GetDecisionIdx(node, Configuration) + POS_VARS, 3),
-        //         v_effective.segment<3>(POS_VARS), dt_[node])).squaredNorm();
-        //
-        // // Joints
-        // violation += (q_kp1.tail(robot_model_->GetNumInputs()) - q_k.tail(robot_model_->GetNumInputs())
-        //     - dt_[node]*v_effective.tail(robot_model_->GetNumInputs())).squaredNorm();
-        //
-        // return violation;
     }
 
     double FullOrderMpc::GetIDViolation(const vectorx_t &qp_res, int node, bool full_order) {
@@ -2526,6 +2537,7 @@ namespace torc::mpc {
 
     void FullOrderMpc::SetWarmStartTrajectory(const Trajectory& traj) {
         traj_ = traj;
+        traj_.SetDtVector(dt_);
     }
 
     void FullOrderMpc::SetConstantConfigTarget(const vectorx_t& q_target) {
