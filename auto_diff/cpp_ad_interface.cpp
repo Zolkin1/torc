@@ -253,11 +253,18 @@ namespace torc::ad {
         UpdateGaussNewtonSparsityPattern();
     }
 
-    // TODO: Debug this!
     void CppADInterface::LoadModel() {
-        throw std::runtime_error("[CppADInterface] Loading models is currently unsupported!");
+        // throw std::runtime_error("[CppADInterface] Loading models is currently unsupported!");
         dynamic_lib_ = std::make_unique<CppAD::cg::LinuxDynamicLib<double>>(lib_path_.string());
-        ad_model_ = dynamic_lib_->model(lib_name_);
+        if (dynamic_lib_ == nullptr) {
+            throw std::runtime_error("[CppADInterface] Could not load the derivative library!");
+        }
+
+        ad_model_.reset();
+        ad_model_ = dynamic_lib_->model(this->name_);
+        if (ad_model_ == nullptr) {
+            throw std::runtime_error("[CppADInterface] Could not retrieve the derivative model from the library!");
+        }
 
         y_size_ = ad_model_->Range();
 

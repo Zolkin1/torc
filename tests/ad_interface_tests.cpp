@@ -166,28 +166,33 @@ TEST_CASE("Sparsity", "[ad]") {
      }
 }
 
-//TEST_CASE("Loading", "[ad]") {
-//    using namespace torc::ad;
-//
-//    double constexpr MARGIN = 1e-8;
-//
-//    int constexpr X_SIZE = 1;
-//    int constexpr P_SIZE = 1;
-//    int constexpr Y_SIZE = 2;
-//
-//    auto curr_path = fs::current_path();
-//    curr_path = curr_path / "deriv_libs";
-//    CppADInterface function(&PowTestFunction, "pow_test_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, true);
-//
-//    CHECK(function.GetDomainSize() == X_SIZE);
-//    CHECK(function.GetParameterSize() == P_SIZE);
-//    CHECK(function.GetRangeSize() == Y_SIZE);
-//
+TEST_CASE("Loading", "[ad]") {
+    using namespace torc::ad;
+
+    double constexpr MARGIN = 1e-8;
+
+    int constexpr X_SIZE = 1;
+    int constexpr P_SIZE = 1;
+    int constexpr Y_SIZE = 2;
+
+    auto curr_path = fs::current_path();
+    curr_path = curr_path / "deriv_libs";
+    CppADInterface function(&PowTestFunction, "pow_test_load_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, true);
+
+    CHECK(function.GetDomainSize() == X_SIZE);
+    CHECK(function.GetParameterSize() == P_SIZE);
+    CHECK(function.GetRangeSize() == Y_SIZE);
+
     // TODO: Fix!
     // Load
-//    CppADInterface function2(&PowTestFunction, "pow_test_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, false);
-//
-//    CHECK(function2.GetDomainSize() == X_SIZE);
-//    CHECK(function2.GetParameterSize() == P_SIZE);
-//    CHECK(function2.GetRangeSize() == Y_SIZE);
-//}
+    CppADInterface function2(&PowTestFunction, "pow_test_load_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, false);
+
+    CHECK(function2.GetDomainSize() == X_SIZE);
+    CHECK(function2.GetParameterSize() == P_SIZE);
+    CHECK(function2.GetRangeSize() == Y_SIZE);
+
+    const auto load_sp_jac = function2.GetJacobianSparsityPatternSet();
+    const auto sp_jac = function.GetJacobianSparsityPatternSet();
+
+    CHECK(load_sp_jac == sp_jac);
+}

@@ -171,6 +171,7 @@ namespace torc::mpc {
             matrixx_t id_config_mat;
             matrixx_t id_vel1_mat;
             matrixx_t id_vel2_mat;
+            matrixx_t id_tau_mat;
             matrixx_t id_force_mat;
             matrixx_t fric_cone_mat;
             vectorx_t swing_vec;
@@ -187,6 +188,20 @@ namespace torc::mpc {
             vectorx_t obj_tau_vector;
             vectorx_t obj_force_vector;
             std::vector<models::ExternalForce<double>> f_ext;
+
+            ad::sparsity_pattern_t sp_dq;
+            ad::sparsity_pattern_t sp_dvk;
+            ad::sparsity_pattern_t sp_dvkp1;
+            ad::sparsity_pattern_t sp_df;
+            ad::sparsity_pattern_t sp_tau;
+
+            std::map<std::string, ad::sparsity_pattern_t> sp_hol_dqk;
+            std::map<std::string, ad::sparsity_pattern_t> sp_hol_dvk;
+
+            ad::sparsity_pattern_t sp_int_dqk;
+            ad::sparsity_pattern_t sp_int_dqkp1;
+            ad::sparsity_pattern_t sp_int_dvk;
+            ad::sparsity_pattern_t sp_int_dvkp1;
         };
     // -------- Constraints -------- //
         void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1,
@@ -224,7 +239,7 @@ namespace torc::mpc {
         matrix3_t QuatIntegrationLinearizationXi(int node);
         matrix3_t QuatIntegrationLinearizationW(int node);
 
-        void InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
+        void InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau);
         void InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
 
         matrix43_t QuatLinearization(int node);

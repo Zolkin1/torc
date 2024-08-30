@@ -50,6 +50,7 @@ namespace torc::mpc {
         vectorx_t weight;
         std::string frame_name;
         std::string constraint_name;        // TODO: Change to cost name!
+        ad::sparsity_pattern_t sp_pattern;
     };
 
     class CostFunction {

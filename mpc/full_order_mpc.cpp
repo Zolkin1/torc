@@ -913,31 +913,25 @@ namespace torc::mpc {
         matrixx_t jac;
         integration_constraint_->GetJacobian(x_zero, p, jac);
 
-        const auto full_sparsity = integration_constraint_->GetJacobianSparsityPatternSet();
-        const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
-        const auto dqkp1_sparisty = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
-        const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 2*vel_dim_, vel_dim_);
-        const auto dvkp1_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 3*vel_dim_, vel_dim_);
-
         // dqk
         int col_start = GetDecisionIdx(node, Configuration);
         MatrixToTripletWithSparsitySet(jac.middleCols(0, vel_dim_), row_start, col_start,
-            constraint_triplets_, constraint_triplet_idx_, dqk_sparsity);
+            constraint_triplets_, constraint_triplet_idx_, ws_->sp_int_dqk);
 
         // dqkp1
         col_start = GetDecisionIdx(node + 1, Configuration);
         MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
-            constraint_triplets_, constraint_triplet_idx_, dqkp1_sparisty);
+            constraint_triplets_, constraint_triplet_idx_, ws_->sp_int_dqkp1);
 
         // dvk
         col_start = GetDecisionIdx(node, Velocity);
         MatrixToTripletWithSparsitySet(jac.middleCols(2*vel_dim_, vel_dim_), row_start, col_start,
-            constraint_triplets_, constraint_triplet_idx_, dvk_sparsity);
+            constraint_triplets_, constraint_triplet_idx_, ws_->sp_int_dvk);
 
         // dvkp1
         col_start = GetDecisionIdx(node + 1, Velocity);
         MatrixToTripletWithSparsitySet(jac.middleCols(3*vel_dim_, vel_dim_), row_start, col_start,
-            constraint_triplets_, constraint_triplet_idx_, dvkp1_sparsity);
+            constraint_triplets_, constraint_triplet_idx_, ws_->sp_int_dvkp1);
 
         // Lower and upper bounds
         vectorx_t y;
@@ -957,43 +951,54 @@ namespace torc::mpc {
         ws_->id_force_mat.setZero();
 
         // compute all derivative terms
-        InverseDynamicsLinearizationAnalytic(node, ws_->id_config_mat,
-            ws_->id_vel1_mat, ws_->id_vel2_mat, ws_->id_force_mat);
+        InverseDynamicsLinearizationAD(node, ws_->id_config_mat,
+            ws_->id_vel1_mat, ws_->id_vel2_mat, ws_->id_force_mat, ws_->id_tau_mat);
+
+        vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
+        vectorx_t p(inverse_dynamics_constraint_->GetParameterSize());
+
+        vectorx_t f(CONTACT_3DOF*num_contact_locations_);
+        int f_idx = 0;
+        for (const auto& frame : contact_frames_) {
+            f.segment<CONTACT_3DOF>(f_idx) = traj_.GetForce(node, frame);
+
+            f_idx += CONTACT_3DOF;
+        }
+        p << traj_.GetConfiguration(node), traj_.GetVelocity(node), traj_.GetVelocity(node + 1), traj_.GetTau(node), f, dt_[node];
+
+        vectorx_t y;
+        inverse_dynamics_constraint_->GetFunctionValue(x, p, y);
 
         // Full inverse dynamics
         if (full_order) {
             // dtau_dq
             int col_start = GetDecisionIdx(node, Configuration);
-            MatrixToTriplet(ws_->id_config_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_config_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, ws_->sp_dq);
 
             // dtau_dv
             col_start = GetDecisionIdx(node, Velocity);
-            MatrixToTriplet(ws_->id_vel1_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_vel1_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, ws_->sp_dvk);
 
             // dtau_dtau
             col_start = GetDecisionIdx(node, Torque);
-            DiagonalScalarMatrixToTriplet(-1, row_start + FLOATING_VEL, col_start, robot_model_->GetNumInputs(),
-                constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_tau_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, ws_->sp_tau);
 
             // dtau_df
             col_start = GetDecisionIdx(node, GroundForce);
-            MatrixToTriplet(ws_->id_force_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_force_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, ws_->sp_df);
 
             // dtau_dv2
             col_start = GetDecisionIdx(node + 1, Velocity);
-            MatrixToTriplet(ws_->id_vel2_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_vel2_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, ws_->sp_dvkp1);
 
             // Set the bounds
             for (auto& f : ws_->f_ext) {
                 f.force_linear = traj_.GetForce(node, f.frame_name);
             }
 
-            osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL)
-                = -robot_model_->InverseDynamics(traj_.GetConfiguration(node), traj_.GetVelocity(node), ws_->acc, ws_->f_ext);
-            osqp_instance_.lower_bounds.segment(row_start + FLOATING_VEL, robot_model_->GetNumInputs()) += traj_.GetTau(node);
+            osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL) = -y;
 
-            osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL) =
-                    osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL);
+            osqp_instance_.upper_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL) = -y;
         } else {    // Dynamics only for the floating base
             // dtau_dq
             int col_start = GetDecisionIdx(node, Configuration);
@@ -1022,12 +1027,9 @@ namespace torc::mpc {
                 f.force_linear = traj_.GetForce(node, f.frame_name);
             }
 
-            osqp_instance_.lower_bounds.segment(row_start, FLOATING_VEL)
-                = -robot_model_->InverseDynamics(traj_.GetConfiguration(node),
-                    traj_.GetVelocity(node), ws_->acc, ws_->f_ext).head<FLOATING_VEL>();
+            osqp_instance_.lower_bounds.segment(row_start, FLOATING_VEL) = -y.head<FLOATING_VEL>();
 
-            osqp_instance_.upper_bounds.segment(row_start, FLOATING_VEL) =
-                    osqp_instance_.lower_bounds.segment(row_start, FLOATING_VEL);
+            osqp_instance_.upper_bounds.segment(row_start, FLOATING_VEL) = -y.head<FLOATING_VEL>();
         }
     }
 
@@ -1185,19 +1187,15 @@ namespace torc::mpc {
 
             holonomic_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
-            const auto full_sparsity = holonomic_constraint_[frame]->GetJacobianSparsityPatternSet();
-            const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
-            const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
-
             // dqk
             int col_start = GetDecisionIdx(node, Configuration);
             MatrixToTripletWithSparsitySet(jac.middleCols(0, vel_dim_), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_, dqk_sparsity);
+                constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dqk[frame]);
 
             // dvk
             col_start = GetDecisionIdx(node, Velocity);
             MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_, dvk_sparsity);
+                constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dvk[frame]);
 
             // Lower and upper bounds
             vectorx_t y;
@@ -1272,39 +1270,73 @@ namespace torc::mpc {
     }
 
     double FullOrderMpc::GetIDViolation(const vectorx_t &qp_res, int node, bool full_order) {
-        vectorx_t q;
-        ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
-            traj_.GetConfiguration(node), q);
-        const vectorx_t v = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
-        const vectorx_t v2 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
-        const vectorx_t a = (v2 - v)/dt_[node];
 
-        // std::cout << "full order: " << full_order << std::endl;
+        vectorx_t x(inverse_dynamics_constraint_->GetDomainSize());
+        vectorx_t p(inverse_dynamics_constraint_->GetParameterSize());
+        vectorx_t y;
 
-        std::vector<models::ExternalForce<double>> f_ext;
-        int idx = GetDecisionIdx(node, GroundForce);
-        for (const auto& frame : contact_frames_) {
-            f_ext.emplace_back(frame, qp_res.segment(idx, 3) + traj_.GetForce(node, frame));
-            // std::cout << "frame: " << frame << ", force: " << (qp_res.segment(idx, 3) + traj_.GetForce(node, frame)).transpose() << std::endl;
-            idx += 3;
+        vectorx_t qp_tau = vectorx_t::Zero(input_dim_);
+        if (full_order) {
+            qp_tau = qp_res.segment(GetDecisionIdx(node, Torque), input_dim_);
         }
 
-        const vectorx_t tau_id = robot_model_->InverseDynamics(q, v, a, f_ext);
+        x << qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_),
+            qp_res.segment(GetDecisionIdx(node, Velocity), vel_dim_),
+            qp_res.segment(GetDecisionIdx(node + 1, Velocity), vel_dim_),
+            qp_tau,
+            qp_res.segment(GetDecisionIdx(node, GroundForce), CONTACT_3DOF*num_contact_locations_);
 
-        // std::cout << "tau id: " << tau_id.transpose() << std::endl;
+        vectorx_t f(CONTACT_3DOF*num_contact_locations_);
+        int f_idx = 0;
+        for (const auto& frame : contact_frames_) {
+            f.segment<CONTACT_3DOF>(f_idx) = traj_.GetForce(node, frame);
+            f_idx += CONTACT_3DOF;
+        }
+
+        p << traj_.GetConfiguration(node), traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
+            traj_.GetTau(node), f, dt_[node];
+
+        inverse_dynamics_constraint_->GetFunctionValue(x, p, y);
 
         if (full_order) {
-            vectorx_t tau(robot_model_->GetVelDim());
-            tau << Eigen::Vector<double, FLOATING_VEL>::Zero(),
-                qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()) + traj_.GetTau(node);
-
-            // std::cout << "tau dec: " << tau.transpose() << std::endl;
-            // std::cout << std::endl;
-
-            return (tau - tau_id).squaredNorm();
+            return y.squaredNorm();
         } else {
-            return tau_id.head<FLOATING_VEL>().squaredNorm();
+            return y.head<FLOATING_VEL>().squaredNorm();
         }
+
+        // vectorx_t q;
+        // ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+        //     traj_.GetConfiguration(node), q);
+        // const vectorx_t v = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
+        // const vectorx_t v2 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
+        // const vectorx_t a = (v2 - v)/dt_[node];
+        //
+        // // std::cout << "full order: " << full_order << std::endl;
+        //
+        // std::vector<models::ExternalForce<double>> f_ext;
+        // int idx = GetDecisionIdx(node, GroundForce);
+        // for (const auto& frame : contact_frames_) {
+        //     f_ext.emplace_back(frame, qp_res.segment(idx, 3) + traj_.GetForce(node, frame));
+        //     // std::cout << "frame: " << frame << ", force: " << (qp_res.segment(idx, 3) + traj_.GetForce(node, frame)).transpose() << std::endl;
+        //     idx += 3;
+        // }
+        //
+        // const vectorx_t tau_id = robot_model_->InverseDynamics(q, v, a, f_ext);
+        //
+        // // std::cout << "tau id: " << tau_id.transpose() << std::endl;
+        //
+        // if (full_order) {
+        //     vectorx_t tau(robot_model_->GetVelDim());
+        //     tau << Eigen::Vector<double, FLOATING_VEL>::Zero(),
+        //         qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()) + traj_.GetTau(node);
+        //
+        //     // std::cout << "tau dec: " << tau.transpose() << std::endl;
+        //     // std::cout << std::endl;
+        //
+        //     return (tau - tau_id).squaredNorm();
+        // } else {
+        //     return tau_id.head<FLOATING_VEL>().squaredNorm();
+        // }
     }
 
     double FullOrderMpc::GetFrictionViolation(const vectorx_t &qp_res, int node) {
@@ -1428,61 +1460,61 @@ namespace torc::mpc {
     // -------------------------------------- //
     // -------- Linearization Helpers ------- //
     // -------------------------------------- //
-    matrix3_t FullOrderMpc::QuatIntegrationLinearizationXi(int node) {
-        assert(node != nodes_ - 1);
-        constexpr double DELTA = 1e-8;
+    // matrix3_t FullOrderMpc::QuatIntegrationLinearizationXi(int node) {
+    //     assert(node != nodes_ - 1);
+    //     constexpr double DELTA = 1e-8;
+    //
+    //     // TODO: Change for code gen derivative
+    //     quat_t qbar_kp1 = traj_.GetQuat(node+1);
+    //     quat_t qbar_k = traj_.GetQuat(node);
+    //     vector3_t xi = vector3_t::Zero();
+    //
+    //     // Use the velocity from the current and next node
+    //     vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
+    //     vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
+    //     vector3_t w = 0.5*(wk + wkp1);
+    //
+    //     const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+    //     matrix3_t update_fd = matrix3_t::Zero();
+    //     for (int i = 0; i < 3; i++) {
+    //         xi(i) += DELTA;
+    //         vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+    //         update_fd.col(i) = (xi2_kp1 - xi1_kp1)/DELTA;
+    //         xi(i) -= DELTA;
+    //     }
+    //
+    //     return update_fd;
+    // }
 
-        // TODO: Change for code gen derivative
-        quat_t qbar_kp1 = traj_.GetQuat(node+1);
-        quat_t qbar_k = traj_.GetQuat(node);
-        vector3_t xi = vector3_t::Zero();
+    // matrix3_t FullOrderMpc::QuatIntegrationLinearizationW(int node) {
+    //     assert(node != nodes_ - 1);
+    //
+    //     // TODO: Change for code gen derivative
+    //     quat_t qbar_kp1 = traj_.GetQuat(node+1);
+    //     quat_t qbar_k = traj_.GetQuat(node);
+    //     vector3_t xi = vector3_t::Zero();
+    //     // TODO: Verify that this is in the correct frame!
+    //     // Use the velocity from the current and next node
+    //     vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
+    //     vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
+    //     vector3_t w = 0.5*(wk + wkp1);
+    //
+    //     const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+    //     matrix3_t update_fd = matrix3_t::Zero();
+    //     for (int i = 0; i < 3; i++) {
+    //         w(i) += FD_DELTA;
+    //         vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
+    //         for (int j = 0; j < 3; j++) {
+    //             update_fd(j, i) = (xi2_kp1(j) - xi1_kp1(j))/FD_DELTA;
+    //         }
+    //
+    //         w(i) -= FD_DELTA;
+    //     }
+    //
+    //     return 0.5*update_fd;
+    // }
 
-        // Use the velocity from the current and next node
-        vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
-        vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
-        vector3_t w = 0.5*(wk + wkp1);
-
-        const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-        matrix3_t update_fd = matrix3_t::Zero();
-        for (int i = 0; i < 3; i++) {
-            xi(i) += DELTA;
-            vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-            update_fd.col(i) = (xi2_kp1 - xi1_kp1)/DELTA;
-            xi(i) -= DELTA;
-        }
-
-        return update_fd;
-    }
-
-    matrix3_t FullOrderMpc::QuatIntegrationLinearizationW(int node) {
-        assert(node != nodes_ - 1);
-
-        // TODO: Change for code gen derivative
-        quat_t qbar_kp1 = traj_.GetQuat(node+1);
-        quat_t qbar_k = traj_.GetQuat(node);
-        vector3_t xi = vector3_t::Zero();
-        // TODO: Verify that this is in the correct frame!
-        // Use the velocity from the current and next node
-        vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
-        vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
-        vector3_t w = 0.5*(wk + wkp1);
-
-        const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-        matrix3_t update_fd = matrix3_t::Zero();
-        for (int i = 0; i < 3; i++) {
-            w(i) += FD_DELTA;
-            vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-            for (int j = 0; j < 3; j++) {
-                update_fd(j, i) = (xi2_kp1(j) - xi1_kp1(j))/FD_DELTA;
-            }
-
-            w(i) -= FD_DELTA;
-        }
-
-        return 0.5*update_fd;
-    }
-
-    void FullOrderMpc::InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df) {
+    void FullOrderMpc::InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau) {
         // Linearizing about the nominal trajectory
         vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
 
@@ -1502,7 +1534,7 @@ namespace torc::mpc {
         dtau_dq = jac.middleCols(0, vel_dim_);
         dtau_dv1 = jac.middleCols(vel_dim_, vel_dim_);
         dtau_dv2 = jac.middleCols(2*vel_dim_, vel_dim_);
-        // TODO: Add deriv wrt tau
+        dtau = jac.middleCols(3*vel_dim_, input_dim_);
         dtau_df =  jac.middleCols(3*vel_dim_ + input_dim_, CONTACT_3DOF*num_contact_locations_);
     }
 
@@ -1536,47 +1568,47 @@ namespace torc::mpc {
     }
 
 
-    matrix43_t FullOrderMpc::QuatLinearization(int node) {
-        matrix43_t q_lin;
+    // matrix43_t FullOrderMpc::QuatLinearization(int node) {
+    //     matrix43_t q_lin;
+    //
+    //     quat_t qbar = traj_.GetQuat(node);
+    //     quat_t q_pert;
+    //     vector3_t pert = vector3_t::Zero();
+    //     for (int i = 0; i < 3; i++) {
+    //         pert(i) += FD_DELTA;
+    //         pinocchio::quaternion::exp3(pert, q_pert);
+    //         pert(i) -= FD_DELTA;
+    //         q_pert = qbar*q_pert;
+    //
+    //         q_lin(0, i) = (q_pert.x() - qbar.x())/FD_DELTA;
+    //         q_lin(1, i) = (q_pert.y() - qbar.y())/FD_DELTA;
+    //         q_lin(2, i) = (q_pert.z() - qbar.z())/FD_DELTA;
+    //         q_lin(3, i) = (q_pert.w() - qbar.w())/FD_DELTA;
+    //     }
+    //
+    //     return q_lin;
+    // }
 
-        quat_t qbar = traj_.GetQuat(node);
-        quat_t q_pert;
-        vector3_t pert = vector3_t::Zero();
-        for (int i = 0; i < 3; i++) {
-            pert(i) += FD_DELTA;
-            pinocchio::quaternion::exp3(pert, q_pert);
-            pert(i) -= FD_DELTA;
-            q_pert = qbar*q_pert;
+    // void FullOrderMpc::SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian) {
+    //     // The world frame seems to behave better numerically, but I really want the LOCAL_WORLD_ALIGNED, not WORLD.
+    //     // TODO: Speed up by not calling ComputeJointJacobian each time.
+    //     robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
+    //     // std::cout << "frame: " << frame << std::endl;
+    //     // std::cout << "local world aligned: \n" << jacobian << std::endl;
+    //
+    //     // *** Note *** The pinocchio body velocity is in the local frame, put I want perturbations to
+    //     // configurations in the world frame, so we can always set the first 3x3 mat to identity
+    //     jacobian.topLeftCorner<3,3>().setIdentity();
+    // }
 
-            q_lin(0, i) = (q_pert.x() - qbar.x())/FD_DELTA;
-            q_lin(1, i) = (q_pert.y() - qbar.y())/FD_DELTA;
-            q_lin(2, i) = (q_pert.z() - qbar.z())/FD_DELTA;
-            q_lin(3, i) = (q_pert.w() - qbar.w())/FD_DELTA;
-        }
+    // void FullOrderMpc::HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian) {
+    //     robot_model_->FrameVelDerivWrtConfiguration(traj_.GetConfiguration(node),
+    //         traj_.GetVelocity(node), vectorx_t::Zero(robot_model_->GetVelDim()), frame, jacobian);
+    // }
 
-        return q_lin;
-    }
-
-    void FullOrderMpc::SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian) {
-        // The world frame seems to behave better numerically, but I really want the LOCAL_WORLD_ALIGNED, not WORLD.
-        // TODO: Speed up by not calling ComputeJointJacobian each time.
-        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
-        // std::cout << "frame: " << frame << std::endl;
-        // std::cout << "local world aligned: \n" << jacobian << std::endl;
-
-        // *** Note *** The pinocchio body velocity is in the local frame, put I want perturbations to
-        // configurations in the world frame, so we can always set the first 3x3 mat to identity
-        jacobian.topLeftCorner<3,3>().setIdentity();
-    }
-
-    void FullOrderMpc::HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian) {
-        robot_model_->FrameVelDerivWrtConfiguration(traj_.GetConfiguration(node),
-            traj_.GetVelocity(node), vectorx_t::Zero(robot_model_->GetVelDim()), frame, jacobian);
-    }
-
-    void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
-        robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
-    }
+    // void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
+    //     robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
+    // }
 
 
     // ------------------------------------------------- //
@@ -1584,30 +1616,30 @@ namespace torc::mpc {
     // ------------------------------------------------- //
     void FullOrderMpc::CreateCostPattern() {
         for (int i = 0; i < nodes_; i++) {
-            for (const auto& data :  cost_data_) {
+            for (auto& data :  cost_data_) {
                 if (data.type == CostTypes::Configuration) {
                     int decision_idx = GetDecisionIdx(i, Configuration);
-                    const auto config_sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
-                    AddSparsitySet(config_sparsity, decision_idx, decision_idx, objective_triplets_);
+                    data.sp_pattern = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
                 } else if (data.type == CostTypes::VelocityTracking) {
                     int decision_idx = GetDecisionIdx(i, Velocity);
-                    const auto vel_sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
-                    AddSparsitySet(vel_sparsity, decision_idx, decision_idx, objective_triplets_);
+                    data.sp_pattern = cost_.GetHessianSparsityPattern(data.constraint_name);
+                    AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
                 } else if (data.type == CostTypes::ForceReg) {
                     int decision_idx = GetDecisionIdx(i, GroundForce);
                     for (const auto& frame: contact_frames_) {
-                        const auto force_reg_sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
-                        AddSparsitySet(force_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
+                        data.sp_pattern = cost_.GetHessianSparsityPattern(data.constraint_name);
+                        AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
                         decision_idx += CONTACT_3DOF;
                     }
                 } else if (data.type == CostTypes::TorqueReg && i < nodes_full_dynamics_) {
                     int decision_idx = GetDecisionIdx(i, Torque);
-                    const auto torque_reg_sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
-                    AddSparsitySet(torque_reg_sparsity, decision_idx, decision_idx, objective_triplets_);
+                    data.sp_pattern = cost_.GetHessianSparsityPattern(data.constraint_name);
+                    AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
                 } else if (data.type == CostTypes::ForwardKinematics && i > 0) {
                     int decision_idx = GetDecisionIdx(i, Configuration);
-                    const auto config_sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
-                    AddSparsitySet(config_sparsity, decision_idx, decision_idx, objective_triplets_);
+                    data.sp_pattern = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
                 }
             }
         }
@@ -1657,9 +1689,8 @@ namespace torc::mpc {
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                             scaling * ws_->obj_config_vector;
 
-                    const auto sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_,
-                                                   objective_triplet_idx_, sparsity);
+                                                   objective_triplet_idx_, data.sp_pattern);
                 } else if (data.type == CostTypes::VelocityTracking) {
                     int decision_idx = GetDecisionIdx(node, Velocity);
 
@@ -1669,10 +1700,8 @@ namespace torc::mpc {
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                             scaling * ws_->obj_vel_vector;
 
-                    const auto sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
-
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_,
-                                                   objective_triplet_idx_, sparsity);
+                                                   objective_triplet_idx_, data.sp_pattern);
                 } else if (data.type == CostTypes::ForceReg) {
                     int force_idx = GetDecisionIdx(node, GroundForce);
                     for (const auto& frame: contact_frames_) {
@@ -1684,10 +1713,8 @@ namespace torc::mpc {
                         osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
                                 scaling * ws_->obj_force_vector;
 
-                        const auto sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
-
                         MatrixToTripletWithSparsitySet(scaling * ws_->obj_force_mat, force_idx, force_idx, objective_triplets_,
-                                                       objective_triplet_idx_, sparsity);
+                                                       objective_triplet_idx_, data.sp_pattern);
 
                         force_idx += CONTACT_3DOF;
                     }
@@ -1701,10 +1728,8 @@ namespace torc::mpc {
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
                             scaling * ws_->obj_tau_vector;
 
-                    const auto sparsity = cost_.GetHessianSparsityPattern(data.constraint_name);
-
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_,
-                                                   objective_triplet_idx_, sparsity);
+                                                   objective_triplet_idx_, data.sp_pattern);
                 } else if (data.type == CostTypes::ForwardKinematics && node > 0) {
 
                     // TODO: Only activate for the first stance + swing (and possibly even second stance)
@@ -1720,9 +1745,8 @@ namespace torc::mpc {
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                             scaling * linear_term;
 
-                    const auto sparsity = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
                     MatrixToTripletWithSparsitySet(scaling * hess_term, decision_idx, decision_idx, objective_triplets_,
-                                                   objective_triplet_idx_, sparsity);
+                                                   objective_triplet_idx_, data.sp_pattern);
                 }
             }
         }
@@ -2121,26 +2145,26 @@ namespace torc::mpc {
         const int row_start = GetConstraintRow(node, Integrator);
 
         const auto full_sparsity = integration_constraint_->GetJacobianSparsityPatternSet();
-        const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
-        const auto dqkp1_sparisty = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
-        const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 2*vel_dim_, vel_dim_);
-        const auto dvkp1_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 3*vel_dim_, vel_dim_);
+        ws_->sp_int_dqk = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
+        ws_->sp_int_dqkp1 = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
+        ws_->sp_int_dvk = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 2*vel_dim_, vel_dim_);
+        ws_->sp_int_dvkp1 = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 3*vel_dim_, vel_dim_);
 
         // dqk pattern
         int col_start = GetDecisionIdx(node, Configuration);
-        AddSparsitySet(dqk_sparsity, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(ws_->sp_int_dqk, row_start, col_start, constraint_triplets_);
 
         // dvk pattern
         col_start = GetDecisionIdx(node, Velocity);
-        AddSparsitySet(dvk_sparsity, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(ws_->sp_int_dvk, row_start, col_start, constraint_triplets_);
 
         // dvkp1
         col_start = GetDecisionIdx(node + 1, Velocity);
-        AddSparsitySet(dvkp1_sparsity, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(ws_->sp_int_dvkp1, row_start, col_start, constraint_triplets_);
 
         // q_kp1
         col_start = GetDecisionIdx(node + 1, Configuration);
-        AddSparsitySet(dqkp1_sparisty, row_start, col_start, constraint_triplets_);
+        AddSparsitySet(ws_->sp_int_dqkp1, row_start, col_start, constraint_triplets_);
 
     }
 
@@ -2149,33 +2173,38 @@ namespace torc::mpc {
 
         const int row_start = GetConstraintRow(node, ID);
 
+
+        const auto sp_full = inverse_dynamics_constraint_->GetJacobianSparsityPatternSet();
+        ws_->sp_dq = ad::CppADInterface::GetSparsityPatternCols(sp_full, 0, vel_dim_);
+        ws_->sp_dvk = ad::CppADInterface::GetSparsityPatternCols(sp_full, vel_dim_, vel_dim_);
+        ws_->sp_dvkp1 = ad::CppADInterface::GetSparsityPatternCols(sp_full, 2*vel_dim_, vel_dim_);
+        ws_->sp_tau = ad::CppADInterface::GetSparsityPatternCols(sp_full, 3*vel_dim_, input_dim_);
+        ws_->sp_df = ad::CppADInterface::GetSparsityPatternCols(sp_full, 3*vel_dim_ + input_dim_, CONTACT_3DOF*num_contact_locations_);
+
+
         // Full order dynamics
         if (full_order) {
             // dtau_dq
             int col_start = GetDecisionIdx(node, Configuration);
-            ws_->id_config_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            MatrixToNewTriplet(ws_->id_config_mat, row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_dq, row_start, col_start, constraint_triplets_);
 
             // dtau_dv
             col_start = GetDecisionIdx(node, Velocity);
-            ws_->id_vel1_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            MatrixToNewTriplet(ws_->id_vel1_mat, row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_dvk, row_start, col_start, constraint_triplets_);
+
 
             // dtau_dtau
             col_start = GetDecisionIdx(node, Torque);
-            matrixx_t id;
-            id.setIdentity(robot_model_->GetNumInputs(), robot_model_->GetNumInputs());
-            MatrixToNewTriplet(id, row_start + FLOATING_VEL, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_tau, row_start, col_start, constraint_triplets_);
 
             // dtau_df
             col_start = GetDecisionIdx(node, GroundForce);
-            ws_->id_force_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, num_contact_locations_*CONTACT_3DOF, 1);
-            MatrixToNewTriplet(ws_->id_force_mat, row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_df, row_start, col_start, constraint_triplets_);
 
             // dtau_dv2
             col_start = GetDecisionIdx(node + 1, Velocity);
-            ws_->id_vel2_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            MatrixToNewTriplet(ws_->id_vel2_mat, row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_dvkp1, row_start, col_start, constraint_triplets_);
+
         } else {    // Floating base dynamics
             // dtau_dq
             int col_start = GetDecisionIdx(node, Configuration);
@@ -2297,14 +2326,14 @@ namespace torc::mpc {
 
         for (const auto& frame : contact_frames_) {
             const auto full_sparsity = holonomic_constraint_[frame]->GetJacobianSparsityPatternSet();
-            const auto dqk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
-            const auto dvk_sparsity = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
+            ws_->sp_hol_dqk[frame] = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, 0, vel_dim_);
+            ws_->sp_hol_dvk[frame] = ad::CppADInterface::GetSparsityPatternCols(full_sparsity, vel_dim_, vel_dim_);
 
             int col_start = GetDecisionIdx(node, Configuration);
-            AddSparsitySet(dqk_sparsity, row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_hol_dqk[frame], row_start, col_start, constraint_triplets_);
 
             col_start = GetDecisionIdx(node, Velocity);
-            AddSparsitySet(dvk_sparsity, row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_hol_dvk[frame], row_start, col_start, constraint_triplets_);
 
             row_start += 2;
         }
