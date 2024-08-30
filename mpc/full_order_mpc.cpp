@@ -76,6 +76,15 @@ namespace torc::mpc {
             ));
         }
 
+        inverse_dynamics_constraint_ = std::make_unique<ad::CppADInterface>(
+            std::bind(&FullOrderMpc::InverseDynamicsConstraint, this, contact_frames_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+            name + "_inverse_dynamics_constraint",
+            deriv_lib_path_,
+            ad::DerivativeOrder::FirstOrder, 3*vel_dim_ + input_dim_ + CONTACT_3DOF*num_contact_locations_,
+            1 + config_dim_ + 2*vel_dim_ + input_dim_ + CONTACT_3DOF*num_contact_locations_,
+            compile_derivatves_
+        );
+
     }
 
     FullOrderMpc::~FullOrderMpc() {
@@ -812,7 +821,6 @@ namespace torc::mpc {
         violation = vel.head<2>();
     }
 
-// TODO: Fix!
     void FullOrderMpc::SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_desheight, ad::ad_vector_t& violation) const {
         const ad::ad_vector_t& qkbar = qk_desheight.head(config_dim_);
         const ad::adcg_t& des_height = qk_desheight(config_dim_);
@@ -830,6 +838,50 @@ namespace torc::mpc {
         violation.resize(1);
         violation(0) = frame_pos(2) - des_height;
     }
+
+    void FullOrderMpc::InverseDynamicsConstraint(const std::vector<std::string>& frames,
+        const ad::ad_vector_t& dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t& qk_vk_vkp1_tauk_fk_dt, ad::ad_vector_t& violation) const {
+        // Decision variables
+        const ad::ad_vector_t& dqk = dqk_dvk_dvkp1_dtauk_dfk.head(vel_dim_);
+        const ad::ad_vector_t& dvk = dqk_dvk_dvkp1_dtauk_dfk.segment(vel_dim_, vel_dim_);
+        const ad::ad_vector_t& dvkp1 = dqk_dvk_dvkp1_dtauk_dfk.segment(2*vel_dim_, vel_dim_);
+        ad::ad_vector_t dtauk(vel_dim_);
+        dtauk << ad::ad_vector_t::Zero(FLOATING_VEL), dqk_dvk_dvkp1_dtauk_dfk.segment(3*vel_dim_, input_dim_);
+        const ad::ad_vector_t& dfk = dqk_dvk_dvkp1_dtauk_dfk.segment(3*vel_dim_ + input_dim_, CONTACT_3DOF*num_contact_locations_);
+
+        // Reference trajectory
+        const ad::ad_vector_t& qk = qk_vk_vkp1_tauk_fk_dt.head(config_dim_);
+        const ad::ad_vector_t& vk = qk_vk_vkp1_tauk_fk_dt.segment(config_dim_, vel_dim_);
+        const ad::ad_vector_t& vkp1 = qk_vk_vkp1_tauk_fk_dt.segment(config_dim_ + vel_dim_, vel_dim_);
+        ad::ad_vector_t tauk(vel_dim_);
+        tauk << ad::ad_vector_t::Zero(FLOATING_VEL), qk_vk_vkp1_tauk_fk_dt.segment(config_dim_ + 2*vel_dim_, input_dim_);
+        const ad::ad_vector_t& fk = qk_vk_vkp1_tauk_fk_dt.segment(config_dim_ + 2*vel_dim_ + input_dim_, CONTACT_3DOF*num_contact_locations_);
+        const ad::adcg_t& dt = qk_vk_vkp1_tauk_fk_dt(config_dim_ + 2*vel_dim_ + input_dim_ + CONTACT_3DOF*num_contact_locations_);
+
+        // Current values
+        const ad::ad_vector_t qk_curr = models::ConvertdqToq(dqk, qk);
+        const ad::ad_vector_t vk_curr = dvk + vk;
+        const ad::ad_vector_t vkp1_curr = dvkp1 + vkp1;
+        const ad::ad_vector_t tauk_curr = dtauk + tauk;
+        const ad::ad_vector_t fk_curr = dfk + fk;
+
+        // Intermediate values
+        const ad::ad_vector_t a = (vkp1_curr - vk_curr)/dt;
+        std::vector<models::ExternalForce<ad::adcg_t>> f_ext;
+
+        int idx = 0;
+        for (const auto& frame : frames) {
+            f_ext.emplace_back(frame, fk_curr.segment<CONTACT_3DOF>(idx));
+            idx += CONTACT_3DOF;
+        }
+
+        // Compute error
+        const ad::ad_vector_t tau_id = models::InverseDynamics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(),
+            qk_curr, vk_curr, a, f_ext);
+
+        violation = tau_id - tauk_curr;
+    }
+
 
 
     void FullOrderMpc::AddICConstraint() {
@@ -905,7 +957,7 @@ namespace torc::mpc {
         ws_->id_force_mat.setZero();
 
         // compute all derivative terms
-        InverseDynamicsLinearization(node, ws_->id_config_mat,
+        InverseDynamicsLinearizationAnalytic(node, ws_->id_config_mat,
             ws_->id_vel1_mat, ws_->id_vel2_mat, ws_->id_force_mat);
 
         // Full inverse dynamics
@@ -1229,7 +1281,7 @@ namespace torc::mpc {
 
         // std::cout << "full order: " << full_order << std::endl;
 
-        std::vector<models::ExternalForce> f_ext;
+        std::vector<models::ExternalForce<double>> f_ext;
         int idx = GetDecisionIdx(node, GroundForce);
         for (const auto& frame : contact_frames_) {
             f_ext.emplace_back(frame, qp_res.segment(idx, 3) + traj_.GetForce(node, frame));
@@ -1430,7 +1482,32 @@ namespace torc::mpc {
         return 0.5*update_fd;
     }
 
-    void FullOrderMpc::InverseDynamicsLinearization(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1,
+    void FullOrderMpc::InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df) {
+        // Linearizing about the nominal trajectory
+        vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
+
+        vectorx_t f(CONTACT_3DOF * num_contact_locations_);
+        int f_idx = 0;
+        for (const auto& frame : contact_frames_) {
+            f.segment<CONTACT_3DOF>(f_idx) = traj_.GetForce(node, frame);
+            f_idx += CONTACT_3DOF;
+        }
+
+        vectorx_t p(inverse_dynamics_constraint_->GetParameterSize());
+        p << traj_.GetConfiguration(node), traj_.GetVelocity(node), traj_.GetVelocity(node + 1), traj_.GetTau(node), f, dt_[node];
+
+        matrixx_t jac;
+        inverse_dynamics_constraint_->GetJacobian(x, p, jac);
+
+        dtau_dq = jac.middleCols(0, vel_dim_);
+        dtau_dv1 = jac.middleCols(vel_dim_, vel_dim_);
+        dtau_dv2 = jac.middleCols(2*vel_dim_, vel_dim_);
+        // TODO: Add deriv wrt tau
+        dtau_df =  jac.middleCols(3*vel_dim_ + input_dim_, CONTACT_3DOF*num_contact_locations_);
+    }
+
+
+    void FullOrderMpc::InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1,
         matrixx_t& dtau_dv2, matrixx_t& dtau_df) {
         assert(node != nodes_ - 1);
 
@@ -1441,7 +1518,7 @@ namespace torc::mpc {
 
         // TODO: Use the ws_->f_ext
         // Get external forces
-        std::vector<models::ExternalForce> f_ext;
+        std::vector<models::ExternalForce<double>> f_ext;
         for (const auto& frame : contact_frames_) {
             f_ext.emplace_back(frame, traj_.GetForce(node, frame));
         }

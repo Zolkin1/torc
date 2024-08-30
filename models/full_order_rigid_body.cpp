@@ -75,7 +75,7 @@ namespace torc::models {
     }
 
     vectorx_t FullOrderRigidBody::GetDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& input,
-                                              const std::vector<ExternalForce>& f_ext) {
+                                              const std::vector<ExternalForce<double>>& f_ext) {
         const vectorx_t tau = InputsToTau(input);
         pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
         pinocchio::aba(pin_model_, *pin_data_, q, v, tau, forces);
@@ -106,7 +106,7 @@ namespace torc::models {
     }
 
     vectorx_t FullOrderRigidBody::InverseDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a,
-                                                  const std::vector<ExternalForce>& f_ext) {
+                                                  const std::vector<ExternalForce<double>>& f_ext) {
 //                                                  const pinocchio::container::aligned_vector<pinocchio::Force>& forces) {
         // Convert force to a pinocchio force
         pinocchio::container::aligned_vector<pinocchio::Force> forces = ConvertExternalForcesToPin(q, f_ext);
@@ -206,7 +206,7 @@ namespace torc::models {
                                                        const vectorx_t& v,
                                                        const vectorx_t& a,
 //                                                       const pinocchio::container::aligned_vector<pinocchio::Force>& forces,
-                                                       const std::vector<ExternalForce>& f_ext,
+                                                       const std::vector<ExternalForce<double>>& f_ext,
                                                        matrixx_t& dtau_dq,
                                                        matrixx_t& dtau_dv,
                                                        matrixx_t& dtau_da,
@@ -500,7 +500,7 @@ namespace torc::models {
     }
 
     pinocchio::container::aligned_vector<pinocchio::Force> FullOrderRigidBody::ConvertExternalForcesToPin(const vectorx_t& q,
-            const std::vector<ExternalForce>& f_ext) const {
+            const std::vector<ExternalForce<double>>& f_ext) const {
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
 
@@ -531,7 +531,7 @@ namespace torc::models {
     }
 
     // TODO: Delete
-    matrixx_t FullOrderRigidBody::ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce>& f_ext) {
+    matrixx_t FullOrderRigidBody::ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce<double>>& f_ext) {
         // For now we will finite difference, but later we will use ad codegen
         // TODO: Use codegen
         const static double FD_DELTA = 1e-8;

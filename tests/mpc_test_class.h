@@ -186,7 +186,7 @@ namespace torc::mpc {
 
             dt_[0] = 0.02;;
 
-            std::vector<models::ExternalForce> f_ext;
+            std::vector<models::ExternalForce<double>> f_ext;
             for (const auto& frame : contact_frames_) {
                 vector3_t force = vector3_t::Random().cwiseMax(-100).cwiseMin(100); //vector3_t::Zero();
                 // std::cout << "force: " << force.transpose() << std::endl;
@@ -206,7 +206,25 @@ namespace torc::mpc {
             dtau_dv2 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
             dtau_df = matrixx_t::Zero(robot_model_->GetVelDim(), num_contact_locations_*3);
 
-            InverseDynamicsLinearization(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+            InverseDynamicsLinearizationAnalytic(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+
+            // AD
+            matrixx_t dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad;
+            dtau_dq_ad = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            dtau_dv1_ad = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            dtau_dv2_ad = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
+            dtau_df_ad = matrixx_t::Zero(robot_model_->GetVelDim(), num_contact_locations_*3);
+
+            InverseDynamicsLinearizationAD(0, dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad);
+
+            // std::cout << "dq analytic: \n" << dtau_dq << std::endl;
+            // std::cout << "dq ad: \n" << dtau_dq_ad << std::endl;
+
+            CHECK(dtau_dq_ad.isApprox(dtau_dq, FD_MARGIN));
+            CHECK(dtau_dv1_ad.isApprox(dtau_dv1));
+            CHECK(dtau_dv2_ad.isApprox(dtau_dv2));
+            CHECK(dtau_df_ad.isApprox(dtau_df));
+
 
             // Finite Difference
             // ----- Configuration ----- //
@@ -562,11 +580,16 @@ namespace torc::mpc {
             vectorx_t v_rand = robot_model_->GetRandomVel();
             vectorx_t v2_rand = v_rand + (robot_model_->GetRandomVel() * 0.05);
 
+            vectorx_t f(CONTACT_3DOF*num_contact_locations_);
+
             dt_[0] = 0.02;
 
-            std::vector<models::ExternalForce> f_ext;
+            int f_idx = 0;
+            std::vector<models::ExternalForce<double>> f_ext;
             for (const auto& frame : contact_frames_) {
                 vector3_t force = vector3_t::Random().cwiseMax(-100).cwiseMin(100); //vector3_t::Zero();
+                f.segment(f_idx, CONTACT_3DOF) = force;
+                f_idx += CONTACT_3DOF;
                 std::cout << "force: " << force.transpose() << std::endl;
                 traj_.SetForce(0, frame, force);
                 f_ext.emplace_back(frame, force);
@@ -585,7 +608,22 @@ namespace torc::mpc {
             dtau_df = matrixx_t::Zero(robot_model_->GetVelDim(), num_contact_locations_*3);
 
             BENCHMARK("inverse dynamics lin") {
-                InverseDynamicsLinearization(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+                InverseDynamicsLinearizationAnalytic(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+            };
+
+            // Autodiff
+            vectorx_t tau_temp(input_dim_);
+            tau_temp = vectorx_t::Ones(input_dim_);
+            traj_.SetTau(0, tau_temp);
+
+            vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
+            vectorx_t p(inverse_dynamics_constraint_->GetParameterSize());
+            p << traj_.GetConfiguration(0), traj_.GetVelocity(0), traj_.GetVelocity(1), tau_temp, f;
+            matrixx_t jac;
+
+            BENCHMARK("inverse dynamics lin AD") {
+                InverseDynamicsLinearizationAD(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+                // inverse_dynamics_constraint_->GetJacobian(x, p, jac);
             };
 
         }

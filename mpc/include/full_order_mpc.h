@@ -186,13 +186,15 @@ namespace torc::mpc {
             vectorx_t obj_vel_vector;
             vectorx_t obj_tau_vector;
             vectorx_t obj_force_vector;
-            std::vector<models::ExternalForce> f_ext;
+            std::vector<models::ExternalForce<double>> f_ext;
         };
     // -------- Constraints -------- //
         void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_vk_vkp1, const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1,
             ad::ad_vector_t& violation) const;
         void HolonomicConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation) const;
         void SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_desheight, ad::ad_vector_t& violation) const;
+        void InverseDynamicsConstraint(const std::vector<std::string>& frames,
+            const ad::ad_vector_t& dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t& qk_vk_vkp1_tauk_fk_dt, ad::ad_vector_t& violation) const;
 
     // -------- Constraint Creation -------- //
         void CreateConstraints();
@@ -222,7 +224,8 @@ namespace torc::mpc {
         matrix3_t QuatIntegrationLinearizationXi(int node);
         matrix3_t QuatIntegrationLinearizationW(int node);
 
-        void InverseDynamicsLinearization(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
+        void InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
+        void InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
 
         matrix43_t QuatLinearization(int node);
 

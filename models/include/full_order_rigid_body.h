@@ -16,11 +16,12 @@ namespace torc::models {
     using matrixx_t = Eigen::MatrixXd;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
 
+    template <typename ScalarT>
     struct ExternalForce {
         std::string frame_name;
-        vector3_t force_linear;
+        Eigen::Vector3<ScalarT> force_linear;
 
-        ExternalForce(const std::string& frame, const vector3_t& force) {
+        ExternalForce(const std::string& frame, const Eigen::Vector3<ScalarT>& force) {
             frame_name = frame;
             force_linear = force;
         }
@@ -52,14 +53,14 @@ namespace torc::models {
 
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& q, const vectorx_t& v,
                                             const vectorx_t& input,
-                                            const std::vector<ExternalForce>& f_ext);
+                                            const std::vector<ExternalForce<double>>& f_ext);
 
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input,
                                             const RobotContactInfo& contact_info) const;
 
         [[nodiscard]] vectorx_t InverseDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a,
-                                                const std::vector<ExternalForce>& f_ext);
+                                                const std::vector<ExternalForce<double>>& f_ext);
 //                                                const pinocchio::container::aligned_vector<pinocchio::Force>& forces);
 
         vectorx_t GetImpulseDynamics(const vectorx_t& state,
@@ -84,7 +85,7 @@ namespace torc::models {
                                        const vectorx_t& v,
                                        const vectorx_t& a,
 //                                       const pinocchio::container::aligned_vector<pinocchio::Force>& forces,
-                                       const std::vector<ExternalForce>& f_ext,
+                                       const std::vector<ExternalForce<double>>& f_ext,
                                        matrixx_t& dtau_dq,
                                        matrixx_t& dtau_dv,
                                        matrixx_t& dtau_da,
@@ -134,9 +135,9 @@ namespace torc::models {
 //        [[nodiscard]] vectorx_t TauToInputs(const vectorx_t& tau) const;
 
         [[nodiscard]] pinocchio::container::aligned_vector<pinocchio::Force> ConvertExternalForcesToPin(const vectorx_t& q,
-                                                                                                        const std::vector<ExternalForce>& f_ext) const;
+                                                                                                        const std::vector<ExternalForce<double>>& f_ext) const;
 
-        matrixx_t ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce>& f_ext);
+        matrixx_t ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce<double>>& f_ext);
 
         // DEBUG ------
         pinocchio::Model GetModel() const;

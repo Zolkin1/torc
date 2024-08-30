@@ -67,7 +67,7 @@ TEST_CASE("MPC Test Class Achilles", "[mpc]") {
     mpc.CheckDefaultSwingTraj();
     mpc.CheckSwingHeightConstraint();
     // mpc.BenchmarkQuaternionIntegrationLin();
-    // mpc.BenchmarkInverseDynamicsLin();
+    mpc.BenchmarkInverseDynamicsLin();
     // mpc.BenchmarkQuaternionConfigurationLin();
     // mpc.BenchmarkSwingHeightLin();
     // mpc.BenchmarkHolonomicLin();
