@@ -34,7 +34,10 @@ int main() {
     // cs.InsertContact("left_foot", 0, 1);
     cs.InsertContact("foot_front_left", 0, 10);
     cs.InsertContact("foot_rear_left", 0, 10);
-    mpc.UpdateContactScheduleAndSwingTraj(cs, 0.08, 0.015, 0.5);
+    const double apex_height = 0.08;
+    const double foot_height = 0.015;
+    const double apex_time = 0.5;
+    mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
@@ -110,8 +113,51 @@ int main() {
         vectorx_t v_current;
         traj.GetVelocityInterp(0.01, v_current);
 
+        cs.ShiftContacts(-0.01);
+        mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
+
         mpc.Compute(q_current, v_current, traj);
         // mpc.Compute(q_target, v_target, traj);
+
+        double temp_time = 0;
+        bool bad_force = false;
+        for (int node = 0; node < traj.GetNumNodes(); node++) {
+            for (const auto& frame : traj.GetContactFrames()) {
+                if (!mpc.PlannedContact(frame, node)) { //!cs.InContact(frame, temp_time)) {
+                    vector3_t force_out;
+                    // traj.GetForceInterp(temp_time, frame, force_out);
+                    force_out = traj.GetForce(node, frame);
+                    if (force_out.norm() > 1) {
+                        std::cerr << "Node: " << node << ", time: " << temp_time << std::endl;
+                        std::cerr << "Force: " << force_out.transpose() << std::endl;
+                        std::cerr << "Force norm: " << force_out.norm() << std::endl;
+                        bad_force = true;
+                    }
+                }
+            }
+            temp_time += traj.GetDtVec()[node];
+        }
+
+        std::cerr << "I: " << i << std::endl;
+
+        if (bad_force) {
+            for (int i = 0; i < traj.GetNumNodes(); i++) {
+                std::cout << "Node: " << i << std::endl;
+                std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+                std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+                // std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+                achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
+                for (const auto& frame : mpc.GetContactFrames()) {
+                    std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;
+                    std::cout << "vel: " << achilles.GetFrameState(frame).vel.linear().transpose() << std::endl;
+                    std::cout << "force: " << traj.GetForce(i, frame).transpose() << std::endl;
+                }
+                std::cout << std::endl;
+            }
+
+            mpc.PrintContactSchedule();
+            throw std::runtime_error("Force norm too large!");
+        }
     }
 
 

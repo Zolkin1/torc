@@ -22,7 +22,7 @@ solver_settings:
   alpha: 1.6 # 1.6, 1.1
   sigma: 1e-6 # 1e-10
   adaptive_rho: False
-  max_iter: 200
+  max_iter: 20
   scaling: 10
 constraints:
   friction_coef: 0.5  # TODO: Tune this

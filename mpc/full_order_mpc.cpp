@@ -996,19 +996,18 @@ namespace torc::mpc {
             // Setting force to zero when in swing
             DiagonalScalarMatrixToTriplet((1-in_contact_[frame][node])*1, row_start, col_start, CONTACT_3DOF,
                 constraint_triplets_, constraint_triplet_idx_);
-            osqp_instance_.lower_bounds.segment(row_start, CONTACT_3DOF).setZero();
-            osqp_instance_.upper_bounds.segment(row_start, CONTACT_3DOF).setZero();
+            osqp_instance_.lower_bounds.segment(row_start, CONTACT_3DOF) = -(1-in_contact_[frame][node])*traj_.GetForce(node, frame);
+            osqp_instance_.upper_bounds.segment(row_start, CONTACT_3DOF) = -(1-in_contact_[frame][node])*traj_.GetForce(node, frame);
 
             row_start += CONTACT_3DOF;
 
             // Force in friction cone when in contact
             if (in_contact_[frame][node]) {
-                MatrixToTriplet(in_contact_[frame][node]*ws_->fric_cone_mat, row_start, col_start,
+                MatrixToTriplet(ws_->fric_cone_mat, row_start, col_start,
                    constraint_triplets_, constraint_triplet_idx_, true);
 
                 osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setConstant(-std::numeric_limits<double>::max());
-                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
-                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE) -= in_contact_[frame][node]*ws_->fric_cone_mat*traj_.GetForce(node, frame);
+                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE) = -ws_->fric_cone_mat*traj_.GetForce(node, frame);
             } else {
                 for (int i = 0; i < ws_->fric_cone_mat.rows(); i++) {
                     for (int j = 0; j < ws_->fric_cone_mat.cols(); j++) {
@@ -2615,6 +2614,19 @@ namespace torc::mpc {
         swing_traj_[frame] = swing_traj;
     }
 
+    bool FullOrderMpc::PlannedContact(const std::string& frame, int node) const {
+        try {
+            int in_contact = in_contact_.at(frame).at(node);
+            if (in_contact != 0) {
+                return true;
+            }
+            return false;
+        } catch (const std::out_of_range& e) {
+            throw std::runtime_error("Frame or node not found!");
+        }
+    }
+
+
     void FullOrderMpc::PrintStatistics() const {
         using std::setw;
         using std::setfill;
@@ -2712,7 +2724,8 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::PrintContactSchedule() const {
-        std::cout << std::setw(17) << "";
+        std::cout << std::setfill(' ');
+        std::cout << std::setw(22) << "";
         double time = 0.00;
         for (int node = 0; node < nodes_; node++) {
             std::cout << std::setw(1) << std::fixed << std::setprecision(2) << " " << time;
@@ -2723,7 +2736,7 @@ namespace torc::mpc {
         for (const auto& frame : contact_frames_) {
             std::cout << std::endl;
 
-            std::cout << std::setw(15) << frame << "  ";
+            std::cout << std::setw(20) << frame << "  ";
             for (int node = 0; node < nodes_; node++) {
                 if (in_contact_.at(frame)[node]) {
                     std::cout << " ____";

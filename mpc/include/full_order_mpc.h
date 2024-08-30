@@ -139,6 +139,7 @@ namespace torc::mpc {
 
         void SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj);
 
+        bool PlannedContact(const std::string& frame, int node) const;
 
         ~FullOrderMpc();
 
