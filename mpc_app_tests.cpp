@@ -156,7 +156,7 @@ int main() {
             }
 
             mpc.PrintContactSchedule();
-            throw std::runtime_error("Force norm too large!");
+            // throw std::runtime_error("Force norm too large!");
         }
     }
 

@@ -190,7 +190,6 @@ namespace torc::mpc {
                 linear_term = 2*jac.transpose()*y;
 
                 cost_fcn_terms_[name]->GetHessian(vectorx_t::Zero(vel_size_), p, 2*y, hessian_term);
-                // TODO: Deal with sparsity from jacobain!
                 hessian_term += 2*jac.transpose() * jac;
 
             } else if (data->type == TorqueReg) {
