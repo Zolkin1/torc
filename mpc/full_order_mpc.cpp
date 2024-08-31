@@ -1189,19 +1189,19 @@ namespace torc::mpc {
 
             // dqk
             int col_start = GetDecisionIdx(node, Configuration);
-            MatrixToTripletWithSparsitySet(jac.middleCols(0, vel_dim_), row_start, col_start,
+            MatrixToTripletWithSparsitySet(in_contact_[frame][node]*jac.middleCols(0, vel_dim_), row_start, col_start,
                 constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dqk[frame]);
 
             // dvk
             col_start = GetDecisionIdx(node, Velocity);
-            MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
+            MatrixToTripletWithSparsitySet(in_contact_[frame][node]*jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
                 constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dvk[frame]);
 
             // Lower and upper bounds
             vectorx_t y;
             holonomic_constraint_[frame]->GetFunctionValue(x_zero, p, y);
-            osqp_instance_.lower_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -y;
-            osqp_instance_.upper_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -y;
+            osqp_instance_.lower_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -in_contact_[frame][node]*y;
+            osqp_instance_.upper_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -in_contact_[frame][node]*y;
 
             row_start+=2;
         }
