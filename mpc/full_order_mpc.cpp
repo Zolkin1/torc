@@ -204,12 +204,6 @@ namespace torc::mpc {
                 nodes_full_dynamics_ = std::min(5, nodes_ - 1);
             }
 
-            if (general_settings["integrate_velocity_targets"] && general_settings["integrate_velocity_targets"].as<bool>()) {
-                integrate_vel_targets_ = true;
-            } else {
-                integrate_vel_targets_ = false;
-            }
-
             terminal_cost_weight_ = (general_settings["terminal_cost_weight"] ? general_settings["terminal_cost_weight"].as<double>() : 1.0);
 
             delay_prediction_dt_ = (general_settings["delay_prediction_dt"] ? general_settings["delay_prediction_dt"].as<double>() : 0);
@@ -316,7 +310,6 @@ namespace torc::mpc {
             std::cout << "\tMax initial solves: " << max_initial_solves_ << std::endl;
             std::cout << "\tInitial constraint tolerance: " << initial_constraint_tol_ << std::endl;
             std::cout << "\tNodes with full dynamics: " << nodes_full_dynamics_ << std::endl;
-            std::cout << "\tIntegrate velocity targets: " << (integrate_vel_targets_ ? "True" : "False") << std::endl;
             std::cout << "\tDelay prediction dt: " << (delay_prediction_dt_ < 0 ? "Adaptive" : std::to_string(delay_prediction_dt_)) << std::endl;
 
             std::cout << "Solver settings: " << std::endl;
@@ -729,10 +722,10 @@ namespace torc::mpc {
             }
 
             if (node < nodes_full_dynamics_) {
-                // AddIDConstraint(node, true);
+                AddIDConstraint(node, true);
                 // AddTorqueBoxConstraint(node);
             } else if (node < nodes_ - 1) {
-                // AddIDConstraint(node, false);
+                AddIDConstraint(node, false);
             }
 
             AddFrictionConeConstraint(node);
@@ -1654,23 +1647,6 @@ namespace torc::mpc {
         objective_triplet_idx_ = 0;
         osqp_instance_.objective_vector.setZero();
 
-        if (integrate_vel_targets_) {
-            std::lock_guard<std::mutex> lock(target_mut_);
-            for (int i = 0; i < nodes_; i++) {
-                if (i == 0) {
-                    q_target_[i].head<POS_VARS>() = traj_.GetConfiguration(0).head<POS_VARS>() + dt_[i]*v_target_[i].head<POS_VARS>();
-                    q_target_[i].segment<QUAT_VARS>(POS_VARS) = (traj_.GetQuat(0) * pinocchio::quaternion::exp3(dt_[i]*v_target_[i].segment<3>(POS_VARS))).coeffs();
-                    q_target_[i].segment<QUAT_VARS>(POS_VARS).normalize();
-                } else {
-                    q_target_[i].head<POS_VARS>() = q_target_[i-1].head<POS_VARS>() + dt_[i]*v_target_[i].head<POS_VARS>();
-
-                    quat_t current_quat(q_target_[i-1].segment<QUAT_VARS>(POS_VARS));
-                    q_target_[i].segment<QUAT_VARS>(POS_VARS) = (current_quat * pinocchio::quaternion::exp3(dt_[i]*v_target_[i].segment<3>(POS_VARS))).coeffs();
-                    q_target_[i].segment<QUAT_VARS>(POS_VARS).normalize();
-                }
-            }
-        }
-
         // For now the target torque will always be 0
         for (int node = 0; node < nodes_; node++) {
             double scaling = (scale_cost_ ? dt_[node] : 1);
@@ -1773,11 +1749,11 @@ namespace torc::mpc {
                 if (data.type == CostTypes::Configuration) {
                     cost_node += scale * cost_.GetTermCost(
                             qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
-                            traj_.GetConfiguration(node), q_target_[node], data.constraint_name);
+                            traj_.GetConfiguration(node), GetConfigTarget(node), data.constraint_name);
                 } else if (data.type == CostTypes::VelocityTracking) {
                     cost_node += scale * cost_.GetTermCost(
                             qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()),
-                            traj_.GetVelocity(node), v_target_[node], data.constraint_name);
+                            traj_.GetVelocity(node), GetVelTarget(node), data.constraint_name);
                 } else if (data.type == CostTypes::TorqueReg && node < nodes_full_dynamics_) {
                     vectorx_t torque_target = GetTorqueTarget(node);
                     cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()),
@@ -1928,7 +1904,7 @@ namespace torc::mpc {
         return force_target;
     }
 
-    vector3_t FullOrderMpc::GetDesiredFramePos(int node, std::string) {
+    vector3_t FullOrderMpc::GetDesiredFramePos(int node, std::string frame) {
         std::lock_guard<std::mutex> lock(target_mut_);
         vector3_t frame_pos;
 
@@ -1938,14 +1914,23 @@ namespace torc::mpc {
         return frame_pos;
     }
 
+    // TODO: Deal with thread safety of these targets better
     vectorx_t FullOrderMpc::GetConfigTarget(int node) {
         std::lock_guard<std::mutex> lock(target_mut_);
-        return q_target_[node];
+        if (q_target_.has_value()) {
+            return q_target_.value()[node];
+        } else {
+            throw std::runtime_error("No configuration target provided!");
+        }
     }
 
     vectorx_t FullOrderMpc::GetVelTarget(int node) {
         std::lock_guard<std::mutex> lock(target_mut_);
-        return v_target_[node];
+        if (v_target_.has_value()) {
+            return v_target_.value()[node];
+        } else {
+            throw std::runtime_error("No velocity target provided!");
+        }
     }
 
     void FullOrderMpc::ParseCostYaml(const YAML::Node& cost_settings) {
@@ -2086,10 +2071,10 @@ namespace torc::mpc {
                 AddIntegrationPattern(node);
             }
             if (node < nodes_full_dynamics_) {
-                // AddIDPattern(node, true);
+                AddIDPattern(node, true);
                 // AddTorqueBoxPattern(node);
             } else if (node < nodes_ - 1) {
-                // AddIDPattern(node, false);
+                AddIDPattern(node, false);
             }
 
             AddFrictionConePattern(node);
@@ -2647,64 +2632,56 @@ namespace torc::mpc {
     void FullOrderMpc::SetConstantConfigTarget(const vectorx_t& q_target) {
         std::lock_guard<std::mutex> lock(target_mut_);
 
-        if (q_target.size() != robot_model_->GetConfigDim()) {
+        if (q_target.size() != config_dim_) {
             throw std::runtime_error("Configuration target does not have the correct size!");
         }
 
-        // if (q_target.segment<QUAT_VARS>(POS_VARS).norm() != 1.0) {
-        //     throw std::runtime_error("Configuration target must have a normalized quaternion!");
-        // }
-
-
-        q_target_.resize(nodes_);
-        for (int node = 0; node < nodes_; node++) {
-            q_target_[node] = q_target;
-            q_target_[node].segment<QUAT_VARS>(POS_VARS).normalize();
-        }
+        q_target_ = SimpleTrajectory(config_dim_, nodes_);
+        q_target_->SetAllData(q_target);
     }
 
     void FullOrderMpc::SetConstantVelTarget(const vectorx_t& v_target) {
         std::lock_guard<std::mutex> lock(target_mut_);
 
-        if (v_target.size() != robot_model_->GetVelDim()) {
+        if (v_target.size() != vel_dim_) {
             throw std::runtime_error("Velocity target does not have the correct size!");
         }
-        v_target_.resize(nodes_);
-        for (int node = 0; node < nodes_; node++) {
-            v_target_[node] = v_target;
-        }
+
+        v_target_ = SimpleTrajectory(vel_dim_, nodes_);
+
+        v_target_->SetAllData(v_target);
     }
 
-    void FullOrderMpc::SetConfigTarget(const std::vector<vectorx_t>& q_target) {
+    void FullOrderMpc::SetConfigTarget(SimpleTrajectory q_target) {
         std::lock_guard<std::mutex> lock(target_mut_);
 
-        if (q_target.size() != nodes_) {
+        if (q_target.GetNumNodes() != nodes_) {
             throw std::invalid_argument("Configuration target has the wrong number of nodes!");
         }
-        for (const auto& q : q_target) {
-            if (q.size() != robot_model_->GetConfigDim()) {
-                throw std::runtime_error("A configuration target does not have the correct size!");
-            }
 
-            if (q.segment<QUAT_VARS>(POS_VARS).norm() != 1.0) {
-                throw std::runtime_error("A configuration target must have a normalized quaternion!");
-            }
+        if (q_target.GetSize() != config_dim_) {
+            throw std::runtime_error("Configuration target does not have the correct size!");
         }
-        q_target_ = q_target;
+
+        for (int node = 0; node < nodes_; node++) {
+            q_target[node].segment<QUAT_VARS>(POS_VARS).normalize();
+        }
+
+        q_target_ = std::move(q_target);
     }
 
-    void FullOrderMpc::SetVelTarget(const std::vector<vectorx_t>& v_target) {
+    void FullOrderMpc::SetVelTarget(SimpleTrajectory v_target) {
         std::lock_guard<std::mutex> lock(target_mut_);
 
-        if (v_target.size() != nodes_) {
+        if (v_target.GetNumNodes() != nodes_) {
             throw std::invalid_argument("Velocity target has the wrong number of nodes!");
         }
-        for (const auto& v : v_target) {
-            if (v.size() != robot_model_->GetVelDim()) {
-                throw std::runtime_error("A velocity target does not have the correct size!");
-            }
+
+        if (v_target.GetSize() != vel_dim_) {
+            throw std::runtime_error("Velocity target does not have the correct size!");
         }
-        q_target_ = v_target;
+
+        v_target_ = std::move(v_target);
     }
 
     void FullOrderMpc::SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj) {

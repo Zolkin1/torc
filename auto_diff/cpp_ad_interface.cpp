@@ -36,11 +36,11 @@ namespace torc::ad {
     void CppADInterface::GetFunctionValue(const torc::ad::vectorx_t& x, const torc::ad::vectorx_t& p,
                                           torc::ad::vectorx_t& y) const {
         if (p.size() != p_size_) {
-            throw std::runtime_error("[CppADInterface] Invalid parameter size!");
+            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid parameter size!");
         }
 
         if (x.size() != x_size_) {
-            throw std::runtime_error("[CppADInterface] Invalid parameter size!");
+            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid domain size!");
         }
 
         vectorx_t xp_combined(x_size_ + p_size_);
@@ -51,11 +51,11 @@ namespace torc::ad {
     void CppADInterface::GetJacobian(const torc::ad::vectorx_t& x, const torc::ad::vectorx_t& p,
                                      torc::ad::matrixx_t& jacobian) const {
          if (x.size() != x_size_) {
-            throw std::runtime_error("[CppADInterface] Invalid x size!");
+            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid domain size!");
          }
 
         if (p.size() != p_size_) {
-            throw std::runtime_error("[CppADInterface] Invalid p size!");
+            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid parameter size!");
         }
 
         vectorx_t xp_combined(x_size_ + p_size_);

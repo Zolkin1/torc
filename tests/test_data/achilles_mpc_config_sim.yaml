@@ -10,7 +10,6 @@ general_settings:
   max_initial_solves: 20
   initial_constraint_tol: 5e-3
   nodes_full_dynamics: 2   # Also determines how many nodes have torque constraints
-  integrate_velocity_targets: False
   delay_prediction_dt: 0 #5e-3 # TODO: Tune or disable
   terminal_cost_weight: 5
 solver_settings:

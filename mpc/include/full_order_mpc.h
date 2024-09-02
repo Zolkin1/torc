@@ -15,8 +15,9 @@
 #include "cost_function.h"
 #include "contact_schedule.h"
 #include "cpp_ad_interface.h"
+#include "simple_trajectory.h"
 
-// TODO: Add a aggregate statistics print out (i.e. averages and standard deviations)
+// TODO: Need to consider thread safety and how to return data better. I think I can return more references
 
 namespace torc::mpc {
     namespace fs = std::filesystem;
@@ -135,8 +136,8 @@ namespace torc::mpc {
         void SetConstantConfigTarget(const vectorx_t& q_target);
         void SetConstantVelTarget(const vectorx_t& v_target);
 
-        void SetConfigTarget(const std::vector<vectorx_t>& q_target);
-        void SetVelTarget(const std::vector<vectorx_t>& v_target);
+        void SetConfigTarget(SimpleTrajectory q_target);
+        void SetVelTarget(SimpleTrajectory v_target);
 
         void SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj);
 
@@ -372,9 +373,8 @@ namespace torc::mpc {
         sp_matrixx_t objective_mat_;
         // vectorx_t objective_vec_;
 
-        std::vector<vectorx_t> q_target_;
-        std::vector<vectorx_t> v_target_;
-        bool integrate_vel_targets_;
+        std::optional<SimpleTrajectory> q_target_;
+        std::optional<SimpleTrajectory> v_target_;
 
         bool scale_cost_;
 
