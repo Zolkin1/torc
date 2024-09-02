@@ -723,7 +723,7 @@ namespace torc::mpc {
 
             if (node < nodes_full_dynamics_) {
                 AddIDConstraint(node, true);
-                // AddTorqueBoxConstraint(node);
+                AddTorqueBoxConstraint(node);
             } else if (node < nodes_ - 1) {
                 AddIDConstraint(node, false);
             }
@@ -976,25 +976,31 @@ namespace torc::mpc {
         } else {    // Dynamics only for the floating base
             // dtau_dq
             int col_start = GetDecisionIdx(node, Configuration);
-            MatrixToTriplet(ws_->id_config_mat.topRows<FLOATING_VEL>(), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_config_mat.topRows<FLOATING_VEL>(), row_start, col_start,
+             constraint_triplets_, constraint_triplet_idx_, ws_->sp_dq_partial);
 
             // dtau_dv
             col_start = GetDecisionIdx(node, Velocity);
-            MatrixToTriplet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start,
+                constraint_triplets_, constraint_triplet_idx_, ws_->sp_dvk_partial);
+            // MatrixToTriplet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start,
+            //     constraint_triplets_, constraint_triplet_idx_);
 
             // dtau_dtau -- no torque enters
 
             // dtau_df
             col_start = GetDecisionIdx(node, GroundForce);
-            MatrixToTriplet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start,
+                constraint_triplets_, constraint_triplet_idx_, ws_->sp_df_partial);
+            // MatrixToTriplet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start,
+            //     constraint_triplets_, constraint_triplet_idx_);
 
             // dtau_dv2
             col_start = GetDecisionIdx(node + 1, Velocity);
-            MatrixToTriplet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_);
+            MatrixToTripletWithSparsitySet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start,
+                constraint_triplets_, constraint_triplet_idx_, ws_->sp_dvkp1_partial);
+            // MatrixToTriplet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start,
+            //     constraint_triplets_, constraint_triplet_idx_);
 
             // Set the bounds
             osqp_instance_.lower_bounds.segment(row_start, FLOATING_VEL) = -y.head<FLOATING_VEL>();
@@ -2072,7 +2078,7 @@ namespace torc::mpc {
             }
             if (node < nodes_full_dynamics_) {
                 AddIDPattern(node, true);
-                // AddTorqueBoxPattern(node);
+                AddTorqueBoxPattern(node);
             } else if (node < nodes_ - 1) {
                 AddIDPattern(node, false);
             }
@@ -2165,6 +2171,18 @@ namespace torc::mpc {
         ws_->sp_tau = ad::CppADInterface::GetSparsityPatternCols(sp_full, 3*vel_dim_, input_dim_);
         ws_->sp_df = ad::CppADInterface::GetSparsityPatternCols(sp_full, 3*vel_dim_ + input_dim_, CONTACT_3DOF*num_contact_locations_);
 
+        ws_->sp_dq_partial.resize(FLOATING_VEL);
+        ws_->sp_dvk_partial.resize(FLOATING_VEL);
+        ws_->sp_dvkp1_partial.resize(FLOATING_VEL);
+        ws_->sp_df_partial.resize(FLOATING_VEL);
+
+        for (int row = 0; row < FLOATING_VEL; row++) {
+            ws_->sp_dq_partial[row] = ws_->sp_dq[row];
+            ws_->sp_dvk_partial[row] = ws_->sp_dvk[row];
+            ws_->sp_dvkp1_partial[row] = ws_->sp_dvkp1[row];
+
+            ws_->sp_df_partial[row] = ws_->sp_df[row];
+        }
 
         // Full order dynamics
         if (full_order) {
@@ -2192,25 +2210,29 @@ namespace torc::mpc {
         } else {    // Floating base dynamics
             // dtau_dq
             int col_start = GetDecisionIdx(node, Configuration);
-            ws_->id_config_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            MatrixToNewTriplet(ws_->id_config_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_dq_partial, row_start, col_start, constraint_triplets_);
+            // ws_->id_config_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
+            // MatrixToNewTriplet(ws_->id_config_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
 
             // dtau_dv
             col_start = GetDecisionIdx(node, Velocity);
-            ws_->id_vel1_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            MatrixToNewTriplet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_dvk_partial, row_start, col_start, constraint_triplets_);
+            // ws_->id_vel1_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
+            // MatrixToNewTriplet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
 
             // dtau_dtau -- does not appear
 
             // dtau_df
             col_start = GetDecisionIdx(node, GroundForce);
-            ws_->id_force_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, num_contact_locations_*CONTACT_3DOF, 1);
-            MatrixToNewTriplet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_df_partial, row_start, col_start, constraint_triplets_);
+            // ws_->id_force_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, num_contact_locations_*CONTACT_3DOF, 1);
+            // MatrixToNewTriplet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
 
             // dtau_dv2
             col_start = GetDecisionIdx(node + 1, Velocity);
-            ws_->id_vel2_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            MatrixToNewTriplet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
+            AddSparsitySet(ws_->sp_dvkp1_partial, row_start, col_start, constraint_triplets_);
+            // ws_->id_vel2_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
+            // MatrixToNewTriplet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
         }
     }
 

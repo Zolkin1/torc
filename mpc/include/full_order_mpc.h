@@ -168,6 +168,7 @@ namespace torc::mpc {
             GroundForce
         };
 
+        // TODO: Clean up
         struct Workspace {
             matrixx_t int_mat;
             matrixx_t id_config_mat;
@@ -196,6 +197,11 @@ namespace torc::mpc {
             ad::sparsity_pattern_t sp_dvkp1;
             ad::sparsity_pattern_t sp_df;
             ad::sparsity_pattern_t sp_tau;
+
+            ad::sparsity_pattern_t sp_dq_partial;
+            ad::sparsity_pattern_t sp_dvk_partial;
+            ad::sparsity_pattern_t sp_dvkp1_partial;
+            ad::sparsity_pattern_t sp_df_partial;
 
             std::map<std::string, ad::sparsity_pattern_t> sp_hol_dqk;
             std::map<std::string, ad::sparsity_pattern_t> sp_hol_dvk;
