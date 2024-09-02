@@ -120,6 +120,7 @@ namespace torc::mpc {
         void PrintStatistics() const;
         void PrintContactSchedule() const;
         void PrintAggregateStats() const;
+        void PrintSwingTraj(const std::string& frame) const;
 
         [[nodiscard]] std::pair<double, double> GetComputeTimeStats() const;
         [[nodiscard]] std::pair<double, double> GetConstraintTimeStats() const;
@@ -239,7 +240,7 @@ namespace torc::mpc {
         matrix3_t QuatIntegrationLinearizationXi(int node);
         matrix3_t QuatIntegrationLinearizationW(int node);
 
-        void InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau);
+        void InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau, vectorx_t& y);
         void InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
 
         matrix43_t QuatLinearization(int node);

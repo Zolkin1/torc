@@ -13,6 +13,8 @@ namespace torc::mpc {
     /**
      * @brief Holds a contact schedule.
      *
+     * By default the frames are in contact, and therefore swing phases are inserted
+     *
      * The times in the contact schedule are in relative time, i.e., the current time is always 0.
      * If you want to updated a contact schedule that was made earlier, you can use the ShiftContacts function.
      */
@@ -31,8 +33,16 @@ namespace torc::mpc {
          * @param start_time the start time of the contact
          * @param stop_time the end time of the contact
          */
-        void InsertContact(const std::string& frame, double start_time, double stop_time);
+        // void InsertContact(const std::string& frame, double start_time, double stop_time);
+
+        void InsertSwing(const std::string& frame, double start_time, double stop_time);
+
+        void InsertSwingByDuration(const std::string& frame, double start_time, double duration);
+
         [[nodiscard]] bool InContact(const std::string& frame, double time) const;
+
+        [[nodiscard]] bool InSwing(const std::string& frame, double time) const;
+
 
         /**
          * @brief Shifts the entire contact schedule by a set amount.
@@ -41,7 +51,7 @@ namespace torc::mpc {
          *  out, while a negative shift will bring them in. If you want to simulate the contact schedule moving through
          *  time, you will need to apply a negative shift.
          */
-        void ShiftContacts(double shift);
+        void ShiftSwings(double shift);
 
         /**
          * @brief Removes all contacts that end before time = time_cutoff
@@ -74,10 +84,13 @@ namespace torc::mpc {
 
         const std::map<std::string, std::vector<std::pair<double, double>>>&  GetScheduleMap() const;
 
-     double GetLastContactTime(const std::string& frame);
-
+     // double GetLastContactTime(const std::string& frame);
+        double GetLastSwingTime(const std::string& frame) const;
     protected:
          static double GetTime(const std::vector<double>& dt_vec, int node);
+
+         static double GetSwingHeight(double apex_height, double ground_height, double apex_time, double time,
+             double start_time, double end_time);
 
         std::map<std::string, std::vector<std::pair<double, double>>> frame_schedule_map;
     };

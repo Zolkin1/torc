@@ -209,13 +209,15 @@ namespace torc::mpc {
             InverseDynamicsLinearizationAnalytic(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
 
             // AD
-            matrixx_t dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad;
+            matrixx_t dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad, dtau;
             dtau_dq_ad = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
             dtau_dv1_ad = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
             dtau_dv2_ad = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
             dtau_df_ad = matrixx_t::Zero(robot_model_->GetVelDim(), num_contact_locations_*3);
 
-            InverseDynamicsLinearizationAD(0, dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad);
+            vectorx_t y;
+
+            InverseDynamicsLinearizationAD(0, dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad, dtau, y);
 
             // std::cout << "dq analytic: \n" << dtau_dq << std::endl;
             // std::cout << "dq ad: \n" << dtau_dq_ad << std::endl;
@@ -544,7 +546,7 @@ namespace torc::mpc {
             PrintTestHeader("Default Swing Traj.");
             ContactSchedule cs;
             cs.SetFrames(contact_frames_);
-            cs.InsertContact(contact_frames_[0], 0.3, 0.6);
+            cs.InsertSwing(contact_frames_[0], 0.3, 0.6);
             UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0.5);
             for (int i = 0; i < nodes_; i++) {
                 std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
@@ -553,10 +555,9 @@ namespace torc::mpc {
             std::cout << "====" << std::endl;
 
             // At time zero we should be at the apex
-            cs.InsertContact(contact_frames_[0], -0.2, -0.1);
-            cs.InsertContact(contact_frames_[0], 0.1, 0.15);
+            cs.InsertSwing(contact_frames_[0], -0.1, 0.1);
 
-            UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0.5);
+            UpdateContactScheduleAndSwingTraj(cs, 1, 0.01, 0.5);
             for (int i = 0; i < nodes_; i++) {
                 std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
             }
@@ -601,7 +602,7 @@ namespace torc::mpc {
             traj_.SetVelocity(1, v2_rand);
 
             // Analytic
-            matrixx_t dtau_dq, dtau_dv1, dtau_dv2, dtau_df;
+            matrixx_t dtau_dq, dtau_dv1, dtau_dv2, dtau_df, dtau;
             dtau_dq = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
             dtau_dv1 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
             dtau_dv2 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
@@ -621,8 +622,10 @@ namespace torc::mpc {
             p << traj_.GetConfiguration(0), traj_.GetVelocity(0), traj_.GetVelocity(1), tau_temp, f;
             matrixx_t jac;
 
-            BENCHMARK("inverse dynamics lin AD") {
-                InverseDynamicsLinearizationAD(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+            vectorx_t y;
+
+            BENCHMARK("inverse dynamics lin and function call AD") {
+                InverseDynamicsLinearizationAD(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df, dtau, y);
                 // inverse_dynamics_constraint_->GetJacobian(x, p, jac);
             };
 

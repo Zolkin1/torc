@@ -729,10 +729,10 @@ namespace torc::mpc {
             }
 
             if (node < nodes_full_dynamics_) {
-                AddIDConstraint(node, true);
-                AddTorqueBoxConstraint(node);
+                // AddIDConstraint(node, true);
+                // AddTorqueBoxConstraint(node);
             } else if (node < nodes_ - 1) {
-                AddIDConstraint(node, false);
+                // AddIDConstraint(node, false);
             }
 
             AddFrictionConeConstraint(node);
@@ -882,8 +882,7 @@ namespace torc::mpc {
         violation = tau_id - tauk_curr;
     }
 
-
-
+    // TODO: Consider removing this constraint
     void FullOrderMpc::AddICConstraint() {
         // Set constraint matrix
         int row_start = 0;
@@ -950,24 +949,11 @@ namespace torc::mpc {
         ws_->id_vel2_mat.setZero();
         ws_->id_force_mat.setZero();
 
+        vectorx_t y;
+
         // compute all derivative terms
         InverseDynamicsLinearizationAD(node, ws_->id_config_mat,
-            ws_->id_vel1_mat, ws_->id_vel2_mat, ws_->id_force_mat, ws_->id_tau_mat);
-
-        vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
-        vectorx_t p(inverse_dynamics_constraint_->GetParameterSize());
-
-        vectorx_t f(CONTACT_3DOF*num_contact_locations_);
-        int f_idx = 0;
-        for (const auto& frame : contact_frames_) {
-            f.segment<CONTACT_3DOF>(f_idx) = traj_.GetForce(node, frame);
-
-            f_idx += CONTACT_3DOF;
-        }
-        p << traj_.GetConfiguration(node), traj_.GetVelocity(node), traj_.GetVelocity(node + 1), traj_.GetTau(node), f, dt_[node];
-
-        vectorx_t y;
-        inverse_dynamics_constraint_->GetFunctionValue(x, p, y);
+            ws_->id_vel1_mat, ws_->id_vel2_mat, ws_->id_force_mat, ws_->id_tau_mat, y);
 
         // Full inverse dynamics
         if (full_order) {
@@ -990,11 +976,6 @@ namespace torc::mpc {
             // dtau_dv2
             col_start = GetDecisionIdx(node + 1, Velocity);
             MatrixToTripletWithSparsitySet(ws_->id_vel2_mat, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, ws_->sp_dvkp1);
-
-            // Set the bounds
-            for (auto& f : ws_->f_ext) {
-                f.force_linear = traj_.GetForce(node, f.frame_name);
-            }
 
             osqp_instance_.lower_bounds.segment(row_start, robot_model_->GetNumInputs() + FLOATING_VEL) = -y;
 
@@ -1023,10 +1004,6 @@ namespace torc::mpc {
                 constraint_triplets_, constraint_triplet_idx_);
 
             // Set the bounds
-            for (auto& f : ws_->f_ext) {
-                f.force_linear = traj_.GetForce(node, f.frame_name);
-            }
-
             osqp_instance_.lower_bounds.segment(row_start, FLOATING_VEL) = -y.head<FLOATING_VEL>();
 
             osqp_instance_.upper_bounds.segment(row_start, FLOATING_VEL) = -y.head<FLOATING_VEL>();
@@ -1180,28 +1157,46 @@ namespace torc::mpc {
         int row_start = GetConstraintRow(node, Holonomic);
 
         for (const auto& frame : contact_frames_) {
-            matrixx_t jac;
-            vectorx_t x_zero = vectorx_t::Zero(holonomic_constraint_[frame]->GetDomainSize());
-            vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
-            p << traj_.GetConfiguration(node), traj_.GetVelocity(node);
+            if (in_contact_[frame][node]) {
+                matrixx_t jac;
+                vectorx_t x_zero = vectorx_t::Zero(holonomic_constraint_[frame]->GetDomainSize());
+                vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
+                p << traj_.GetConfiguration(node), traj_.GetVelocity(node);
 
-            holonomic_constraint_[frame]->GetJacobian(x_zero, p, jac);
+                holonomic_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
-            // dqk
-            int col_start = GetDecisionIdx(node, Configuration);
-            MatrixToTripletWithSparsitySet(in_contact_[frame][node]*jac.middleCols(0, vel_dim_), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dqk[frame]);
+                // dqk
+                int col_start = GetDecisionIdx(node, Configuration);
+                MatrixToTripletWithSparsitySet(jac.middleCols(0, vel_dim_), row_start, col_start,
+                    constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dqk[frame]);
 
-            // dvk
-            col_start = GetDecisionIdx(node, Velocity);
-            MatrixToTripletWithSparsitySet(in_contact_[frame][node]*jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
-                constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dvk[frame]);
+                // dvk
+                col_start = GetDecisionIdx(node, Velocity);
+                MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
+                    constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dvk[frame]);
 
-            // Lower and upper bounds
-            vectorx_t y;
-            holonomic_constraint_[frame]->GetFunctionValue(x_zero, p, y);
-            osqp_instance_.lower_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -in_contact_[frame][node]*y;
-            osqp_instance_.upper_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize())= -in_contact_[frame][node]*y;
+                // Lower and upper bounds
+                vectorx_t y;
+                holonomic_constraint_[frame]->GetFunctionValue(x_zero, p, y);
+                osqp_instance_.lower_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize()) = -y;
+                osqp_instance_.upper_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize()) = -y;
+            } else {
+                matrixx_t jac = matrixx_t::Zero(holonomic_constraint_[frame]->GetRangeSize(), holonomic_constraint_[frame]->GetDomainSize());
+
+                // dqk
+                int col_start = GetDecisionIdx(node, Configuration);
+                MatrixToTripletWithSparsitySet(jac.middleCols(0, vel_dim_), row_start, col_start,
+                    constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dqk[frame]);
+
+                // dvk
+                col_start = GetDecisionIdx(node, Velocity);
+                MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
+                    constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dvk[frame]);
+
+                // Lower and upper bounds
+                osqp_instance_.lower_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize()) = vectorx_t::Zero(holonomic_constraint_[frame]->GetRangeSize());
+                osqp_instance_.upper_bounds.segment(row_start, holonomic_constraint_[frame]->GetRangeSize()) = vectorx_t::Zero(holonomic_constraint_[frame]->GetRangeSize());
+            }
 
             row_start+=2;
         }
@@ -1420,18 +1415,20 @@ namespace torc::mpc {
         double violation = 0;
 
         for (const auto& frame : contact_frames_) {
-            vectorx_t x(holonomic_constraint_[frame]->GetDomainSize());
-            vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
-            vectorx_t y;
+            if (in_contact_[frame][node]) {
+                vectorx_t x(holonomic_constraint_[frame]->GetDomainSize());
+                vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
+                vectorx_t y;
 
-            const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
-            const vectorx_t& dvk = qp_res.segment(GetDecisionIdx(node, Velocity), vel_dim_);
-            x << dqk, dvk;
+                const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
+                const vectorx_t& dvk = qp_res.segment(GetDecisionIdx(node, Velocity), vel_dim_);
+                x << dqk, dvk;
 
-            p << traj_.GetConfiguration(node), traj_.GetVelocity(node);
+                p << traj_.GetConfiguration(node), traj_.GetVelocity(node);
 
-            holonomic_constraint_[frame]->GetFunctionValue(x, p, y);
-            violation += y.squaredNorm();
+                holonomic_constraint_[frame]->GetFunctionValue(x, p, y);
+                violation += y.squaredNorm();
+            }
         }
 
         return violation;
@@ -1514,9 +1511,9 @@ namespace torc::mpc {
     //     return 0.5*update_fd;
     // }
 
-    void FullOrderMpc::InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau) {
+    void FullOrderMpc::InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau, vectorx_t& y) {
         // Linearizing about the nominal trajectory
-        vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
+        const vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
 
         vectorx_t f(CONTACT_3DOF * num_contact_locations_);
         int f_idx = 0;
@@ -1536,6 +1533,8 @@ namespace torc::mpc {
         dtau_dv2 = jac.middleCols(2*vel_dim_, vel_dim_);
         dtau = jac.middleCols(3*vel_dim_, input_dim_);
         dtau_df =  jac.middleCols(3*vel_dim_ + input_dim_, CONTACT_3DOF*num_contact_locations_);
+
+        inverse_dynamics_constraint_->GetFunctionValue(x, p, y);
     }
 
 
@@ -2087,10 +2086,10 @@ namespace torc::mpc {
                 AddIntegrationPattern(node);
             }
             if (node < nodes_full_dynamics_) {
-                AddIDPattern(node, true);
-                AddTorqueBoxPattern(node);
+                // AddIDPattern(node, true);
+                // AddTorqueBoxPattern(node);
             } else if (node < nodes_ - 1) {
-                AddIDPattern(node, false);
+                // AddIDPattern(node, false);
             }
 
             AddFrictionConePattern(node);
@@ -3015,7 +3014,23 @@ namespace torc::mpc {
         return dt_;
     }
 
+    void FullOrderMpc::PrintSwingTraj(const std::string& frame) const {
+        std::cout << "Frame: " << frame << std::endl;
 
+        double time = 0;
+        std::cout << "Time: ";
+        for (int node = 0; node < nodes_; node++) {
+            std::cout << std::setw(1) << std::fixed << std::setprecision(3) << " " << time;
+
+            time += dt_[node];
+        }
+
+        std::cout << std::endl << "      ";
+        for (int node = 0; node < nodes_; node++) {
+            std::cout << std::setw(1) << std::fixed << std::setprecision(3) << " " << swing_traj_.at(frame)[node];
+        }
+        std::cout << std::endl;
+    }
 
 
 } // namespace torc::mpc

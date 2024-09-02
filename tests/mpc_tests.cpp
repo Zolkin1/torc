@@ -45,17 +45,17 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
     mpc.SetConstantVelTarget(vectorx_t::Zero(a1.GetVelDim()));
 
     ContactSchedule cs(mpc.GetContactFrames());
-    const double contact_time = 0.3;
+    const double swing_time = 0.3;
     double time = 0;
     for (int i = 0; i < 3; i++) {
         if (i % 2 != 0) {
-            cs.InsertContact("FR_foot", time, time + contact_time);
-            cs.InsertContact("RL_foot", time, time + contact_time);
+            cs.InsertSwing("FR_foot", time, time + swing_time);
+            cs.InsertSwing("RL_foot", time, time + swing_time);
         } else {
-            cs.InsertContact("FL_foot", time, time + contact_time);
-            cs.InsertContact("RR_foot", time, time + contact_time);
+            cs.InsertSwing("FL_foot", time, time + swing_time);
+            cs.InsertSwing("RR_foot", time, time + swing_time);
         }
-        time += contact_time;
+        time += swing_time;
     }
 
     mpc.UpdateContactSchedule(cs);
@@ -102,19 +102,19 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
     std::cout << "initial vel: " << random_state.tail(achilles.GetVelDim()).transpose() << std::endl;
 
     ContactSchedule cs(mpc.GetContactFrames());
-    const double contact_time = 0.3;
+    const double swing_time = 0.3;
     double time = 0;
     for (int i = 0; i < 3; i++) {
         if (i % 2 != 0) {
-            cs.InsertContact("foot_front_right", time, time + contact_time);
-            cs.InsertContact("foot_rear_right", time, time + contact_time);
+            cs.InsertSwing("foot_front_right", time, time + swing_time);
+            cs.InsertSwing("foot_rear_right", time, time + swing_time);
             // cs.InsertContact("right_hand", time, time + contact_time);
         } else {
-            cs.InsertContact("foot_front_left", time, time + contact_time);
-            cs.InsertContact("foot_rear_left", time, time + contact_time);
+            cs.InsertSwing("foot_front_left", time, time + swing_time);
+            cs.InsertSwing("foot_rear_left", time, time + swing_time);
             // cs.InsertContact("left_hand", time, time + contact_time);
         }
-        time += contact_time;
+        time += swing_time;
     }
 
     mpc.UpdateContactSchedule(cs);
@@ -163,19 +163,20 @@ TEST_CASE("Achilles MPC Test", "[mpc]") {
 TEST_CASE("Contact schedule", "[mpc][contact schedule]") {
     std::cout << "Contact Schedule Tests" << std::endl;
     torc::mpc::ContactSchedule cs({"LF_FRONT", "RF_FRONT"});
-    cs.InsertContact("LF_FRONT", 0.1, 0.2);
-    cs.InsertContact("RF_FRONT", 0.05, 0.15);
+    cs.InsertSwing("LF_FRONT", 0.1, 0.2);
+    cs.InsertSwing("RF_FRONT", 0.05, 0.15);
 
-    CHECK(!cs.InContact("LF_FRONT", 0.075));
-    CHECK(!cs.InContact("LF_FRONT", 0.25));
-    CHECK(cs.InContact("LF_FRONT", 0.12));
-    CHECK(cs.InContact("LF_FRONT", 0.2));
+    CHECK(cs.InContact("LF_FRONT", 0.075));
+    CHECK(cs.InContact("LF_FRONT", 0.25));
 
-    CHECK(cs.InContact("RF_FRONT", 0.1));
-    CHECK(cs.InContact("RF_FRONT", 0.12));
-    CHECK(cs.InContact("RF_FRONT", 0.05));
-    CHECK(!cs.InContact("RF_FRONT", 0.025));
-    CHECK(!cs.InContact("RF_FRONT", 0.25));
+    CHECK(cs.InSwing("LF_FRONT", 0.12));
+    CHECK(cs.InSwing("LF_FRONT", 0.2));
+
+    CHECK(cs.InSwing("RF_FRONT", 0.1));
+    CHECK(cs.InSwing("RF_FRONT", 0.12));
+    CHECK(cs.InSwing("RF_FRONT", 0.05));
+    CHECK(cs.InContact("RF_FRONT", 0.025));
+    CHECK(cs.InContact("RF_FRONT", 0.25));
 }
 
 TEST_CASE("Trajectory Interpolation", "[trajectory]") {

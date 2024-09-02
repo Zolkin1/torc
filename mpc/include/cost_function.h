@@ -154,11 +154,15 @@ namespace torc::mpc {
         void GetApproximation(const vectorx_t& reference, const vectorx_t& target, vectorx_t& linear_term,
                               matrixx_t& hessian_term, const std::string& name) {
             CostData* data;
-            for (int i = 0; i < cost_data_.size(); i++) {
-                if (cost_data_[i].constraint_name == name) {
-                    data = &cost_data_[i];
+            for (auto & i : cost_data_) {
+                if (i.constraint_name == name) {
+                    data = &i;
                     break;
                 }
+            }
+
+            if (data == nullptr) {
+                throw std::runtime_error("Cost name not found!");
             }
 
             vectorx_t p(reference.size() + target.size() + data->weight.size());

@@ -4,6 +4,8 @@
 
 #include "full_order_mpc.h"
 
+// TODO: Fix the new constraint violation issues
+
 int main() {
  using namespace torc::mpc;
     std::filesystem::path achilles_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/achilles.urdf";
@@ -25,19 +27,16 @@ int main() {
     // cs.InsertContact("foot_front_right", 0, 1);
     // cs.InsertContact("foot_rear_right", 0, 1);
 
-    cs.InsertContact("foot_front_right", 0.6, 1000);
-    cs.InsertContact("foot_rear_right", 0.6, 1000);
+    cs.InsertSwing("foot_front_right", 0.3, 0.6);
+    cs.InsertSwing("foot_rear_right", 0.3, 0.6);
 
-    cs.InsertContact("foot_front_right", 0, 0.3);
-    cs.InsertContact("foot_rear_right", 0, 0.3);
-
-    // cs.InsertContact("left_foot", 0, 1);
-    cs.InsertContact("foot_front_left", 0, 10);
-    cs.InsertContact("foot_rear_left", 0, 10);
     const double apex_height = 0.08;
     const double foot_height = 0.015;
     const double apex_time = 0.5;
     mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
+    for (const auto& frame : mpc.GetContactFrames()) {
+        mpc.PrintSwingTraj(frame);
+    }
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
@@ -102,7 +101,7 @@ int main() {
 
     // mpc.Compute(q_target, v_target, traj);
 
-    q_target(0) += 0.2;
+    // q_target(0) += 0.2;
     mpc.ComputeNLP(q_target, v_target, traj);
 
     for (int i = 0; i < 20; i++) {
@@ -113,7 +112,7 @@ int main() {
         vectorx_t v_current;
         traj.GetVelocityInterp(0.01, v_current);
 
-        cs.ShiftContacts(-0.01);
+        // cs.ShiftSwings(-0.01);
         mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
 
         mpc.Compute(q_current, v_current, traj);

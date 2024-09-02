@@ -208,7 +208,8 @@ namespace torc::sample {
                             contact_start_times[i] = data_[robot_num]->time;
                         } else if (data_[robot_num]->contact[i].dist > 0 && contact_start_times[i] >= 0) {
                             // Contact is ending bc the contact dist is positive and there was a recorded start time
-                            cs_out.InsertContact(mj_id2name(model_, mjOBJ_GEOM, geom1_idx), contact_start_times[i], data_[robot_num]->time);
+                            throw std::runtime_error("TODO: Reimplement the contacts in the sample planner!");
+                            // cs_out.InsertContact(mj_id2name(model_, mjOBJ_GEOM, geom1_idx), contact_start_times[i], data_[robot_num]->time);
 
                             // Reset the start time
                             contact_start_times[i] = -1;
