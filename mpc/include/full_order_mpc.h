@@ -158,7 +158,8 @@ namespace torc::mpc {
         VelBox,
         TorqueBox,
         SwingHeight,
-        Holonomic
+        Holonomic,
+        Collision
         };
 
         enum DecisionType {
@@ -219,6 +220,11 @@ namespace torc::mpc {
         void InverseDynamicsConstraint(const std::vector<std::string>& frames,
             const ad::ad_vector_t& dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t& qk_vk_vkp1_tauk_fk_dt, ad::ad_vector_t& violation) const;
 
+        // Simple joint level spherical keep out constraints
+        void SelfCollisionConstraint(const std::string& frame1, const std::string& frame2,
+            const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_r1_r2, ad::ad_vector_t& violation);
+
+
     // -------- Constraint Creation -------- //
         void CreateConstraints();
         void AddICConstraint();
@@ -230,6 +236,7 @@ namespace torc::mpc {
         void AddTorqueBoxConstraint(int node);
         void AddSwingHeightConstraint(int node);
         void AddHolonomicConstraint(int node);
+        void AddCollisionConstraint(int node);
 
     // -------- Constraint Violation -------- //
         double GetConstraintViolation(const vectorx_t& qp_res);
@@ -242,6 +249,7 @@ namespace torc::mpc {
         double GetVelocityBoxViolation(const vectorx_t& qp_res, int node);
         double GetSwingHeightViolation(const vectorx_t& qp_res, int node);
         double GetHolonomicViolation(const vectorx_t& qp_res, int node);
+        double GetCollisionViolation(const vectorx_t& qp_res, int node);
 
     // -------- Linearization Helpers ------- //
         matrix3_t QuatIntegrationLinearizationXi(int node);
@@ -272,6 +280,7 @@ namespace torc::mpc {
         vectorx_t GetVelTarget(int node);
 
         void ParseCostYaml(const YAML::Node& cost_settings);
+        void ParseCollisionYaml(const YAML::Node& collision_settings);
 
     // ----- Sparsity Pattern Creation ----- //
         /**
@@ -291,6 +300,7 @@ namespace torc::mpc {
         void AddTorqueBoxPattern(int node);
         void AddSwingHeightPattern(int node);
         void AddHolonomicPattern(int node);
+        void AddCollisionPattern(int node);
 
     // ----- Helper Functions ----- //
         void ConvertSolutionToTraj(const vectorx_t& qp_sol, Trajectory& traj);
@@ -336,6 +346,7 @@ namespace torc::mpc {
         [[nodiscard]] int NumTorqueBoxConstraintsNode() const;
         [[nodiscard]] int NumSwingHeightConstraintsNode() const;
         [[nodiscard]] int NumHolonomicConstraintsNode() const;
+        [[nodiscard]] int NumCollisionConstraintsNode() const;
 
         void UpdateSettings();
 
@@ -443,6 +454,8 @@ namespace torc::mpc {
         std::map<std::string, std::unique_ptr<ad::CppADInterface>> holonomic_constraint_;
         std::map<std::string, std::unique_ptr<ad::CppADInterface>> swing_height_constraint_;
         std::unique_ptr<ad::CppADInterface> inverse_dynamics_constraint_;
+        std::vector<std::unique_ptr<ad::CppADInterface>> collision_constraints_;
+        std::vector<std::pair<double, double>> radii_;
 
         // Contact settings
         int num_contact_locations_{};

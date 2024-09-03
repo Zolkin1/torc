@@ -249,6 +249,8 @@ namespace torc::mpc {
         friction_coef_ = constraint_settings["friction_coef"].as<double>();
         max_grf_ = constraint_settings["max_grf"].as<double>();
 
+        ParseCollisionYaml(constraint_settings["collisions"]);
+
         // ---------- Cost Settings ---------- //
         if (!config["costs"]) {
             throw std::runtime_error("No cost settings provided!");
@@ -738,6 +740,8 @@ namespace torc::mpc {
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxConstraint(node);
                 AddSwingHeightConstraint(node);
+
+                AddCollisionConstraint(node);
             }
         }
 
@@ -873,6 +877,27 @@ namespace torc::mpc {
             qk_curr, vk_curr, a, f_ext);
 
         violation = tau_id - tauk_curr;
+    }
+
+    void FullOrderMpc::SelfCollisionConstraint(const std::string& frame1, const std::string& frame2,
+        const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_r1_r2, ad::ad_vector_t& violation) {
+        const ad::ad_vector_t& qk = qk_r1_r2.head(config_dim_);
+        const ad::ad_vector_t q = models::ConvertdqToq(dqk, qk);
+        const ad::adcg_t& r1 = qk_r1_r2(config_dim_);
+        const ad::adcg_t& r2 = qk_r1_r2(config_dim_ + 1);
+
+        pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q);
+        const long frame_idx1 = robot_model_->GetFrameIdx(frame1);
+        pinocchio::updateFramePlacement(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx1);
+
+        const long frame_idx2 = robot_model_->GetFrameIdx(frame2);
+        pinocchio::updateFramePlacement(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx2);
+
+        ad::ad_vector_t frame_pos1 = robot_model_->GetADPinData()->oMf.at(frame_idx1).translation();
+        ad::ad_vector_t frame_pos2 = robot_model_->GetADPinData()->oMf.at(frame_idx2).translation();
+
+        violation.resize(1);
+        violation(0) = (frame_pos1 - frame_pos2).norm() - (r1 + r2);
     }
 
     // TODO: Consider removing this constraint
@@ -1201,6 +1226,33 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::AddCollisionConstraint(int node) {
+        int row_start = GetConstraintRow(node, Collision);
+        const int col_start = GetDecisionIdx(node, Configuration);
+
+        int radii_idx = 0;
+        for (const auto& constraint : collision_constraints_) {
+            const auto sparsity = constraint->GetJacobianSparsityPatternSet();
+            matrixx_t jac;
+            vectorx_t x_zero = vectorx_t::Zero(constraint->GetDomainSize());
+            vectorx_t p(constraint->GetParameterSize());
+            p << traj_.GetConfiguration(node), radii_[0].first, radii_[0].second;
+
+            constraint->GetJacobian(x_zero, p, jac);
+            MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+
+            // Bounds
+            vectorx_t y;
+            constraint->GetFunctionValue(x_zero, p, y);
+            osqp_instance_.lower_bounds(row_start) = -y(0);
+            osqp_instance_.upper_bounds(row_start) = std::numeric_limits<double>::max();
+
+            row_start++;
+            radii_idx++;
+        }
+    }
+
+
     // -------------------------------------- //
     // -------- Constraint Violation -------- //
     // -------------------------------------- //
@@ -1232,6 +1284,8 @@ namespace torc::mpc {
 
                 violation += GetConfigurationBoxViolation(qp_res, node);
                 violation += GetSwingHeightViolation(qp_res, node);
+
+                violation += GetCollisionViolation(qp_res, node);
             }
         }
 
@@ -1410,7 +1464,6 @@ namespace torc::mpc {
     }
 
     double FullOrderMpc::GetHolonomicViolation(const vectorx_t &qp_res, int node) {
-
         double violation = 0;
 
         for (const auto& frame : contact_frames_) {
@@ -1432,6 +1485,28 @@ namespace torc::mpc {
 
         return violation;
     }
+
+    double FullOrderMpc::GetCollisionViolation(const vectorx_t& qp_res, int node) {
+        double violation = 0;
+
+        int radii_idx = 0;
+        for (const auto& constraint : collision_constraints_) {
+            vectorx_t x(constraint->GetDomainSize());
+            x << qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
+
+            vectorx_t p(constraint->GetParameterSize());
+            p << traj_.GetConfiguration(node), radii_[radii_idx].first, radii_[radii_idx].second;
+
+            vectorx_t y;
+            constraint->GetFunctionValue(x, p, y);
+
+            violation += y.squaredNorm();
+            radii_idx++;
+        }
+
+        return violation;
+    }
+
 
     double FullOrderMpc::GetSwingHeightViolation(const vectorx_t &qp_res, int node) {
         double violation = 0;
@@ -1991,6 +2066,33 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::ParseCollisionYaml(const YAML::Node& collision_settings) {
+        if (!collision_settings.IsSequence()) {
+            throw std::runtime_error("Collision settings must be a sequence!");
+        }
+
+        for (const auto& collision : collision_settings) {
+            const auto frame1 = collision["frame1"].as<std::string>();
+            const auto frame2 = collision["frame2"].as<std::string>();
+
+            const auto r1 = collision["radius1"].as<double>();
+            const auto r2 = collision["radius2"].as<double>();
+
+            collision_constraints_.emplace_back(std::make_unique<ad::CppADInterface>(
+            std::bind(&FullOrderMpc::SelfCollisionConstraint, this, frame1, frame2, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+            frame1 + "_" + frame2 + "_inverse_dynamics_constraint",
+            deriv_lib_path_,
+            ad::DerivativeOrder::FirstOrder, vel_dim_,
+            config_dim_ + 2,
+            compile_derivatves_
+            ));
+
+            radii_.emplace_back(r1, r2);
+        }
+
+    }
+
+
     std::pair<double, double> FullOrderMpc::LineSearch(const vectorx_t& qp_res) {
     // TODO: Fix with the new constraint violation functions
         // Backtracing linesearch (see ETH paper)
@@ -2093,6 +2195,8 @@ namespace torc::mpc {
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxPattern(node);
                 AddSwingHeightPattern(node);
+
+                AddCollisionPattern(node);
             }
         }
 
@@ -2328,6 +2432,7 @@ namespace torc::mpc {
     void FullOrderMpc::AddHolonomicPattern(int node) {
         int row_start = GetConstraintRow(node, Holonomic);
 
+        // TODO: Remove
         ws_->holo_mat.setConstant(2, robot_model_->GetVelDim(), 1);
 
         for (const auto& frame : contact_frames_) {
@@ -2344,6 +2449,18 @@ namespace torc::mpc {
             row_start += 2;
         }
     }
+
+    void FullOrderMpc::AddCollisionPattern(int node) {
+        int row_start = GetConstraintRow(node, Collision);
+        const int col_start = GetDecisionIdx(node, Configuration);
+
+        for (const auto& constraint : collision_constraints_) {
+            const auto sparsity = constraint->GetJacobianSparsityPatternSet();
+            AddSparsitySet(sparsity, row_start, col_start, constraint_triplets_);
+            row_start++;
+        }
+    }
+
 
     // ------------------------------------------------- //
     // ---------------- Helper Functions --------------- //
@@ -2445,6 +2562,8 @@ namespace torc::mpc {
 
                 row += NumConfigBoxConstraintsNode();
                 row += NumSwingHeightConstraintsNode();
+
+                row += NumCollisionConstraintsNode();
             }
         }
 
@@ -2455,6 +2574,10 @@ namespace torc::mpc {
     int FullOrderMpc::GetConstraintRow(int node, const ConstraintType& constraint) const {
         int row = GetConstraintRowStartNode(node);
         switch (constraint) {
+            case Collision:
+                if (node > 0) {
+                    row += NumHolonomicConstraintsNode();
+                }
             case Holonomic:
                 if (node > 0) {
                     row += NumSwingHeightConstraintsNode();
@@ -2632,6 +2755,11 @@ namespace torc::mpc {
     int FullOrderMpc::NumHolonomicConstraintsNode() const {
         return num_contact_locations_*2;
     }
+
+    int FullOrderMpc::NumCollisionConstraintsNode() const {
+        return collision_constraints_.size();
+    }
+
 
     // Other functions
     void FullOrderMpc::SetVerbosity(bool verbose) {

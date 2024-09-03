@@ -4,7 +4,7 @@ general_settings:
   node_dt_type: SmallFirst # Even, SmallFirst, Adaptive
   node_dt: 0.025
   first_node_dt: 0.01
-  compile_derivatives: False #True
+  compile_derivatives: True #True
   base_frame: "torso"
   scale_cost: False
   max_initial_solves: 20
@@ -26,6 +26,24 @@ solver_settings:
 constraints:
   friction_coef: 0.5  # TODO: Tune this
   max_grf: 400
+  collisions:
+    - frame1: "foot_front_left"
+      frame2: "foot_front_right"
+      radius1: 0.01
+      radius2: 0.01
+    - frame1: "foot_rear_left"
+      frame2: "foot_rear_right"
+      radius1: 0.01
+      radius2: 0.01
+    - frame1: "foot_front_left"
+      frame2: "foot_rear_right"
+      radius1: 0.01
+      radius2: 0.01
+    - frame1: "foot_rear_left"
+      frame2: "foot_front_right"
+      radius1: 0.01
+      radius2: 0.01
+    # TODO: Add hand and knee collisions
 costs:
   - type: ConfigurationTracking
     name: "ConfigTracking"

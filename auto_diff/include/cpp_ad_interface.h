@@ -54,6 +54,7 @@ namespace torc::ad {
         void GetHessianSparsityPatternMat(matrixx_t& H) const;
 
         // ----- Set Based Sparsity Pattern ----- //
+        // TODO: Make this a return by reference!
         [[nodiscard]] sparsity_pattern_t GetJacobianSparsityPatternSet() const;
         [[nodiscard]] sparsity_pattern_t GetGaussNewtonSparsityPatternSet() const;
         [[nodiscard]] sparsity_pattern_t GetHessianSparsityPatternSet() const;
