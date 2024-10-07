@@ -92,6 +92,10 @@ target_link_libraries(ad_tests PUBLIC Autodiff)
 catch_discover_tests(ad_tests)
 
 
+# Dynamics
+add_executable(dynamics_tests dynamics_tests.cpp)
+target_link_libraries(dynamics_tests PUBLIC Models SamplePlanner Mpc) # Sample planner gives access to Mujoco
+
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 

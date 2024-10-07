@@ -4,7 +4,7 @@ general_settings:
   node_dt_type: SmallFirst # Even, SmallFirst, Adaptive
   node_dt: 0.025
   first_node_dt: 0.01
-  compile_derivatives: True #True
+  compile_derivatives: False #True
   base_frame: "torso"
   scale_cost: False
   max_initial_solves: 20
@@ -17,11 +17,11 @@ solver_settings:
   abs_tol: 1e-6
   verbose: True
   polish: True
-  rho: 0.1 #9e-3 #2e-4 # Having this small (like 1e-4) seems to help remove oscillations
+  rho: 0.05 #9e-3 #2e-4 # Having this small (like 1e-4) seems to help remove oscillations
   alpha: 1.6 # 1.6, 1.1
   sigma: 1e-6 # 1e-10
   adaptive_rho: False
-  max_iter: 200
+  max_iter: 20
   scaling: 10
 constraints:
   friction_coef: 0.5  # TODO: Tune this

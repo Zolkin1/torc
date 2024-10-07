@@ -104,6 +104,34 @@ int main() {
     // q_target(0) += 0.2;
     mpc.ComputeNLP(q_target, v_target, traj);
 
+    // for (int node = 0; node < mpc.GetNumNodes(); node++) {
+    //     vectorx_t q_ic = traj.GetConfiguration(node);
+    //     vectorx_t v_ic = (traj.GetVelocity(node) + traj.GetVelocity(node + 1))/2;
+    //     vectorx_t tau = traj.GetTau(node);
+    //
+    //     std::vector<torc::models::ExternalForce<double>> f_ext;
+    //     for (const auto& frame : mpc.GetContactFrames()) {
+    //         f_ext.emplace_back(frame, traj.GetForce(0, frame));
+    //     }
+    //
+    //
+    //     vectorx_t xdot = achilles.GetDynamics(q_ic, v_ic, tau, f_ext);
+    //     double dt = traj.GetDtVec()[node];
+    //     vectorx_t q_next = vectorx_t::Zero(q_ic.size());
+    //     pinocchio::integrate(achilles.GetModel(), q_ic, dt*xdot.head(v_ic.size()), q_next);
+    //     vectorx_t v_next = v_ic + dt*xdot.tail(v_ic.size());
+    //
+    //     std::cout << "Node: " << node << std::endl;
+    //     std::cout << "Integrated dynamics: " << std::endl;
+    //     std::cout << "q next: " << q_next.transpose() << std::endl;
+    //     std::cout << "v next: " << v_next.transpose() << std::endl << std::endl;
+    //
+    //     std::cout << "Next node: " << std::endl;
+    //     std::cout << "q[1]: " << traj.GetConfiguration(1).transpose() << std::endl;
+    //     std::cout << "v[1]: " << traj.GetVelocity(1).transpose() << std::endl << std::endl << std::endl;
+    //     // std::cout << "v[1]: " << ((traj.GetVelocity(1) + traj.GetVelocity(2))/2).transpose() << std::endl;
+    // }
+
     for (int i = 0; i < 20; i++) {
     // TODO: put back!
         vectorx_t q_current;
@@ -137,8 +165,6 @@ int main() {
             temp_time += traj.GetDtVec()[node];
         }
 
-        std::cerr << "I: " << i << std::endl;
-
         if (bad_force) {
             for (int i = 0; i < traj.GetNumNodes(); i++) {
                 std::cout << "Node: " << i << std::endl;
@@ -157,6 +183,9 @@ int main() {
             mpc.PrintContactSchedule();
             // throw std::runtime_error("Force norm too large!");
         }
+
+        std::cout << "q current: " << q_current.transpose() << std::endl;
+        std::cout << "v current: " << v_current.transpose() << std::endl;
     }
 
 
@@ -165,7 +194,7 @@ int main() {
         std::cout << "Node: " << i << std::endl;
         std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
         std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-        // std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+        std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
          achilles.SecondOrderFK(traj.GetConfiguration(i), traj.GetVelocity(i));
          for (const auto& frame : mpc.GetContactFrames()) {
              std::cout << "frame: " << frame << "\npos: " << achilles.GetFrameState(frame).placement.translation().transpose() << std::endl;

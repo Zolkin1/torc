@@ -227,7 +227,7 @@ namespace torc::mpc {
 
     // -------- Constraint Creation -------- //
         void CreateConstraints();
-        void AddICConstraint();
+        // void AddICConstraint();
         void AddIntegrationConstraint(int node);
         void AddIDConstraint(int node, bool full_order);
         void AddFrictionConeConstraint(int node);
@@ -240,7 +240,7 @@ namespace torc::mpc {
 
     // -------- Constraint Violation -------- //
         double GetConstraintViolation(const vectorx_t& qp_res);
-        double GetICViolation(const vectorx_t& qp_res);
+        // double GetICViolation(const vectorx_t& qp_res);
         double GetIntegrationViolation(const vectorx_t& qp_res, int node) const;
         double GetIDViolation(const vectorx_t& qp_res, int node, bool full_order);
         double GetFrictionViolation(const vectorx_t& qp_res, int node);
@@ -291,7 +291,7 @@ namespace torc::mpc {
          * Then this will reset the triplet index
          */
         void CreateConstraintSparsityPattern();
-        void AddICPattern();
+        // void AddICPattern();
         void AddIntegrationPattern(int node);
         void AddIDPattern(int node, bool full_order);
         void AddFrictionConePattern(int node);
@@ -359,6 +359,7 @@ namespace torc::mpc {
         static constexpr double FD_DELTA = 1e-8;
 
     //---------- Member Variables ---------- //
+        std::string name_;
         fs::path config_file_;
 
         // OSQP Interface
@@ -456,6 +457,7 @@ namespace torc::mpc {
         std::unique_ptr<ad::CppADInterface> inverse_dynamics_constraint_;
         std::vector<std::unique_ptr<ad::CppADInterface>> collision_constraints_;
         std::vector<std::pair<double, double>> radii_;
+
 
         // Contact settings
         int num_contact_locations_{};

@@ -6,6 +6,7 @@
 #define TORC_TRAJECTORY_H
 
 #include <map>
+#include <optional>
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -52,6 +53,8 @@ namespace torc::mpc {
     protected:
     private:
         void StandardVectorInterp(double time, vectorx_t& vec_out, const std::vector<vectorx_t>& vecs);
+
+        [[nodiscard]] std::optional<int> GetNode(double time) const;
 
         static constexpr int POS_VARS = 3;
         static constexpr int QUAT_VARS = 4;

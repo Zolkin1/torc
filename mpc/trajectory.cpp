@@ -171,6 +171,19 @@ namespace torc::mpc {
     }
 
     void Trajectory::GetVelocityInterp(double time, vectorx_t& v_out) {
+        // TODO: Remove (potentially)
+        // TODO: Consider putting back
+        // vectorx_t v_temp;
+        // StandardVectorInterp(time, v_temp, v_);
+        // const auto node = GetNode(time);
+        // if (!node.has_value()) {
+        //     throw std::runtime_error("Invalid time provided!");
+        // }
+        //
+        // StandardVectorInterp(time + dt_[node.value()], v_out, v_);
+        //
+        // v_out = (v_out + v_temp)/2;
+
         StandardVectorInterp(time, v_out, v_);
     }
 
@@ -261,5 +274,18 @@ namespace torc::mpc {
             }
         }
     }
+
+    std::optional<int> Trajectory::GetNode(double time) const {
+        double time_temp = 0;
+        for (int node = 0; node < nodes_; node++) {
+            if (time < time_temp) {
+                return node;
+            }
+            time_temp += dt_[node];
+        }
+
+        return std::nullopt;
+    }
+
 
 } //torc::mpc

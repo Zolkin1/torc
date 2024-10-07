@@ -7,8 +7,12 @@
     - 3 shoulder joints: roll, pitch, yaw
     - 1 elbow joint
     XML and URDF generated from CAD information.
+
+    Note that none of the actuators are control limited because all of the saturation occurs in the joint field actuatorfrcrange
      -->
 <mujoco model="achilles">
+<!--  TODO: put time step back!-->
+  <option timestep="0.025" integrator = "implicitfast" cone="pyramidal"/>
 
   <!-- Set the angles to be in radians -->
   <compiler angle="radian" autolimits="true" eulerseq="zyx" meshdir="./meshes"/>
@@ -16,7 +20,7 @@
   <!-- Fix simulation options -->
   <!-- Note: Using RK4 causes weird simulation instability when also using the PD controller. Suggesting implicfast.  -->
   <!-- TODO: How fine of a time step can I get? -->
-  <option timestep="0.004" integrator = "implicitfast"/>
+  <!-- <option timestep="0.001" integrator = "implicitfast"/> -->
 
   <!-- Specify the light settings -->
   <visual>
@@ -30,117 +34,168 @@
 
     <!-- Note that position and velocity defaults don't work together! -->
 
+    <!-- <position name="left_hip_yaw_pos"  joint="left_hip_yaw_joint" kp="200" />
+    <position name="left_hip_roll_pos"  joint="left_hip_roll_joint" kp="800" />
+    <position name="left_hip_pitch_pos"  joint="left_hip_pitch_joint" kp="600" />
+    <position name="left_knee_pitch_pos"  joint="left_knee_pitch_joint" kp="600" />
+    <position name="left_ankle_pitch_pos"  joint="left_ankle_pitch_joint" kp="100" />
+    <position name="left_shoulder_pitch_pos"  joint="left_shoulder_pitch_joint" kp="50" />
+    <position name="left_shoulder_roll_pos"  joint="left_shoulder_roll_joint" kp="50" />
+    <position name="left_shoulder_yaw_pos"  joint="left_shoulder_yaw_joint" kp="10" />
+    <position name="left_elbow_pitch_pos"  joint="left_elbow_pitch_joint" kp="10" />
+    <position name="right_hip_yaw_pos"  joint="right_hip_yaw_joint" kp="200" />
+    <position name="right_hip_roll_pos"  joint="right_hip_roll_joint" kp="800" />
+    <position name="right_hip_pitch_pos"  joint="right_hip_pitch_joint" kp="600" />
+    <position name="right_knee_pitch_pos"  joint="right_knee_pitch_joint" kp="600" />
+    <position name="right_ankle_pitch_pos"  joint="right_ankle_pitch_joint" kp="100" />
+    <position name="right_shoulder_pitch_pos"  joint="right_shoulder_pitch_joint" kp="50" />
+    <position name="right_shoulder_roll_pos"  joint="right_shoulder_roll_joint" kp="50" />
+    <position name="right_shoulder_yaw_pos"  joint="right_shoulder_yaw_joint" kp="10" />
+    <position name="right_elbow_pitch_pos"  joint="right_elbow_pitch_joint" kp="10" />
+
+    <velocity name="left_hip_yaw_vel"  joint="left_hip_yaw_joint" kv="10" />
+    <velocity name="left_hip_roll_vel"  joint="left_hip_roll_joint" kv="10" />
+    <velocity name="left_hip_pitch_vel"  joint="left_hip_pitch_joint" kv="20" />
+    <velocity name="left_knee_pitch_vel"  joint="left_knee_pitch_joint" kv="5" />
+    <velocity name="left_ankle_pitch_vel"  joint="left_ankle_pitch_joint" kv="2" />
+    <velocity name="left_shoulder_pitch_vel"  joint="left_shoulder_pitch_joint" kv="2" />
+    <velocity name="left_shoulder_roll_vel"  joint="left_shoulder_roll_joint" kv="2" />
+    <velocity name="left_shoulder_yaw_vel"  joint="left_shoulder_yaw_joint" kv="1" />
+    <velocity name="left_elbow_pitch_vel"  joint="left_elbow_pitch_joint" kv="1" />
+    <velocity name="right_hip_yaw_vel"  joint="right_hip_yaw_joint" kv="10" />
+    <velocity name="right_hip_roll_vel"  joint="right_hip_roll_joint" kv="10" />
+    <velocity name="right_hip_pitch_vel"  joint="right_hip_pitch_joint" kv="20" />
+    <velocity name="right_knee_pitch_vel"  joint="right_knee_pitch_joint" kv="5" />
+    <velocity name="right_ankle_pitch_vel"  joint="right_ankle_pitch_joint" kv="2" />
+    <velocity name="right_shoulder_pitch_vel"  joint="right_shoulder_pitch_joint" kv="2" />
+    <velocity name="right_shoulder_roll_vel"  joint="right_shoulder_roll_joint" kv="2" />
+    <velocity name="right_shoulder_yaw_vel"  joint="right_shoulder_yaw_joint" kv="1" />
+    <velocity name="right_elbow_pitch_vel"  joint="right_elbow_pitch_joint" kv="1" /> -->
+
     <!-- Hip Pitch Settings -->
     <default class="hip_pitch">
       <default class="hip_pitch_pos">
-        <position kp="680" ctrllimited="true" ctrlrange="-35 35"/>
+        <!-- <position kp="480" ctrllimited="false"/> -->
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="hip_pitch_vel">
-        <velocity kv="70" ctrllimited="true" ctrlrange="-35 35"/>
+        <!-- <velocity kv="40" ctrllimited="false"/> -->
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-35 35"/>
+      <motor ctrllimited="false"/>
       <!-- TODO: The right joint in the URDF had the wrong joint limit, it had a max of 1.5, which is right? -->
-      <joint axis="0 1 0" pos="0 0 0" range="-1.5 0.5" damping="0.1" frictionloss="0.3"/> <!-- limited="true"-->
+      <joint axis="0 1 0" pos="0 0 0" range="-1.5 0.5" damping="0.1" frictionloss="0.03" actuatorfrcrange="-35.0 35.0" actuatorfrclimited="true"/> <!-- limited="true"-->
     </default>
 
     <!-- Hip Yaw Settings  -->
     <default class="hip_yaw">
       <default class="hip_yaw_pos">
-        <position kp="580" ctrllimited="true" ctrlrange="-35 35"/>
+        <!-- <position kp="480" ctrllimited="false"/> -->
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="hip_yaw_vel">
-        <velocity kv="30" ctrllimited="true" ctrlrange="-35 35"/>
+        <!-- <velocity kv="30" ctrllimited="false"/> -->
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-35 35"/>
-      <joint axis="0 0 1" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="0 0 1" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3" actuatorfrcrange="-35.0 35.0" actuatorfrclimited="true"/>
     </default>
 
     <!-- Hip Roll Settings  -->
     <default class="hip_roll">
       <default class="hip_roll_pos">
-        <position kp="680" ctrllimited="true" ctrlrange="-70  70"/>
+        <!-- <position kp="480" ctrllimited="false"/> -->
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="hip_roll_vel">
-        <velocity kv="70" ctrllimited="true" ctrlrange="-70  70"/>
+        <!-- <velocity kv="40" ctrllimited="false"/> -->
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-70  70"/>
-      <joint axis="1 0 0" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="1 0 0" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3" actuatorfrcrange="-70.0 70.0" actuatorfrclimited="true"/>
     </default>
 
     <!-- Knee Pitch Settings  -->
     <default class="knee_pitch">
       <default class="knee_pitch_pos">
         <!-- TODO: Bring this gain back down -->
-        <!-- 120, 35 -->
-        <position kp="370" ctrllimited="true" ctrlrange="-70  70"/>
+        <!-- 370, 30
+             1200, 50 -->
+        <!-- <position kp="370" ctrllimited="false"/>  -->
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="knee_pitch_vel">
-        <velocity kv="40" ctrllimited="true" ctrlrange="-70  70"/>
+        <!-- <velocity kv="10" ctrllimited="false"/> -->
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-70  70"/>
-      <joint axis="0 1 0" pos="0 0 0" range="0 2.0" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="0 1 0" pos="0 0 0" range="0. 2.0" damping="0.1" frictionloss="0.3" actuatorfrcrange="-70.0 70.0" actuatorfrclimited="true"/>
     </default>
 
     <!-- Ankle Pitch Settings  -->
     <default class="ankle_pitch">
       <default class="ankle_pitch_pos">
-        <position kp="75" kv="2.0" ctrllimited="true" ctrlrange="-35 35" forcelimited="true" forcerange="-35 35"/>
+        <!-- <position kp="50" kv="2.0" ctrllimited="false"/> -->
+        <!-- 625, 95
+            8200, 15 -->
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="ankle_pitch_vel">
         <!-- NOTE: The kv here causes weird issues with the contact dynamcis -->
         <!-- TODO: Be careful with this! -->
-        <velocity kv="3.0" forcelimited="true" forcerange="0 5"/>
+        <!-- <velocity kv="1.0" forcelimited="true" forcerange="0 5"/> -->
+        <velocity kv="0"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-35 35"/>
-      <joint axis="0 1 0" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="0 1 0" pos="0 0 0" range="-1.0 1.0" damping="0.1" frictionloss="0.3" actuatorfrcrange="-35.0 35.0" actuatorfrclimited="true"/>
     </default>
 
     <!-- Shoulder Pitch Settings  -->
     <default class="shoulder_pitch">
       <default class="shoulder_pitch_pos">
-        <position kp="100" ctrllimited="true" ctrlrange="-35 35"/>
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="shoulder_pitch_vel">
-        <velocity kv="20" ctrllimited="true" ctrlrange="-35 35"/>
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-35 35"/>
-      <joint axis="0 1 0" pos="0 0 0" range="-1.58 1.58" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="0 1 0" pos="0 0 0" range="-1.58 1.58" damping="0.1" frictionloss="0.3" actuatorfrcrange="-35.0 35.0" actuatorfrclimited="true"/>
     </default>
 
     <!-- Shoulder Roll Settings  -->
     <default class="shoulder_roll">
       <default class="shoulder_roll_pos">
-        <position kp="150" ctrllimited="true" ctrlrange="-12  12"/>
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="shoulder_roll_vel">
-        <velocity kv="20" ctrllimited="true" ctrlrange="-12  12"/>
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-12  12"/>
-      <joint axis="1 0 0" pos="0 0 0" range="0 3.14" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="1 0 0" pos="0 0 0" range="0 3.14" damping="0.1" frictionloss="0.3" actuatorfrcrange="-12.0 12.0" actuatorfrclimited="true"/>
     </default>
 
     <!-- Shoulder Yaw Settings  -->
     <default class="shoulder_yaw">
       <default class="shoulder_yaw_pos">
-        <position kp="150" ctrllimited="true" ctrlrange="-12  12"/>
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="shoulder_yaw_vel">
-        <velocity kv="20" ctrllimited="true" ctrlrange="-12  12"/>
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-12  12"/>
-      <joint axis="0 0 1" pos="0 0 0" range="-1.58 1.58" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="0 0 1" pos="0 0 0" range="-1.58 1.58" damping="0.1" frictionloss="0.3" actuatorfrcrange="-12.0 12.0" actuatorfrclimited="true"/>
     </default>
 
     <!-- Elbow Pitch Settings  -->
     <default class="elbow_pitch">
       <default class="elbow_pitch_pos">
-        <position kp="150" ctrllimited="true" ctrlrange="-24  24"/>
+        <position kp="0" ctrllimited="false"/>
       </default>
       <default class="elbow_pitch_vel">
-        <velocity kv="20" ctrllimited="true" ctrlrange="-24  24"/>
+        <velocity kv="0" ctrllimited="false"/>
       </default>
-      <motor ctrllimited="true" ctrlrange="-24  24"/>
-      <joint axis="0 1 0" pos="0 0 0" range="-1.58 0" damping="0.1" frictionloss="0.3"/>
+      <motor ctrllimited="false"/>
+      <joint axis="0 1 0" pos="0 0 0" range="-1.58 0" damping="0.1" frictionloss="0.3" actuatorfrcrange="-24.0 24.0" actuatorfrclimited="true"/>
     </default>
 
     <default class="visual">
@@ -195,6 +250,7 @@
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".7 .7 .7" specular="0.3 0.3 0.3" pos="1.5 -6 4" cutoff="30"/>
 
     <!-- Ground -->
+    <!-- TODO: Put back -->
     <geom material="plane" name="plane" rgba=".9 .9 .9 1" size="100 100 0.1" type="plane" euler="0 0 0"/>
 
     <!-- Achilles -->
@@ -238,16 +294,19 @@
 
               <body name="left_ankle_pitch" pos="0 0 -0.275">
                 <!-- Correct inertia from CAD Model -->
-                <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" />
+                <!-- <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" /> -->
 
                 <!-- Adjusted inertia to avoid sim artifacts -->
-                <!-- <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" /> -->
+                <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" />
 
                 <joint name="left_ankle_pitch_joint" class="ankle_pitch"/>
                 <geom name="left_foot" mesh="ankle_pitch" type="mesh" class="visual"/>
 
                 <geom name="foot_front_left" pos="0.088 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision" group="2"/>
+                <site name="left_toe_force_site" pos="0.088 0 -0.018" euler="0 0 0" size="0.001"/>
+
                 <geom name="foot_rear_left" pos="-0.02 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision" group="2"/>
+                <site name="left_heel_force_site" pos="-0.02 0 -0.018" euler="0 0 0" size="0.001"/>
 
                 <site name="left_foot_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
               </body>
@@ -312,16 +371,19 @@
 
               <body name="right_ankle_pitch" pos="0 0 -0.275">
                 <!-- Correct inertia from CAD Model -->
-                <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" />
+                <!-- <inertial mass="0.180" fullinertia="0.000031 0.000286 0.000272 0 0 0" pos="0.0272 0.0 -0.0156" /> -->
 
                 <!-- Adjusted inertia to avoid sim artifacts -->
-                <!-- <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" /> -->
+                <inertial mass="0.180" fullinertia="0.001 0.001 0.001 0 0 0" pos="0 0 0" />
 
                 <joint name="right_ankle_pitch_joint" class="ankle_pitch" />
                 <geom name="right_foot" mesh="ankle_pitch" type="mesh" class="visual"/>
 
                 <geom name="foot_front_right" pos="0.088 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision"/>
+                <site name="right_toe_force_site" pos="0.088 0 -0.018" euler="0 0 0" size="0.001"/>
+
                 <geom name="foot_rear_right" pos="-0.02 0 -0.018" type="sphere" size="0.02" condim="6" friction="1" class="collision"/>
+                <site name="right_heel_force_site" pos="-0.02 0 -0.018" euler="0 0 0" size="0.001"/>
 
                 <site name="right_foot_imu_site" pos="0 0 0" euler="0 0 0" size="0.001"/>
               </body>
@@ -430,13 +492,15 @@
     <!-- <pair name="left_foot_to_plane" geom1="left_foot" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
     <pair name="right_foot_to_plane" geom1="right_foot" geom2="plane" friction="1 1 0.001 0.001 0.001"/> -->
 
+    <!-- TODO: put back! -->
     <pair name="torso_to_plane" geom1="torso_collision_box" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
 
     <!-- Contacts using sphere approximations -->
-    <pair name="foot_front_left_to_plane" geom1="foot_front_left" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
-    <pair name="foot_rear_left_to_plane" geom1="foot_rear_left" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
-    <pair name="foot_front_right_to_plane" geom1="foot_front_right" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
-    <pair name="foot_rear_right_to_plane" geom1="foot_rear_right" geom2="plane" friction="1 1 0.001 0.1 0.1"/>
+    <!-- TODO: put back! -->
+    <pair name="foot_front_left_to_plane" geom1="foot_front_left" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
+    <pair name="foot_rear_left_to_plane" geom1="foot_rear_left" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
+    <pair name="foot_front_right_to_plane" geom1="foot_front_right" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
+    <pair name="foot_rear_right_to_plane" geom1="foot_rear_right" geom2="plane" friction="1 1 0.001 0.001 0.001"/>
   </contact>
 
   <sensor>
@@ -503,6 +567,11 @@
     <framepos name="torso_mocap_pos_sensor" objtype="site" objname="torso_mocap_site" noise="0.01"/>
     <framequat name="torso_mocap_quat_sensor" objtype="site" objname="torso_mocap_site" noise="0.01"/>
 
+    <!--  Force sensors  -->
+    <force name="left_toe_force_sensor" site="left_toe_force_site"/>
+    <force name="left_heel_force_sensor" site="left_heel_force_site"/>
+    <force name="right_toe_force_sensor" site="right_toe_force_site"/>
+    <force name="right_heel_force_sensor" site="right_heel_force_site"/>
   </sensor>
 
   <!-- Keyframes -->
@@ -556,6 +625,85 @@
       0 0
       0 0 0
       0"/>
+
+    <key name="testing"
+         qpos="
+      0 0 0.94
+      0 0 0 0
+      0 0 -0.26
+      0.65 -0.43
+      0 0 0
+      0
+      0 0 -0.26
+      0.65 -0.43
+      0 0 0
+      0"
+
+         ctrl="
+      0 0 -0.26
+      0.65 -0.43
+      0 0 0
+      0
+      0 0 -0.26
+      0.65 -0.43
+      0 0 0
+      0
+      0 0 0
+      0 0
+      0 0 0
+      0
+      0 0 0
+      0 0
+      0 0 0
+      0
+      0 0 0
+      0 0
+      0 0 0
+      0
+      0 0 0
+      0 0
+      0 0 0
+      0"/>
+
+    <!-- Stands only with implicit fast -->
+    <key name="stand_A"
+         qpos="
+      0. 0. 0.93
+      0. 0. 0. 0.
+      0.0000 0.0209 -0.5515
+      1.0239 -0.4725
+      0.0000 0.0000 0.0000
+      0.0000
+      0.0000 -0.0209 -0.3200
+      0.9751 -0.6552
+      0.0000 0.0000 0.0000
+      0.0000"
+         ctrl="
+      0.0000 0.0209 -0.5515
+      1.0239 -0.4725
+      0.0000 0.0000 0.0000
+      0.0000
+      0.0000 -0.0209 -0.3200
+      0.9751 -0.6552
+      0.0000 0.0000 0.0000
+      0.0000
+      0 0 0
+      0 0
+      0 0 0
+      0
+      0 0 0
+      0 0
+      0 0 0
+      0
+      0 0 0
+      0 0
+      0 0 0
+      0
+      0 0 0
+      0 0
+      0 0 0
+      0"/>
+
   </keyframe>
   <!-- For a fixed base debugging version -->
   <!-- <key name="ic"
