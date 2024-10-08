@@ -7,7 +7,7 @@
 // TODO: Fix the new constraint violation issues
 
 int main() {
- using namespace torc::mpc;
+    using namespace torc::mpc;
     std::filesystem::path achilles_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/achilles.urdf";
 
     std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/achilles_mpc_config_sim.yaml";
@@ -18,6 +18,15 @@ int main() {
 
     torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
 
+    if (achilles.GetJointID("base_to_torso_joint").has_value()) {
+        std::cout << "Joint: base_to_torso_joint, idx: " << achilles.GetJointID("base_to_torso_joint").value() << std::endl;
+    } else {
+        std::cout << "Joint: base_to_torso_joint not found!" << std::endl;
+    }
+
+    if (achilles.GetJointID("left_hip_yaw_joint").has_value()) {
+        std::cout << "Joint: left_hip_yaw_joint, idx: " << achilles.GetJointID("left_hip_yaw_joint").value() << std::endl;
+    }
 
     torc::mpc::ContactSchedule cs(mpc.GetContactFrames());
     // cs.InsertContact("right_hand", 0, 1);

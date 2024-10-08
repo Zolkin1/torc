@@ -1268,15 +1268,15 @@ namespace torc::mpc {
         // violation += GetICViolation(qp_res);
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
-            std::cout << "Node: " << node << std::endl;
+            // std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
                 violation += GetIntegrationViolation(qp_res, node);
-                std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
+                // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
                 violation += GetIDViolation(qp_res, node, true);
-                std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
+                // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
                  violation += GetIDViolation(qp_res, node, false);
@@ -1287,7 +1287,7 @@ namespace torc::mpc {
             // These could conflict with the initial condition constraints
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
+                // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetHolonomicViolation(qp_res, node);
                 violation += GetVelocityBoxViolation(qp_res, node);
 

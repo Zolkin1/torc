@@ -3,6 +3,7 @@
 
 #include <eigen3/Eigen/Dense>
 #include <filesystem>
+#include <optional>
 
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/multibody/data.hpp"
@@ -70,6 +71,8 @@ namespace torc::models {
         [[nodiscard]] virtual vectorx_t GetRandomState() const = 0;
 
         [[nodiscard]] virtual quat_t GetBaseOrientation(const vectorx_t &q) const = 0;
+
+        [[nodiscard]] std::optional<unsigned long> GetJointID(const std::string& joint_name);
 
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
