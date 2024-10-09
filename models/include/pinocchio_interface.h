@@ -15,6 +15,11 @@ namespace torc::models {
     Eigen::Vector<ScalarT, Eigen::Dynamic> ConvertdqToq(const Eigen::Vector<ScalarT, Eigen::Dynamic>& dq,
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& q) {
 
+        if (dq.size() != q.size() - 1) {
+            std::cerr << "dq size: " << dq.size() << std::endl;
+            throw std::runtime_error("dq size is incorrect!");
+        }
+
         Eigen::Vector<ScalarT, Eigen::Dynamic> q_out(q.size());
 
         // Position variables

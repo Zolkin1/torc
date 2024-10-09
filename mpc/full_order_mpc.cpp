@@ -810,12 +810,13 @@ namespace torc::mpc {
         // Get the frame velocity
         const long frame_idx = robot_model_->GetFrameIdx(frame);
         // TODO: Consider going back to LocalWorldAligned frame!
-        const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL).linear();
+        // const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL).linear();
+        const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
 
         // TODO: In the future we will want to rotate this into the ground frame so the constraint is always tangential to the terrain
 
         // Violation is the velocity as we want to drive it to 0
-        violation = vel.head<2>();
+        violation = vel.head<3>();      // As of 10/8/24 also constrain the z velocity
     }
 
     void FullOrderMpc::SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_desheight, ad::ad_vector_t& violation) const {
@@ -1152,25 +1153,39 @@ namespace torc::mpc {
         // TODO: Consider adding a little feedback controller in the constraint to bring the foot back if it off the trajectory
         //  Could also choose to track velocity instead of position.
         for (const auto& frame : contact_frames_) {
-            // Linearization
-            matrixx_t jac;
-            vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
-            vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
-            p << traj_.GetConfiguration(node), swing_traj_[frame][node];
-            swing_height_constraint_[frame]->GetJacobian(x_zero, p, jac);
+            if (!in_contact_[frame][node]) {     // Only constrain the height if not in contact
+                // Linearization
+                matrixx_t jac;
+                vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
+                vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
+                p << traj_.GetConfiguration(node), swing_traj_[frame][node];
+                swing_height_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
-            const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
+                const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
 
-            // dqk
-            MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+                // dqk
+                MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
 
-            // Lower and upper bounds
-            vectorx_t y;
-            swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y);
-            osqp_instance_.lower_bounds(row_start) = -y(0);
-            osqp_instance_.upper_bounds(row_start) = -y(0);
+                // Lower and upper bounds
+                vectorx_t y;
+                swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y);
+                osqp_instance_.lower_bounds(row_start) = -y(0);
+                osqp_instance_.upper_bounds(row_start) = -y(0);
 
-            row_start++;
+                row_start++;
+            } else {
+                matrixx_t jac = matrixx_t::Zero(swing_height_constraint_[frame]->GetRangeSize(), swing_height_constraint_[frame]->GetDomainSize());
+                const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
+
+                // dqk
+                MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+
+                // Lower and upper bounds
+                osqp_instance_.lower_bounds(row_start) = 0;
+                osqp_instance_.upper_bounds(row_start) = 0;
+
+                row_start++;
+            }
 
             // std::cout << "Frame " << frame << " jac: \n" << jac << std::endl;
             // std::cout << "y: " << y << std::endl;
@@ -1268,15 +1283,15 @@ namespace torc::mpc {
         // violation += GetICViolation(qp_res);
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
-            // std::cout << "Node: " << node << std::endl;
+            std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
                 violation += GetIntegrationViolation(qp_res, node);
-                // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
+                std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
                 violation += GetIDViolation(qp_res, node, true);
-                // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
+                std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
                  violation += GetIDViolation(qp_res, node, false);
@@ -1287,7 +1302,7 @@ namespace torc::mpc {
             // These could conflict with the initial condition constraints
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
+                std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetHolonomicViolation(qp_res, node);
                 violation += GetVelocityBoxViolation(qp_res, node);
 
@@ -1743,6 +1758,24 @@ namespace torc::mpc {
 
         osqp_instance_.objective_matrix.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
 
+        // ----- PSD Checks
+        // std::cout << "sparsity pattern mat: \n" << osqp_instance_.objective_matrix << std::endl;
+        //
+        // Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(osqp_instance_.objective_matrix.toDense());
+        // if (solver.info() == Eigen::Success) {
+        //     std::cout << "Eigenvalues are:\n" << solver.eigenvalues() << std::endl;
+        // } else {
+        //     std::cout << "Eigenvalue computation failed!" << std::endl;
+        // }
+        //
+        // if (!osqp_instance_.objective_matrix.isApprox(osqp_instance_.objective_matrix.transpose())) {
+        //     throw std::runtime_error("[Cost Function] osqp_instance_.objective_matrix is not symmetric!");
+        // }
+        // const auto ldlt = osqp_instance_.objective_matrix.toDense().template selfadjointView<Eigen::Upper>().ldlt();
+        // if (ldlt.info() == Eigen::NumericalIssue || !ldlt.isPositive()) {
+        //     throw std::runtime_error("[Cost Function] osqp_instance_.objective_matrix is not PSD!");
+        // }
+
         ws_->obj_config_vector.resize(robot_model_->GetVelDim());
         ws_->obj_vel_vector.resize(robot_model_->GetVelDim());
         ws_->obj_tau_vector.resize(robot_model_->GetNumInputs());
@@ -1822,6 +1855,11 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetConfiguration(node), GetDesiredFramePos(node, data.frame_name),
                                            linear_term, hess_term, data.constraint_name);
 
+                    // std::cout << "----- " << data.constraint_name << std::endl;
+                    // std::cout << "q: " << traj_.GetConfiguration(node).transpose() << std::endl;
+                    // std::cout << "Hess: \n" << hess_term << std::endl;
+                    // std::cout << "Linear: \n" << linear_term.transpose() << std::endl;
+
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                             scaling * linear_term;
 
@@ -1834,11 +1872,28 @@ namespace torc::mpc {
         objective_mat_.setFromTriplets(objective_triplets_.begin(), objective_triplets_.end());
 
         // std::cout << "obj mat:\n" << objective_mat_ << std::endl;
+        // std::cout << "obj vec:\n" << osqp_instance_.objective_vector << std::endl;
         if (objective_triplet_idx_ != objective_triplets_.size()) {
              std::cerr << "triplet idx: " << objective_triplet_idx_ << std::endl;
              std::cerr << "triplet size: " << objective_triplets_.size() << std::endl;
             throw std::runtime_error("[Cost Function] Could not populate the cost function matrix correctly.");
         }
+
+        // ----- PSD Checks
+        // Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(objective_mat_.toDense());
+        // if (solver.info() == Eigen::Success) {
+        //     std::cout << "Eigenvalues are:\n" << solver.eigenvalues() << std::endl;
+        // } else {
+        //     std::cout << "Eigenvalue computation failed!" << std::endl;
+        // }
+        //
+        // if (!objective_mat_.isApprox(objective_mat_.transpose())) {
+        //     throw std::runtime_error("[Cost Function] objective_mat_ is not symmetric!");
+        // }
+        // const auto ldlt = objective_mat_.toDense().template selfadjointView<Eigen::Upper>().ldlt();
+        // if (ldlt.info() == Eigen::NumericalIssue || !ldlt.isPositive()) {
+        //     throw std::runtime_error("[Cost Function] objective_mat_ is not PSD!");
+        // }
     }
 
     double FullOrderMpc::GetFullCost(const vectorx_t& qp_res) {
@@ -1871,7 +1926,7 @@ namespace torc::mpc {
                                 force_idx, CONTACT_3DOF), traj_.GetForce(node, frame), force_target, data.constraint_name);
                         force_idx += CONTACT_3DOF;
                     }
-                } else if (data.type == CostTypes::ForwardKinematics) {
+                } else if (data.type == CostTypes::ForwardKinematics && node > 0) {
                     vectorx_t pos_target = GetDesiredFramePos(node, data.frame_name);
                     cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
                                                            traj_.GetConfiguration(node), pos_target, data.constraint_name);
@@ -2683,7 +2738,12 @@ namespace torc::mpc {
                                       std::vector<Eigen::Triplet<double>>& triplet) {
         for (int row = 0; row < sparsity.size(); row++) {
             for (const auto& col : sparsity[row]) {
-                triplet.emplace_back(row_start + row, col_start + col, 1);
+                if (row == col){
+                    triplet.emplace_back(row_start + row, col_start + col, 100);    // To ensure the sparsity pattern is psd
+
+                } else {
+                    triplet.emplace_back(row_start + row, col_start + col, 1);
+                }
             }
         }
     }
@@ -2806,7 +2866,7 @@ namespace torc::mpc {
     }
 
     int FullOrderMpc::NumHolonomicConstraintsNode() const {
-        return num_contact_locations_*2;
+        return num_contact_locations_*3;
     }
 
     int FullOrderMpc::NumCollisionConstraintsNode() const {

@@ -19,6 +19,7 @@
 #include "trajectory.h"
 #include "cpp_ad_interface.h"
 #include "full_order_rigid_body.h"
+#include "pinocchio_interface.h"
 
 namespace torc::mpc {
     using vectorx_t = Eigen::VectorXd;
@@ -233,6 +234,19 @@ namespace torc::mpc {
                 cost_fcn_terms_[name]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
                 hessian_term = 2*hessian_term;
 
+                hessian_term = hessian_term + 1e-5*matrixx_t::Identity(hessian_term.rows(), hessian_term.cols());       // Ensures that we are PSD
+
+                // ----- PSD Checks
+                // if (!hessian_term.isApprox(hessian_term.transpose())) {
+                //     throw std::runtime_error("[Cost Function] hessian_term is not symmetric!");
+                // }
+                // const auto ldlt = hessian_term.template selfadjointView<Eigen::Upper>().ldlt();
+                // if (ldlt.info() == Eigen::NumericalIssue || !ldlt.isPositive()) {
+                //     throw std::runtime_error("[Cost Function] hessiam term is not PSD!");
+                // }
+                //
+                // std::cout << "hessian term is PSD" << std::endl;
+
                 vectorx_t y;
                 cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
                 linear_term = 2*jac.transpose()*y;
@@ -384,18 +398,18 @@ namespace torc::mpc {
          */
         void FkCost(int frame_idx,
                     const torc::ad::ad_vector_t& dq,        // Change in configuration and velocity
-                    const torc::ad::ad_vector_t& q_xyzdes_weight,    // configuration, velocity, stance time, nominal height
+                    const torc::ad::ad_vector_t& q_xyzdes_weight,    // configuration, desired position, weight
                     torc::ad::ad_vector_t& frame_error) {       // Error on the foot location
             const torc::ad::ad_vector_t& q = q_xyzdes_weight.head(config_size_);
             const Eigen::Vector3<torc::ad::adcg_t>& des_pos = q_xyzdes_weight.segment<3>(config_size_);
 
             // Get the current configuration
-            torc::ad::ad_vector_t q_curr = pinocchio::integrate(ad_pin_model_, q, dq);
+            const torc::ad::ad_vector_t q_curr = torc::models::ConvertdqToq(dq, q);
 
             // Get the frame location
             pinocchio::forwardKinematics(ad_pin_model_, *ad_pin_data_, q_curr);
             pinocchio::updateFramePlacement(ad_pin_model_, *ad_pin_data_, frame_idx);
-            const Eigen::Vector3<torc::ad::adcg_t>& frame_pos = ad_pin_data_->oMf[frame_idx].translation();
+            ad::ad_vector_t frame_pos = ad_pin_data_->oMf.at(frame_idx).translation();
 
             frame_error = frame_pos - des_pos;
 

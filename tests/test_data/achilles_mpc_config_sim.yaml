@@ -64,23 +64,23 @@ costs:
   - type: ForceRegularization
     name: "ForceReg"
     weight: [0.0001, 0.0001, 0.01]
-
-#  - type: ForwardKinematics
-#    name: "LeftToe"
-#    weight: [0.0001, 0.0001, 0.0]
-#    frame: "foot_front_left"
-#  - type: ForwardKinematics
-#    name: "LeftHeel"
-#    weight: [0.0001, 0.0001, 0.0 ]
-#    frame: "foot_rear_left"
-#  - type: ForwardKinematics
-#    name: "RightToe"
-#    weight: [0.0001, 0.0001, 0.0 ]
-#    frame: "foot_front_right"
-#  - type: ForwardKinematics
-#    name: "RightHeel"
-#    weight: [0.0001, 0.0001, 0.0 ]
-#    frame: "foot_rear_right"
+  # FK
+  - type: ForwardKinematics
+    name: "LeftToe"
+    weight: [0.0001, 0.0001, 0.0]
+    frame: "foot_front_left"
+  - type: ForwardKinematics
+    name: "LeftHeel"
+    weight: [0.0001, 0.0001, 0.0 ]
+    frame: "foot_rear_left"
+  - type: ForwardKinematics
+    name: "RightToe"
+    weight: [0.0001, 0.0001, 0.0 ]
+    frame: "foot_front_right"
+  - type: ForwardKinematics
+    name: "RightHeel"
+    weight: [0.0001, 0.0001, 0.0 ]
+    frame: "foot_rear_right"
 contacts:
   # For now, removing hands
   # contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]
