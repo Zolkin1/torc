@@ -810,13 +810,14 @@ namespace torc::mpc {
         // Get the frame velocity
         const long frame_idx = robot_model_->GetFrameIdx(frame);
         // TODO: Consider going back to LocalWorldAligned frame!
-        // const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL).linear();
-        const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
+        const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL).linear();
+        // const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
 
         // TODO: In the future we will want to rotate this into the ground frame so the constraint is always tangential to the terrain
 
         // Violation is the velocity as we want to drive it to 0
-        violation = vel.head<3>();      // As of 10/8/24 also constrain the z velocity
+        // TODO: Consider going back to 3
+        violation = vel.head<2>();
     }
 
     void FullOrderMpc::SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_desheight, ad::ad_vector_t& violation) const {
@@ -1153,7 +1154,7 @@ namespace torc::mpc {
         // TODO: Consider adding a little feedback controller in the constraint to bring the foot back if it off the trajectory
         //  Could also choose to track velocity instead of position.
         for (const auto& frame : contact_frames_) {
-            if (!in_contact_[frame][node]) {     // Only constrain the height if not in contact
+            // if (!in_contact_[frame][node]) {     // Only constrain the height if not in contact
                 // Linearization
                 matrixx_t jac;
                 vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
@@ -1173,19 +1174,19 @@ namespace torc::mpc {
                 osqp_instance_.upper_bounds(row_start) = -y(0);
 
                 row_start++;
-            } else {
-                matrixx_t jac = matrixx_t::Zero(swing_height_constraint_[frame]->GetRangeSize(), swing_height_constraint_[frame]->GetDomainSize());
-                const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
-
-                // dqk
-                MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
-
-                // Lower and upper bounds
-                osqp_instance_.lower_bounds(row_start) = 0;
-                osqp_instance_.upper_bounds(row_start) = 0;
-
-                row_start++;
-            }
+            // } else {
+            //     matrixx_t jac = matrixx_t::Zero(swing_height_constraint_[frame]->GetRangeSize(), swing_height_constraint_[frame]->GetDomainSize());
+            //     const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
+            //
+            //     // dqk
+            //     MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+            //
+            //     // Lower and upper bounds
+            //     osqp_instance_.lower_bounds(row_start) = 0;
+            //     osqp_instance_.upper_bounds(row_start) = 0;
+            //
+            //     row_start++;
+            // }
 
             // std::cout << "Frame " << frame << " jac: \n" << jac << std::endl;
             // std::cout << "y: " << y << std::endl;
@@ -2866,7 +2867,7 @@ namespace torc::mpc {
     }
 
     int FullOrderMpc::NumHolonomicConstraintsNode() const {
-        return num_contact_locations_*3;
+        return num_contact_locations_*2;
     }
 
     int FullOrderMpc::NumCollisionConstraintsNode() const {
