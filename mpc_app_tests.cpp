@@ -40,7 +40,7 @@ int main() {
     cs.InsertSwing("foot_rear_right", 0.3, 0.6);
 
     const double apex_height = 0.08;
-    const double foot_height = 0.015;
+    const std::vector<double> foot_height = {0.015, 0.015, 0.015, 0.015};
     const double apex_time = 0.5;
     mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
     for (const auto& frame : mpc.GetContactFrames()) {

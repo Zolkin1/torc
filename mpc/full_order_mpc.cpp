@@ -453,11 +453,17 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
-            double end_height, double apex_time) {
+            std::vector<double> end_height, double apex_time) {
         UpdateContactSchedule(contact_schedule);
 
+        if (end_height.size() != num_contact_locations_) {
+            throw std::runtime_error("end_height size does not match the number of contacts in the MPC!");
+        }
+
+        int frame_idx = 0;
         for (auto& [frame, traj] : swing_traj_) {
-            contact_schedule.CreateSwingTraj(frame, apex_height, end_height, apex_time, dt_, traj);
+            contact_schedule.CreateSwingTraj(frame, apex_height, end_height[frame_idx], apex_time, dt_, traj);
+            frame_idx++;
         }
     }
 

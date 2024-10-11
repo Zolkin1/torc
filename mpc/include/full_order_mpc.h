@@ -84,7 +84,7 @@ namespace torc::mpc {
         void UpdateContactSchedule(const ContactSchedule& contact_schedule);
 
         void UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
-            double end_height, double apex_time);
+            std::vector<double> end_height, double apex_time);
 
         /**
          * @brief Computes the trajectory given the current state.

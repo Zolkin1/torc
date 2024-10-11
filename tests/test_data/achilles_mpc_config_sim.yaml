@@ -4,7 +4,7 @@ general_settings:
   node_dt_type: SmallFirst # Even, SmallFirst, Adaptive
   node_dt: 0.025
   first_node_dt: 0.01
-  compile_derivatives: True #True
+  compile_derivatives: False #True
   base_frame: "torso"
   scale_cost: False
   max_initial_solves: 20
