@@ -15,6 +15,7 @@ namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
+    using matrix3x_t = Eigen::Matrix<double, 3, Eigen::Dynamic>;
 
     template <typename ScalarT>
     struct ExternalForce {
@@ -138,6 +139,14 @@ namespace torc::models {
                                                                                                         const std::vector<ExternalForce<double>>& f_ext) const;
 
         matrixx_t ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce<double>>& f_ext);
+
+        /**
+        * Compute a configuration that respects the task space constraints.
+        * @param positions 3d positions for certain frames
+        * @param frames corresponding frame names
+        */
+        vectorx_t InverseKinematics(const vectorx_t& base_config, const std::vector<vector3_t>& positions, const std::vector<std::string>& frames,
+            const vectorx_t& q_guess);
 
         // DEBUG ------
         pinocchio::Model GetModel() const;

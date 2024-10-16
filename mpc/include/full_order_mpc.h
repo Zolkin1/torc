@@ -23,6 +23,7 @@ namespace torc::mpc {
     namespace fs = std::filesystem;
 
     using vectorx_t = Eigen::VectorXd;
+    using vector2_t = Eigen::Vector2d;
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3x_t = Eigen::Matrix3Xd;
@@ -142,6 +143,19 @@ namespace torc::mpc {
         void SetSwingFootTrajectory(const std::string& frame, const std::vector<double>& swing_traj);
 
         bool PlannedContact(const std::string& frame, int node) const;
+
+        void ShiftWarmStart(double dt);
+
+        /**
+        * Generate a full body reference. Take in the desired velocity and use the current swing trajectory.
+        * In the future I will need to take into account terrain with different height and deal with contacts that
+        * do not interact with the ground, but for now we will take the simple approach.
+        *
+        * The z velocity is assumed to be 0
+        * @param pos is a 3-vector giving the the x,y,z positions of the base link
+        * @param vel is a 3-vector in the form [xdot, ydot, yawdot] where yaw dot is the rotation about the z axis
+        */
+        void GenerateCostReference(const vector3_t& pos, const vector3_t& vel);
 
         ~FullOrderMpc();
 

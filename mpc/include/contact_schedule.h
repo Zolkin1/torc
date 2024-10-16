@@ -84,13 +84,13 @@ namespace torc::mpc {
 
         const std::map<std::string, std::vector<std::pair<double, double>>>&  GetScheduleMap() const;
 
+        static double GetSwingHeight(double apex_height, double ground_height, double apex_time, double time,
+            double start_time, double end_time);
+
      // double GetLastContactTime(const std::string& frame);
         double GetLastSwingTime(const std::string& frame) const;
     protected:
          static double GetTime(const std::vector<double>& dt_vec, int node);
-
-         static double GetSwingHeight(double apex_height, double ground_height, double apex_time, double time,
-             double start_time, double end_time);
 
         std::map<std::string, std::vector<std::pair<double, double>>> frame_schedule_map;
     };

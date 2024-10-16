@@ -713,6 +713,68 @@ namespace torc::mpc {
         enable_delay_prediction_ = true;
     }
 
+    void FullOrderMpc::ShiftWarmStart(double dt) {
+        // Update the warm start trajectory
+        // Shift all but the first node
+        vectorx_t q, v, tau;
+        vector3_t force;
+        for (int node = 1; node < nodes_; node++) {
+            const double time = GetTime(node) + dt;
+
+            traj_.GetConfigInterp(time, q);
+            traj_.SetConfiguration(node, q);
+
+            traj_.GetVelocityInterp(time, v);
+            traj_.SetVelocity(node, v);
+
+            traj_.GetTorqueInterp(time, tau);
+            traj_.SetTau(node, tau);
+
+            for (const auto& frame : contact_frames_) {
+                traj_.GetForceInterp(time, frame, force);
+                traj_.SetForce(node, frame, force);
+            }
+        }
+    }
+
+    void FullOrderMpc::GenerateCostReference(const vector3_t& pos, const vector3_t& vel) {
+        for (int node = 0; node < nodes_; node++) {
+            // Integrate the velocity forward to get the planar positions
+            q_target_.value()[node](0) = node*dt_[node]*vel(0) + pos(0);
+            q_target_.value()[node](1) = node*dt_[node]*vel(1) + pos(1);
+            q_target_.value()[node](2) = pos(2);
+            // TODO: Determine the quaternion targets from the commanded velocity, for now ignoring
+            q_target_.value()[node].segment<3>(POS_VARS).setZero();
+
+            // Assign velocity targets
+            v_target_.value()[node](0) = vel(0);
+            v_target_.value()[node](1) = vel(1);
+            v_target_.value()[node](2) = 0;
+            // TODO: Determine the quaternion velocity from the commanded velocity, for now setting to 0
+            v_target_.value()[node].segment<3>(POS_VARS).setZero();
+            v_target_.value()[node].tail(robot_model_->GetVelDim() - FLOATING_VEL).setZero();
+
+            // IK for joint targets
+            // Get end effector positions
+            std::vector<vector3_t> positions(contact_frames_.size());
+            for (const auto& frame : contact_frames_) {
+                // TODO: Determine how to extract the hip offset - might need hip info in the yaml
+                vector2_t hip_offset = vector2_t::Zero(); //robot_model_->GetHipOffset();
+                vector3_t position;
+                // TODO: Consider adding in the raibert heuristic
+
+                // TODO: For the feet already in contact we should use their current location, not the nominal position
+                position << q_target_.value()[node](0) + hip_offset(0),
+                            q_target_.value()[node](1) + hip_offset(1),
+                            swing_traj_[frame][node];
+                positions.emplace_back(position);
+            }
+            q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
+                robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
+                    positions, contact_frames_, traj_.GetConfiguration(node));
+        }
+    }
+
 
     // ------------------------------------------------- //
     // -------------- Constraint Creation -------------- //
@@ -1290,15 +1352,15 @@ namespace torc::mpc {
         // violation += GetICViolation(qp_res);
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
-            std::cout << "Node: " << node << std::endl;
+            // std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
                 violation += GetIntegrationViolation(qp_res, node);
-                std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
+                // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
                 violation += GetIDViolation(qp_res, node, true);
-                std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
+                // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
                  violation += GetIDViolation(qp_res, node, false);
@@ -1309,7 +1371,7 @@ namespace torc::mpc {
             // These could conflict with the initial condition constraints
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
+                // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetHolonomicViolation(qp_res, node);
                 violation += GetVelocityBoxViolation(qp_res, node);
 

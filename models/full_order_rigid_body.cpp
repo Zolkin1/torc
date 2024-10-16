@@ -621,6 +621,106 @@ namespace torc::models {
         }
     }
 
+    vectorx_t FullOrderRigidBody::InverseKinematics(const vectorx_t& base_config, const std::vector<vector3_t>& positions, const std::vector<std::string>& frames,
+        const vectorx_t& q_guess) {
+        // For each position I will need to update the tree's joints.
+        // Note that I assume that each position is on an independent part of the tree.
+
+        // TODO: Try to speed this up!
+
+        if (base_config.size() != FLOATING_CONFIG) {
+            throw std::runtime_error("[IK] Invalid base config size!");
+        }
+
+        if (frames.size() != positions.size()) {
+            throw std::runtime_error("[IK] Number of positions and frames do not match!");
+        }
+
+        // Define constants for the optimization
+        constexpr double THRESHOLD = 1e-2;
+        constexpr int IT_MAX = 5e2;
+        constexpr double DT = 1e-2;
+        constexpr double DAMP = 1e-6;
+
+        vectorx_t q = q_guess;
+        q.head<FLOATING_CONFIG>() = base_config;
+
+        matrix6x_t J = matrix6x_t::Zero(6, GetVelDim());
+        matrix3x_t Jlin = matrix3x_t::Zero(3, GetVelDim());
+        vectorx_t v = vectorx_t::Zero(GetVelDim());
+
+        for (int ee = 0; ee < positions.size(); ee++) {
+            const int frame_idx = GetFrameIdx(frames[ee]);
+            v.setZero();
+            for (int i = 0; i < IT_MAX; i++) {
+                pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+                const vector3_t error = positions[ee] - pin_data_->oMf[frame_idx].translation();
+
+                if (error.norm() <= THRESHOLD) {
+                    break;
+                }
+
+                Jlin.setZero();
+                J.setZero();
+                pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, frame_idx, J);
+                // Jlin = J.block(0, FLOATING_VEL, 3, GetVelDim() - FLOATING_VEL);
+                Jlin = J.topRows<3>();
+
+                matrix3x_t JJt;
+                JJt.noalias() = Jlin * Jlin.transpose();
+                JJt.diagonal().array() += DAMP;
+
+                v.noalias() = -Jlin.transpose() * JJt.ldlt().solve(error);
+                v.head<FLOATING_VEL>().setZero();
+                double alpha = 1;
+                while (alpha >= DT) {
+                    q = pinocchio::integrate(pin_model_, q, v*alpha);
+                    pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+                    q = pinocchio::integrate(pin_model_, q, -v*alpha);
+
+                    const vector3_t error_ls = positions[ee] - pin_data_->oMf[frame_idx].translation();
+
+                    if (error_ls.norm() < error.norm()) {
+                        break;
+                    }
+
+                    alpha *= 0.5;
+                }
+
+                if (alpha < DT) {
+                    // Not getting more decrease. Break the loop.
+                    break;
+                }
+
+                // std::cout << "alpha: " << alpha << std::endl;
+
+                q = pinocchio::integrate(pin_model_, q, v*alpha);
+
+                // TODO: Remove after debugged
+                // if (!(i%5)) {
+                //     // std::cout << "q: " << q.transpose() << std::endl;
+                //     // std::cout << "v: " << v.transpose() << std::endl;
+                //     // std::cout << "Jlin:\n" << Jlin << std::endl;
+                //     std::cout << "end effector: " << ee << ", iteration: " << i << ", error: " << error.transpose() << ", error norm: " << error.norm() << std::endl;
+                // }
+            }
+
+            // std::cout << std::endl;
+        }
+
+        // TODO: Remove after debugged
+        // pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+        // for (int ee = 0; ee < positions.size(); ee++) {
+        //     const int frame_idx = GetFrameIdx(frames[ee]);
+        //     const vector3_t error = positions[ee] - pin_data_->oMf[frame_idx].translation();
+        //     std::cout << "end effector: " << ee << ", error norm: " << error.norm() << std::endl;
+        //     std::cout << "resulting position: " << pin_data_->oMf[frame_idx].translation().transpose() << std::endl;
+        // }
+
+        return q;
+    }
+
+
     // DEBUG ------
     pinocchio::Model FullOrderRigidBody::GetModel() const {
         return pin_model_;

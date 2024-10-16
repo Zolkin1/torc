@@ -41,11 +41,23 @@ int main() {
 
     const double apex_height = 0.08;
     const std::vector<double> foot_height = {0.015, 0.015, 0.015, 0.015};
-    const double apex_time = 0.5;
+    const double apex_time = 0.75;
     mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
     for (const auto& frame : mpc.GetContactFrames()) {
         mpc.PrintSwingTraj(frame);
     }
+
+    // Print swing trajectory to csv for checking
+    std::ofstream traj_file;
+    traj_file.open("swing_traj.txt");
+    double t = 0.2;
+    for (int i = 0; i < 100; i++) {
+        double height = cs.GetSwingHeight(apex_height, foot_height[0], apex_time, t, 0.2, 0.5);
+        t += 0.3/100;
+        traj_file << height << ", " << t << std::endl;
+    }
+    std::cout << "Apex time: " << apex_time << " foot height: " << foot_height[0] << " start time: " << 0 << " end time: " << 0.3 << std::endl;
+    traj_file.close();
 
     vectorx_t q_target, v_target;
     q_target.resize(achilles.GetConfigDim());
@@ -151,6 +163,8 @@ int main() {
 
         // cs.ShiftSwings(-0.01);
         mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
+
+        mpc.ShiftWarmStart(0.01);
 
         mpc.Compute(q_current, v_current, traj);
         // mpc.Compute(q_target, v_target, traj);
