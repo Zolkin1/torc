@@ -74,6 +74,8 @@ namespace torc::models {
 
         [[nodiscard]] std::optional<unsigned long> GetJointID(const std::string& joint_name);
 
+        [[nodiscard]] vector3_t GetRelativeJointOffset(const std::string& joint_name);
+
         // -------------------------------------- //
         // ------------- Kinematics ------------- //
         // -------------------------------------- //

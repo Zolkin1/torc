@@ -160,6 +160,17 @@ namespace torc::models {
         }
     }
 
+    vector3_t PinocchioModel::GetRelativeJointOffset(const std::string& joint_name) {
+        const auto idx = GetJointID(joint_name);
+
+        if (!idx.has_value()) {
+            throw std::runtime_error("Invalid joint name!");
+        }
+
+        // TODO: Verify that this is general
+        return pin_model_.jointPlacements[idx.value()].translation(); //pin_data_->oMi[idx.value()].translation() - pin_data_->oMi[2].translation();
+    }
+
 
     void PinocchioModel::MakePinocchioContacts(const RobotContactInfo& contact_info,
                                                std::vector<pinocchio::RigidConstraintModel>& contact_models,

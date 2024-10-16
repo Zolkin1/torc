@@ -155,7 +155,11 @@ namespace torc::mpc {
         * @param pos is a 3-vector giving the the x,y,z positions of the base link
         * @param vel is a 3-vector in the form [xdot, ydot, yawdot] where yaw dot is the rotation about the z axis
         */
-        void GenerateCostReference(const vector3_t& pos, const vector3_t& vel);
+        void GenerateCostReference(const vectorx_t& q, const vector3_t& vel);
+
+        SimpleTrajectory GetConfigTargets();
+
+        // std::vector<vector3_t> ComputeHeuristicFootPositions();
 
         ~FullOrderMpc();
 
@@ -476,6 +480,7 @@ namespace torc::mpc {
         // Contact settings
         int num_contact_locations_{};
         std::vector<std::string> contact_frames_{};
+        std::vector<double> hip_offsets_{};
 
         // std::map<std::string, std::vector<double>> swing_traj_;
 

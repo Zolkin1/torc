@@ -275,6 +275,13 @@ namespace torc::mpc {
             in_contact_[frame] = std::vector<int>(nodes_);
         }
 
+        if (contact_settings["hip_offsets"]) {
+            hip_offsets_ = contact_settings["hip_offsets"].as<std::vector<double>>();
+            if (hip_offsets_.size() != 2*contact_frames_.size()) {
+                throw std::runtime_error("Invalid number of hip offsets provided! Must match the number of contacts x 2!");
+            }
+        }
+
         // ---------- Line Search Settings ---------- //
         if (!config["line_search"]) {
             throw std::runtime_error("No line search setting provided!");
@@ -737,12 +744,16 @@ namespace torc::mpc {
         }
     }
 
-    void FullOrderMpc::GenerateCostReference(const vector3_t& pos, const vector3_t& vel) {
+    void FullOrderMpc::GenerateCostReference(const vectorx_t& q, const vector3_t& vel) {
+        if (hip_offsets_.empty()) {
+            throw std::runtime_error("No hip joint provided in the config file! Cannot generate the cost reference!");
+        }
+
         for (int node = 0; node < nodes_; node++) {
             // Integrate the velocity forward to get the planar positions
-            q_target_.value()[node](0) = node*dt_[node]*vel(0) + pos(0);
-            q_target_.value()[node](1) = node*dt_[node]*vel(1) + pos(1);
-            q_target_.value()[node](2) = pos(2);
+            q_target_.value()[node](0) = node*dt_[node]*vel(0) + q(0);
+            q_target_.value()[node](1) = node*dt_[node]*vel(1) + q(1);
+            q_target_.value()[node](2) = q(2);
             // TODO: Determine the quaternion targets from the commanded velocity, for now ignoring
             q_target_.value()[node].segment<3>(POS_VARS).setZero();
 
@@ -753,27 +764,120 @@ namespace torc::mpc {
             // TODO: Determine the quaternion velocity from the commanded velocity, for now setting to 0
             v_target_.value()[node].segment<3>(POS_VARS).setZero();
             v_target_.value()[node].tail(robot_model_->GetVelDim() - FLOATING_VEL).setZero();
+        }
 
-            // IK for joint targets
-            // Get end effector positions
-            std::vector<vector3_t> positions(contact_frames_.size());
-            for (const auto& frame : contact_frames_) {
-                // TODO: Determine how to extract the hip offset - might need hip info in the yaml
-                vector2_t hip_offset = vector2_t::Zero(); //robot_model_->GetHipOffset();
-                vector3_t position;
-                // TODO: Consider adding in the raibert heuristic
+        // Compute foothold positions
+        std::map<std::string, std::vector<vector3_t>> positions;
+        int frame_idx = 0;
+        for (const auto& frame : contact_frames_) {
+            positions[frame] = std::vector<vector3_t>(nodes_);
 
-                // TODO: For the feet already in contact we should use their current location, not the nominal position
-                position << q_target_.value()[node](0) + hip_offset(0),
-                            q_target_.value()[node](1) + hip_offset(1),
-                            swing_traj_[frame][node];
-                positions.emplace_back(position);
+            vector2_t foothold = vector2_t::Zero();
+
+            for (int node = 0; node < nodes_; node++) {
+                if (in_contact_[frame][node]) {
+                    if ((node == 0 && in_contact_[frame][node]) || ( node > 0 && (!in_contact_[frame][node-1] && in_contact_[frame][node]))) {
+                        // Compute the middle node of the contact
+                        int contact_count = 0;
+                        while (contact_count < nodes_ && in_contact_[frame][node + contact_count]) {
+                            contact_count++;
+                        }
+
+                        // Flooring division, could be ceil
+                        int contact_middle = std::floor(contact_count / 2);
+                        int contact_node_middle = node + contact_middle;
+
+                        // Compute x,y reference given this node
+                        // TODO: Maybe just have the user enter in a fixed offset, probably more flexible
+                        vector2_t hip_offset;
+                        hip_offset << hip_offsets_[2*frame_idx], hip_offsets_[2*frame_idx + 1];  //robot_model_->GetRelativeJointOffset(hip_offsets_[frame_idx]); // Get the hip joint relative to the base
+                        // std::cout << "frame: " << frame << ", hip offset: " << hip_offset << std::endl;
+
+                        // TODO: Consider adding in the raibert heuristic
+                        foothold = hip_offset.head<2>() + q_target_.value()[node].head<2>();
+                    }
+
+                    positions[frame][node] << foothold(0), foothold(1), swing_traj_[frame][node];
+                }
             }
-            q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
-                robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
-                    positions, contact_frames_, traj_.GetConfiguration(node));
+            frame_idx++;
+        }
+
+
+        // std::vector<std::string> frames;
+        // for (int i = 0; i < contact_frames_.size(); i++) {
+        //     if (hip_offsets_[i] != "none") {
+        //         frames.push_back(contact_frames_[i]);
+        //     }
+        // }
+
+        robot_model_->FirstOrderFK(q);
+        frame_idx = 0;
+        for (const auto& frame : contact_frames_) {
+            vector2_t prev_foothold = robot_model_->GetFrameState(frame).placement.translation().head<2>();
+            vector2_t next_foothold = robot_model_->GetFrameState(frame).placement.translation().head<2>();
+            // std::cout << "Frame: " << frame << std::endl;
+            int swing_start = 0;
+            int swing_end = 0;
+            for (int node = 0; node < nodes_; node++) {
+                // Linear interpolation between footholds
+                if ((node == 0 && !in_contact_[frame][node]) || (node > 0 && (!in_contact_[frame][node] && in_contact_[frame][node-1]))) {
+                    swing_start = node;
+                }
+
+                swing_end = swing_start;
+                while (swing_end < nodes_ && !in_contact_[frame][swing_end]) {
+                    swing_end++;
+                }
+
+                if (swing_end == nodes_) {
+                    swing_end += 5; // TODO: Deal with this better, for now just extending it a bit
+                    // TODO: Change how this next foothold is computed
+                    next_foothold = prev_foothold + dt_[1]*(swing_end - swing_start)*vel.head<2>();
+                } else {
+                    next_foothold = positions[frame][swing_end].head<2>();
+                }
+
+                if (!in_contact_[frame][node]) {
+                    vector2_t swing_location = prev_foothold + (next_foothold - prev_foothold)*((node - swing_start)/(swing_end - swing_start));
+
+                    positions[frame][node] << swing_location(0), swing_location(1), swing_traj_[frame][node];
+                } else {
+                    prev_foothold = positions[frame][swing_start].head<2>();
+                }
+
+                // std::cout << node << ": " << positions[frame][node].transpose() << std::endl;
+                // std::cout << "start swing: " << swing_start << ", end swing: " << swing_end << std::endl;
+                // std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
+            }
+
+
+            q_target_.value()[0] = q;
+            for (int node = 1; node < nodes_; node++) {
+                std::vector<vector3_t> end_effectors(contact_frames_.size());
+                for (int i = 0; i < contact_frames_.size(); i++) {
+                    end_effectors[i] = positions[contact_frames_[i]][node];
+                    // std::cout << "node: " << node << ", target: " << positions[contact_frames_[i]][node].transpose() << std::endl;
+                }
+                // IK for joint targets
+                // q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
+                //     robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
+                //         end_effectors, frames, traj_.GetConfiguration(node)).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
+
+
+                q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
+                    robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
+                        end_effectors, contact_frames_, q_target_.value()[node-1]).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
+            }
+
+            frame_idx++;
         }
     }
+
+    SimpleTrajectory FullOrderMpc::GetConfigTargets() {
+        return q_target_.value();
+    }
+
 
 
     // ------------------------------------------------- //

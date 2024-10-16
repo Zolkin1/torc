@@ -2,7 +2,7 @@ general_settings:
   nodes: 32
   verbose: True
   node_dt: 0.025
-  compile_derivatives: True
+  compile_derivatives: False
   base_frame: "trunk"
   scale_cost: False
   max_initial_solves: 20
@@ -21,29 +21,54 @@ solver_settings:
   adaptive_rho: True
   max_iter: 50
 constraints:
-  friction_coef: 0.5
-  max_grf: 200
+  friction_coef: 0.5  # TODO: Tune this
+  max_grf: 800
+  collisions:
+    - frame1: "FR_foot"
+      frame2: "FL_foot"
+      radius1: 0.06
+      radius2: 0.06
+    - frame1: "RR_foot"
+      frame2: "RL_foot"
+      radius1: 0.06
+      radius2: 0.06
+    - frame1: "FR_foot"
+      frame2: "RR_foot"
+      radius1: 0.06
+      radius2: 0.06
+    - frame1: "FL_foot"
+      frame2: "RL_foot"
+      radius1: 0.06
+      radius2: 0.06
 costs:
   - type: ConfigurationTracking
     name: "ConfigTracking"
-    weight: [ 0.0, 0.0, 1,  # Having x and y weights appears to be bad
-              .01, .01, .01,
-              0.01, 1, 0.001, 0.001, 0.1, 0.001,
-              0.01, 1, 0.001, 0.001, 0.1, 0.001 ]
+    weight: [ 2.0, 2.0, 20, #2, 2, 150, or 2,2,30
+              15.5, 15.5, 15.5, # 5.5, 5.5, 5.5
+              10, 10, 10,
+              10, 10, 10,
+              10, 10, 10,
+              10, 10, 10 ]
   - type: VelocityTracking
     name: "VelocityTracking"
-    weight: [5, 2, 5,
-             0.5, 0.5, 0.5,
-             1, 1, 0.05, .002, .05, 0,
-             1, 1, 0.05, .002, .05, 0]
+    weight: [ 10, 10, 1,
+              .5, .5, .5,
+              0.01, 0.01, 0.0001,
+              0.01, 0.01, 0.0001,
+              0.01, 0.01, 0.0001,
+              0.01, 0.01, 0.0001 ]
   - type: TorqueRegularization
     name: "TorqueReg"
-    weight: [.000, .000, .000, .000, .001, 0,
-             .000, .000, .000, .000, .001, 0]
+    weight: [ .001, .001, .0001,
+              .001, .001, .0001,
+              .001, .001, .0001,
+              .001, .001, .0001 ]
   - type: ForceRegularization
     name: "ForceReg"
-    weight: [0.0001, 0.0001, 0.01]
+    weight: [ 0.0001, 0.0001, 0.001 ]
 contacts:
   num_contact_locations: 4
   contact_frames: ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]
+  hip_offsets: [0.1805, -0.128, 0.1805, 0.128, -0.1805, -0.128, -0.1805, 0.128]
+
 line_search:
