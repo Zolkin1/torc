@@ -637,7 +637,7 @@ namespace torc::models {
         }
 
         // Define constants for the optimization
-        constexpr double THRESHOLD = 1e-2;
+        constexpr double THRESHOLD = 1e-3;
         constexpr int IT_MAX = 5e2;
         constexpr double DT = 1e-2;
         constexpr double DAMP = 1e-6;
@@ -667,6 +667,8 @@ namespace torc::models {
 
                 if (error.norm() <= THRESHOLD) {
                     break;
+                } else if (i == IT_MAX - 1) {
+                    std::cout << "[IK] Inverse Kinematics failed! Error: " << error.norm() << std::endl;
                 }
 
                 Jlin.setZero();

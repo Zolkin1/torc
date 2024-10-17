@@ -63,7 +63,7 @@ int main() {
     q_target(0) = 0;
 
     v_target.resize(a1.GetVelDim());
-    v_target << 0, 0, 0,
+    v_target << 0.2, 0, 0,
                 0, 0, 0,
                 0, 0, 0,
                 0, 0, 0,

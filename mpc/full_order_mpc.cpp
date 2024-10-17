@@ -616,6 +616,7 @@ namespace torc::mpc {
 
         if (solve_status == osqp::OsqpExitCode::kPrimalInfeasible || solve_status == osqp::OsqpExitCode::kPrimalInfeasibleInaccurate) {
             std::cerr << "Bad solve!" << std::endl;
+            throw std::runtime_error("Infeasible!");
         }
 
 #if NAN_CHECKS
@@ -756,6 +757,7 @@ namespace torc::mpc {
             q_target_.value()[node](2) = q(2);
             // TODO: Determine the quaternion targets from the commanded velocity, for now ignoring
             q_target_.value()[node].segment<3>(POS_VARS).setZero();
+            q_target_.value()[node](6) = 1;
 
             // Assign velocity targets
             v_target_.value()[node](0) = vel(0);
@@ -794,7 +796,8 @@ namespace torc::mpc {
                         // std::cout << "frame: " << frame << ", hip offset: " << hip_offset << std::endl;
 
                         // TODO: Consider adding in the raibert heuristic
-                        foothold = hip_offset.head<2>() + q_target_.value()[node].head<2>();
+                        foothold = hip_offset + q_target_.value()[contact_node_middle].head<2>();
+                        // std::cout << "frame: " << frame << ", foothold: " << foothold.transpose() << std::endl;
                     }
 
                     positions[frame][node] << foothold(0), foothold(1), swing_traj_[frame][node];
@@ -825,53 +828,58 @@ namespace torc::mpc {
                     swing_start = node;
                 }
 
-                swing_end = swing_start;
-                while (swing_end < nodes_ && !in_contact_[frame][swing_end]) {
-                    swing_end++;
-                }
+                if (swing_start == node) {
+                    swing_end = swing_start;
+                    while (swing_end < nodes_ && !in_contact_[frame][swing_end]) {
+                        swing_end++;
+                    }
 
-                if (swing_end == nodes_) {
-                    swing_end += 5; // TODO: Deal with this better, for now just extending it a bit
-                    // TODO: Change how this next foothold is computed
-                    next_foothold = prev_foothold + dt_[1]*(swing_end - swing_start)*vel.head<2>();
-                } else {
-                    next_foothold = positions[frame][swing_end].head<2>();
+                    if (swing_end == nodes_) {
+                        swing_end += 5; // TODO: Deal with this better, for now just extending it a bit
+                        // TODO: Consider changing how this next foothold is computed
+                        next_foothold = prev_foothold + dt_[1]*(swing_end - swing_start)*vel.head<2>();
+                    } else {
+                        next_foothold = positions[frame][swing_end].head<2>();
+                    }
                 }
 
                 if (!in_contact_[frame][node]) {
-                    vector2_t swing_location = prev_foothold + (next_foothold - prev_foothold)*((node - swing_start)/(swing_end - swing_start));
-
+                    vector2_t swing_location = prev_foothold + (next_foothold - prev_foothold)*(static_cast<double>(node - swing_start)/static_cast<double>(swing_end - swing_start));
+                    // std::cout << "node: " << node << ", swing_start: " << swing_start << ", swing end: " << swing_end << std::endl;
+                    // std::cout << "prev_foothold: " << prev_foothold.transpose() << std::endl;
+                    // std::cout << "next_foothold: " << next_foothold.transpose() << std::endl;
+                    // std::cout << "swing location: " << swing_location.transpose() << std::endl;
                     positions[frame][node] << swing_location(0), swing_location(1), swing_traj_[frame][node];
                 } else {
-                    prev_foothold = positions[frame][swing_start].head<2>();
+                    prev_foothold = positions[frame][node].head<2>();
                 }
 
                 // std::cout << node << ": " << positions[frame][node].transpose() << std::endl;
                 // std::cout << "start swing: " << swing_start << ", end swing: " << swing_end << std::endl;
                 // std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
             }
-
-
-            q_target_.value()[0] = q;
-            for (int node = 1; node < nodes_; node++) {
-                std::vector<vector3_t> end_effectors(contact_frames_.size());
-                for (int i = 0; i < contact_frames_.size(); i++) {
-                    end_effectors[i] = positions[contact_frames_[i]][node];
-                    // std::cout << "node: " << node << ", target: " << positions[contact_frames_[i]][node].transpose() << std::endl;
-                }
-                // IK for joint targets
-                // q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
-                //     robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
-                //         end_effectors, frames, traj_.GetConfiguration(node)).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
-
-
-                q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
-                    robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
-                        end_effectors, contact_frames_, q_target_.value()[node-1]).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
-            }
-
             frame_idx++;
         }
+
+        // TODO: Do I want this?
+        q_target_.value()[0] = q;
+        for (int node = 1; node < nodes_; node++) {
+            std::vector<vector3_t> end_effectors(contact_frames_.size());
+            for (int i = 0; i < contact_frames_.size(); i++) {
+                end_effectors[i] = positions[contact_frames_[i]][node];
+                // std::cout << "node: " << node << ", target: " << positions[contact_frames_[i]][node].transpose() << std::endl;
+            }
+            // IK for joint targets
+            // q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
+            //     robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
+            //         end_effectors, frames, traj_.GetConfiguration(node)).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
+
+
+            q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
+                robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
+                    end_effectors, contact_frames_, q_target_.value()[node-1]).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
+        }
+
     }
 
     SimpleTrajectory FullOrderMpc::GetConfigTargets() {
@@ -891,28 +899,28 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
-                AddIntegrationConstraint(node);
+                // AddIntegrationConstraint(node);
             }
 
             if (node < nodes_full_dynamics_) {
-                AddIDConstraint(node, true);
+                // AddIDConstraint(node, true);
                 AddTorqueBoxConstraint(node);
             } else if (node < nodes_ - 1) {
-                AddIDConstraint(node, false);
+                // AddIDConstraint(node, false);
             }
 
-            AddFrictionConeConstraint(node);
+            // AddFrictionConeConstraint(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                AddHolonomicConstraint(node);
+                // AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
 
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxConstraint(node);
-                AddSwingHeightConstraint(node);
+                // AddSwingHeightConstraint(node);
 
-                AddCollisionConstraint(node);
+                // AddCollisionConstraint(node);
             }
         }
 
@@ -1458,31 +1466,31 @@ namespace torc::mpc {
             // Dynamics related constraints don't happen in the last node
             // std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
-                violation += GetIntegrationViolation(qp_res, node);
+                // violation += GetIntegrationViolation(qp_res, node);
                 // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
-                violation += GetIDViolation(qp_res, node, true);
+                // violation += GetIDViolation(qp_res, node, true);
                 // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                 violation += GetIDViolation(qp_res, node, false);
+                 // violation += GetIDViolation(qp_res, node, false);
             }
 
-            violation += GetFrictionViolation(qp_res, node);
+            // violation += GetFrictionViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
-                violation += GetHolonomicViolation(qp_res, node);
+                // violation += GetHolonomicViolation(qp_res, node);
                 violation += GetVelocityBoxViolation(qp_res, node);
 
                 violation += GetConfigurationBoxViolation(qp_res, node);
-                violation += GetSwingHeightViolation(qp_res, node);
+                // violation += GetSwingHeightViolation(qp_res, node);
 
-                violation += GetCollisionViolation(qp_res, node);
+                // violation += GetCollisionViolation(qp_res, node);
             }
         }
 
@@ -2430,27 +2438,27 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
-                AddIntegrationPattern(node);
+                // AddIntegrationPattern(node);
             }
             if (node < nodes_full_dynamics_) {
-                AddIDPattern(node, true);
+                // AddIDPattern(node, true);
                 AddTorqueBoxPattern(node);
             } else if (node < nodes_ - 1) {
-                AddIDPattern(node, false);
+                // AddIDPattern(node, false);
             }
 
-            AddFrictionConePattern(node);
+            // AddFrictionConePattern(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                AddHolonomicPattern(node);
+                // AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
 
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxPattern(node);
-                AddSwingHeightPattern(node);
+                // AddSwingHeightPattern(node);
 
-                AddCollisionPattern(node);
+                // AddCollisionPattern(node);
             }
         }
 
