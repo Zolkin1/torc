@@ -22,6 +22,7 @@ solver_settings:
   max_iter: 50
 constraints:
   friction_coef: 0.5  # TODO: Tune this
+  friction_margin: 2
   max_grf: 800
   collisions:
     - frame1: "FR_foot"

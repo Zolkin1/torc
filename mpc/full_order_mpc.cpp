@@ -85,6 +85,14 @@ namespace torc::mpc {
             compile_derivatves_
         );
 
+        friction_cone_constraint_ = std::make_unique<ad::CppADInterface>(
+            std::bind(&FullOrderMpc::FrictionConeConstraint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+            name_ + "_friction_cone_constraint",
+            deriv_lib_path_,
+            ad::DerivativeOrder::FirstOrder, 3, 4,
+            compile_derivatves_
+        );
+
     }
 
     FullOrderMpc::~FullOrderMpc() {
@@ -248,6 +256,7 @@ namespace torc::mpc {
         YAML::Node constraint_settings = config["constraints"];
         friction_coef_ = constraint_settings["friction_coef"].as<double>();
         max_grf_ = constraint_settings["max_grf"].as<double>();
+        friction_margin_ = (constraint_settings["friction_margin"] ? constraint_settings["friction_margin"].as<double>() : 0.05);
 
         ParseCollisionYaml(constraint_settings["collisions"]);
 
@@ -335,6 +344,7 @@ namespace torc::mpc {
 
             std::cout << "Constraints:" << std::endl;
             std::cout << "\tFriction coefficient: " << friction_coef_ << std::endl;
+            std::cout << "\tFriction margin: " << friction_margin_ << std::endl;
             std::cout << "\tMaximum ground reaction force: " << max_grf_ << std::endl;
 
             std::cout << "Costs:" << std::endl;
@@ -899,28 +909,28 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
-                // AddIntegrationConstraint(node);
+                AddIntegrationConstraint(node);
             }
 
             if (node < nodes_full_dynamics_) {
-                // AddIDConstraint(node, true);
+                AddIDConstraint(node, true);
                 AddTorqueBoxConstraint(node);
             } else if (node < nodes_ - 1) {
-                // AddIDConstraint(node, false);
+                AddIDConstraint(node, false);
             }
 
             // AddFrictionConeConstraint(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicConstraint(node);
+                AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
 
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxConstraint(node);
-                // AddSwingHeightConstraint(node);
+                AddSwingHeightConstraint(node);
 
-                // AddCollisionConstraint(node);
+                AddCollisionConstraint(node);
             }
         }
 
@@ -1082,6 +1092,15 @@ namespace torc::mpc {
         violation(0) = (frame_pos1 - frame_pos2).norm() - (r1 + r2);
     }
 
+    void FullOrderMpc::FrictionConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk_margin, ad::ad_vector_t& violation) const {
+        const ad::ad_vector_t f = df + fk_margin.head<CONTACT_3DOF>();
+        const ad::adcg_t& margin = fk_margin(3);
+
+        violation.resize(1);
+        violation(0) = friction_coef_*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
+    }
+
+
     // TODO: Consider removing this constraint
     // void FullOrderMpc::AddICConstraint() {
     //     // Set constraint matrix
@@ -1224,17 +1243,17 @@ namespace torc::mpc {
         int row_start = GetConstraintRow(node, FrictionCone);
         int col_start = GetDecisionIdx(node, GroundForce);
 
-        vector3_t h = {1, 0, 0};
-        vector3_t l = {0, 1, 0};
-        vector3_t n = {0, 0, 1};
-
-        ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
-                -(h + n*friction_coef_).transpose(),
-                (l - n*friction_coef_).transpose(),
-                -(l + n*friction_coef_).transpose();
+        // vector3_t h = {1, 0, 0};
+        // vector3_t l = {0, 1, 0};
+        // vector3_t n = {0, 0, 1};
+        //
+        // ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
+        //         -(h + n*friction_coef_).transpose(),
+        //         (l - n*friction_coef_).transpose(),
+        //         -(l + n*friction_coef_).transpose();
 
         for (const auto& frame : contact_frames_) {
-            // Setting force to zero when in swing
+            // ----- Zero Force in Swing ----- //
             DiagonalScalarMatrixToTriplet((1-in_contact_[frame][node])*1, row_start, col_start, CONTACT_3DOF,
                 constraint_triplets_, constraint_triplet_idx_);
             osqp_instance_.lower_bounds.segment(row_start, CONTACT_3DOF) = -(1-in_contact_[frame][node])*traj_.GetForce(node, frame);
@@ -1242,37 +1261,33 @@ namespace torc::mpc {
 
             row_start += CONTACT_3DOF;
 
-            // Force in friction cone when in contact
-            if (in_contact_[frame][node]) {
-                MatrixToTriplet(ws_->fric_cone_mat, row_start, col_start,
-                   constraint_triplets_, constraint_triplet_idx_, true);
+            // ----- Friction Cone ----- //
+            matrixx_t jac;
+            vectorx_t x_zero = vectorx_t::Zero(friction_cone_constraint_->GetDomainSize());
+            vectorx_t p(friction_cone_constraint_->GetParameterSize());
+            p << traj_.GetForce(node, frame), friction_margin_;
+            friction_cone_constraint_->GetJacobian(x_zero, p, jac);
 
-                osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setConstant(-std::numeric_limits<double>::max());
-                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE) = -ws_->fric_cone_mat*traj_.GetForce(node, frame);
-            } else {
-                for (int i = 0; i < ws_->fric_cone_mat.rows(); i++) {
-                    for (int j = 0; j < ws_->fric_cone_mat.cols(); j++) {
-                        if (ws_->fric_cone_mat(i,j) != 0) {
-                            constraint_triplets_[constraint_triplet_idx_] = Eigen::Triplet<double>(i + row_start, j + col_start, 0);
-                            constraint_triplet_idx_++;
-                        }
-                    }
-                }
+            const auto sparsity = friction_cone_constraint_->GetJacobianSparsityPatternSet();
 
-                osqp_instance_.lower_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
-                osqp_instance_.upper_bounds.segment(row_start, FRICTION_CONE_SIZE).setZero();
-            }
+            MatrixToTripletWithSparsitySet(0*in_contact_[frame][node]*jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
 
+            // Lower and upper bounds
+            vectorx_t y;
+            friction_cone_constraint_->GetFunctionValue(x_zero, p, y);
+            osqp_instance_.lower_bounds.segment<CONTACT_3DOF>(row_start) = -0*in_contact_[frame][node]*y;
+            osqp_instance_.upper_bounds.segment<CONTACT_3DOF>(row_start) = in_contact_[frame][node]*std::numeric_limits<double>::max()*vector3_t::Ones();
 
-            row_start += FRICTION_CONE_SIZE;
+            row_start += friction_cone_constraint_->GetRangeSize();
             col_start += CONTACT_3DOF;
 
-            // z force bounds
-            DiagonalScalarMatrixToTriplet(1, row_start, col_start - 1, 1,
+            // TODO: I think I can remove this
+            // ----- Z Force Bounds ----- //
+            DiagonalScalarMatrixToTriplet(0*in_contact_[frame][node]*1, row_start, col_start - 1, 1,
                 constraint_triplets_, constraint_triplet_idx_);
 
-            osqp_instance_.lower_bounds(row_start) = 0;
-            osqp_instance_.upper_bounds(row_start) = max_grf_;
+            osqp_instance_.lower_bounds(row_start) = -0*in_contact_[frame][node]*traj_.GetForce(node, frame)(2);
+            osqp_instance_.upper_bounds(row_start) = 0*in_contact_[frame][node]*(max_grf_ - traj_.GetForce(node, frame)(2));
 
             row_start += 1;
 
@@ -1466,31 +1481,32 @@ namespace torc::mpc {
             // Dynamics related constraints don't happen in the last node
             // std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
-                // violation += GetIntegrationViolation(qp_res, node);
+                violation += GetIntegrationViolation(qp_res, node);
                 // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
-                // violation += GetIDViolation(qp_res, node, true);
+                violation += GetIDViolation(qp_res, node, true);
                 // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                 // violation += GetIDViolation(qp_res, node, false);
+                 violation += GetIDViolation(qp_res, node, false);
             }
 
+            // std::cout << "Friction cone violation: " << GetFrictionViolation(qp_res, node) << std::endl;
             // violation += GetFrictionViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
-                // violation += GetHolonomicViolation(qp_res, node);
+                violation += GetHolonomicViolation(qp_res, node);
                 violation += GetVelocityBoxViolation(qp_res, node);
 
                 violation += GetConfigurationBoxViolation(qp_res, node);
-                // violation += GetSwingHeightViolation(qp_res, node);
+                violation += GetSwingHeightViolation(qp_res, node);
 
-                // violation += GetCollisionViolation(qp_res, node);
+                violation += GetCollisionViolation(qp_res, node);
             }
         }
 
@@ -1615,15 +1631,25 @@ namespace torc::mpc {
             vector3_t force = qp_res.segment<3>(idx) + traj_.GetForce(node, frame);
             violation += (1-in_contact_[frame][node])*force.squaredNorm();
 
-            // Friction Cone constraints
-            Eigen::Vector4d force_vio = ws_->fric_cone_mat*force;
-            force_vio = force_vio.cwiseMax(0);  // Upper bound of 0, no lower bound
-            violation += in_contact_[frame][node]*force_vio.squaredNorm();
+            if (in_contact_[frame][node]) {
+                // Friction Cone constraints
+                vectorx_t x(friction_cone_constraint_->GetDomainSize());
+                vectorx_t p(friction_cone_constraint_->GetParameterSize());
+                vectorx_t y;
 
-            if (force(2) < 0) {
-                violation += std::pow(force(2), 2);
-            } else if (force(2) > max_grf_) {
-                violation += std::pow(force(2) - max_grf_, 2);
+                x << qp_res.segment<3>(idx);
+                p << traj_.GetForce(node, frame), friction_margin_;
+
+                friction_cone_constraint_->GetFunctionValue(x, p, y);
+                // std::cout << frame << ": " << y(0) << std::endl;
+                // std::cout << "force: " << force.transpose() << std::endl;
+                violation += std::min(y(0), 0.)*std::min(y(0), 0.);
+
+                if (force(2) < 0) {
+                    violation += std::pow(force(2), 2);
+                } else if (force(2) > max_grf_) {
+                    violation += std::pow(force(2) - max_grf_, 2);
+                }
             }
 
             idx += 3;
@@ -2438,27 +2464,27 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
-                // AddIntegrationPattern(node);
+                AddIntegrationPattern(node);
             }
             if (node < nodes_full_dynamics_) {
-                // AddIDPattern(node, true);
+                AddIDPattern(node, true);
                 AddTorqueBoxPattern(node);
             } else if (node < nodes_ - 1) {
-                // AddIDPattern(node, false);
+                AddIDPattern(node, false);
             }
 
             // AddFrictionConePattern(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicPattern(node);
+                AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
 
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxPattern(node);
-                // AddSwingHeightPattern(node);
+                AddSwingHeightPattern(node);
 
-                // AddCollisionPattern(node);
+                AddCollisionPattern(node);
             }
         }
 
@@ -2614,40 +2640,38 @@ namespace torc::mpc {
         matrixx_t id;
         id.setIdentity(CONTACT_3DOF, CONTACT_3DOF);
 
-        vector3_t h = {1, 0, 0};
-        vector3_t l = {0, 1, 0};
-        vector3_t n = {0, 0, 1};
+        // vector3_t h = {1, 0, 0};
+        // vector3_t l = {0, 1, 0};
+        // vector3_t n = {0, 0, 1};
 
-        ws_->fric_cone_mat.resize(FRICTION_CONE_SIZE, CONTACT_3DOF);
-        ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
-                -(h + n*friction_coef_).transpose(),
-                (l - n*friction_coef_).transpose(),
-                -(l + n*friction_coef_).transpose();
-        for (int i = 0; i < ws_->fric_cone_mat.rows(); i++) {
-            for (int j = 0; j < ws_->fric_cone_mat.cols(); j++) {
-                if (ws_->fric_cone_mat(i, j) != 0) {
-                    ws_->fric_cone_mat(i, j) = 1;
-                }
-            }
-        }
+        const auto sparsity = friction_cone_constraint_->GetJacobianSparsityPatternSet();
+
+        // ws_->fric_cone_mat.resize(FRICTION_CONE_SIZE, CONTACT_3DOF);
+        // ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
+        //         -(h + n*friction_coef_).transpose(),
+        //         (l - n*friction_coef_).transpose(),
+        //         -(l + n*friction_coef_).transpose();
+        // for (int i = 0; i < ws_->fric_cone_mat.rows(); i++) {
+        //     for (int j = 0; j < ws_->fric_cone_mat.cols(); j++) {
+        //         if (ws_->fric_cone_mat(i, j) != 0) {
+        //             ws_->fric_cone_mat(i, j) = 1;
+        //         }
+        //     }
+        // }
 
         for (int contact = 0; contact < num_contact_locations_; contact++) {
-            // Setting force to zero when in swing
+            // ----- Zero Force in Swing ----- //
             MatrixToNewTriplet(id, row_start, col_start, constraint_triplets_);
-
             row_start += CONTACT_3DOF;
 
-            // Force in friction cone when in contact
-            MatrixToNewTriplet(ws_->fric_cone_mat, row_start, col_start, constraint_triplets_);
-
-            row_start += FRICTION_CONE_SIZE;
+            // ----- Friction Cone ----- //
+            AddSparsitySet(sparsity, row_start, col_start, constraint_triplets_);
+            row_start += friction_cone_constraint_->GetRangeSize();
             col_start += CONTACT_3DOF;
 
-            // Positive z force
+            // ----- Z force bounds ----- //
             MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
-
             row_start += 1;
-
         }
     }
 
@@ -3027,7 +3051,7 @@ namespace torc::mpc {
 
 
     int FullOrderMpc::NumFrictionConeConstraintsNode() const {
-        return num_contact_locations_ * (FRICTION_CONE_SIZE + CONTACT_3DOF + 1);
+        return num_contact_locations_ * (1 + CONTACT_3DOF + 1);
     }
 
     int FullOrderMpc::NumConfigBoxConstraintsNode() const {

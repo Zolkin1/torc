@@ -36,7 +36,7 @@ namespace torc::ad {
     void CppADInterface::GetFunctionValue(const torc::ad::vectorx_t& x, const torc::ad::vectorx_t& p,
                                           torc::ad::vectorx_t& y) const {
         if (p.size() != p_size_) {
-            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid parameter size!");
+            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid parameter size! Parameter size: " + std::to_string(p.size()) + " expected: " + std::to_string(p_size_));
         }
 
         if (x.size() != x_size_) {
@@ -55,7 +55,7 @@ namespace torc::ad {
          }
 
         if (p.size() != p_size_) {
-            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid parameter size!");
+            throw std::runtime_error("[CppADInterface] " + name_ + " Invalid parameter size! Parameter size: " + std::to_string(p.size()) + " expected: " + std::to_string(p_size_));
         }
 
         vectorx_t xp_combined(x_size_ + p_size_);

@@ -195,7 +195,7 @@ namespace torc::mpc {
             matrixx_t id_vel2_mat;
             matrixx_t id_tau_mat;
             matrixx_t id_force_mat;
-            matrixx_t fric_cone_mat;
+            // matrixx_t fric_cone_mat;
             vectorx_t swing_vec;
             matrix6x_t frame_jacobian;
             matrixx_t holo_mat;
@@ -242,6 +242,7 @@ namespace torc::mpc {
         void SelfCollisionConstraint(const std::string& frame1, const std::string& frame2,
             const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_r1_r2, ad::ad_vector_t& violation);
 
+        void FrictionConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk, ad::ad_vector_t& violation) const;
 
     // -------- Constraint Creation -------- //
         void CreateConstraints();
@@ -464,6 +465,7 @@ namespace torc::mpc {
 
         // Constraint settings
         double friction_coef_{};
+        double friction_margin_{};
         double max_grf_{};
         int nodes_{};
         int nodes_full_dynamics_;
@@ -474,6 +476,7 @@ namespace torc::mpc {
         std::map<std::string, std::unique_ptr<ad::CppADInterface>> swing_height_constraint_;
         std::unique_ptr<ad::CppADInterface> inverse_dynamics_constraint_;
         std::vector<std::unique_ptr<ad::CppADInterface>> collision_constraints_;
+        std::unique_ptr<ad::CppADInterface> friction_cone_constraint_;
         std::vector<std::pair<double, double>> radii_;
 
 
