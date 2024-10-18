@@ -122,7 +122,7 @@ int main() {
 
     // mpc.Compute(q_target, v_target, traj);
 
-    mpc.GenerateCostReference(q_target, v_target.head<3>());
+    mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>());
     std::cout << "\nTargets:" << std::endl;
     for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
         std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;

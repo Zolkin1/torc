@@ -755,7 +755,7 @@ namespace torc::mpc {
         }
     }
 
-    void FullOrderMpc::GenerateCostReference(const vectorx_t& q, const vector3_t& vel) {
+    void FullOrderMpc::GenerateCostReference(const vectorx_t& q, const vectorx_t& v, const vector3_t& vel) {
         if (hip_offsets_.empty()) {
             throw std::runtime_error("No hip joint provided in the config file! Cannot generate the cost reference!");
         }
@@ -785,10 +785,16 @@ namespace torc::mpc {
             positions[frame] = std::vector<vector3_t>(nodes_);
 
             vector2_t foothold = vector2_t::Zero();
+            bool first_contact = false;
 
             for (int node = 0; node < nodes_; node++) {
                 if (in_contact_[frame][node]) {
-                    if ((node == 0 && in_contact_[frame][node]) || ( node > 0 && (!in_contact_[frame][node-1] && in_contact_[frame][node]))) {
+                    if (node == 0 && in_contact_[frame][node]) {
+                        // Foothold is where we currently are
+                        robot_model_->FirstOrderFK(q);
+                        foothold = robot_model_->GetFrameState(frame).placement.translation().head<2>();
+                        first_contact = true;
+                    } else if (node > 0 && (!in_contact_[frame][node-1] && in_contact_[frame][node])) {
                         // Compute the middle node of the contact
                         int contact_count = 0;
                         while (contact_count < nodes_ && in_contact_[frame][node + contact_count]) {
@@ -800,13 +806,20 @@ namespace torc::mpc {
                         int contact_node_middle = node + contact_middle;
 
                         // Compute x,y reference given this node
-                        // TODO: Maybe just have the user enter in a fixed offset, probably more flexible
                         vector2_t hip_offset;
-                        hip_offset << hip_offsets_[2*frame_idx], hip_offsets_[2*frame_idx + 1];  //robot_model_->GetRelativeJointOffset(hip_offsets_[frame_idx]); // Get the hip joint relative to the base
+                        hip_offset << hip_offsets_[2*frame_idx], hip_offsets_[2*frame_idx + 1];
                         // std::cout << "frame: " << frame << ", hip offset: " << hip_offset << std::endl;
 
-                        // TODO: Consider adding in the raibert heuristic
                         foothold = hip_offset + q_target_.value()[contact_node_middle].head<2>();
+
+                        if (!first_contact) {
+                            first_contact = true;
+                            vector2_t raibert_offset;
+                            raibert_offset << std::sqrt(q(2)/9.81)*(v(0) - vel(0)),
+                                              std::sqrt(q(2)/9.81)*(v(1) - vel(1));
+                            foothold = foothold + raibert_offset;
+                        }
+
                         // std::cout << "frame: " << frame << ", foothold: " << foothold.transpose() << std::endl;
                     }
 

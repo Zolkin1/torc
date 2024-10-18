@@ -146,6 +146,7 @@ namespace torc::mpc {
 
         void ShiftWarmStart(double dt);
 
+    // TODO: Update this doc string
         /**
         * Generate a full body reference. Take in the desired velocity and use the current swing trajectory.
         * In the future I will need to take into account terrain with different height and deal with contacts that
@@ -155,7 +156,7 @@ namespace torc::mpc {
         * @param pos is a 3-vector giving the the x,y,z positions of the base link
         * @param vel is a 3-vector in the form [xdot, ydot, yawdot] where yaw dot is the rotation about the z axis
         */
-        void GenerateCostReference(const vectorx_t& q, const vector3_t& vel);
+        void GenerateCostReference(const vectorx_t& q, const vectorx_t& v, const vector3_t& vel);
 
         SimpleTrajectory GetConfigTargets();
 
