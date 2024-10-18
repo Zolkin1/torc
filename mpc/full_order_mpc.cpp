@@ -919,7 +919,7 @@ namespace torc::mpc {
                 AddIDConstraint(node, false);
             }
 
-            // AddFrictionConeConstraint(node);
+            AddFrictionConeConstraint(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
@@ -1270,26 +1270,26 @@ namespace torc::mpc {
 
             const auto sparsity = friction_cone_constraint_->GetJacobianSparsityPatternSet();
 
-            MatrixToTripletWithSparsitySet(0*in_contact_[frame][node]*jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+            MatrixToTripletWithSparsitySet(in_contact_[frame][node]*jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
 
             // Lower and upper bounds
             vectorx_t y;
             friction_cone_constraint_->GetFunctionValue(x_zero, p, y);
-            osqp_instance_.lower_bounds.segment<CONTACT_3DOF>(row_start) = -0*in_contact_[frame][node]*y;
-            osqp_instance_.upper_bounds.segment<CONTACT_3DOF>(row_start) = in_contact_[frame][node]*std::numeric_limits<double>::max()*vector3_t::Ones();
+            osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*y(0);
+            osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*std::numeric_limits<double>::max();
 
             row_start += friction_cone_constraint_->GetRangeSize();
             col_start += CONTACT_3DOF;
 
             // TODO: I think I can remove this
             // ----- Z Force Bounds ----- //
-            DiagonalScalarMatrixToTriplet(0*in_contact_[frame][node]*1, row_start, col_start - 1, 1,
-                constraint_triplets_, constraint_triplet_idx_);
-
-            osqp_instance_.lower_bounds(row_start) = -0*in_contact_[frame][node]*traj_.GetForce(node, frame)(2);
-            osqp_instance_.upper_bounds(row_start) = 0*in_contact_[frame][node]*(max_grf_ - traj_.GetForce(node, frame)(2));
-
-            row_start += 1;
+            // DiagonalScalarMatrixToTriplet(in_contact_[frame][node]*1, row_start, col_start - 1, 1,
+            //     constraint_triplets_, constraint_triplet_idx_);
+            //
+            // osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*traj_.GetForce(node, frame)(2);
+            // osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*(max_grf_ - traj_.GetForce(node, frame)(2));
+            //
+            // row_start += 1;
 
         }
     }
@@ -1494,7 +1494,7 @@ namespace torc::mpc {
             }
 
             // std::cout << "Friction cone violation: " << GetFrictionViolation(qp_res, node) << std::endl;
-            // violation += GetFrictionViolation(qp_res, node);
+            violation += GetFrictionViolation(qp_res, node);
 
             // These could conflict with the initial condition constraints
             if (node > 0) {
@@ -1645,11 +1645,11 @@ namespace torc::mpc {
                 // std::cout << "force: " << force.transpose() << std::endl;
                 violation += std::min(y(0), 0.)*std::min(y(0), 0.);
 
-                if (force(2) < 0) {
-                    violation += std::pow(force(2), 2);
-                } else if (force(2) > max_grf_) {
-                    violation += std::pow(force(2) - max_grf_, 2);
-                }
+                // if (force(2) < 0) {
+                //     violation += std::pow(force(2), 2);
+                // } else if (force(2) > max_grf_) {
+                //     violation += std::pow(force(2) - max_grf_, 2);
+                // }
             }
 
             idx += 3;
@@ -2473,7 +2473,7 @@ namespace torc::mpc {
                 AddIDPattern(node, false);
             }
 
-            // AddFrictionConePattern(node);
+            AddFrictionConePattern(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
@@ -2670,8 +2670,8 @@ namespace torc::mpc {
             col_start += CONTACT_3DOF;
 
             // ----- Z force bounds ----- //
-            MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
-            row_start += 1;
+            // MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
+            // row_start += 1;
         }
     }
 
