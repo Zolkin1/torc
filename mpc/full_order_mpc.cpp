@@ -26,11 +26,19 @@ namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
         : config_file_(config_file), verbose_(true), name_(name), cost_(name), compile_derivatves_(true), scale_cost_(false),
             total_solves_(0), enable_delay_prediction_(true) {
+
+        ParseJointDefualts();
+
         // Verify the robot file exists
         if (!fs::exists(model_path)) {
             throw std::runtime_error("Robot file does not exist!");
         }
-        robot_model_ = std::make_unique<models::FullOrderRigidBody>("mpc_robot", model_path);
+
+        if (joint_skip_names_.empty()) {
+            robot_model_ = std::make_unique<models::FullOrderRigidBody>("mpc_robot", model_path);
+        } else {
+            robot_model_ = std::make_unique<models::FullOrderRigidBody>("mpc_robot", model_path, joint_skip_names_, joint_skip_values_);
+        }
 
         vel_dim_ = robot_model_->GetVelDim();
         config_dim_ = robot_model_->GetConfigDim();
@@ -380,6 +388,7 @@ namespace torc::mpc {
 
             std::cout << "Robot: " << std::endl;
             std::cout << "\tName: " << robot_model_->GetUrdfRobotName() << std::endl;
+            std::cout << "\tDoFs: " << config_dim_ - FLOATING_BASE << std::endl;
             std::cout << "\tUpper Configuration Bounds: " << robot_model_->GetUpperConfigLimits().transpose() << std::endl;
             std::cout << "\tLower Configuration Bounds: " << robot_model_->GetLowerConfigLimits().transpose() << std::endl;
             std::cout << "\tVelocity Bounds: " << robot_model_->GetVelocityJointLimits().transpose() << std::endl;
@@ -389,6 +398,29 @@ namespace torc::mpc {
 
         }
     }
+
+    void FullOrderMpc::ParseJointDefualts() {
+        // Read in the yaml file.
+        YAML::Node config;
+        try {
+            config = YAML::LoadFile(config_file_);
+        } catch (...) {
+            throw std::runtime_error("Could not load the configuration file!");
+        }
+
+        // ---------- Joint Default Settings ---------- //
+        if (config["joint_defaults"]) {
+            std::cout << "Reading in joint defaults." << std::endl;
+            YAML::Node joint_defualt_settings = config["joint_defaults"];
+            joint_skip_names_ = joint_defualt_settings["joints"].as<std::vector<std::string>>();
+            joint_skip_values_ = joint_defualt_settings["values"].as<std::vector<double>>();
+        }
+
+        if (joint_skip_names_.size() != joint_skip_values_.size()) {
+            throw std::runtime_error("Joint names and joint values in joint_defaults do not match!");
+        }
+    }
+
 
     void FullOrderMpc::Configure() {
         utils::TORCTimer config_timer;
@@ -909,7 +941,13 @@ namespace torc::mpc {
         return q_target_.value();
     }
 
+    std::vector<std::string> FullOrderMpc::GetJointSkipNames() const {
+        return joint_skip_names_;
+    }
 
+    std::vector<double> FullOrderMpc::GetJointSkipValues() const {
+        return joint_skip_values_;
+    }
 
     // ------------------------------------------------- //
     // -------------- Constraint Creation -------------- //
@@ -3114,7 +3152,8 @@ namespace torc::mpc {
         std::lock_guard<std::mutex> lock(target_mut_);
 
         if (q_target.size() != config_dim_) {
-            throw std::runtime_error("Configuration target does not have the correct size!");
+            throw std::runtime_error("Configuration target does not have the correct size! Expected "
+                + std::to_string(config_dim_) + ", got: " + std::to_string(q_target.size()));
         }
 
         q_target_ = SimpleTrajectory(config_dim_, nodes_);

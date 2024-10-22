@@ -51,6 +51,9 @@ target_link_libraries(mpc_app_test Mpc)
 add_executable(mpc_quad_test mpc_quad_test.cpp)
 target_link_libraries(mpc_quad_test Mpc)
 
+add_executable(mpc_g1_test mpc_g1_app_test.cpp)
+target_link_libraries(mpc_g1_test Mpc)
+
 add_executable(sample_app_test sample_app_tests.cpp)
 target_link_libraries(sample_app_test SamplePlanner)
 

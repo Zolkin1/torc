@@ -34,32 +34,67 @@ namespace torc::models {
         n_input_ = other.n_input_;
     }
 
-    void PinocchioModel::CreatePinModel(bool urdf_model) {
+    PinocchioModel::PinocchioModel(const std::string& name, const std::filesystem::path& model_path,
+        const SystemType& system_type, const std::vector<std::string>& joint_skip_names,
+        const std::vector<double>& joint_skip_values)
+            : BaseModel(name, system_type), model_path_(model_path) {
+        // Create the pin model with some fixed joints
+        CreatePinModel(true, joint_skip_names, joint_skip_values);
+    }
+
+
+    void PinocchioModel::CreatePinModel(bool urdf_model, const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_values) {
         // Verify that the given file exists
         if (!std::filesystem::exists(model_path_)) {
             throw std::runtime_error("Provided model file does not exist.");
         }
+        if (joint_skip_names.empty()) {
+            // Create the pinocchio model from the file
+            pin_model_ = pinocchio::Model();
 
-        // Create the pinocchio model from the file
-        pin_model_ = pinocchio::Model();
+            if (urdf_model) {
+                // Verify that we are given a .urdf
+                if (model_path_.extension() != ".urdf") {
+                    throw std::runtime_error("Provided urdf does not end in a .urdf");
+                }
+                // Normal model
+                pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
 
-        if (urdf_model) {
-            // Verify that we are given a .urdf
-            if (model_path_.extension() != ".urdf") {
-                throw std::runtime_error("Provided urdf does not end in a .urdf");
+                // AD Model
+                pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
+            } else {
+                // Verify that we are given a .xml
+                if (model_path_.extension() != ".xml") {
+                    throw std::runtime_error("Provided urdf does not end in a .xml");
+                }
+                throw std::runtime_error("MJCF files not fully supported yet.");
+                pinocchio::mjcf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
             }
+        } else {
+            std::cout << "[Pinocchio Model] Building a model with fixed joints." << std::endl;
+            pinocchio::Model temp_model;
+            pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), temp_model);
+
+            vectorx_t q = pinocchio::randomConfiguration(temp_model);
+
+            std::vector<pinocchio::JointIndex> joint_ids;
+            for (int i = 0; i < joint_skip_names.size(); i++) {
+                if (!temp_model.existJointName(joint_skip_names[i])) {
+                    throw std::runtime_error(joint_skip_names[i] + " was not found in the URDF!");
+                } else {
+                    const long id = temp_model.getJointId(joint_skip_names[i]);
+                    joint_ids.push_back(id);
+
+                    // TODO: Is the id really the index here?
+                    q[id] = joint_values[i];
+                }
+            }
+
             // Normal model
-            pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+            pin_model_ = pinocchio::buildReducedModel(temp_model, joint_ids, q);
 
             // AD Model
             pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
-        } else {
-            // Verify that we are given a .xml
-            if (model_path_.extension() != ".xml") {
-                throw std::runtime_error("Provided urdf does not end in a .xml");
-            }
-            throw std::runtime_error("MJCF files not fully supported yet.");
-            pinocchio::mjcf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
         }
 
         // Normal data

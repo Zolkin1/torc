@@ -160,6 +160,10 @@ namespace torc::mpc {
 
         SimpleTrajectory GetConfigTargets();
 
+        std::vector<std::string> GetJointSkipNames() const;
+
+        std::vector<double> GetJointSkipValues() const;
+
         // std::vector<vector3_t> ComputeHeuristicFootPositions();
 
         ~FullOrderMpc();
@@ -370,6 +374,8 @@ namespace torc::mpc {
 
         void UpdateSettings();
 
+        void ParseJointDefualts();
+
         static constexpr int CONTACT_3DOF = 3;
         static constexpr int FLOATING_VEL = 6;
         static constexpr int FLOATING_BASE = 7;
@@ -480,11 +486,14 @@ namespace torc::mpc {
         std::unique_ptr<ad::CppADInterface> friction_cone_constraint_;
         std::vector<std::pair<double, double>> radii_;
 
-
         // Contact settings
         int num_contact_locations_{};
         std::vector<std::string> contact_frames_{};
         std::vector<double> hip_offsets_{};
+
+        // Joint defaults
+        std::vector<std::string> joint_skip_names_{};
+        std::vector<double> joint_skip_values_{};
 
         // std::map<std::string, std::vector<double>> swing_traj_;
 

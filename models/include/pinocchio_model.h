@@ -34,6 +34,11 @@ namespace torc::models {
                        const SystemType& system_type,
                        bool urdf_model = true);
 
+        PinocchioModel(const std::string& name,
+               const std::filesystem::path& model_path,
+               const SystemType& system_type,
+               const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values);
+
         PinocchioModel(const PinocchioModel& other);
 
         [[nodiscard]] virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
@@ -142,7 +147,7 @@ namespace torc::models {
         static const std::string ROOT_JOINT;
 
     private:
-        void CreatePinModel(bool urdf_model);
+        void CreatePinModel(bool urdf_model, const std::vector<std::string>& joint_skip_names={}, const std::vector<double>& joint_values={});
     };
 } // torc::models
 

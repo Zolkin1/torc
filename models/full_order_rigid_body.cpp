@@ -35,6 +35,17 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+            const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values)
+        : PinocchioModel(name, model_path, HybridSystemImpulse, joint_skip_names, joint_skip_values) {
+        std::vector<std::string> unactuated_joints;
+        unactuated_joints.emplace_back("root_joint");
+
+        CreateActuationMatrix(unactuated_joints);
+
+        contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
+    }
+
     FullOrderRigidBody::FullOrderRigidBody(const torc::models::FullOrderRigidBody& other)
         : PinocchioModel(other.name_, other.model_path_, HybridSystemImpulse) {
         n_input_ = other.n_input_;

@@ -36,6 +36,9 @@ namespace torc::models {
         FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
                            const std::vector<std::string>& underactuated_joints, bool urdf_model=true);
 
+        FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+            const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values);
+
         FullOrderRigidBody(const FullOrderRigidBody& other);
 
         [[nodiscard]] int GetStateDim() const override;
