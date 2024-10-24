@@ -12,7 +12,7 @@ namespace torc::mpc {
 
 	void SimpleTrajectory::InsertData(int node, const vectorx_t& data) {
 		if (data.size() != size_) {
-			throw std::runtime_error("Data size does not match!");
+			throw std::runtime_error("[Simple Trajectory] Data size does not match! Expected " + std::to_string(size_) + ", got: " + std::to_string(data.size()));
 		}
 
 		data_.segment(GetStartIdx(node), size_) = data;
@@ -20,7 +20,7 @@ namespace torc::mpc {
 
 	void SimpleTrajectory::SetAllData(const vectorx_t& data) {
 		if (data.size() != size_) {
-			throw std::runtime_error("Data size does not match!");
+			throw std::runtime_error("[Simple Trajectory] Data size does not match! Expected " + std::to_string(size_) + ", got: " + std::to_string(data.size()));
 		}
 
 		for (int node = 0; node < nodes_; node++) {

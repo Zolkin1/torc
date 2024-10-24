@@ -61,6 +61,8 @@ namespace torc::models {
 
         [[nodiscard]] std::string GetFrameName(int j) const;
 
+        [[nodiscard]] std::string GetJointName(int j) const;
+
         [[nodiscard]] std::string GetFrameType(int j) const;
 
         [[nodiscard]] long GetFrameIdx(const std::string& frame) const;

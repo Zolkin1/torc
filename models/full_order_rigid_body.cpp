@@ -647,6 +647,10 @@ namespace torc::models {
             throw std::runtime_error("[IK] Number of positions and frames do not match!");
         }
 
+        // Joint Bounds
+        const vectorx_t lower_joint_lims = GetLowerConfigLimits();
+        const vectorx_t upper_joint_lims = GetUpperConfigLimits();
+
         // Define constants for the optimization
         constexpr double THRESHOLD = 1e-3;
         constexpr int IT_MAX = 5e2;
@@ -688,6 +692,12 @@ namespace torc::models {
                 // Jlin = J.block(0, FLOATING_VEL, 3, GetVelDim() - FLOATING_VEL);
                 Jlin = J.topRows<3>();
                 Jlin.leftCols<FLOATING_VEL>().setZero();
+
+                for (int j = 0; j < Jlin.cols(); j++) {
+                    if (q(j) == upper_joint_lims(j) || q(j) == lower_joint_lims(j)) {
+                        Jlin.col(j).setZero();
+                    }
+                }
 
                 matrix3x_t JJt;
                 JJt.noalias() = Jlin * Jlin.transpose();

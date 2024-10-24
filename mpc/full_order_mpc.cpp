@@ -495,7 +495,7 @@ namespace torc::mpc {
                     time += dt_[node];
                 }
             } else {
-                throw std::runtime_error("Contact schedule contains contact frames not recognized by the MPC!");
+                throw std::runtime_error("Contact schedule contains contact frames not recognized by the MPC: " + frame);
             }
         }
 

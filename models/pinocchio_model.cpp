@@ -75,7 +75,7 @@ namespace torc::models {
             pinocchio::Model temp_model;
             pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), temp_model);
 
-            vectorx_t q = pinocchio::randomConfiguration(temp_model);
+            vectorx_t q = pinocchio::neutral(temp_model);
 
             std::vector<pinocchio::JointIndex> joint_ids;
             for (int i = 0; i < joint_skip_names.size(); i++) {
@@ -130,6 +130,10 @@ namespace torc::models {
 
     std::string PinocchioModel::GetFrameName(int j) const {
         return pin_model_.frames.at(j).name;
+    }
+
+    std::string PinocchioModel::GetJointName(int j) const {
+        return pin_model_.names.at(j);
     }
 
     vectorx_t PinocchioModel::GetNeutralConfig() const {
