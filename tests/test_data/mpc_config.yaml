@@ -70,6 +70,6 @@ costs:
 contacts:
   num_contact_locations: 4
   contact_frames: ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]
-  hip_offsets: [0.1805, -0.128, 0.1805, 0.128, -0.1805, -0.128, -0.1805, 0.128]
+#  hip_offsets: [0.1805, -0.128, 0.1805, 0.128, -0.1805, -0.128, -0.1805, 0.128]
 
 line_search:

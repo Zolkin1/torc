@@ -10,21 +10,19 @@ set(MODELS_SOURCES_LIST
 )
 
 #----------- Pinocchio -----------#
-if (BUILD_WITH_PINOCCHIO)
-    message(STATUS "Building with Pinocchio")
+message(STATUS "Building with Pinocchio")
 
-    list(APPEND MODELS_SOURCES_LIST
-                pinocchio_model.cpp
-                full_order_rigid_body.cpp
-                single_rigid_body.cpp)
+list(APPEND MODELS_SOURCES_LIST
+            pinocchio_model.cpp
+            full_order_rigid_body.cpp
+            single_rigid_body.cpp)
 
-    list(APPEND MODELS_HEADER_LIST
-            "${MODELS_INC}/pinocchio_model.h"
-            "${MODELS_INC}/full_order_rigid_body.h"
-            "${MODELS_INC}/frame_state_types.h"
-            "${MODELS_INC}/single_rigid_body.h"
-            "${MODELS_INC}/pinocchio_interface.h")
-endif ()
+list(APPEND MODELS_HEADER_LIST
+        "${MODELS_INC}/pinocchio_model.h"
+        "${MODELS_INC}/full_order_rigid_body.h"
+        "${MODELS_INC}/frame_state_types.h"
+        "${MODELS_INC}/single_rigid_body.h"
+        "${MODELS_INC}/pinocchio_interface.h")
 
 # -------  Create Library -------- #
 add_library(Models
@@ -44,8 +42,6 @@ find_package(Eigen3 REQUIRED)
 target_link_libraries(Models PUBLIC Autodiff)
 
 #----------- Pinocchio -----------#
-if (BUILD_WITH_PINOCCHIO)
-    list(APPEND CMAKE_PREFIX_PATH /opt/openrobots/)
-    find_package(pinocchio 3.0.0 REQUIRED)
-    target_link_libraries(Models PUBLIC pinocchio::pinocchio)
-endif ()
+list(APPEND CMAKE_PREFIX_PATH /opt/openrobots/)
+find_package(pinocchio 3.0.0 REQUIRED)
+target_link_libraries(Models PUBLIC pinocchio::pinocchio)
