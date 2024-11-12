@@ -22,6 +22,10 @@
 //  then I reduce the time delay between recieving the estimate and the outputting a control. (Total computation time
 //  is the same).
 
+// TODO: Remove the stuff added in for the sample planner and don't worry about thread safety for now
+// TODO: Clean up the workspace struct
+// TODO: Clean up IC conditions
+
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
         : config_file_(config_file), verbose_(true), name_(name), cost_(name), compile_derivatves_(true), scale_cost_(false),
@@ -678,23 +682,11 @@ namespace torc::mpc {
         utils::TORCTimer ls_timer;
         ls_timer.Tic();
         // TODO: Keep an eye on this
-        // auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
-        double cost_ls = GetFullCost(osqp_solver_.primal_solution());
-        double constraint_ls = GetConstraintViolation(osqp_solver_.primal_solution());  // TODO: Fix this function!
-        alpha_ = 1;
+        auto [constraint_ls, cost_ls] = LineSearch(osqp_solver_.primal_solution());
+        // double cost_ls = GetFullCost(osqp_solver_.primal_solution());
+        // double constraint_ls = GetConstraintViolation(osqp_solver_.primal_solution());  // TODO: Fix this function!
+        // alpha_ = 1;
         ls_timer.Toc();
-
-        // for (const auto& frame : contact_frames_) {
-        //     int node = 1;
-        //     vectorx_t x(swing_height_constraint_[frame]->GetDomainSize());
-        //     x << osqp_solver_.primal_solution().segment(GetDecisionIdx(node, Configuration), vel_dim_);
-        //     vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
-        //     p << traj_.GetConfiguration(node), swing_traj_[frame][node];
-        //     vectorx_t y;
-        //     swing_height_constraint_[frame]->GetFunctionValue(x, p, y);
-        //     std::cout << "swing height error for frame " << frame << " is " << y << std::endl;
-        //     std::cout << "desired height: " << swing_traj_[frame][node] << std::endl << std::endl;
-        // }
 
 #if NAN_CHECKS
         if (std::isnan(constraint_ls)) {
@@ -722,18 +714,6 @@ namespace torc::mpc {
              ls_condition_, constraint_ls);
 
         traj_ = traj_out;
-
-        // double post_cost = GetFullCost(vectorx_t::Zero(GetNumDecisionVars()));
-        // double post_constraint = GetConstraintViolation(vectorx_t::Zero(GetNumDecisionVars()));
-        // if (std::abs(cost_ls - post_cost) > 1e-8) {
-        //     std::cerr << "Cost Difference: " << std::abs(cost_ls - post_cost) << std::endl;
-        //     // throw std::runtime_error("Traj conversion effected cost!");
-        // }
-        //
-        // if (std::abs(constraint_ls - post_constraint) > 1e-8) {
-        //     std::cerr << "Constraint Difference: " << std::abs(constraint_ls - post_constraint) << std::endl;
-        //     // throw std::runtime_error("Traj conversion effected constraint violation!");
-        // }
 
         total_solves_++;
 
@@ -900,18 +880,10 @@ namespace torc::mpc {
 
                 if (!in_contact_[frame][node]) {
                     vector2_t swing_location = prev_foothold + (next_foothold - prev_foothold)*(static_cast<double>(node - swing_start)/static_cast<double>(swing_end - swing_start));
-                    // std::cout << "node: " << node << ", swing_start: " << swing_start << ", swing end: " << swing_end << std::endl;
-                    // std::cout << "prev_foothold: " << prev_foothold.transpose() << std::endl;
-                    // std::cout << "next_foothold: " << next_foothold.transpose() << std::endl;
-                    // std::cout << "swing location: " << swing_location.transpose() << std::endl;
                     positions[frame][node] << swing_location(0), swing_location(1), swing_traj_[frame][node];
                 } else {
                     prev_foothold = positions[frame][node].head<2>();
                 }
-
-                // std::cout << node << ": " << positions[frame][node].transpose() << std::endl;
-                // std::cout << "start swing: " << swing_start << ", end swing: " << swing_end << std::endl;
-                // std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
             }
             frame_idx++;
         }
@@ -1151,24 +1123,6 @@ namespace torc::mpc {
         violation(0) = friction_coef_*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
     }
 
-
-    // TODO: Consider removing this constraint
-    // void FullOrderMpc::AddICConstraint() {
-    //     // Set constraint matrix
-    //     int row_start = 0;
-    //     int col_start = 0;
-    //     DiagonalScalarMatrixToTriplet(1, row_start, col_start, 2*robot_model_->GetVelDim(), constraint_triplets_, constraint_triplet_idx_);
-    //
-    //     // Set bounds
-    //     // Configuration differences are all set to 0
-    //     osqp_instance_.lower_bounds.head(robot_model_->GetVelDim()).setZero();
-    //     osqp_instance_.upper_bounds.head(robot_model_->GetVelDim()).setZero();
-    //
-    //     // Velocity differences are all set to 0
-    //     osqp_instance_.lower_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()).setZero();
-    //     osqp_instance_.upper_bounds.segment(robot_model_->GetVelDim(), robot_model_->GetVelDim()).setZero();
-    // }
-
     void FullOrderMpc::AddIntegrationConstraint(int node) {
         assert(node != nodes_ - 1);
 
@@ -1264,8 +1218,6 @@ namespace torc::mpc {
             col_start = GetDecisionIdx(node, Velocity);
             MatrixToTripletWithSparsitySet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start,
                 constraint_triplets_, constraint_triplet_idx_, ws_->sp_dvk_partial);
-            // MatrixToTriplet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start,
-            //     constraint_triplets_, constraint_triplet_idx_);
 
             // dtau_dtau -- no torque enters
 
@@ -1273,15 +1225,11 @@ namespace torc::mpc {
             col_start = GetDecisionIdx(node, GroundForce);
             MatrixToTripletWithSparsitySet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start,
                 constraint_triplets_, constraint_triplet_idx_, ws_->sp_df_partial);
-            // MatrixToTriplet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start,
-            //     constraint_triplets_, constraint_triplet_idx_);
 
             // dtau_dv2
             col_start = GetDecisionIdx(node + 1, Velocity);
             MatrixToTripletWithSparsitySet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start,
                 constraint_triplets_, constraint_triplet_idx_, ws_->sp_dvkp1_partial);
-            // MatrixToTriplet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start,
-            //     constraint_triplets_, constraint_triplet_idx_);
 
             // Set the bounds
             osqp_instance_.lower_bounds.segment(row_start, FLOATING_VEL) = -y.head<FLOATING_VEL>();
@@ -1293,15 +1241,6 @@ namespace torc::mpc {
     void FullOrderMpc::AddFrictionConeConstraint(int node) {
         int row_start = GetConstraintRow(node, FrictionCone);
         int col_start = GetDecisionIdx(node, GroundForce);
-
-        // vector3_t h = {1, 0, 0};
-        // vector3_t l = {0, 1, 0};
-        // vector3_t n = {0, 0, 1};
-        //
-        // ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
-        //         -(h + n*friction_coef_).transpose(),
-        //         (l - n*friction_coef_).transpose(),
-        //         -(l + n*friction_coef_).transpose();
 
         for (const auto& frame : contact_frames_) {
             // ----- Zero Force in Swing ----- //
@@ -1400,46 +1339,25 @@ namespace torc::mpc {
         // TODO: Consider adding a little feedback controller in the constraint to bring the foot back if it off the trajectory
         //  Could also choose to track velocity instead of position.
         for (const auto& frame : contact_frames_) {
-            // if (!in_contact_[frame][node]) {     // Only constrain the height if not in contact
-                // Linearization
-                matrixx_t jac;
-                vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
-                vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
-                p << traj_.GetConfiguration(node), swing_traj_[frame][node];
-                swing_height_constraint_[frame]->GetJacobian(x_zero, p, jac);
+            // Linearization
+            matrixx_t jac;
+            vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
+            vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
+            p << traj_.GetConfiguration(node), swing_traj_[frame][node];
+            swing_height_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
-                const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
+            const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
 
-                // dqk
-                MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+            // dqk
+            MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
 
-                // Lower and upper bounds
-                vectorx_t y;
-                swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y);
-                osqp_instance_.lower_bounds(row_start) = -y(0);
-                osqp_instance_.upper_bounds(row_start) = -y(0);
+            // Lower and upper bounds
+            vectorx_t y;
+            swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y);
+            osqp_instance_.lower_bounds(row_start) = -y(0);
+            osqp_instance_.upper_bounds(row_start) = -y(0);
 
-                row_start++;
-            // } else {
-            //     matrixx_t jac = matrixx_t::Zero(swing_height_constraint_[frame]->GetRangeSize(), swing_height_constraint_[frame]->GetDomainSize());
-            //     const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
-            //
-            //     // dqk
-            //     MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
-            //
-            //     // Lower and upper bounds
-            //     osqp_instance_.lower_bounds(row_start) = 0;
-            //     osqp_instance_.upper_bounds(row_start) = 0;
-            //
-            //     row_start++;
-            // }
-
-            // std::cout << "Frame " << frame << " jac: \n" << jac << std::endl;
-            // std::cout << "y: " << y << std::endl;
-            // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
-            // vector3_t frame_pos = robot_model_->GetFrameState(frame).placement.translation();
-            // std::cout << "frame z: " << frame_pos(2) << std::endl;
-            // std::cout << "des swing height: " << swing_traj_[frame][node] << std::endl;
+            row_start++;
         }
     }
 
@@ -1462,7 +1380,6 @@ namespace torc::mpc {
 
                 // dvk
                 col_start = GetDecisionIdx(node, Velocity);
-                // std::cout << "holonomic dv: \n" << jac.middleCols(vel_dim_, vel_dim_) << std::endl;
                 MatrixToTripletWithSparsitySet(jac.middleCols(vel_dim_, vel_dim_), row_start, col_start,
                     constraint_triplets_, constraint_triplet_idx_, ws_->sp_hol_dvk[frame]);
 
@@ -1565,10 +1482,6 @@ namespace torc::mpc {
         return dt_[1]*sqrt(violation);
     }
 
-    // double FullOrderMpc::GetICViolation(const vectorx_t &qp_res) {
-    //     return qp_res.head(robot_model_->GetVelDim()*2).squaredNorm();
-    // }
-
     double FullOrderMpc::GetIntegrationViolation(const vectorx_t &qp_res, int node) const {
 
         vectorx_t dqk, dvk;
@@ -1638,40 +1551,6 @@ namespace torc::mpc {
         } else {
             return y.head<FLOATING_VEL>().squaredNorm();
         }
-
-        // vectorx_t q;
-        // ConvertdqToq(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
-        //     traj_.GetConfiguration(node), q);
-        // const vectorx_t v = qp_res.segment(GetDecisionIdx(node, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node);
-        // const vectorx_t v2 = qp_res.segment(GetDecisionIdx(node + 1, Velocity), robot_model_->GetVelDim()) + traj_.GetVelocity(node + 1);
-        // const vectorx_t a = (v2 - v)/dt_[node];
-        //
-        // // std::cout << "full order: " << full_order << std::endl;
-        //
-        // std::vector<models::ExternalForce<double>> f_ext;
-        // int idx = GetDecisionIdx(node, GroundForce);
-        // for (const auto& frame : contact_frames_) {
-        //     f_ext.emplace_back(frame, qp_res.segment(idx, 3) + traj_.GetForce(node, frame));
-        //     // std::cout << "frame: " << frame << ", force: " << (qp_res.segment(idx, 3) + traj_.GetForce(node, frame)).transpose() << std::endl;
-        //     idx += 3;
-        // }
-        //
-        // const vectorx_t tau_id = robot_model_->InverseDynamics(q, v, a, f_ext);
-        //
-        // // std::cout << "tau id: " << tau_id.transpose() << std::endl;
-        //
-        // if (full_order) {
-        //     vectorx_t tau(robot_model_->GetVelDim());
-        //     tau << Eigen::Vector<double, FLOATING_VEL>::Zero(),
-        //         qp_res.segment(GetDecisionIdx(node, Torque), robot_model_->GetNumInputs()) + traj_.GetTau(node);
-        //
-        //     // std::cout << "tau dec: " << tau.transpose() << std::endl;
-        //     // std::cout << std::endl;
-        //
-        //     return (tau - tau_id).squaredNorm();
-        // } else {
-        //     return tau_id.head<FLOATING_VEL>().squaredNorm();
-        // }
     }
 
     double FullOrderMpc::GetFrictionViolation(const vectorx_t &qp_res, int node) {
@@ -1692,22 +1571,13 @@ namespace torc::mpc {
                 p << traj_.GetForce(node, frame), friction_margin_;
 
                 friction_cone_constraint_->GetFunctionValue(x, p, y);
-                // std::cout << frame << ": " << y(0) << std::endl;
-                // std::cout << "force: " << force.transpose() << std::endl;
                 violation += std::min(y(0), 0.)*std::min(y(0), 0.);
-
-                // if (force(2) < 0) {
-                //     violation += std::pow(force(2), 2);
-                // } else if (force(2) > max_grf_) {
-                //     violation += std::pow(force(2) - max_grf_, 2);
-                // }
             }
 
             idx += 3;
 
         }
 
-        // std::cout << "friction violation: " << violation << std::endl;
         return violation;
     }
 
@@ -1828,60 +1698,6 @@ namespace torc::mpc {
     // -------------------------------------- //
     // -------- Linearization Helpers ------- //
     // -------------------------------------- //
-    // matrix3_t FullOrderMpc::QuatIntegrationLinearizationXi(int node) {
-    //     assert(node != nodes_ - 1);
-    //     constexpr double DELTA = 1e-8;
-    //
-    //     // TODO: Change for code gen derivative
-    //     quat_t qbar_kp1 = traj_.GetQuat(node+1);
-    //     quat_t qbar_k = traj_.GetQuat(node);
-    //     vector3_t xi = vector3_t::Zero();
-    //
-    //     // Use the velocity from the current and next node
-    //     vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
-    //     vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
-    //     vector3_t w = 0.5*(wk + wkp1);
-    //
-    //     const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-    //     matrix3_t update_fd = matrix3_t::Zero();
-    //     for (int i = 0; i < 3; i++) {
-    //         xi(i) += DELTA;
-    //         vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-    //         update_fd.col(i) = (xi2_kp1 - xi1_kp1)/DELTA;
-    //         xi(i) -= DELTA;
-    //     }
-    //
-    //     return update_fd;
-    // }
-
-    // matrix3_t FullOrderMpc::QuatIntegrationLinearizationW(int node) {
-    //     assert(node != nodes_ - 1);
-    //
-    //     // TODO: Change for code gen derivative
-    //     quat_t qbar_kp1 = traj_.GetQuat(node+1);
-    //     quat_t qbar_k = traj_.GetQuat(node);
-    //     vector3_t xi = vector3_t::Zero();
-    //     // TODO: Verify that this is in the correct frame!
-    //     // Use the velocity from the current and next node
-    //     vector3_t wk = traj_.GetVelocity(node).segment<3>(POS_VARS);
-    //     vector3_t wkp1 = traj_.GetVelocity(node + 1).segment<3>(POS_VARS);
-    //     vector3_t w = 0.5*(wk + wkp1);
-    //
-    //     const vector3_t xi1_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-    //     matrix3_t update_fd = matrix3_t::Zero();
-    //     for (int i = 0; i < 3; i++) {
-    //         w(i) += FD_DELTA;
-    //         vector3_t xi2_kp1 = robot_model_->QuaternionIntegrationRelative(qbar_kp1, qbar_k, xi, w, dt_[node]);
-    //         for (int j = 0; j < 3; j++) {
-    //             update_fd(j, i) = (xi2_kp1(j) - xi1_kp1(j))/FD_DELTA;
-    //         }
-    //
-    //         w(i) -= FD_DELTA;
-    //     }
-    //
-    //     return 0.5*update_fd;
-    // }
-
     void FullOrderMpc::InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau, vectorx_t& y) {
         // Linearizing about the nominal trajectory
         const vectorx_t x = vectorx_t::Zero(inverse_dynamics_constraint_->GetDomainSize());
@@ -1908,78 +1724,34 @@ namespace torc::mpc {
         inverse_dynamics_constraint_->GetFunctionValue(x, p, y);
     }
 
-
-    void FullOrderMpc::InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1,
-        matrixx_t& dtau_dv2, matrixx_t& dtau_df) {
-        assert(node != nodes_ - 1);
-
-        // Compute acceleration via finite difference
-        ws_->acc = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
-        // std::cout << "mpc a: " << a.transpose() << std::endl;
-        // std::cout << "mpc dt: " << dt_[node] << std::endl;
-
-        // TODO: Use the ws_->f_ext
-        // Get external forces
-        std::vector<models::ExternalForce<double>> f_ext;
-        for (const auto& frame : contact_frames_) {
-            f_ext.emplace_back(frame, traj_.GetForce(node, frame));
-        }
-
-        robot_model_->InverseDynamicsDerivative(traj_.GetConfiguration(node), traj_.GetVelocity(node),
-            ws_->acc, f_ext, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
-
-        // Note that only the upper triangular part of dtau_da is filled, so we need to extract it
-        dtau_dv2.triangularView<Eigen::StrictlyLower>() =
-                       dtau_dv2.transpose().triangularView<Eigen::StrictlyLower>();
-
-        // Compute the velocity derivatives
-        dtau_dv1 = dtau_dv1 - dtau_dv2/dt_[node];
-        dtau_dv2 = dtau_dv2/dt_[node];
-    }
-
-
-    // matrix43_t FullOrderMpc::QuatLinearization(int node) {
-    //     matrix43_t q_lin;
+    // TODO: Consider removing
+    // void FullOrderMpc::InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1,
+    //     matrixx_t& dtau_dv2, matrixx_t& dtau_df) {
+    //     assert(node != nodes_ - 1);
     //
-    //     quat_t qbar = traj_.GetQuat(node);
-    //     quat_t q_pert;
-    //     vector3_t pert = vector3_t::Zero();
-    //     for (int i = 0; i < 3; i++) {
-    //         pert(i) += FD_DELTA;
-    //         pinocchio::quaternion::exp3(pert, q_pert);
-    //         pert(i) -= FD_DELTA;
-    //         q_pert = qbar*q_pert;
+    //     // Compute acceleration via finite difference
+    //     ws_->acc = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
+    //     // std::cout << "mpc a: " << a.transpose() << std::endl;
+    //     // std::cout << "mpc dt: " << dt_[node] << std::endl;
     //
-    //         q_lin(0, i) = (q_pert.x() - qbar.x())/FD_DELTA;
-    //         q_lin(1, i) = (q_pert.y() - qbar.y())/FD_DELTA;
-    //         q_lin(2, i) = (q_pert.z() - qbar.z())/FD_DELTA;
-    //         q_lin(3, i) = (q_pert.w() - qbar.w())/FD_DELTA;
+    //     // TODO: Use the ws_->f_ext
+    //     // Get external forces
+    //     std::vector<models::ExternalForce<double>> f_ext;
+    //     for (const auto& frame : contact_frames_) {
+    //         f_ext.emplace_back(frame, traj_.GetForce(node, frame));
     //     }
     //
-    //     return q_lin;
-    // }
-
-    // void FullOrderMpc::SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian) {
-    //     // The world frame seems to behave better numerically, but I really want the LOCAL_WORLD_ALIGNED, not WORLD.
-    //     // TODO: Speed up by not calling ComputeJointJacobian each time.
-    //     robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
-    //     // std::cout << "frame: " << frame << std::endl;
-    //     // std::cout << "local world aligned: \n" << jacobian << std::endl;
+    //     robot_model_->InverseDynamicsDerivative(traj_.GetConfiguration(node), traj_.GetVelocity(node),
+    //         ws_->acc, f_ext, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
     //
-    //     // *** Note *** The pinocchio body velocity is in the local frame, put I want perturbations to
-    //     // configurations in the world frame, so we can always set the first 3x3 mat to identity
-    //     jacobian.topLeftCorner<3,3>().setIdentity();
+    //     // Note that only the upper triangular part of dtau_da is filled, so we need to extract it
+    //     dtau_dv2.triangularView<Eigen::StrictlyLower>() =
+    //                    dtau_dv2.transpose().triangularView<Eigen::StrictlyLower>();
+    //
+    //     // Compute the velocity derivatives
+    //     dtau_dv1 = dtau_dv1 - dtau_dv2/dt_[node];
+    //     dtau_dv2 = dtau_dv2/dt_[node];
     // }
-
-    // void FullOrderMpc::HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian) {
-    //     robot_model_->FrameVelDerivWrtConfiguration(traj_.GetConfiguration(node),
-    //         traj_.GetVelocity(node), vectorx_t::Zero(robot_model_->GetVelDim()), frame, jacobian);
-    // }
-
-    // void FullOrderMpc::HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian) {
-    //     robot_model_->GetFrameJacobian(frame, traj_.GetConfiguration(node), jacobian, pinocchio::LOCAL_WORLD_ALIGNED);
-    // }
-
 
     // ------------------------------------------------- //
     // ----------------- Cost Creation ----------------- //
@@ -2112,11 +1884,6 @@ namespace torc::mpc {
 
                     cost_.GetApproximation(traj_.GetConfiguration(node), GetDesiredFramePos(node, data.frame_name),
                                            linear_term, hess_term, data.constraint_name);
-
-                    // std::cout << "----- " << data.constraint_name << std::endl;
-                    // std::cout << "q: " << traj_.GetConfiguration(node).transpose() << std::endl;
-                    // std::cout << "Hess: \n" << hess_term << std::endl;
-                    // std::cout << "Linear: \n" << linear_term.transpose() << std::endl;
 
                     osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
                             scaling * linear_term;
@@ -2324,6 +2091,7 @@ namespace torc::mpc {
         return force_target;
     }
 
+    // TODO: Consider removing or at least moving this function
     vector3_t FullOrderMpc::GetDesiredFramePos(int node, std::string frame) {
         std::lock_guard<std::mutex> lock(target_mut_);
         vector3_t frame_pos;
@@ -2433,40 +2201,16 @@ namespace torc::mpc {
 
 
     std::pair<double, double> FullOrderMpc::LineSearch(const vectorx_t& qp_res) {
-    // TODO: Fix with the new constraint violation functions
         // Backtracing linesearch (see ETH paper)
         // TODO: Speed up
 
         alpha_ = 1;
 
-        // std::cout << "------ alpha: " << 0 << " ------" << std::endl;
-        // TODO: Make sure there are no bugs because I feel like I reject a lot of steps
-
-        // Print out QP violation
-//        vectorx_t constraint_vals = A_*qp_res;
-//
-//        double qp_constraint_violation = 0;
-//        for (int i = 0; i < constraint_vals.size(); i++) {
-//            if (constraint_vals(i) < osqp_instance_.lower_bounds(i)) {
-//                qp_constraint_violation += std::pow(constraint_vals(i) - osqp_instance_.lower_bounds(i), 2);
-//            } else if (constraint_vals(i) > osqp_instance_.upper_bounds(i)) {
-//                qp_constraint_violation += std::pow(constraint_vals(i) - osqp_instance_.upper_bounds(i), 2);
-//            }
-//        }
-//
-//        std::cout << "QP constraint violation (no scaling): " << std::sqrt(qp_constraint_violation) << std::endl;
-
         double theta_k = GetConstraintViolation(vectorx_t::Zero(qp_res.size()));
         double phi_k = GetFullCost(vectorx_t::Zero(qp_res.size()));
 
-//        std::cout << "Starting violation: " << theta_k << std::endl;
-
         while (alpha_ > ls_alpha_min_) {
             double theta_kp1 = GetConstraintViolation(alpha_*qp_res);
-
-//            std::cout << "------ alpha: " << alpha_ << " ------" << std::endl;
-//            std::cout << "violation: " << theta_kp1 << std::endl;
-
 
             if (theta_kp1 >= ls_theta_max_) {
                 if (theta_kp1 < (1 - ls_gamma_theta_)*theta_k) {
@@ -2559,6 +2303,7 @@ namespace torc::mpc {
         // std::cout << "A: \n" << osqp_instance_.constraint_matrix << std::endl;
     }
 
+    // TODO: Remove
     // void FullOrderMpc::AddICPattern() {
     //     int row_start = 0;
     //     int col_start = 0;
@@ -2659,28 +2404,20 @@ namespace torc::mpc {
             // dtau_dq
             int col_start = GetDecisionIdx(node, Configuration);
             AddSparsitySet(ws_->sp_dq_partial, row_start, col_start, constraint_triplets_);
-            // ws_->id_config_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            // MatrixToNewTriplet(ws_->id_config_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
 
             // dtau_dv
             col_start = GetDecisionIdx(node, Velocity);
             AddSparsitySet(ws_->sp_dvk_partial, row_start, col_start, constraint_triplets_);
-            // ws_->id_vel1_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            // MatrixToNewTriplet(ws_->id_vel1_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
 
             // dtau_dtau -- does not appear
 
             // dtau_df
             col_start = GetDecisionIdx(node, GroundForce);
             AddSparsitySet(ws_->sp_df_partial, row_start, col_start, constraint_triplets_);
-            // ws_->id_force_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, num_contact_locations_*CONTACT_3DOF, 1);
-            // MatrixToNewTriplet(ws_->id_force_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
 
             // dtau_dv2
             col_start = GetDecisionIdx(node + 1, Velocity);
             AddSparsitySet(ws_->sp_dvkp1_partial, row_start, col_start, constraint_triplets_);
-            // ws_->id_vel2_mat.setConstant(robot_model_->GetNumInputs() + FLOATING_VEL, robot_model_->GetVelDim(), 1);
-            // MatrixToNewTriplet(ws_->id_vel2_mat.topRows<FLOATING_VEL>(), row_start, col_start, constraint_triplets_);
         }
     }
 
@@ -2691,24 +2428,7 @@ namespace torc::mpc {
         matrixx_t id;
         id.setIdentity(CONTACT_3DOF, CONTACT_3DOF);
 
-        // vector3_t h = {1, 0, 0};
-        // vector3_t l = {0, 1, 0};
-        // vector3_t n = {0, 0, 1};
-
         const auto sparsity = friction_cone_constraint_->GetJacobianSparsityPatternSet();
-
-        // ws_->fric_cone_mat.resize(FRICTION_CONE_SIZE, CONTACT_3DOF);
-        // ws_->fric_cone_mat << (h - n*friction_coef_).transpose(),
-        //         -(h + n*friction_coef_).transpose(),
-        //         (l - n*friction_coef_).transpose(),
-        //         -(l + n*friction_coef_).transpose();
-        // for (int i = 0; i < ws_->fric_cone_mat.rows(); i++) {
-        //     for (int j = 0; j < ws_->fric_cone_mat.cols(); j++) {
-        //         if (ws_->fric_cone_mat(i, j) != 0) {
-        //             ws_->fric_cone_mat(i, j) = 1;
-        //         }
-        //     }
-        // }
 
         for (int contact = 0; contact < num_contact_locations_; contact++) {
             // ----- Zero Force in Swing ----- //
