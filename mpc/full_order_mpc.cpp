@@ -22,8 +22,6 @@
 //  then I reduce the time delay between recieving the estimate and the outputting a control. (Total computation time
 //  is the same).
 
-// TODO: Remove the stuff added in for the sample planner and don't worry about thread safety for now
-// TODO: Clean up the workspace struct
 // TODO: Clean up IC conditions
 
 namespace torc::mpc {
@@ -31,7 +29,7 @@ namespace torc::mpc {
         : config_file_(config_file), verbose_(true), name_(name), cost_(name), compile_derivatves_(true), scale_cost_(false),
             total_solves_(0), enable_delay_prediction_(true) {
 
-        ParseJointDefualts();
+        ParseJointDefaults();
 
         // Verify the robot file exists
         if (!fs::exists(model_path)) {
@@ -403,7 +401,7 @@ namespace torc::mpc {
         }
     }
 
-    void FullOrderMpc::ParseJointDefualts() {
+    void FullOrderMpc::ParseJointDefaults() {
         // Read in the yaml file.
         YAML::Node config;
         try {
@@ -462,11 +460,9 @@ namespace torc::mpc {
         traj_.SetDtVector(dt_);
 
         // Setup remaining workspace memory
-        ws_->acc.resize(robot_model_->GetVelDim());
         for (const auto& frame : contact_frames_) {
             ws_->f_ext.emplace_back(frame, vector3_t::Zero());
         }
-        ws_->frame_jacobian.resize(6, robot_model_->GetVelDim());
 
         // Setup cost function
         cost_.Configure(robot_model_, compile_derivatves_, cost_data_, deriv_lib_path_);
@@ -524,60 +520,11 @@ namespace torc::mpc {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
 
-        // Delay prediction
-        vectorx_t q_new = q;
-        vectorx_t v_new = v;
-
-        if (delay_prediction_dt_ != 0 && enable_delay_prediction_) {
-            // TODO: Fix!
-            throw std::runtime_error("Delay prediction not implemented yet!");
-
-            double total_dt;
-            if (delay_prediction_dt_ < 0) {
-                // Average the last 5 computation times
-                if (stats_.size() >= 5) {
-                    total_dt = 0;
-                    for (int i = 0; i < 5; i++) {
-                        total_dt += stats_[stats_.size() - (i + 1)].total_compute_time;
-                    }
-                    total_dt = total_dt / 5e3;
-                } else {
-                    total_dt = 1e-2;
-                }
-            } else {
-                total_dt = delay_prediction_dt_;
-            }
-
-            const int steps = 2;
-            double dt = total_dt / static_cast<double>(steps);
-
-            vectorx_t tau;
-            for (int i = 0; i < steps; i++) {
-                double curr_time = i * dt;
-                traj_.GetTorqueInterp(delay_start_time + curr_time, tau);
-                for (auto& f : ws_->f_ext) {
-                    traj_.GetForceInterp(delay_start_time + curr_time, f.frame_name, f.force_linear);
-                }
-
-                vectorx_t xdot = robot_model_->GetDynamics(q_new, v_new, tau, ws_->f_ext);
-                q_new = robot_model_->IntegrateVelocity(q_new, dt*xdot.head(v.size()));
-                v_new = v_new + dt*xdot.tail(v.size());
-            }
-
-            // TODO: Measure the error between this and the measured one
-
-//            std::cout << "q delay: " << q_new.transpose() << std::endl;
-//            std::cout << "v delay: " << v_new.transpose() << std::endl;
-        }
-
-//        std::cout << "Current traj config node 0: " << traj_.GetConfiguration(0).transpose() << std::endl;
-//        std::cout << "Current traj vel node 0: " << traj_.GetVelocity(0).transpose() << std::endl;
-
         // Normalize quaternion to be safe
-        q_new.segment<QUAT_VARS>(POS_VARS).normalize();
+        // q.segment<QUAT_VARS>(POS_VARS).normalize();
 
-        traj_.SetConfiguration(0, q_new);
-        traj_.SetVelocity(0, v_new);
+        traj_.SetConfiguration(0, q);
+        traj_.SetVelocity(0, v);
         utils::TORCTimer constraint_timer;
         constraint_timer.Tic();
         CreateConstraints();
@@ -767,6 +714,7 @@ namespace torc::mpc {
         }
     }
 
+    // TODO: Consider moving this to a different class along with the swing trajectory generation
     void FullOrderMpc::GenerateCostReference(const vectorx_t& q, const vectorx_t& v, const vector3_t& vel) {
         if (hip_offsets_.empty()) {
             throw std::runtime_error("No hip joint provided in the config file! Cannot generate the cost reference!");
@@ -840,14 +788,6 @@ namespace torc::mpc {
             }
             frame_idx++;
         }
-
-
-        // std::vector<std::string> frames;
-        // for (int i = 0; i < contact_frames_.size(); i++) {
-        //     if (hip_offsets_[i] != "none") {
-        //         frames.push_back(contact_frames_[i]);
-        //     }
-        // }
 
         robot_model_->FirstOrderFK(q);
         frame_idx = 0;
@@ -1177,6 +1117,7 @@ namespace torc::mpc {
 
         vectorx_t y;
 
+        // TODO: Consider adding a different constraint that only does the terms we need rather than all of it for all the nodes
         // compute all derivative terms
         InverseDynamicsLinearizationAD(node, ws_->id_config_mat,
             ws_->id_vel1_mat, ws_->id_vel2_mat, ws_->id_force_mat, ws_->id_tau_mat, y);
@@ -1724,35 +1665,6 @@ namespace torc::mpc {
         inverse_dynamics_constraint_->GetFunctionValue(x, p, y);
     }
 
-    // TODO: Consider removing
-    // void FullOrderMpc::InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1,
-    //     matrixx_t& dtau_dv2, matrixx_t& dtau_df) {
-    //     assert(node != nodes_ - 1);
-    //
-    //     // Compute acceleration via finite difference
-    //     ws_->acc = (traj_.GetVelocity(node + 1) - traj_.GetVelocity(node))/dt_[node];
-    //     // std::cout << "mpc a: " << a.transpose() << std::endl;
-    //     // std::cout << "mpc dt: " << dt_[node] << std::endl;
-    //
-    //     // TODO: Use the ws_->f_ext
-    //     // Get external forces
-    //     std::vector<models::ExternalForce<double>> f_ext;
-    //     for (const auto& frame : contact_frames_) {
-    //         f_ext.emplace_back(frame, traj_.GetForce(node, frame));
-    //     }
-    //
-    //     robot_model_->InverseDynamicsDerivative(traj_.GetConfiguration(node), traj_.GetVelocity(node),
-    //         ws_->acc, f_ext, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
-    //
-    //     // Note that only the upper triangular part of dtau_da is filled, so we need to extract it
-    //     dtau_dv2.triangularView<Eigen::StrictlyLower>() =
-    //                    dtau_dv2.transpose().triangularView<Eigen::StrictlyLower>();
-    //
-    //     // Compute the velocity derivatives
-    //     dtau_dv1 = dtau_dv1 - dtau_dv2/dt_[node];
-    //     dtau_dv2 = dtau_dv2/dt_[node];
-    // }
-
     // ------------------------------------------------- //
     // ----------------- Cost Creation ----------------- //
     // ------------------------------------------------- //
@@ -2021,54 +1933,53 @@ namespace torc::mpc {
         return cost;
     }
 
-    CostTargets FullOrderMpc::GetCostSnapShot() {
-        CostTargets targets;
-
-        for (const auto& data : cost_data_) {
-            if (data.type == CostTypes::Configuration) {
-                targets.q_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
-            } else if (data.type == CostTypes::VelocityTracking) {
-                targets.v_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
-            } else if (data.type == CostTypes::TorqueReg) {
-                targets.tau_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
-            } else if (data.type == CostTypes::ForceReg) {
-                targets.force_targets.insert(std::pair<std::string, std::map<std::string, std::vector<vector3_t>>>(
-                        data.constraint_name, std::map<std::string, std::vector<vector3_t>>()));
-                for (const auto& frame : contact_frames_) {
-                    targets.force_targets.at(data.constraint_name).insert(std::pair<std::string, std::vector<vector3_t>>(frame, std::vector<vector3_t>()));
-                }
-            } else if (data.type == CostTypes::ForwardKinematics) {
-                targets.fk_targets.insert(std::pair<std::string, std::vector<vector3_t>>(data.constraint_name, std::vector<vector3_t>()));
-            } else {
-                throw std::runtime_error("Invalid cost type!");
-            }
-        }
-
-        for (int node = 0; node < nodes_; node++) {
-            for (const auto& data : cost_data_) {
-                if (data.type == CostTypes::Configuration) {
-                    targets.q_targets[data.constraint_name].push_back(GetConfigTarget(node));
-                } else if (data.type == CostTypes::VelocityTracking) {
-                    targets.v_targets[data.constraint_name].push_back(GetVelTarget(node));
-                } else if (data.type == CostTypes::TorqueReg) {
-                    targets.tau_targets[data.constraint_name].push_back(GetTorqueTarget(node));
-                } else if (data.type == CostTypes::ForceReg) {
-                    for (const auto& frame : contact_frames_) {
-                        targets.force_targets[data.constraint_name][frame].push_back(GetForceTarget(node, frame));
-                    }
-                } else if (data.type == CostTypes::ForwardKinematics) {
-                    targets.fk_targets[data.constraint_name].push_back(GetDesiredFramePos(node, data.frame_name));
-                }
-            }
-        }
-
-        targets.cost_data = cost_data_;
-
-        return targets;
-    }
+    // CostTargets FullOrderMpc::GetCostSnapShot() {
+    //     CostTargets targets;
+    //
+    //     for (const auto& data : cost_data_) {
+    //         if (data.type == CostTypes::Configuration) {
+    //             targets.q_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
+    //         } else if (data.type == CostTypes::VelocityTracking) {
+    //             targets.v_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
+    //         } else if (data.type == CostTypes::TorqueReg) {
+    //             targets.tau_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
+    //         } else if (data.type == CostTypes::ForceReg) {
+    //             targets.force_targets.insert(std::pair<std::string, std::map<std::string, std::vector<vector3_t>>>(
+    //                     data.constraint_name, std::map<std::string, std::vector<vector3_t>>()));
+    //             for (const auto& frame : contact_frames_) {
+    //                 targets.force_targets.at(data.constraint_name).insert(std::pair<std::string, std::vector<vector3_t>>(frame, std::vector<vector3_t>()));
+    //             }
+    //         } else if (data.type == CostTypes::ForwardKinematics) {
+    //             targets.fk_targets.insert(std::pair<std::string, std::vector<vector3_t>>(data.constraint_name, std::vector<vector3_t>()));
+    //         } else {
+    //             throw std::runtime_error("Invalid cost type!");
+    //         }
+    //     }
+    //
+    //     for (int node = 0; node < nodes_; node++) {
+    //         for (const auto& data : cost_data_) {
+    //             if (data.type == CostTypes::Configuration) {
+    //                 targets.q_targets[data.constraint_name].push_back(GetConfigTarget(node));
+    //             } else if (data.type == CostTypes::VelocityTracking) {
+    //                 targets.v_targets[data.constraint_name].push_back(GetVelTarget(node));
+    //             } else if (data.type == CostTypes::TorqueReg) {
+    //                 targets.tau_targets[data.constraint_name].push_back(GetTorqueTarget(node));
+    //             } else if (data.type == CostTypes::ForceReg) {
+    //                 for (const auto& frame : contact_frames_) {
+    //                     targets.force_targets[data.constraint_name][frame].push_back(GetForceTarget(node, frame));
+    //                 }
+    //             } else if (data.type == CostTypes::ForwardKinematics) {
+    //                 targets.fk_targets[data.constraint_name].push_back(GetDesiredFramePos(node, data.frame_name));
+    //             }
+    //         }
+    //     }
+    //
+    //     targets.cost_data = cost_data_;
+    //
+    //     return targets;
+    // }
 
     vectorx_t FullOrderMpc::GetTorqueTarget(int node) {
-        std::lock_guard<std::mutex> lock(target_mut_);
         // TODO: Put back - might want to make the target a value interpolated further into the traj
         // TODO: Might want to make this one have different weights
         // if (node == 0) {
@@ -2079,7 +1990,6 @@ namespace torc::mpc {
     }
 
     vector3_t FullOrderMpc::GetForceTarget(int node, const std::string& frame) {
-        std::lock_guard<std::mutex> lock(target_mut_);
         int num_contacts = GetNumContacts(node);
         vector3_t force_target;
         if (num_contacts != 0) {
@@ -2093,7 +2003,6 @@ namespace torc::mpc {
 
     // TODO: Consider removing or at least moving this function
     vector3_t FullOrderMpc::GetDesiredFramePos(int node, std::string frame) {
-        std::lock_guard<std::mutex> lock(target_mut_);
         vector3_t frame_pos;
 
         // TODO: Implement raibert heuristic
@@ -2102,9 +2011,7 @@ namespace torc::mpc {
         return frame_pos;
     }
 
-    // TODO: Deal with thread safety of these targets better
     vectorx_t FullOrderMpc::GetConfigTarget(int node) {
-        std::lock_guard<std::mutex> lock(target_mut_);
         if (q_target_.has_value()) {
             return q_target_.value()[node];
         } else {
@@ -2113,7 +2020,6 @@ namespace torc::mpc {
     }
 
     vectorx_t FullOrderMpc::GetVelTarget(int node) {
-        std::lock_guard<std::mutex> lock(target_mut_);
         if (v_target_.has_value()) {
             return v_target_.value()[node];
         } else {
@@ -2479,7 +2385,6 @@ namespace torc::mpc {
         int row_start = GetConstraintRow(node, SwingHeight);
         const int col_start = GetDecisionIdx(node, Configuration);
 
-        ws_->swing_vec.setConstant(robot_model_->GetVelDim(), 1);
 
         for (const auto& frame : contact_frames_) {
             const auto sparsity = swing_height_constraint_[frame]->GetJacobianSparsityPatternSet();
@@ -2493,9 +2398,6 @@ namespace torc::mpc {
 
     void FullOrderMpc::AddHolonomicPattern(int node) {
         int row_start = GetConstraintRow(node, Holonomic);
-
-        // TODO: Remove
-        ws_->holo_mat.setConstant(2, robot_model_->GetVelDim(), 1);
 
         for (const auto& frame : contact_frames_) {
             const auto full_sparsity = holonomic_constraint_[frame]->GetJacobianSparsityPatternSet();
@@ -2870,7 +2772,6 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::SetConstantConfigTarget(const vectorx_t& q_target) {
-        std::lock_guard<std::mutex> lock(target_mut_);
 
         if (q_target.size() != config_dim_) {
             throw std::runtime_error("Configuration target does not have the correct size! Expected "
@@ -2882,8 +2783,6 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::SetConstantVelTarget(const vectorx_t& v_target) {
-        std::lock_guard<std::mutex> lock(target_mut_);
-
         if (v_target.size() != vel_dim_) {
             throw std::runtime_error("Velocity target does not have the correct size!");
         }
@@ -2894,8 +2793,6 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::SetConfigTarget(SimpleTrajectory q_target) {
-        std::lock_guard<std::mutex> lock(target_mut_);
-
         if (q_target.GetNumNodes() != nodes_) {
             throw std::invalid_argument("Configuration target has the wrong number of nodes!");
         }
@@ -2912,8 +2809,6 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::SetVelTarget(SimpleTrajectory v_target) {
-        std::lock_guard<std::mutex> lock(target_mut_);
-
         if (v_target.GetNumNodes() != nodes_) {
             throw std::invalid_argument("Velocity target has the wrong number of nodes!");
         }
@@ -2948,7 +2843,6 @@ namespace torc::mpc {
             throw std::runtime_error("Frame or node not found!");
         }
     }
-
 
     void FullOrderMpc::PrintStatistics() const {
         using std::setw;

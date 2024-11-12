@@ -192,19 +192,13 @@ namespace torc::mpc {
             GroundForce
         };
 
-        // TODO: Clean up
         struct Workspace {
-            matrixx_t int_mat;
             matrixx_t id_config_mat;
             matrixx_t id_vel1_mat;
             matrixx_t id_vel2_mat;
             matrixx_t id_tau_mat;
             matrixx_t id_force_mat;
-            // matrixx_t fric_cone_mat;
-            vectorx_t swing_vec;
-            matrix6x_t frame_jacobian;
-            matrixx_t holo_mat;
-            vectorx_t acc;
+
             matrixx_t obj_config_mat;
             matrixx_t obj_vel_mat;
             matrixx_t obj_tau_mat;
@@ -374,7 +368,7 @@ namespace torc::mpc {
 
         void UpdateSettings();
 
-        void ParseJointDefualts();
+        void ParseJointDefaults();
 
         static constexpr int CONTACT_3DOF = 3;
         static constexpr int FLOATING_VEL = 6;
@@ -423,9 +417,6 @@ namespace torc::mpc {
         bool scale_cost_;
 
         std::vector<vectorx_t> cost_weights_;
-
-        // Cost Mutexes
-        std::mutex target_mut_;
 
         // Line search
         double alpha_;
