@@ -3,13 +3,11 @@ This repository is for a currently in-development set of tools for optimization 
 A full description of the capabilities and documentation of the library will be available soon.
 
 The code is written in C++ with real-time applications in mind. Ultimately, the code will be able to help users 
-setup reduced and full order models for robots, and create, manage, and approximate constraints and costs. 
+setup full order models for robots, and create, manage, and approximate constraints and costs. 
 
 ## Dependencies and Supported Systems
-Dependencies (required):
+Dependencies:
 - Eigen 3
-
-Dependencies (optional):
 - Pinocchio 3.0
 - OSQP & OSQP++
 
