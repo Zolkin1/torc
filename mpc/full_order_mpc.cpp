@@ -22,8 +22,6 @@
 //  then I reduce the time delay between recieving the estimate and the outputting a control. (Total computation time
 //  is the same).
 
-// TODO: Clean up IC conditions
-
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
         : config_file_(config_file), verbose_(true), name_(name), cost_(name), compile_derivatves_(true), scale_cost_(false),
@@ -1385,7 +1383,6 @@ namespace torc::mpc {
         // Uses l2 norm!
 
         double violation = 0;
-        // violation += GetICViolation(qp_res);
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             // std::cout << "Node: " << node << std::endl;
@@ -1933,52 +1930,6 @@ namespace torc::mpc {
         return cost;
     }
 
-    // CostTargets FullOrderMpc::GetCostSnapShot() {
-    //     CostTargets targets;
-    //
-    //     for (const auto& data : cost_data_) {
-    //         if (data.type == CostTypes::Configuration) {
-    //             targets.q_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
-    //         } else if (data.type == CostTypes::VelocityTracking) {
-    //             targets.v_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
-    //         } else if (data.type == CostTypes::TorqueReg) {
-    //             targets.tau_targets.insert(std::pair<std::string, std::vector<vectorx_t>>(data.constraint_name, std::vector<vectorx_t>()));
-    //         } else if (data.type == CostTypes::ForceReg) {
-    //             targets.force_targets.insert(std::pair<std::string, std::map<std::string, std::vector<vector3_t>>>(
-    //                     data.constraint_name, std::map<std::string, std::vector<vector3_t>>()));
-    //             for (const auto& frame : contact_frames_) {
-    //                 targets.force_targets.at(data.constraint_name).insert(std::pair<std::string, std::vector<vector3_t>>(frame, std::vector<vector3_t>()));
-    //             }
-    //         } else if (data.type == CostTypes::ForwardKinematics) {
-    //             targets.fk_targets.insert(std::pair<std::string, std::vector<vector3_t>>(data.constraint_name, std::vector<vector3_t>()));
-    //         } else {
-    //             throw std::runtime_error("Invalid cost type!");
-    //         }
-    //     }
-    //
-    //     for (int node = 0; node < nodes_; node++) {
-    //         for (const auto& data : cost_data_) {
-    //             if (data.type == CostTypes::Configuration) {
-    //                 targets.q_targets[data.constraint_name].push_back(GetConfigTarget(node));
-    //             } else if (data.type == CostTypes::VelocityTracking) {
-    //                 targets.v_targets[data.constraint_name].push_back(GetVelTarget(node));
-    //             } else if (data.type == CostTypes::TorqueReg) {
-    //                 targets.tau_targets[data.constraint_name].push_back(GetTorqueTarget(node));
-    //             } else if (data.type == CostTypes::ForceReg) {
-    //                 for (const auto& frame : contact_frames_) {
-    //                     targets.force_targets[data.constraint_name][frame].push_back(GetForceTarget(node, frame));
-    //                 }
-    //             } else if (data.type == CostTypes::ForwardKinematics) {
-    //                 targets.fk_targets[data.constraint_name].push_back(GetDesiredFramePos(node, data.frame_name));
-    //             }
-    //         }
-    //     }
-    //
-    //     targets.cost_data = cost_data_;
-    //
-    //     return targets;
-    // }
-
     vectorx_t FullOrderMpc::GetTorqueTarget(int node) {
         // TODO: Put back - might want to make the target a value interpolated further into the traj
         // TODO: Might want to make this one have different weights
@@ -2208,20 +2159,6 @@ namespace torc::mpc {
 
         // std::cout << "A: \n" << osqp_instance_.constraint_matrix << std::endl;
     }
-
-    // TODO: Remove
-    // void FullOrderMpc::AddICPattern() {
-    //     int row_start = 0;
-    //     int col_start = 0;
-    //     matrixx_t id;
-    //     id.setIdentity(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-    //     MatrixToNewTriplet(id, row_start, col_start, constraint_triplets_);
-    //
-    //     row_start += robot_model_->GetVelDim();
-    //     col_start += robot_model_->GetVelDim();
-    //
-    //     MatrixToNewTriplet(id, row_start, col_start, constraint_triplets_);
-    // }
 
     void FullOrderMpc::AddIntegrationPattern(int node) {
         assert(node != nodes_ - 1);
