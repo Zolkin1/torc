@@ -1,0 +1,99 @@
+general_settings:
+  nodes: 32
+  verbose: True
+  node_dt_type: SmallFirst # Even, SmallFirst, Adaptive
+  node_dt: 0.025
+  first_node_dt: 0.01
+  compile_derivatives: False #True
+  base_frame: "torso"
+  scale_cost: False
+  max_initial_solves: 20
+  initial_constraint_tol: 5e-3
+  nodes_full_dynamics: 2   # Also determines how many nodes have torque constraints
+  delay_prediction_dt: 0 #5e-3 # TODO: Tune or disable
+  terminal_cost_weight: 5
+solver_settings:
+  rel_tol: 1e-6
+  abs_tol: 1e-6
+  verbose: True
+  polish: True
+  rho: 0.05 #9e-3 #2e-4 # Having this small (like 1e-4) seems to help remove oscillations
+  alpha: 1.6 # 1.6, 1.1
+  sigma: 1e-6 # 1e-10
+  adaptive_rho: False
+  max_iter: 20
+  scaling: 10
+constraints:
+  friction_coef: 0.5  # TODO: Tune this
+  max_grf: 400
+  collisions:
+    - frame1: "foot_front_left"
+      frame2: "foot_front_right"
+      radius1: 0.01
+      radius2: 0.01
+    - frame1: "foot_rear_left"
+      frame2: "foot_rear_right"
+      radius1: 0.01
+      radius2: 0.01
+    - frame1: "foot_front_left"
+      frame2: "foot_rear_right"
+      radius1: 0.01
+      radius2: 0.01
+    - frame1: "foot_rear_left"
+      frame2: "foot_front_right"
+      radius1: 0.01
+      radius2: 0.01
+    # TODO: Add hand and knee collisions
+costs:
+  - type: ConfigurationTracking
+    name: "ConfigTracking"
+    weight: [ 0.0, 0.0, 1,  # Having x and y weights appears to be bad
+             .01, .01, .01,
+             0.01, 1, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001,
+             0.01, 1, 0.001, 0.001, 0.1, 0.001, 0.001, 0.001, 0.001 ]
+  - type: VelocityTracking
+    name: "VelocityTracking"
+    weight: [5, 2, 5,
+             0.5, 0.5, 0.5,
+             1, 1, 0.05, .002, .05, 4, 4, 4, 1,
+             1, 1, 0.05, .002, .05, 4, 4, 4, 1]
+  - type: TorqueRegularization
+    name: "TorqueReg"
+    weight: [.000, .000, .000, .000, .001, .5, .5, .5, .1,
+             .000, .000, .000, .000, .001, .5, .5, .5, .1]
+  - type: ForceRegularization
+    name: "ForceReg"
+    weight: [0.0001, 0.0001, 0.01]
+  # FK
+#  - type: ForwardKinematics
+#    name: "LeftToe"
+#    weight: [0.0001, 0.0001, 0.0]
+#    frame: "foot_front_left"
+#  - type: ForwardKinematics
+#    name: "LeftHeel"
+#    weight: [0.0001, 0.0001, 0.0 ]
+#    frame: "foot_rear_left"
+#  - type: ForwardKinematics
+#    name: "RightToe"
+#    weight: [0.0001, 0.0001, 0.0 ]
+#    frame: "foot_front_right"
+#  - type: ForwardKinematics
+#    name: "RightHeel"
+#    weight: [0.0001, 0.0001, 0.0 ]
+#    frame: "foot_rear_right"
+contacts:
+  # For now, removing hands
+  # contact_frames: ["right_foot", "left_foot"] #, "right_hand", "left_hand"]
+  contact_frames: ["foot_front_right", "foot_rear_right", "foot_front_left", "foot_rear_left"]
+  hip_joints: ["none", "right_hip_yaw_joint", "none", "left_hip_yaw_joint"]
+# Weights notes:
+# - More weight on keeping the arm velocity and torques down since for now they are unconstrained
+# - Slightly more weight on hip yaw torque to keep the feet straight
+
+line_search:
+  alpha_min: 1e-3
+  large_constraint_vio: 1e-2
+  small_constraint_vio: 1e-6
+  constraint_reduction_mult: 1e-6
+  alpha_step: 0.5 # Since the line search is high variance, lowering this helps
+  armijo_constant: 1e-4

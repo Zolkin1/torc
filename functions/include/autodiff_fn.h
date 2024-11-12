@@ -7,7 +7,7 @@
 #include <iostream>
 #include <filesystem>
 #include <ctime>
-#include <cppad/cg.hpp>
+#include "pinocchio/codegen/cppadcg.hpp" // Note that using the pinocchio header is critical!
 
 #include "explicit_fn.h"
 
@@ -36,7 +36,7 @@ namespace torc::fn {
          * @param timestamp_files whether or not to timestamp the dynamic libraries
          * @param identifier string identifier for the cg_fn
          */
-        explicit AutodiffFn(const std::function<adcg_t(Eigen::VectorX<adcg_t>)>& cg_fn,
+        explicit AutodiffFn(const std::function<adcg_t(const Eigen::VectorX<adcg_t>&)>& cg_fn,
                             const size_t dim=1,
                             const bool& force_generate=false,
                             const bool& timestamp_files=false,
@@ -52,6 +52,7 @@ namespace torc::fn {
                 create_lib = (loaded_dim != dim);
             }
             if (create_lib) {
+                std::cout << "Compiling derivative..." << std::endl;
                 this->dim_ = dim;
                 // record operations in the ADFun object
                 std::vector<adcg_t> x(dim);
@@ -144,7 +145,7 @@ namespace torc::fn {
             // original function
             const std::function<scalar_t(vectorx_t)> func = [cg_fn, dim](const vectorx_t& x) {
                 Eigen::VectorX<adcg_t> x_eigen(dim);
-                for (int i = 0; i < dim; ++i) {
+                for (size_t i = 0; i < dim; ++i) {
                     x_eigen[i] = adcg_t(x[i]);
                 }
                 return AD::Value(cg_fn(x_eigen)).getValue();    // first get the cg_t, then extract the scalar_t
@@ -171,9 +172,9 @@ namespace torc::fn {
                 const size_t dim  = this->dim_;
                 std::vector<scalar_t> hess = this->cg_model_->Hessian(x_std, 0);
                 matrixx_t grad_eigen(dim, dim);
+                grad_eigen.setZero();
                 for (size_t n_row=0; n_row < dim; n_row++) {
-                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t>, Eigen::Unaligned>(hess.data() + n_row * dim, (n_row + 1) * dim);
-                    grad_row_eigen.conservativeResize(dim);  // so row assignment doesn't complain
+                    Eigen::RowVectorX<scalar_t> grad_row_eigen = Eigen::Map<Eigen::RowVectorX<scalar_t>, Eigen::Unaligned>(hess.data() + n_row * dim, dim);
                     grad_eigen.row(n_row) << grad_row_eigen;
                 }
                 return grad_eigen;

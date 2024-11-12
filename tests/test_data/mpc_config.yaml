@@ -1,0 +1,75 @@
+general_settings:
+  nodes: 32
+  verbose: True
+  node_dt: 0.025
+  compile_derivatives: False
+  base_frame: "trunk"
+  scale_cost: False
+  max_initial_solves: 20
+  initial_constraint_tol: 5e-3
+  nodes_full_dynamics: 2   # Also determines how many nodes have torque constraints
+  integrate_velocity_targets: False
+  delay_prediction_dt: 0 #5e-3 # TODO: Tune or disable
+  terminal_cost_weight: 5
+solver_settings:
+  rel_tol: 1e-6
+  abs_tol: 1e-6
+  verbose: True
+  polish: False
+  rho: 0.02
+#  alpha:
+  adaptive_rho: True
+  max_iter: 50
+constraints:
+  friction_coef: 0.5  # TODO: Tune this
+  friction_margin: 2
+  max_grf: 800
+  collisions:
+    - frame1: "FR_foot"
+      frame2: "FL_foot"
+      radius1: 0.06
+      radius2: 0.06
+    - frame1: "RR_foot"
+      frame2: "RL_foot"
+      radius1: 0.06
+      radius2: 0.06
+    - frame1: "FR_foot"
+      frame2: "RR_foot"
+      radius1: 0.06
+      radius2: 0.06
+    - frame1: "FL_foot"
+      frame2: "RL_foot"
+      radius1: 0.06
+      radius2: 0.06
+costs:
+  - type: ConfigurationTracking
+    name: "ConfigTracking"
+    weight: [ 2.0, 2.0, 20, #2, 2, 150, or 2,2,30
+              15.5, 15.5, 15.5, # 5.5, 5.5, 5.5
+              10, 10, 10,
+              10, 10, 10,
+              10, 10, 10,
+              10, 10, 10 ]
+  - type: VelocityTracking
+    name: "VelocityTracking"
+    weight: [ 10, 10, 1,
+              .5, .5, .5,
+              0.01, 0.01, 0.0001,
+              0.01, 0.01, 0.0001,
+              0.01, 0.01, 0.0001,
+              0.01, 0.01, 0.0001 ]
+  - type: TorqueRegularization
+    name: "TorqueReg"
+    weight: [ .001, .001, .0001,
+              .001, .001, .0001,
+              .001, .001, .0001,
+              .001, .001, .0001 ]
+  - type: ForceRegularization
+    name: "ForceReg"
+    weight: [ 0.0001, 0.0001, 0.001 ]
+contacts:
+  num_contact_locations: 4
+  contact_frames: ["FR_foot", "FL_foot", "RR_foot", "RL_foot"]
+#  hip_offsets: [0.1805, -0.128, 0.1805, 0.128, -0.1805, -0.128, -0.1805, 0.128]
+
+line_search:

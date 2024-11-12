@@ -14,6 +14,19 @@
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
     using matrixx_t = Eigen::MatrixXd;
+    using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
+    using matrix3x_t = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+
+    template <typename ScalarT>
+    struct ExternalForce {
+        std::string frame_name;
+        Eigen::Vector3<ScalarT> force_linear;
+
+        ExternalForce(const std::string& frame, const Eigen::Vector3<ScalarT>& force) {
+            frame_name = frame;
+            force_linear = force;
+        }
+    };
 
     class FullOrderRigidBody : public PinocchioModel {
     public:
@@ -22,6 +35,9 @@ namespace torc::models {
 
         FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
                            const std::vector<std::string>& underactuated_joints, bool urdf_model=true);
+
+        FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+            const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values);
 
         FullOrderRigidBody(const FullOrderRigidBody& other);
 
@@ -33,13 +49,23 @@ namespace torc::models {
 
         [[nodiscard]] quat_t GetBaseOrientation(const vectorx_t& q) const override;
 
+        [[nodiscard]] vectorx_t IntegrateVelocity(const vectorx_t& q0, const vectorx_t& v) const;
+
         // @note These are not actually const functions as we modify the pin_data struct
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input) override;
 
+        [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& q, const vectorx_t& v,
+                                            const vectorx_t& input,
+                                            const std::vector<ExternalForce<double>>& f_ext);
+
         [[nodiscard]] vectorx_t GetDynamics(const vectorx_t& state,
                                             const vectorx_t& input,
                                             const RobotContactInfo& contact_info) const;
+
+        [[nodiscard]] vectorx_t InverseDynamics(const vectorx_t& q, const vectorx_t& v, const vectorx_t& a,
+                                                const std::vector<ExternalForce<double>>& f_ext);
+//                                                const pinocchio::container::aligned_vector<pinocchio::Force>& forces);
 
         vectorx_t GetImpulseDynamics(const vectorx_t& state,
                                      const vectorx_t& input,
@@ -59,6 +85,15 @@ namespace torc::models {
                                 matrixx_t& A,
                                 matrixx_t& B);
 
+        void InverseDynamicsDerivative(const vectorx_t& q,
+                                       const vectorx_t& v,
+                                       const vectorx_t& a,
+//                                       const pinocchio::container::aligned_vector<pinocchio::Force>& forces,
+                                       const std::vector<ExternalForce<double>>& f_ext,
+                                       matrixx_t& dtau_dq,
+                                       matrixx_t& dtau_dv,
+                                       matrixx_t& dtau_da,
+                                       matrixx_t& dtau_df);
 
         void ImpulseDerivative(const vectorx_t& state,
                                const vectorx_t& input,
@@ -84,6 +119,15 @@ namespace torc::models {
 
         void ParseInput(const vectorx_t& input, vectorx_t& tau) const;
 
+        vector3_t QuaternionIntegrationRelative(const quat_t& qbar_kp1, const quat_t& qbar_k, const vector3_t& xi,
+            const vector3_t& w, double dt);
+
+        void FrameVelDerivWrtConfiguration(const vectorx_t& q,
+            const vectorx_t& v, const vectorx_t& a, const std::string& frame, matrix6x_t& jacobian,
+            const pinocchio::ReferenceFrame& ref = pinocchio::LOCAL_WORLD_ALIGNED);
+
+        void PerturbConfiguration(vectorx_t& q, double delta, int idx);
+
         /**
          * Takes the torques on the actuated coordinates and maps to a vector of
          * dimension model.nv with zeros on underacutated joints
@@ -91,6 +135,25 @@ namespace torc::models {
          * @return full input vector
          */
         [[nodiscard]] vectorx_t InputsToTau(const vectorx_t& input) const override;
+
+//        [[nodiscard]] vectorx_t TauToInputs(const vectorx_t& tau) const;
+
+        [[nodiscard]] pinocchio::container::aligned_vector<pinocchio::Force> ConvertExternalForcesToPin(const vectorx_t& q,
+                                                                                                        const std::vector<ExternalForce<double>>& f_ext) const;
+
+        matrixx_t ExternalForcesDerivativeWrtConfiguration(const vectorx_t& q, const std::vector<ExternalForce<double>>& f_ext);
+
+        /**
+        * Compute a configuration that respects the task space constraints.
+        * @param positions 3d positions for certain frames
+        * @param frames corresponding frame names
+        */
+        vectorx_t InverseKinematics(const vectorx_t& base_config, const std::vector<vector3_t>& positions, const std::vector<std::string>& frames,
+            const vectorx_t& q_guess);
+
+        // DEBUG ------
+        pinocchio::Model GetModel() const;
+        // ------------
 
         constexpr static size_t STATE_Q_IDX = 0;
         constexpr static size_t STATE_V_IDX = 1;

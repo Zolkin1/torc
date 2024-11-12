@@ -10,6 +10,8 @@
 
 #include <utility>
 
+#include "full_order_rigid_body.h"
+
 namespace torc::models {
     const std::string PinocchioModel::ROOT_JOINT = "root_joint";
 
@@ -32,31 +34,74 @@ namespace torc::models {
         n_input_ = other.n_input_;
     }
 
-    void PinocchioModel::CreatePinModel(bool urdf_model) {
+    PinocchioModel::PinocchioModel(const std::string& name, const std::filesystem::path& model_path,
+        const SystemType& system_type, const std::vector<std::string>& joint_skip_names,
+        const std::vector<double>& joint_skip_values)
+            : BaseModel(name, system_type), model_path_(model_path) {
+        // Create the pin model with some fixed joints
+        CreatePinModel(true, joint_skip_names, joint_skip_values);
+    }
+
+
+    void PinocchioModel::CreatePinModel(bool urdf_model, const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_values) {
         // Verify that the given file exists
         if (!std::filesystem::exists(model_path_)) {
             throw std::runtime_error("Provided model file does not exist.");
         }
+        if (joint_skip_names.empty()) {
+            // Create the pinocchio model from the file
+            pin_model_ = pinocchio::Model();
 
-        // Create the pinocchio model from the file
-        pin_model_ = pinocchio::Model();
+            if (urdf_model) {
+                // Verify that we are given a .urdf
+                if (model_path_.extension() != ".urdf") {
+                    throw std::runtime_error("Provided urdf does not end in a .urdf");
+                }
+                // Normal model
+                pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
 
-        if (urdf_model) {
-            // Verify that we are given a .urdf
-            if (model_path_.extension() != ".urdf") {
-                throw std::runtime_error("Provided urdf does not end in a .urdf");
+                // AD Model
+                pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
+            } else {
+                // Verify that we are given a .xml
+                if (model_path_.extension() != ".xml") {
+                    throw std::runtime_error("Provided urdf does not end in a .xml");
+                }
+                throw std::runtime_error("MJCF files not fully supported yet.");
+                pinocchio::mjcf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
             }
-            pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
         } else {
-            // Verify that we are given a .xml
-            if (model_path_.extension() != ".xml") {
-                throw std::runtime_error("Provided urdf does not end in a .xml");
+            std::cout << "[Pinocchio Model] Building a model with fixed joints." << std::endl;
+            pinocchio::Model temp_model;
+            pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), temp_model);
+
+            vectorx_t q = pinocchio::neutral(temp_model);
+
+            std::vector<pinocchio::JointIndex> joint_ids;
+            for (int i = 0; i < joint_skip_names.size(); i++) {
+                if (!temp_model.existJointName(joint_skip_names[i])) {
+                    throw std::runtime_error(joint_skip_names[i] + " was not found in the URDF!");
+                } else {
+                    const long id = temp_model.getJointId(joint_skip_names[i]);
+                    joint_ids.push_back(id);
+
+                    // TODO: Is the id really the index here?
+                    q[id] = joint_values[i];
+                }
             }
-            throw std::runtime_error("MJCF files not fully supported yet.");
-            pinocchio::mjcf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+
+            // Normal model
+            pin_model_ = pinocchio::buildReducedModel(temp_model, joint_ids, q);
+
+            // AD Model
+            pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
         }
 
+        // Normal data
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
+
+        // AD data
+        pin_ad_data_ = std::make_shared<ad_pin_data_t>(pin_ad_model_);
     }
 
     long PinocchioModel::GetNumInputs() const {
@@ -87,18 +132,22 @@ namespace torc::models {
         return pin_model_.frames.at(j).name;
     }
 
+    std::string PinocchioModel::GetJointName(int j) const {
+        return pin_model_.names.at(j);
+    }
+
     vectorx_t PinocchioModel::GetNeutralConfig() const {
-        return pinocchio::neutral(pin_model_);
+        return pinocchio::neutral(pin_model_).cwiseMax(GetLowerConfigLimits()).cwiseMin(GetUpperConfigLimits());
     }
 
     vectorx_t PinocchioModel::GetRandomConfig() const {
-        // Make dummy limits
-        const vectorx_t ub = vectorx_t::Constant(GetConfigDim(), 10);
-        const vectorx_t lb = vectorx_t::Constant(GetConfigDim(), -10);
-
         vectorx_t q(GetConfigDim());
-        pinocchio::randomConfiguration(pin_model_, lb, ub, q);
+        vectorx_t lb = GetLowerConfigLimits();
+        vectorx_t ub = GetUpperConfigLimits();
+        lb.head<FLOATING_CONFIG>() = vectorx_t::Constant(FLOATING_CONFIG, -10);
+        ub.head<FLOATING_CONFIG>() = vectorx_t::Constant(FLOATING_CONFIG, 10);
 
+        pinocchio::randomConfiguration(pin_model_, lb, ub, q);
         return q;
     }
 
@@ -131,6 +180,36 @@ namespace torc::models {
             return idx;
         }
     }
+
+    long PinocchioModel::GetParentJointIdx(const std::string& frame) const {
+        unsigned long idx = this->pin_model_.frames.at(GetFrameIdx(frame)).parentJoint;
+        if (idx == pin_model_.joints.size()) {
+            return -1;
+        } else {
+            return idx;
+        }
+    }
+
+    std::optional<unsigned long> PinocchioModel::GetJointID(const std::string& joint_name) {
+        unsigned long idx = this->pin_model_.getJointId(joint_name);
+        if (idx == pin_model_.joints.size()) {
+            return {};
+        } else {
+            return idx;
+        }
+    }
+
+    vector3_t PinocchioModel::GetRelativeJointOffset(const std::string& joint_name) {
+        const auto idx = GetJointID(joint_name);
+
+        if (!idx.has_value()) {
+            throw std::runtime_error("Invalid joint name!");
+        }
+
+        // TODO: Verify that this is general
+        return pin_model_.jointPlacements[idx.value()].translation(); //pin_data_->oMi[idx.value()].translation() - pin_data_->oMi[2].translation();
+    }
+
 
     void PinocchioModel::MakePinocchioContacts(const RobotContactInfo& contact_info,
                                                std::vector<pinocchio::RigidConstraintModel>& contact_models,
@@ -202,31 +281,69 @@ namespace torc::models {
          pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
     }
 
-    FrameState PinocchioModel::GetFrameState(const std::string& frame) const {
+    FrameState PinocchioModel::GetFrameState(const std::string& frame, const pinocchio::ReferenceFrame& ref) const {
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
         const long idx = GetFrameIdx(frame);
         if (idx != -1) {
             FrameState state(pin_data_->oMf.at(idx),
-                             pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx));
+                             pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx, ref));
             return state;
-        } else {
-            throw std::runtime_error("Provided frame does not exist.");
         }
+        throw std::runtime_error("Provided frame does not exist.");
     }
 
-     FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v) {
+     FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v, const pinocchio::ReferenceFrame& ref) {
          SecondOrderFK(q, v);
-         return GetFrameState(frame);
+         return GetFrameState(frame, ref);
      }
 
-    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrixx_t& J) const {
+    void PinocchioModel::GetFrameJacobian(const std::string& frame, const vectorx_t& q, matrix6x_t& J,
+        const pinocchio::ReferenceFrame& ref) const {
         const long idx = GetFrameIdx(frame);
         if (idx == -1) {
             throw std::runtime_error("Provided frame does not exist.");
         }
 
+        J.resize(6, GetVelDim());
         J.setZero();
 
-        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, J);
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, idx, ref, J);
     }
+
+    std::string PinocchioModel::GetUrdfRobotName() const {
+        return pin_model_.name;
+    }
+
+    vectorx_t PinocchioModel::GetUpperConfigLimits() const {
+        vectorx_t q_ub = pin_model_.upperPositionLimit;
+        q_ub.head<FLOATING_CONFIG>() = q_ub.head<FLOATING_CONFIG>().cwiseMin(100);
+        return q_ub;
+    }
+
+    vectorx_t PinocchioModel::GetLowerConfigLimits() const {
+        vectorx_t q_lb = pin_model_.lowerPositionLimit;
+        q_lb.head<FLOATING_CONFIG>() = q_lb.head<FLOATING_CONFIG>().cwiseMax(-100);
+        return q_lb;
+    }
+
+    vectorx_t PinocchioModel::GetVelocityJointLimits() const {
+        return pin_model_.velocityLimit.cwiseMin(1000); // Bound at 1000 to prevent having crazy large numbers
+    }
+
+    vectorx_t PinocchioModel::GetTorqueJointLimits() const {
+        return pin_model_.effortLimit.tail(GetNumInputs());
+    }
+
+    // ------------------------------------ //
+    // ---------- Getters for AD ---------- //
+    // ------------------------------------ //
+    const ad_pin_model_t& PinocchioModel::GetADPinModel() const {
+        return pin_ad_model_;
+    }
+
+    std::shared_ptr<ad_pin_data_t> PinocchioModel::GetADPinData() {
+        return pin_ad_data_;
+    }
+
 
 } // torc::models

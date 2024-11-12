@@ -11,47 +11,66 @@ Dependencies (required):
 
 Dependencies (optional):
 - Pinocchio 3.0
-- OSQP & OSQP Eigen
-- Clarabel.cpp
-- IPOPT
+- OSQP & OSQP++
 
 Officially Supported Systems:
 - Ubuntu 22.04
 We hope to expand the supported systems soon.
 
-## CMake Options
-A number of external dependency interfaces (optimization solvers, rigid body dynamics) are provided and can be built with the 
-library if desired. The following cmake variables can be set to build these interfaces:
-
-- `BUILD_WITH_PINOCCHIO`
-- `BUILD_WITH_IPOPT`
-- `BUILD_WITH_OSQP`
-- `BUILD_WITH_CLARABEL`
-
-We currently default all of these to `ON`. If we want to turn off IPOPT, for example, then we can pass 
-`-DBUILD_WITH_IPOPT=OFF`.
-
-### IPOPT
-`IPOPT_INC_PATH` and `IPOPT_LIB_PATH` may need to be set. They set the location to search for the header files,
-and the location to search for the library (.so) file, respectively. Their default values are:
-- `IPOPT_INC_PATH = /usr/local/include/coin-or`
-- `IPOPT_LIB_PATH = /usr/local/lib`
-
-These are the default install locations for IPOPT. If you have installed IPOPT in a different location then these
-variables must be set accordingly.
-
-### Clarabel
-`CLARABEL_INC_PATH` and `CLARABEL_LIB_PATH` may need to be set. They set the location to search for the header files,
-and the location of the library (.so) file, respectively. Their default values are:
-- `CLARABEL_INC_PATH = ~/Clarabel.cpp/include`
-- `CLARABEL_LIB_PATH = ~/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so`
-
 If you have installed Clarabel in a different location then these variables must be set accordingly.
 
-### OSQP
+## OSQP
 If OSQP is installed properly, then the library will be automatically found and linked.
 
-### Pinocchio
+## Pinocchio
 If Pinocchio is installed properly, then the library will be automatically found and linked.
 Note that we rely on Pinocchio 3.0, which as of 6/18/24 is only available as a build from source 
 (but note that it is an officially supported release, not a preview branch).
+
+## CppAD and CppAD Codegen
+When installing CppAD, make sure you use the following cmake flags: `cmake -DCMAKE_BUILD_TYPE=Release -Dcppad_cxx_flags=-std=c++17`
+
+# Running Code
+Create the build folder. Then run
+```
+cmake --build . --config <Release/Debug/RelWithDebug>  --target <target> -- -j 30
+```
+
+# Profiling:
+I personally like cachegrind more than perf.
+
+## Valgrind
+### Memcheck
+Go to `cmake-build-relwithdebinfo` and run
+```
+valgrind --tool=memcheck ./mpc_app_test
+```
+
+### Cachegrind
+Compile with optimizations and debug info.
+Go to `cmake-build-relwithdebinfo` and run
+```
+valgrind --tool=cachegrind --cache-sim=yes ./mpc_app_test
+```
+To see the output:
+```
+cg_annotate cachegrind.out.<PID>
+```
+
+### Massif
+*Currently appears to be encountering a segfault*.
+
+In `cmake-build-relwithdebinfo` run
+```
+valgrind --tool=massif ./mpc_app_test
+```
+
+then use ms_print.
+
+## Perf
+- Run with `-DCMAKE_CXX_FLAGS=-fno-omit-frame-pointer`
+- Get PID: `ps -eo pid,command | grep mpc_app_test | grep -v grep`
+- Recording: `sudo perf record -g -p PID`
+- Performance counter stats: `sudo perf stat -d -p PID`
+- Stop with Ctrl-C or when the program ends.
+- See data: `sudo perf report -i perf.data`

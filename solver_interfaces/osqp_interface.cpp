@@ -134,4 +134,8 @@ namespace torc::solvers {
         }
     }
 
+    OSQPInterfaceSettings OSQPInterface::GetSettings() const {
+        return settings_;
+    }
+
 } // torc::solvers
