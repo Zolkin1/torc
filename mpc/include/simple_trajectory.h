@@ -4,9 +4,17 @@
 
 #ifndef SIMPLE_TRAJECTORY_H
 #define SIMPLE_TRAJECTORY_H
-#include "cost_function.h"
+
+#include <Eigen/Core>
 
 namespace torc::mpc {
+	using vectorx_t = Eigen::VectorXd;
+	using vector3_t = Eigen::Vector3d;
+
+	/**
+	* @brief A simple trajectory with no semantic meaning.
+	* Held as a single vector for cache friendlyness.
+	*/
 	class SimpleTrajectory {
 	public:
 		SimpleTrajectory(int size, int nodes);
@@ -17,11 +25,11 @@ namespace torc::mpc {
 
 		Eigen::VectorBlock<vectorx_t> GetNodeData(int node);
 
-		// const Eigen::VectorBlock<vectorx_t> GetNodeData(int node) const;
+		Eigen::VectorBlock<const vectorx_t> GetNodeData(int node) const;
 
 		Eigen::VectorBlock<vectorx_t> operator[](int node);
 
-		// const Eigen::VectorBlock<vectorx_t> operator[](int node) const;
+		Eigen::VectorBlock<const vectorx_t> operator[](int node) const;
 
 		[[nodiscard]] int GetNumNodes() const;
 
