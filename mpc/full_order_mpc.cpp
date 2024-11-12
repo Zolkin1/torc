@@ -24,7 +24,7 @@
 namespace torc::mpc {
     FullOrderMpc::FullOrderMpc(const std::string& name, const fs::path& config_file, const fs::path& model_path)
         : config_file_(config_file), verbose_(true), name_(name), cost_(name), compile_derivatves_(true), scale_cost_(false),
-            total_solves_(0), enable_delay_prediction_(true) {
+            total_solves_(0), enable_delay_prediction_(true), q_target_(0, 0), v_target_(0, 0) {
 
         ParseJointDefaults();
 
@@ -100,6 +100,8 @@ namespace torc::mpc {
             compile_derivatves_
         );
 
+        q_target_.SetSizes(robot_model_->GetConfigDim(), nodes_);
+        v_target_.SetSizes(robot_model_->GetVelDim(), nodes_);
     }
 
     FullOrderMpc::~FullOrderMpc() {
@@ -719,20 +721,20 @@ namespace torc::mpc {
 
         for (int node = 0; node < nodes_; node++) {
             // Integrate the velocity forward to get the planar positions
-            q_target_.value()[node](0) = node*dt_[node]*vel(0) + q(0);
-            q_target_.value()[node](1) = node*dt_[node]*vel(1) + q(1);
-            q_target_.value()[node](2) = q(2);
+            q_target_[node](0) = node*dt_[node]*vel(0) + q(0);
+            q_target_[node](1) = node*dt_[node]*vel(1) + q(1);
+            q_target_[node](2) = q(2);
             // TODO: Determine the quaternion targets from the commanded velocity, for now ignoring
-            q_target_.value()[node].segment<3>(POS_VARS).setZero();
-            q_target_.value()[node](6) = 1;
+            q_target_[node].segment<3>(POS_VARS).setZero();
+            q_target_[node](6) = 1;
 
             // Assign velocity targets
-            v_target_.value()[node](0) = vel(0);
-            v_target_.value()[node](1) = vel(1);
-            v_target_.value()[node](2) = 0;
+            v_target_[node](0) = vel(0);
+            v_target_[node](1) = vel(1);
+            v_target_[node](2) = 0;
             // TODO: Determine the quaternion velocity from the commanded velocity, for now setting to 0
-            v_target_.value()[node].segment<3>(POS_VARS).setZero();
-            v_target_.value()[node].tail(robot_model_->GetVelDim() - FLOATING_VEL).setZero();
+            v_target_[node].segment<3>(POS_VARS).setZero();
+            v_target_[node].tail(robot_model_->GetVelDim() - FLOATING_VEL).setZero();
         }
 
         // Compute foothold positions
@@ -767,7 +769,7 @@ namespace torc::mpc {
                         hip_offset << hip_offsets_[2*frame_idx], hip_offsets_[2*frame_idx + 1];
                         // std::cout << "frame: " << frame << ", hip offset: " << hip_offset << std::endl;
 
-                        foothold = hip_offset + q_target_.value()[contact_node_middle].head<2>();
+                        foothold = hip_offset + q_target_[contact_node_middle].head<2>();
 
                         if (!first_contact) {
                             first_contact = true;
@@ -826,7 +828,7 @@ namespace torc::mpc {
         }
 
         // TODO: Do I want this?
-        q_target_.value()[0] = q;
+        q_target_[0] = q;
         for (int node = 1; node < nodes_; node++) {
             std::vector<vector3_t> end_effectors(contact_frames_.size());
             for (int i = 0; i < contact_frames_.size(); i++) {
@@ -839,15 +841,15 @@ namespace torc::mpc {
             //         end_effectors, frames, traj_.GetConfiguration(node)).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
 
 
-            q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
-                robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
-                    end_effectors, contact_frames_, q_target_.value()[node-1]).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
+            q_target_[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
+                robot_model_->InverseKinematics(q_target_[node].head<FLOATING_BASE>(),
+                    end_effectors, contact_frames_, q_target_[node-1]).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
         }
 
     }
 
     SimpleTrajectory FullOrderMpc::GetConfigTargets() {
-        return q_target_.value();
+        return q_target_;
     }
 
     std::vector<std::string> FullOrderMpc::GetJointSkipNames() const {
@@ -1962,16 +1964,16 @@ namespace torc::mpc {
     }
 
     vectorx_t FullOrderMpc::GetConfigTarget(int node) {
-        if (q_target_.has_value()) {
-            return q_target_.value()[node];
+        if (q_target_.GetSize() > 0) {
+            return q_target_[node];
         } else {
             throw std::runtime_error("No configuration target provided!");
         }
     }
 
     vectorx_t FullOrderMpc::GetVelTarget(int node) {
-        if (v_target_.has_value()) {
-            return v_target_.value()[node];
+        if (v_target_.GetSize() > 0) {
+            return v_target_[node];
         } else {
             throw std::runtime_error("No velocity target provided!");
         }
@@ -2715,7 +2717,7 @@ namespace torc::mpc {
         }
 
         q_target_ = SimpleTrajectory(config_dim_, nodes_);
-        q_target_->SetAllData(q_target);
+        q_target_.SetAllData(q_target);
     }
 
     void FullOrderMpc::SetConstantVelTarget(const vectorx_t& v_target) {
@@ -2725,7 +2727,7 @@ namespace torc::mpc {
 
         v_target_ = SimpleTrajectory(vel_dim_, nodes_);
 
-        v_target_->SetAllData(v_target);
+        v_target_.SetAllData(v_target);
     }
 
     void FullOrderMpc::SetConfigTarget(SimpleTrajectory q_target) {

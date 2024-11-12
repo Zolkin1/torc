@@ -270,18 +270,18 @@ namespace torc::mpc {
         double GetCollisionViolation(const vectorx_t& qp_res, int node);
 
     // -------- Linearization Helpers ------- //
-        matrix3_t QuatIntegrationLinearizationXi(int node);
-        matrix3_t QuatIntegrationLinearizationW(int node);
+        // matrix3_t QuatIntegrationLinearizationXi(int node);
+        // matrix3_t QuatIntegrationLinearizationW(int node);
 
         void InverseDynamicsLinearizationAD(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df, matrixx_t& dtau, vectorx_t& y);
-        void InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
+        // void InverseDynamicsLinearizationAnalytic(int node, matrixx_t& dtau_dq, matrixx_t& dtau_dv1, matrixx_t& dtau_dv2, matrixx_t& dtau_df);
 
-        matrix43_t QuatLinearization(int node);
+        // matrix43_t QuatLinearization(int node);
 
-        void SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian);
+        // void SwingHeightLinearization(int node, const std::string& frame, matrix6x_t& jacobian);
 
-        void HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian);
-        void HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian);
+        // void HolonomicLinearizationq(int node, const std::string& frame, matrix6x_t& jacobian);
+        // void HolonomicLinearizationv(int node, const std::string& frame, matrix6x_t& jacobian);
     // ----------- Cost Creation ----------- //
         void CreateCostPattern();
         void UpdateCost();
@@ -411,8 +411,8 @@ namespace torc::mpc {
         sp_matrixx_t objective_mat_;
         // vectorx_t objective_vec_;
 
-        std::optional<SimpleTrajectory> q_target_;
-        std::optional<SimpleTrajectory> v_target_;
+        SimpleTrajectory q_target_;
+        SimpleTrajectory v_target_;
 
         bool scale_cost_;
 

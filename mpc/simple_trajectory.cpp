@@ -37,6 +37,14 @@ namespace torc::mpc {
 		return GetNodeData(node);
 	}
 
+	void SimpleTrajectory::SetSizes(int size, int nodes) {
+		size_ = size;
+		nodes_ = nodes;
+		data_.resize(size_*nodes_);
+	}
+
+
+
 	// const Eigen::VectorBlock<vectorx_t> SimpleTrajectory::GetNodeData(int node) const {
 	// 	return data_.segment(GetStartIdx(node), size_);
 	// }

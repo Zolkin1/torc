@@ -199,15 +199,6 @@ namespace torc::mpc {
             traj_.SetVelocity(0, v_rand);
             traj_.SetVelocity(1, v2_rand);
 
-            // Analytic
-            matrixx_t dtau_dq, dtau_dv1, dtau_dv2, dtau_df;
-            dtau_dq = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-            dtau_dv1 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-            dtau_dv2 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
-            dtau_df = matrixx_t::Zero(robot_model_->GetVelDim(), num_contact_locations_*3);
-
-            InverseDynamicsLinearizationAnalytic(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
-
             // AD
             matrixx_t dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad, dtau;
             dtau_dq_ad = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
@@ -219,15 +210,6 @@ namespace torc::mpc {
 
             InverseDynamicsLinearizationAD(0, dtau_dq_ad, dtau_dv1_ad, dtau_dv2_ad, dtau_df_ad, dtau, y);
 
-            // std::cout << "dq analytic: \n" << dtau_dq << std::endl;
-            // std::cout << "dq ad: \n" << dtau_dq_ad << std::endl;
-
-            CHECK(dtau_dq_ad.isApprox(dtau_dq, FD_MARGIN));
-            CHECK(dtau_dv1_ad.isApprox(dtau_dv1));
-            CHECK(dtau_dv2_ad.isApprox(dtau_dv2));
-            CHECK(dtau_df_ad.isApprox(dtau_df));
-
-
             // Finite Difference
             // ----- Configuration ----- //
             matrixx_t fd_q = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
@@ -235,18 +217,16 @@ namespace torc::mpc {
             vectorx_t tau1 = robot_model_->InverseDynamics(q_rand, v_rand, a, f_ext);
             for (int i = 0; i < robot_model_->GetVelDim(); i++) {
                 PerturbConfiguration(q_rand, FD_DELTA, i);
-                // std::cout << "q_rand pert: " << q_rand.transpose() << std::endl;
                 vectorx_t q = traj_.GetConfiguration(0);
                 vectorx_t v_eps = vectorx_t::Zero(robot_model_->GetVelDim());
                 v_eps(i) += FD_DELTA;
-                // std::cout << "q integrate: " << pinocchio::integrate(robot_model_->GetModel(), q, v_eps).transpose() << std::endl;
                 vectorx_t tau2 = robot_model_->InverseDynamics(q_rand, v_rand, a, f_ext);
 
                 fd_q.col(i) = (tau2 - tau1)/FD_DELTA;
 
                 q_rand = traj_.GetConfiguration(0);
             }
-            CHECK(dtau_dq.isApprox(fd_q, sqrt(FD_DELTA)));
+            CHECK(dtau_dq_ad.isApprox(fd_q, sqrt(FD_DELTA)));
 
             // std::cout << "q analytic: \n" << dtau_dq << std::endl;
             // std::cout << "q fd: \n" << fd_q << std::endl;
@@ -264,7 +244,7 @@ namespace torc::mpc {
                 v_rand(i) -= FD_DELTA;
             }
 
-            CHECK(dtau_dv1.isApprox(fd_v, sqrt(FD_DELTA)));
+            CHECK(dtau_dv1_ad.isApprox(fd_v, sqrt(FD_DELTA)));
 
             // std::cout << "v analytic: \n" << dtau_dv1 << std::endl;
             // std::cout << "v fd: \n" << fd_v << std::endl;
@@ -280,7 +260,7 @@ namespace torc::mpc {
 
                 v2_rand(i) -= FD_DELTA;
             }
-            CHECK(dtau_dv2.isApprox(fd_v2, sqrt(FD_DELTA)));
+            CHECK(dtau_dv2_ad.isApprox(fd_v2, sqrt(FD_DELTA)));
 
             // std::cout << "v2 analytic: \n" << dtau_dv2 << std::endl;
             // std::cout << "v2 fd: \n" << fd_v2 << std::endl;
@@ -297,43 +277,9 @@ namespace torc::mpc {
                     fd_f.col(i*CONTACT_3DOF + j) = (tau2 - tau1)/FD_DELTA;
                 }
             }
-            CHECK(dtau_df.isApprox(fd_f, sqrt(FD_DELTA)));
+            CHECK(dtau_df_ad.isApprox(fd_f, sqrt(FD_DELTA)));
             // std::cout << "f analytic: \n" << dtau_df << std::endl;
             // std::cout << "f fd: \n" << fd_f << std::endl;
-        }
-
-
-        void CheckQuaternionLin() {
-            PrintTestHeader("Quaternion Value Linearization");
-
-            for (int k = 0; k < 5; k++) {
-                // Random state
-                vectorx_t q_rand = robot_model_->GetRandomConfig();
-                traj_.SetConfiguration(0, q_rand);
-
-                // Analytic
-                matrix43_t q_int_lin = QuatLinearization(0);
-
-                // Finite difference
-                matrix43_t fd = matrix43_t::Zero();
-                quat_t q1 = traj_.GetQuat(0);
-                vector3_t v = vector3_t::Zero();
-                for (int i = 0; i < 3; i++) {
-                    v(i) += FD_DELTA;
-                    quat_t q2 = q1*pinocchio::quaternion::exp3(v);
-                    v(i) -= FD_DELTA;
-
-                    fd(0, i) = (q2.x() - q1.x())/FD_DELTA;
-                    fd(1, i) = (q2.y() - q1.y())/FD_DELTA;
-                    fd(2, i) = (q2.z() - q1.z())/FD_DELTA;
-                    fd(3, i) = (q2.w() - q1.w())/FD_DELTA;
-
-                    for (int j = 0; j < 4; j++) {
-                        CHECK_THAT(fd(j,i) - q_int_lin(j, i),
-                            Catch::Matchers::WithinAbs(0, FD_MARGIN));
-                    }
-                }
-            }
         }
 
         void CheckSwingHeightLin() {
@@ -341,30 +287,30 @@ namespace torc::mpc {
 
             for (int k = 0; k < 5; k++) {
                 vectorx_t q_rand = robot_model_->GetRandomConfig();
-                vectorx_t q_original = q_rand;
-                traj_.SetConfiguration(0, q_rand);
 
                 for (const auto& frame : contact_frames_) {
-                    // Analytic solution
-                    matrix6x_t frame_jacobian = matrix6x_t::Zero(6, robot_model_->GetVelDim());
-                    SwingHeightLinearization(0, frame, frame_jacobian);
+                    // Autodiff
+                    matrixx_t jac;
+                    vectorx_t x_zero = vectorx_t::Zero(swing_height_constraint_[frame]->GetDomainSize());
+                    vectorx_t p(swing_height_constraint_[frame]->GetParameterSize());
+                    p << q_rand, 0.08;
+                    swing_height_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
                     // Finite difference
-                    matrix6x_t frame_fd = matrix6x_t::Zero(6, robot_model_->GetVelDim());
-                    robot_model_->FirstOrderFK(q_rand);
-                    vector3_t frame_pos_nom = robot_model_->GetFrameState(frame).placement.translation();
-                    for (int i = 0; i < robot_model_->GetVelDim(); i++) {
-                        PerturbConfiguration(q_rand, FD_DELTA, i);
-                        robot_model_->FirstOrderFK(q_rand);
-                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame).placement.translation();
-                        q_rand = q_original;
+                    vectorx_t y = vectorx_t::Zero(swing_height_constraint_[frame]->GetRangeSize());
+                    swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y);
 
-                        for (int j = 0; j < frame_pos_nom.size(); j++) {
-                            frame_fd(j, i) = (frame_pos_pert(j) - frame_pos_nom(j))/FD_DELTA;
-                            CHECK_THAT(frame_fd(j,i) - frame_jacobian(j, i),
-                                Catch::Matchers::WithinAbs(0, FD_MARGIN));
-                        }
+                    matrixx_t jac_fd = matrixx_t::Zero(1, robot_model_->GetVelDim());
+                    vectorx_t y_pert = vectorx_t::Zero(swing_height_constraint_[frame]->GetRangeSize());
+                    for (int i = 0; i < robot_model_->GetVelDim(); i++) {
+                        x_zero(i) = FD_DELTA;
+                        swing_height_constraint_[frame]->GetFunctionValue(x_zero, p, y_pert);
+                        x_zero(i) = 0;
+
+                        jac_fd(0, i) = (-y(0) + y_pert(0))/FD_DELTA;
                     }
+                    std::cout << "jac:\n" << jac << "\nfd:\n" << jac_fd << std::endl;
+                    CHECK(jac.isApprox(jac_fd, 1e-5));
                 }
             }
         }
@@ -372,112 +318,76 @@ namespace torc::mpc {
         void CheckHolonomicLin() {
             PrintTestHeader("Holonomic Linearization");
 
-            // TODO: Put back to 5
-            for (int k = 0; k < 1; k++) {
+            for (int k = 0; k < 5; k++) {
                 vectorx_t q_rand = robot_model_->GetRandomConfig();
                 vectorx_t v_rand = robot_model_->GetRandomVel();
-                vectorx_t q_original = q_rand;
-                traj_.SetConfiguration(0, q_rand);
-                traj_.SetVelocity(0, v_rand);
 
                 for (const auto& frame : contact_frames_) {
-                    // ------- Configuration ------- //
-                    // Analytic solution
-                    matrix6x_t jacobian = matrix6x_t::Zero(6, robot_model_->GetVelDim());
-                    HolonomicLinearizationq(0, frame, jacobian);
+                    //Autodiff
+                    matrixx_t jac;
+                    vectorx_t x_zero = vectorx_t::Zero(holonomic_constraint_[frame]->GetDomainSize());
+                    vectorx_t p(holonomic_constraint_[frame]->GetParameterSize());
+                    p << q_rand, v_rand;
+
+                    holonomic_constraint_[frame]->GetJacobian(x_zero, p, jac);
 
                     // Finite difference
-                    matrix6x_t frame_fd = matrix6x_t::Zero(6, robot_model_->GetVelDim());
-                    vector3_t frame_vel = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
-                    for (int i = 0; i < robot_model_->GetVelDim(); i++) {
-                        PerturbConfiguration(q_rand, FD_DELTA, i);
-                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
-                        q_rand = q_original;
+                    vectorx_t y = vectorx_t::Zero(holonomic_constraint_[frame]->GetRangeSize());
+                    holonomic_constraint_[frame]->GetFunctionValue(x_zero, p, y);
 
-                        frame_fd.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
+                    matrixx_t jac_fd = matrixx_t::Zero(holonomic_constraint_[frame]->GetRangeSize(), holonomic_constraint_[frame]->GetDomainSize());
+                    vectorx_t y_pert = vectorx_t::Zero(holonomic_constraint_[frame]->GetRangeSize());
+                    for (int i = 0; i < 2*robot_model_->GetVelDim(); i++) {
+                        x_zero(i) = FD_DELTA;
+                        holonomic_constraint_[frame]->GetFunctionValue(x_zero, p, y_pert);
+                        x_zero(i) = 0;
 
-                        // for (int j = 0; j < frame_vel.size(); j++) {
-                        //     frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
-                        //     CHECK_THAT(frame_fd(j,i) - jacobian(j, i),
-                        //         Catch::Matchers::WithinAbs(0, FD_MARGIN));
-                        // }
+                        jac_fd.col(i) = (y_pert - y)/FD_DELTA;
                     }
 
-                    std::cout << "configuration" << std::endl;
-                    std::cout << "jac analytic: \n" << jacobian.topRows<3>() << std::endl;
-                    std::cout << "jac fd: \n" << frame_fd.topRows<3>() << std::endl << std::endl;
-                    CHECK(jacobian.topRows<3>().isApprox(frame_fd.topRows<3>(), sqrt(FD_DELTA)));
-
-                    // ------- Velocity ------- //
-                    // Analytic solution
-                    jacobian.setZero();
-                    HolonomicLinearizationv(0, frame, jacobian);
-
-                    // Finite difference
-                    frame_fd.setZero();
-                    frame_vel = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
-                    for (int i = 0; i < robot_model_->GetVelDim(); i++) {
-                        v_rand(i) += FD_DELTA;
-                        vector3_t frame_pos_pert = robot_model_->GetFrameState(frame, q_rand, v_rand, pinocchio::LOCAL_WORLD_ALIGNED).vel.linear();
-                        v_rand(i) -= FD_DELTA;
-
-                        frame_fd.block(0, i, 3, 1) = (frame_pos_pert - frame_vel)/FD_DELTA;
-
-                        // for (int j = 0; j < frame_vel.size(); j++) {
-                        //     frame_fd(j, i) = (frame_pos_pert(j) - frame_vel(j))/FD_DELTA;
-                        //     // CHECK_THAT(frame_fd(j,i) - jacobian(j, i),
-                        //     //     Catch::Matchers::WithinAbs(0, FD_MARGIN));
-                        // }
-                    }
-
-                    CHECK(jacobian.topRows<3>().isApprox(frame_fd.topRows<3>(), sqrt(FD_DELTA)));
-
-                    std::cout << "velocity" << std::endl;
-                    std::cout << "jac analytic: \n" << jacobian.topRows<3>() << std::endl;
-                    std::cout << "jac fd: \n" << frame_fd.topRows<3>() << std::endl << std::endl;
+                    std::cout << "jac autodiff:\n" << jac<< std::endl;
+                    std::cout << "jac fd:\n" << jac_fd << std::endl << std::endl;
+                    CHECK(jac.isApprox(jac_fd, sqrt(FD_DELTA)));
                 }
             }
         }
 
-        //TODO: Put back
-        // void CheckCostFunctionDefiniteness() {
-        //     PrintTestHeader("Cost Function Definiteness");
-        //
-        //     for (int k = 0; k < 5; k++) {
-        //         traj_.SetNumNodes(nodes_);
-        //         q_target_.resize(nodes_);
-        //         v_target_.resize(nodes_);
-        //         for (int i = 0; i < nodes_; i++) {
-        //             traj_.SetConfiguration(i, robot_model_->GetRandomConfig());
-        //             q_target_[i] = robot_model_->GetRandomConfig();
-        //             traj_.SetVelocity(i, robot_model_->GetRandomVel());
-        //             v_target_[i] = robot_model_->GetRandomVel();
-        //             traj_.SetTau(i, vectorx_t::Random(robot_model_->GetNumInputs()));
-        //
-        //             for (const auto& frame : contact_frames_) {
-        //                 vector3_t force = vector3_t::Random().cwiseMax(-100).cwiseMin(100); //vector3_t::Zero();
-        //                 // std::cout << "force: " << force.transpose() << std::endl;
-        //                 traj_.SetForce(i, frame, force);
-        //             }
-        //         }
-        //
-        //         UpdateCost();
-        //
-        //         for (const auto& objective_triplet : objective_triplets_) {
-        //             REQUIRE(!std::isnan(objective_triplet.value()));
-        //         }
-        //
-        //         for (const auto& val : osqp_instance_.objective_vector) {
-        //             REQUIRE(!std::isnan(val));
-        //         }
-        //
-        //         CHECK(objective_mat_.isApprox(objective_mat_.transpose()));
-        //
-        //         Eigen::LDLT<matrixx_t> ldlt(objective_mat_);
-        //         CHECK(ldlt.info() != Eigen::NumericalIssue);
-        //         CHECK(ldlt.isPositive());
-        //     }
-        // }
+        void CheckCostFunctionDefiniteness() {
+            PrintTestHeader("Cost Function Definiteness");
+
+            for (int k = 0; k < 5; k++) {
+                traj_.SetNumNodes(nodes_);
+                for (int i = 0; i < nodes_; i++) {
+                    traj_.SetConfiguration(i, robot_model_->GetRandomConfig());
+                    q_target_.InsertData(i, robot_model_->GetRandomConfig());
+                    traj_.SetVelocity(i, robot_model_->GetRandomVel());
+                    v_target_.InsertData(i, robot_model_->GetRandomVel());
+                    traj_.SetTau(i, vectorx_t::Random(robot_model_->GetNumInputs()));
+
+                    for (const auto& frame : contact_frames_) {
+                        vector3_t force = vector3_t::Random().cwiseMax(-100).cwiseMin(100); //vector3_t::Zero();
+                        // std::cout << "force: " << force.transpose() << std::endl;
+                        traj_.SetForce(i, frame, force);
+                    }
+                }
+
+                UpdateCost();
+
+                for (const auto& objective_triplet : objective_triplets_) {
+                    REQUIRE(!std::isnan(objective_triplet.value()));
+                }
+
+                for (const auto& val : osqp_instance_.objective_vector) {
+                    REQUIRE(!std::isnan(val));
+                }
+
+                CHECK(objective_mat_.isApprox(objective_mat_.transpose()));
+
+                Eigen::LDLT<matrixx_t> ldlt(objective_mat_);
+                CHECK(ldlt.info() != Eigen::NumericalIssue);
+                CHECK(ldlt.isPositive());
+            }
+        }
 
         void CheckConstraintIdx() {
             PrintTestHeader("Constraint Index");
@@ -548,39 +458,37 @@ namespace torc::mpc {
             CHECK(row1 == GetConstraintRowStartNode(nodes_));
         }
 
+        void CheckDefaultSwingTraj() {
+            PrintTestHeader("Default Swing Traj.");
+            ContactSchedule cs;
+            cs.SetFrames(contact_frames_);
+            cs.InsertSwing(contact_frames_[0], 0.3, 0.6);
+            std::vector<double> end_heights(num_contact_locations_);
+            for (auto& h : end_heights) {
+                h = 0;
+            }
+            UpdateContactScheduleAndSwingTraj(cs, 1, end_heights, 0.5);
+            for (int i = 0; i < nodes_; i++) {
+                std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
+            }
+            CHECK(swing_traj_[contact_frames_[0]][0] == 0.0);
+            std::cout << "====" << std::endl;
 
-        // TODO: Put back once fixed
-        // void CheckDefaultSwingTraj() {
-        //     PrintTestHeader("Default Swing Traj.");
-        //     ContactSchedule cs;
-        //     cs.SetFrames(contact_frames_);
-        //     cs.InsertSwing(contact_frames_[0], 0.3, 0.6);
-        //     UpdateContactScheduleAndSwingTraj(cs, 1, 0, 0.5);
-        //     for (int i = 0; i < nodes_; i++) {
-        //         std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
-        //     }
-        //     CHECK(swing_traj_[contact_frames_[0]][0] == 0.0);
-        //     std::cout << "====" << std::endl;
-        //
-        //     // At time zero we should be at the apex
-        //     cs.InsertSwing(contact_frames_[0], -0.1, 0.1);
-        //
-        //     UpdateContactScheduleAndSwingTraj(cs, 1, 0.01, 0.5);
-        //     for (int i = 0; i < nodes_; i++) {
-        //         std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
-        //     }
-        //     CHECK(swing_traj_[contact_frames_[0]][0] == 1.0);
-        // }
+            // At time zero we should be at the apex
+            cs.InsertSwing(contact_frames_[0], -0.1, 0.1);
+            for (auto& h : end_heights) {
+                h = 0.01;
+            }
+            UpdateContactScheduleAndSwingTraj(cs, 1, end_heights, 0.5);
+            for (int i = 0; i < nodes_; i++) {
+                std::cout << swing_traj_[contact_frames_[0]][i] << std::endl;
+            }
+            CHECK(swing_traj_[contact_frames_[0]][0] == 1.0);
+        }
 
         // ---------------------- //
         // ----- Benchmarks ----- //
         // ---------------------- //
-        void BenchmarkQuaternionIntegrationLin() {
-            BENCHMARK("quaternion integration lin") {
-                auto deriv = QuatIntegrationLinearizationXi(0);
-            };
-        }
-
         void BenchmarkInverseDynamicsLin() {
             // Random state
             vectorx_t q_rand = robot_model_->GetRandomConfig();
@@ -616,9 +524,9 @@ namespace torc::mpc {
             dtau_dv2 = matrixx_t::Zero(robot_model_->GetVelDim(), robot_model_->GetVelDim());
             dtau_df = matrixx_t::Zero(robot_model_->GetVelDim(), num_contact_locations_*3);
 
-            BENCHMARK("inverse dynamics lin") {
-                InverseDynamicsLinearizationAnalytic(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
-            };
+            //BENCHMARK("inverse dynamics lin") {
+            //    InverseDynamicsLinearizationAnalytic(0, dtau_dq, dtau_dv1, dtau_dv2, dtau_df);
+            //};
 
             // Autodiff
             vectorx_t tau_temp(input_dim_);
@@ -639,19 +547,13 @@ namespace torc::mpc {
 
         }
 
-        void BenchmarkQuaternionConfigurationLin() {
-            BENCHMARK("quaternion configuration lin") {
-                auto deriv = QuatLinearization(0);
-            };
-        }
-
         void BenchmarkSwingHeightLin() {
             vectorx_t q_rand = robot_model_->GetRandomConfig();
             traj_.SetConfiguration(0, q_rand);
             matrix6x_t frame_jacobian = matrix6x_t::Zero(6, robot_model_->GetVelDim());
             std::string frame = contact_frames_[0];
             BENCHMARK("swing height lin") {
-                SwingHeightLinearization(0, frame, frame_jacobian);
+                // SwingHeightLinearization(0, frame, frame_jacobian);
             };
         }
 
@@ -663,7 +565,7 @@ namespace torc::mpc {
             std::string frame = contact_frames_[0];
             matrix6x_t jacobian = matrix6x_t::Zero(6, robot_model_->GetVelDim());
             BENCHMARK("holonomic lin") {
-                HolonomicLinearizationq(0, frame, jacobian);
+                // HolonomicLinearizationq(0, frame, jacobian);
             };
         }
 

@@ -32,7 +32,7 @@ target_link_libraries(utils_tests PUBLIC Utils)
 catch_discover_tests(utils_tests)
 
 # --------- MPC Tests --------- #
-add_executable(mpc_tests mpc_tests.cpp mpc_test_class.cpp)
+add_executable(mpc_tests mpc_tests.cpp mpc_test_class.cpp mpc_test_class.h)
 target_link_libraries(mpc_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(mpc_tests PUBLIC Mpc)
 catch_discover_tests(mpc_tests)

@@ -6,8 +6,6 @@
 #define SIMPLE_TRAJECTORY_H
 #include "cost_function.h"
 
-
-// TODO: Write
 namespace torc::mpc {
 	class SimpleTrajectory {
 	public:
@@ -28,6 +26,8 @@ namespace torc::mpc {
 		[[nodiscard]] int GetNumNodes() const;
 
 		[[nodiscard]] int GetSize() const;
+
+		void SetSizes(int size, int nodes);
 
 	protected:
 		int GetStartIdx(int node) const;
