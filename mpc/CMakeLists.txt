@@ -34,9 +34,6 @@ target_include_directories(Mpc PUBLIC
 # ------- Model ------ #
 target_link_libraries(Mpc PUBLIC Models)
 
-# ------- Functions ------ #
-target_link_libraries(Mpc PUBLIC Functions)
-
 # ------- CppADInterface ------ #
 target_link_libraries(Mpc PUBLIC Autodiff)
 

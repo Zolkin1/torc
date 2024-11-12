@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include "full_order_mpc.h"
-#include "autodiff_fn.h"
 
 #include <pinocchio/algorithm/kinematics-derivatives.hxx>
 #include <Eigen/Dense>

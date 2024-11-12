@@ -13,13 +13,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 include(Catch)
 
-# ---------- Function Tests ------- #
-add_executable(function_tests
-                function_tests.cpp
-                test_fn.h)
-target_link_libraries(function_tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(function_tests PUBLIC Functions)
-
 # ---------- Model Tests ---------- #
 add_executable(rigid_body_tests rigid_body_tests.cpp)
 target_link_libraries(rigid_body_tests PRIVATE Catch2::Catch2WithMain)
@@ -57,7 +50,3 @@ target_link_libraries(dynamics_tests PUBLIC Models SamplePlanner Mpc) # Sample p
 
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
-
-include(Catch)
-catch_discover_tests(function_tests)

@@ -25,7 +25,6 @@ endif()
 
 add_subdirectory(models)
 add_subdirectory(auto_diff)
-add_subdirectory(functions)
 add_subdirectory(mpc)
 add_subdirectory(utils)
 add_subdirectory(examples)
