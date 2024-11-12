@@ -3102,7 +3102,8 @@ namespace torc::mpc {
 
 
     int FullOrderMpc::NumFrictionConeConstraintsNode() const {
-        return num_contact_locations_ * (1 + CONTACT_3DOF + 1);
+        return num_contact_locations_ * (1 + CONTACT_3DOF);
+        // return num_contact_locations_ * (1 + CONTACT_3DOF + 1);
     }
 
     int FullOrderMpc::NumConfigBoxConstraintsNode() const {

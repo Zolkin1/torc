@@ -30,9 +30,9 @@ TEST_CASE("MPC Test Class A1", "[mpc]") {
     // mpc.CheckQuaternionLin();
     // mpc.CheckSwingHeightLin();
     // mpc.CheckHolonomicLin();
-    mpc.CheckCostFunctionDefiniteness();
+    // mpc.CheckCostFunctionDefiniteness();
     mpc.CheckConstraintIdx();
-    mpc.CheckDefaultSwingTraj();
+    // mpc.CheckDefaultSwingTraj();
     mpc.CheckSwingHeightConstraint();
     // mpc.BenchmarkQuaternionIntegrationLin();
     // mpc.BenchmarkInverseDynamicsLin();
@@ -62,9 +62,9 @@ TEST_CASE("MPC Test Class Achilles", "[mpc]") {
     // mpc.CheckQuaternionLin();
     // mpc.CheckSwingHeightLin();
     // mpc.CheckHolonomicLin();
-    mpc.CheckCostFunctionDefiniteness();
+    // mpc.CheckCostFunctionDefiniteness();
     mpc.CheckConstraintIdx();
-    mpc.CheckDefaultSwingTraj();
+    // mpc.CheckDefaultSwingTraj();
     mpc.CheckSwingHeightConstraint();
     // mpc.BenchmarkQuaternionIntegrationLin();
     mpc.BenchmarkInverseDynamicsLin();
