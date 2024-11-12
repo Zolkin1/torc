@@ -11,7 +11,6 @@
 
 #include "mpc_test_class.h"
 #include "cost_test_class.h"
-#include "autodiff_fn.h"
 
 TEST_CASE("MPC Test Class A1", "[mpc]") {
     using namespace torc::mpc;
@@ -25,14 +24,12 @@ TEST_CASE("MPC Test Class A1", "[mpc]") {
 
     mpc.Configure();
 
-    // mpc.CheckQuaternionIntLin();
     mpc.CheckInverseDynamicsLin();
-    // mpc.CheckQuaternionLin();
-    // mpc.CheckSwingHeightLin();
-    // mpc.CheckHolonomicLin();
-    // mpc.CheckCostFunctionDefiniteness();
+    mpc.CheckSwingHeightLin();
+    mpc.CheckHolonomicLin();
+    mpc.CheckCostFunctionDefiniteness();
     mpc.CheckConstraintIdx();
-    // mpc.CheckDefaultSwingTraj();
+    mpc.CheckDefaultSwingTraj();
     mpc.CheckSwingHeightConstraint();
     // mpc.BenchmarkQuaternionIntegrationLin();
     // mpc.BenchmarkInverseDynamicsLin();
@@ -57,17 +54,15 @@ TEST_CASE("MPC Test Class Achilles", "[mpc]") {
 
     mpc.Configure();
 
-    // mpc.CheckQuaternionIntLin();
     mpc.CheckInverseDynamicsLin();
-    // mpc.CheckQuaternionLin();
-    // mpc.CheckSwingHeightLin();
-    // mpc.CheckHolonomicLin();
-    // mpc.CheckCostFunctionDefiniteness();
+    mpc.CheckSwingHeightLin();
+    mpc.CheckHolonomicLin();
+    mpc.CheckCostFunctionDefiniteness();
     mpc.CheckConstraintIdx();
-    // mpc.CheckDefaultSwingTraj();
+    mpc.CheckDefaultSwingTraj();
     mpc.CheckSwingHeightConstraint();
     // mpc.BenchmarkQuaternionIntegrationLin();
-    mpc.BenchmarkInverseDynamicsLin();
+    // mpc.BenchmarkInverseDynamicsLin();
     // mpc.BenchmarkQuaternionConfigurationLin();
     // mpc.BenchmarkSwingHeightLin();
     // mpc.BenchmarkHolonomicLin();

@@ -25,20 +25,9 @@ endif()
 
 add_subdirectory(models)
 add_subdirectory(auto_diff)
-add_subdirectory(functions)
 add_subdirectory(mpc)
 add_subdirectory(utils)
-
-
-#  TODO: Remove these
-add_executable(mpc_app_test mpc_app_tests.cpp)
-target_link_libraries(mpc_app_test Mpc)
-
-add_executable(mpc_quad_test mpc_quad_test.cpp)
-target_link_libraries(mpc_quad_test Mpc)
-
-add_executable(mpc_g1_test mpc_g1_app_test.cpp)
-target_link_libraries(mpc_g1_test Mpc)
+add_subdirectory(examples)
 
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library

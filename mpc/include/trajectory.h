@@ -11,6 +11,8 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+#include "simple_trajectory.h"
+
 namespace torc::mpc {
     using vectorx_t = Eigen::VectorXd;
     using vector3_t = Eigen::Vector3d;
@@ -19,6 +21,8 @@ namespace torc::mpc {
     // TODO: Add a start_time field
     class Trajectory {
     public:
+        Trajectory();
+
         void UpdateSizes(int config_size, int vel_size, int tau_size, const std::vector<std::string>& force_frames, int nodes);
 
         int GetNumNodes() const;
@@ -52,7 +56,7 @@ namespace torc::mpc {
 
     protected:
     private:
-        void StandardVectorInterp(double time, vectorx_t& vec_out, const std::vector<vectorx_t>& vecs);
+        void StandardVectorInterp(double time, vectorx_t& vec_out, const SimpleTrajectory& vecs);
 
         [[nodiscard]] std::optional<int> GetNode(double time) const;
 
@@ -60,9 +64,10 @@ namespace torc::mpc {
         static constexpr int QUAT_VARS = 4;
         static constexpr int FLOATING_BASE = 7;
 
-        std::vector<vectorx_t> q_;
-        std::vector<vectorx_t> v_;
-        std::vector<vectorx_t> tau_;
+
+        SimpleTrajectory q_;
+        SimpleTrajectory v_;
+        SimpleTrajectory tau_;
         std::vector<std::vector<vector3_t>> forces_;
         std::map<std::string, int> force_frames_;
         std::vector<double> dt_;

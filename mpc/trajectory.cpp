@@ -7,6 +7,9 @@
 #include "trajectory.h"
 
 namespace torc::mpc {
+    Trajectory::Trajectory()
+        : q_(0, 0), v_(0, 0), tau_(0, 0) {}
+
     void Trajectory::UpdateSizes(int config_size, int vel_size, int tau_size, const std::vector<std::string>& force_frames, int nodes) {
         config_size_ = config_size;
         vel_size_ = vel_size;
@@ -21,10 +24,14 @@ namespace torc::mpc {
 
         SetNumNodes(nodes);
 
+        q_.SetSizes(config_size_, nodes_);
+        v_.SetSizes(vel_size_, nodes_);
+        tau_.SetSizes(tau_size_, nodes_);
+
         for (int node = 0; node < nodes_; node++) {
-            q_[node].setZero(config_size_);
-            v_[node].setZero(vel_size_);
-            tau_[node].setZero(tau_size_);
+            q_.InsertData(node, vectorx_t::Zero(config_size_));
+            v_.InsertData(node, vectorx_t::Zero(vel_size_));
+            tau_.InsertData(node, vectorx_t::Zero(tau_size_));
             for (int frame = 0; frame < num_frames_; frame++) {
                 forces_[node][frame].setZero();
             }
@@ -37,9 +44,9 @@ namespace torc::mpc {
 
     void Trajectory::SetNumNodes(int nodes) {
         nodes_ = nodes;
-        q_.resize(nodes_);
-        v_.resize(nodes_);
-        tau_.resize(nodes_);
+        q_.SetSizes(config_size_, nodes_);
+        v_.SetSizes(vel_size_, nodes_);
+        tau_.SetSizes(tau_size_, nodes_);
         forces_.resize(nodes_);
         dt_.resize(nodes_);
         for (auto& force : forces_) {
@@ -64,7 +71,7 @@ namespace torc::mpc {
     }
 
     void Trajectory::SetDtVector(const std::vector<double>& dt) {
-        if (dt.size() != q_.size()) {
+        if (dt.size() != q_.GetNumNodes()) {
             std::cerr << "dt vector does not have the correct number of nodes! Ignoring!" << std::endl;
         }
         dt_ = dt;
@@ -171,19 +178,6 @@ namespace torc::mpc {
     }
 
     void Trajectory::GetVelocityInterp(double time, vectorx_t& v_out) {
-        // TODO: Remove (potentially)
-        // TODO: Consider putting back
-        // vectorx_t v_temp;
-        // StandardVectorInterp(time, v_temp, v_);
-        // const auto node = GetNode(time);
-        // if (!node.has_value()) {
-        //     throw std::runtime_error("Invalid time provided!");
-        // }
-        //
-        // StandardVectorInterp(time + dt_[node.value()], v_out, v_);
-        //
-        // v_out = (v_out + v_temp)/2;
-
         StandardVectorInterp(time, v_out, v_);
     }
 
@@ -228,7 +222,7 @@ namespace torc::mpc {
     }
 
 
-    void Trajectory::StandardVectorInterp(double time, vectorx_t& vec_out, const std::vector<vectorx_t>& vecs) {
+    void Trajectory::StandardVectorInterp(double time, vectorx_t& vec_out, const SimpleTrajectory& vecs) {
         if (time < 0) {
             std::cerr << "Interpolation time < 0! No interpolation provided!" << std::endl;
             return;

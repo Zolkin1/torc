@@ -183,7 +183,6 @@ TEST_CASE("Loading", "[ad]") {
     CHECK(function.GetParameterSize() == P_SIZE);
     CHECK(function.GetRangeSize() == Y_SIZE);
 
-    // TODO: Fix!
     // Load
     CppADInterface function2(&PowTestFunction, "pow_test_load_ad_function", curr_path, FirstOrder, X_SIZE, P_SIZE, false);
 
