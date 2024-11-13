@@ -15,7 +15,7 @@ general_settings:
 solver_settings:
   rel_tol: 1e-3
   abs_tol: 1e-3
-  verbose: False
+  verbose: True
   polish: False
   rho: 0.01
   alpha: 1.6 # 1.6, 1.1

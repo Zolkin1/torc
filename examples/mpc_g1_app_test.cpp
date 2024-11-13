@@ -103,44 +103,16 @@ int main() {
 
     // mpc.Compute(q_target, v_target, traj);
 
-    mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>());
-    std::cout << "\nTargets:" << std::endl;
-    for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
-        std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;
-    }
+    // mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>());
+    // std::cout << "\nTargets:" << std::endl;
+    // for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
+    //     std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;
+    // }
 
     // q_target(0) += 0.2;
     mpc.ComputeNLP(q_target, v_target, traj);
 
-    // for (int node = 0; node < mpc.GetNumNodes(); node++) {
-    //     vectorx_t q_ic = traj.GetConfiguration(node);
-    //     vectorx_t v_ic = (traj.GetVelocity(node) + traj.GetVelocity(node + 1))/2;
-    //     vectorx_t tau = traj.GetTau(node);
-    //
-    //     std::vector<torc::models::ExternalForce<double>> f_ext;
-    //     for (const auto& frame : mpc.GetContactFrames()) {
-    //         f_ext.emplace_back(frame, traj.GetForce(0, frame));
-    //     }
-    //
-    //
-    //     vectorx_t xdot = achilles.GetDynamics(q_ic, v_ic, tau, f_ext);
-    //     double dt = traj.GetDtVec()[node];
-    //     vectorx_t q_next = vectorx_t::Zero(q_ic.size());
-    //     pinocchio::integrate(achilles.GetModel(), q_ic, dt*xdot.head(v_ic.size()), q_next);
-    //     vectorx_t v_next = v_ic + dt*xdot.tail(v_ic.size());
-    //
-    //     std::cout << "Node: " << node << std::endl;
-    //     std::cout << "Integrated dynamics: " << std::endl;
-    //     std::cout << "q next: " << q_next.transpose() << std::endl;
-    //     std::cout << "v next: " << v_next.transpose() << std::endl << std::endl;
-    //
-    //     std::cout << "Next node: " << std::endl;
-    //     std::cout << "q[1]: " << traj.GetConfiguration(1).transpose() << std::endl;
-    //     std::cout << "v[1]: " << traj.GetVelocity(1).transpose() << std::endl << std::endl << std::endl;
-    //     // std::cout << "v[1]: " << ((traj.GetVelocity(1) + traj.GetVelocity(2))/2).transpose() << std::endl;
-    // }
-
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 20; i++) {
     // TODO: put back!
         vectorx_t q_current;
         traj.GetConfigInterp(0.01, q_current);

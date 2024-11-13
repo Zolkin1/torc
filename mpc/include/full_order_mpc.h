@@ -51,6 +51,8 @@ namespace torc::mpc {
         double ls_time;                     // Time to line search
         LineSearchCondition ls_condition;   // Condition for line search termination
         double constraint_violation;        // Constraint violation
+        double update_time;                 // Time to update the mats and vecs
+        double solve_time;                  // QP solve time
     };
 
     // TODO: Clean up these data structures
@@ -128,6 +130,8 @@ namespace torc::mpc {
         [[nodiscard]] std::pair<double, double> GetConstraintTimeStats() const;
         [[nodiscard]] std::pair<double, double> GetCostTimeStats() const;
         [[nodiscard]] std::pair<double, double> GetLineSearchTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetSolveTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetUpdateTimeStats() const;
 
         [[nodiscard]] std::pair<double, double> GetConstraintViolationStats() const;
         [[nodiscard]] std::pair<double, double> GetCostStats() const;

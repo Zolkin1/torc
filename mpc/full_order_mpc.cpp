@@ -13,7 +13,7 @@
 #include "torc_timer.h"
 #include "pinocchio_interface.h"
 
-#define NAN_CHECKS 1
+#define NAN_CHECKS 0
 
 //  Can make the max force different for each contact, so I make sure the toe force is small (i.e. proportional to the ankle torque)
 // TODO: Consider removing the last torque and force variables (i.e. in the last node) - would make the problem slightly smaller
@@ -574,27 +574,36 @@ namespace torc::mpc {
          // std::cout << "objective vec: " << osqp_instance_.objective_vector.transpose() << std::endl;
          // std::cout << "A: \n" << A_ << std::endl;
 
+        // Scaling seems to take a non-trivial amount of time here.
+
+        utils::TORCTimer update_mats_timer;
         // Set upper and lower bounds
+        // This was getting inconsistent with using numeric limit bounds that change with contacts
+        update_mats_timer.Tic();
         auto status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
         if (!status.ok()) {
             std::cerr << "status: " << status << std::endl;
             throw std::runtime_error("Could not update the constraint bounds.");
         }
 
-         // Set matrices
+        // This is the most time-consuming operation in the MPC solve.
+        // This is where the numeric matrix factorization takes place.
+        // Set matrices
         status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
          if (!status.ok()) {
              std::cerr << "status: " << status << std::endl;
              throw std::runtime_error("Could not update the objective and constraint matrix.");
          }
 
-         // Set objective vector
-         status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
-         if (!status.ok()) {
-             std::cerr << "status: " << status << std::endl;
-             throw std::runtime_error("Could not update the objective vector.");
-         }
+        // This update takes almost no time!
+        // Set objective vector
+        status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
+        if (!status.ok()) {
+            std::cerr << "status: " << status << std::endl;
+            throw std::runtime_error("Could not update the objective vector.");
+        }
 
+        // This update takes almost no time!
         // Set the warmstart to 0 -- appears to be very important
         status = osqp_solver_.SetWarmStart(vectorx_t::Zero(GetNumDecisionVars()),
             vectorx_t::Zero(GetNumConstraints()));
@@ -602,9 +611,13 @@ namespace torc::mpc {
             std::cerr << "status: " << status << std::endl;
             throw std::runtime_error("Could not update the warmstart.");
         }
+        update_mats_timer.Toc();
 
+        utils::TORCTimer solve_timer;
+        solve_timer.Tic();
         // Solve
         auto solve_status = osqp_solver_.Solve();
+        solve_timer.Toc();
 
         if (solve_status == osqp::OsqpExitCode::kPrimalInfeasible || solve_status == osqp::OsqpExitCode::kPrimalInfeasibleInaccurate) {
             std::cerr << "Bad solve!" << std::endl;
@@ -657,7 +670,11 @@ namespace torc::mpc {
              constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              cost_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              ls_timer.Duration<std::chrono::microseconds>().count()/1000.0,
-             ls_condition_, constraint_ls);
+             ls_condition_, constraint_ls,
+             update_mats_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+             solve_timer.Duration<std::chrono::microseconds>().count()/1000.0);
+
+        // std::cout << "Update timer: " << update_mats_timer.Duration<std::chrono::microseconds>().count()/1000.0 << std::endl;
 
         traj_ = traj_out;
 
@@ -1206,7 +1223,8 @@ namespace torc::mpc {
             vectorx_t y;
             friction_cone_constraint_->GetFunctionValue(x_zero, p, y);
             osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*y(0);
-            osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*std::numeric_limits<double>::max();
+            // osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*std::numeric_limits<double>::max();
+            osqp_instance_.upper_bounds(row_start) = std::numeric_limits<double>::max();
 
             row_start += friction_cone_constraint_->GetRangeSize();
             col_start += CONTACT_3DOF;
@@ -2928,6 +2946,8 @@ namespace torc::mpc {
         const auto constraint_times = GetConstraintTimeStats();
         const auto cost_times = GetCostTimeStats();
         const auto ls_times = GetLineSearchTimeStats();
+        const auto solve_times = GetSolveTimeStats();
+        const auto update_times = GetUpdateTimeStats();
 
         std::cout << std::fixed << std::setprecision(6);
         std::cout << std::left << setw(col_width) << "Compute time (ms): " << std::right << compute_times.first <<
@@ -2938,6 +2958,10 @@ namespace torc::mpc {
             setw(col_width) << cost_times.second << std::endl;
         std::cout << std::left << setw(col_width) << "Line search time (ms): " << std::right << ls_times.first <<
             setw(col_width) << ls_times.second << std::endl;
+        std::cout << std::left << setw(col_width) << "Update time (ms): " << std::right << update_times.first <<
+            setw(col_width) << update_times.second << std::endl;
+        std::cout << std::left << setw(col_width) << "QP solve time (ms): " << std::right << solve_times.first <<
+            setw(col_width) << solve_times.second << std::endl;
 
         const auto constr_vio_stats = GetConstraintViolationStats();
         std::cout << std::left << setw(col_width) << "Constraint violation: " << std::right << constr_vio_stats.first <<
@@ -3031,6 +3055,42 @@ namespace torc::mpc {
         double st_dev = 0;
         for (const auto& stat : stats_) {
             st_dev += std::pow((stat.constraint_violation - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetUpdateTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.update_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.update_time - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetSolveTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.solve_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.solve_time - avg), 2);
         }
 
         st_dev = sqrt(st_dev/stats_.size());
