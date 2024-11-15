@@ -179,7 +179,8 @@ namespace torc::mpc {
         TorqueBox,
         SwingHeight,
         Holonomic,
-        Collision
+        Collision,
+        FootPolytope
         };
 
         enum DecisionType {
@@ -240,6 +241,8 @@ namespace torc::mpc {
 
         void FrictionConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk, ad::ad_vector_t& violation) const;
 
+        void FootPolytopeConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_A_b, ad::ad_vector_t& violation) const;
+
     // -------- Constraint Creation -------- //
         void CreateConstraints();
         // void AddICConstraint();
@@ -252,6 +255,7 @@ namespace torc::mpc {
         void AddSwingHeightConstraint(int node);
         void AddHolonomicConstraint(int node);
         void AddCollisionConstraint(int node);
+        void AddFootPolytopeConstraint(int node);
 
     // -------- Constraint Violation -------- //
         double GetConstraintViolation(const vectorx_t& qp_res);
@@ -265,6 +269,7 @@ namespace torc::mpc {
         double GetSwingHeightViolation(const vectorx_t& qp_res, int node);
         double GetHolonomicViolation(const vectorx_t& qp_res, int node);
         double GetCollisionViolation(const vectorx_t& qp_res, int node);
+        double GetFootPolytopeViolation(const vectorx_t& qp_res, int node);
 
     // -------- Linearization Helpers ------- //
         // matrix3_t QuatIntegrationLinearizationXi(int node);
@@ -316,6 +321,7 @@ namespace torc::mpc {
         void AddSwingHeightPattern(int node);
         void AddHolonomicPattern(int node);
         void AddCollisionPattern(int node);
+        void AddFootPolytopePattern(int node);
 
     // ----- Helper Functions ----- //
         void ConvertSolutionToTraj(const vectorx_t& qp_sol, Trajectory& traj);
@@ -361,6 +367,7 @@ namespace torc::mpc {
         [[nodiscard]] int NumSwingHeightConstraintsNode() const;
         [[nodiscard]] int NumHolonomicConstraintsNode() const;
         [[nodiscard]] int NumCollisionConstraintsNode() const;
+        [[nodiscard]] int NumFootPolytopeConstraintsNode() const;
 
         void UpdateSettings();
 
@@ -373,6 +380,8 @@ namespace torc::mpc {
         static constexpr int POS_VARS = 3;
         static constexpr int QUAT_VARS = 4;
         static constexpr double FD_DELTA = 1e-8;
+
+        static constexpr int POLYTOPE_SIZE = 4;
 
     //---------- Member Variables ---------- //
         std::string name_;
@@ -437,7 +446,10 @@ namespace torc::mpc {
 
         // Contact schedule
         std::map<std::string, std::vector<int>> in_contact_;
-        ContactSchedule cs_;
+        // Hold the polytope giving the foot constraint
+        std::map<std::string, std::vector<matrixx_t>> foot_polytope_;
+        std::map<std::string, std::vector<vectorx_t>> ub_lb_polytope;
+        // ContactSchedule cs_;
 
         // dt's
         std::vector<double> dt_;
@@ -471,6 +483,7 @@ namespace torc::mpc {
         std::unique_ptr<ad::CppADInterface> inverse_dynamics_constraint_;
         std::vector<std::unique_ptr<ad::CppADInterface>> collision_constraints_;
         std::unique_ptr<ad::CppADInterface> friction_cone_constraint_;
+        std::map<std::string, std::unique_ptr<ad::CppADInterface>> foot_polytope_constraint_;
         std::vector<std::pair<double, double>> radii_;
 
         // Contact settings

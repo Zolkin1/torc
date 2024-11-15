@@ -81,6 +81,15 @@ namespace torc::mpc {
                ad::DerivativeOrder::FirstOrder, vel_dim_,  config_dim_ + 1,
                compile_derivatves_
             ));
+
+            foot_polytope_constraint_.emplace(frame,
+            std::make_unique<ad::CppADInterface>(
+            std::bind(&FullOrderMpc::FootPolytopeConstraint, this, frame, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+            name_ + "_" + frame + "_foot_polytope_constraint",
+            deriv_lib_path_,
+            ad::DerivativeOrder::FirstOrder, vel_dim_,  config_dim_ + POLYTOPE_SIZE + POLYTOPE_SIZE,
+            true //compile_derivatves_  //TODO: Put back
+            ));
         }
 
         inverse_dynamics_constraint_ = std::make_unique<ad::CppADInterface>(
@@ -99,6 +108,22 @@ namespace torc::mpc {
             ad::DerivativeOrder::FirstOrder, 3, 4,
             compile_derivatves_
         );
+
+        // Init polytope
+        matrixx_t A_temp = matrixx_t::Identity(2, 2);
+        vector4_t b_temp = vector4_t::Zero();
+        b_temp << 10, 20, 10, 50;
+        std::vector<matrixx_t> A_vec(nodes_);
+        std::vector<vectorx_t> b_vec(nodes_);
+        for (int i = 0; i < nodes_; i++) {
+            A_vec[i] = A_temp;
+            b_vec[i] = b_temp;   // Default box size
+        }
+
+        for (const auto& frame : contact_frames_) {
+            foot_polytope_.insert(std::pair<std::string, std::vector<matrixx_t>>(frame, A_vec));
+            ub_lb_polytope.insert(std::pair<std::string, std::vector<vectorx_t>>(frame, b_vec));
+        }
 
         q_target_.SetSizes(robot_model_->GetConfigDim(), nodes_);
         v_target_.SetSizes(robot_model_->GetVelDim(), nodes_);
@@ -480,6 +505,7 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::UpdateContactSchedule(const ContactSchedule& contact_schedule) {
+        // TODO: Also need to grab the foot polytope
         // Convert the contact schedule into the binary digits I need
         for (auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
             if (in_contact_.contains(frame)) {
@@ -910,6 +936,8 @@ namespace torc::mpc {
                 AddSwingHeightConstraint(node);
 
                 AddCollisionConstraint(node);
+
+                AddFootPolytopeConstraint(node);
             }
         }
 
@@ -1078,6 +1106,36 @@ namespace torc::mpc {
         violation.resize(1);
         violation(0) = friction_coef_*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
     }
+
+    void FullOrderMpc::FootPolytopeConstraint(const std::string& frame, const ad::ad_vector_t& dqk,
+        const ad::ad_vector_t& qk_A_b, ad::ad_vector_t& violation) const {
+
+        const ad::ad_vector_t& qkbar = qk_A_b.head(config_dim_);
+        ad::ad_matrix_t A = ad::ad_matrix_t::Zero(POLYTOPE_SIZE, 2);
+        // ad::ad_matrix_t A = ad::ad_matrix_t::Identity(POLYTOPE_SIZE, 2);
+
+        for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+            A.row(i) = qk_A_b.segment<2>(config_dim_ + i*2);
+        }
+
+        A.bottomRows<POLYTOPE_SIZE/2>() = -A.topRows<POLYTOPE_SIZE/2>();
+
+        const ad::ad_vector_t& b = qk_A_b.tail<POLYTOPE_SIZE>();        // ub then lb
+
+        const ad::ad_vector_t q = torc::models::ConvertdqToq(dqk, qkbar);
+
+        // Forward kinematics
+        pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q);
+        const long frame_idx = robot_model_->GetFrameIdx(frame);
+        pinocchio::updateFramePlacement(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx);
+
+        // Get frame position in world frame (data oMf)
+        ad::ad_vector_t frame_pos = robot_model_->GetADPinData()->oMf.at(frame_idx).translation();
+
+        violation.resize(POLYTOPE_SIZE);
+        violation = A*frame_pos.head<2>() - b;
+    }
+
 
     void FullOrderMpc::AddIntegrationConstraint(int node) {
         assert(node != nodes_ - 1);
@@ -1394,6 +1452,44 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::AddFootPolytopeConstraint(int node) {
+        int row_start = GetConstraintRow(node, FootPolytope);
+        int col_start = GetDecisionIdx(node, Configuration);
+
+        // TODO: Double check all of this
+        // TODO: Might be able to get away with only enforcing this on one contact per foot (only if needed)
+        for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+            matrixx_t jac;
+            vectorx_t x_zero = vectorx_t::Zero(constraint->GetDomainSize());
+            vectorx_t p(constraint->GetParameterSize());
+            // std::cout << "A row 0: " << foot_polytope_[frame][node].row(0) << std::endl;
+            // std::cout << "A row 1: " << foot_polytope_[frame][node].row(1) << std::endl;
+            p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), 0, 0, 0, 0; //ub_lb_polytope[frame][node];
+
+            const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
+            torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                sparsity_head[i] = sparsity[i];
+            }
+
+            // TODO: For now the way it is programmed the polytope must be in the x-y plane. Expand to support the polytope on different planes.
+            constraint->GetJacobian(x_zero, p, jac);
+            // Only need to put the top POLYTOPE_SIZE/2 rows into the matrix because the bottom rows are covered by the double-sided constraints
+            MatrixToTripletWithSparsitySet(jac.topRows<POLYTOPE_SIZE/2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity_head);
+
+            // Bounds
+            vectorx_t y;
+            constraint->GetFunctionValue(x_zero, p, y);
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                osqp_instance_.upper_bounds(row_start + i) = std::max(-y(i), -y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.lower_bounds(row_start + i) = std::min(-y(i), -y(i + POLYTOPE_SIZE/2));
+            }
+
+            // std::cout << "y: " << y.transpose() << std::endl;
+
+            row_start += POLYTOPE_SIZE/2;
+        }
+    }
 
     // -------------------------------------- //
     // -------- Constraint Violation -------- //
@@ -1432,6 +1528,9 @@ namespace torc::mpc {
                 violation += GetSwingHeightViolation(qp_res, node);
 
                 violation += GetCollisionViolation(qp_res, node);
+
+                violation += GetFootPolytopeViolation(qp_res, node);
+                // std::cout << "Foot polytope constraint violation: " << GetFootPolytopeConstraint(qp_res, node) << std::endl;
             }
         }
 
@@ -1631,7 +1730,6 @@ namespace torc::mpc {
         return violation;
     }
 
-
     double FullOrderMpc::GetSwingHeightViolation(const vectorx_t &qp_res, int node) {
         double violation = 0;
         for (const auto& frame : contact_frames_) {
@@ -1651,6 +1749,28 @@ namespace torc::mpc {
         return violation;
     }
 
+    double FullOrderMpc::GetFootPolytopeViolation(const vectorx_t& qp_res, int node) {
+        double violation = 0;
+
+        for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+            vectorx_t x(constraint->GetDomainSize());
+            vectorx_t p(constraint->GetParameterSize());
+            vectorx_t y;
+
+            const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
+            x << dqk;
+
+            p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(),
+                foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
+
+            constraint->GetFunctionValue(x, p, y);
+            for (double yi : y) {
+                violation += yi*std::max(yi, 0.0);
+            }
+        }
+
+        return violation;
+    }
 
     // -------------------------------------- //
     // -------- Linearization Helpers ------- //
@@ -2156,6 +2276,8 @@ namespace torc::mpc {
                 AddSwingHeightPattern(node);
 
                 AddCollisionPattern(node);
+
+                AddFootPolytopePattern(node);
             }
         }
 
@@ -2381,6 +2503,21 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::AddFootPolytopePattern(int node) {
+        int row_start = GetConstraintRow(node, FootPolytope);
+        int col_start = GetDecisionIdx(node, Configuration);
+
+        for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+            const auto sparsity = constraint->GetJacobianSparsityPatternSet();
+            torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                sparsity_head[i] = sparsity[i];
+            }
+            AddSparsitySet(sparsity_head, row_start, col_start, constraint_triplets_);
+            row_start += POLYTOPE_SIZE/2;
+        }
+    }
+
 
     // ------------------------------------------------- //
     // ---------------- Helper Functions --------------- //
@@ -2506,6 +2643,8 @@ namespace torc::mpc {
                 row += NumSwingHeightConstraintsNode();
 
                 row += NumCollisionConstraintsNode();
+
+                row += NumFootPolytopeConstraintsNode();
             }
         }
 
@@ -2516,6 +2655,10 @@ namespace torc::mpc {
     int FullOrderMpc::GetConstraintRow(int node, const ConstraintType& constraint) const {
         int row = GetConstraintRowStartNode(node);
         switch (constraint) {
+            case FootPolytope:
+                if (node > 0) {
+                    row += NumCollisionConstraintsNode();
+                }
             case Collision:
                 if (node > 0) {
                     row += NumHolonomicConstraintsNode();
@@ -2708,6 +2851,9 @@ namespace torc::mpc {
         return collision_constraints_.size();
     }
 
+    int FullOrderMpc::NumFootPolytopeConstraintsNode() const {
+        return (POLYTOPE_SIZE/2)*num_contact_locations_;
+    }
 
     // Other functions
     void FullOrderMpc::SetVerbosity(bool verbose) {
