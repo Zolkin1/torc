@@ -106,13 +106,6 @@ namespace torc::mpc {
          */
         [[nodiscard]] double GetTrajCost(const Trajectory& traj, const CostTargets& targets) const;
 
-        /**
-         * @brief return the current parameters that define the cost.
-         * Thread safe.
-         * @return
-         */
-        [[nodiscard]] CostTargets GetCostSnapShot();
-
         void SetVerbosity(bool verbose);
 
         [[nodiscard]] std::vector<std::string> GetContactFrames() const;
@@ -333,7 +326,6 @@ namespace torc::mpc {
         [[nodiscard]] int GetDecisionIdxStart(int node) const;
 
         [[nodiscard]] int GetNumConstraints() const;
-        [[nodiscard]] int GetConstraintsPerNode() const;
         [[nodiscard]] int GetConstraintRow(int node, const ConstraintType& constraint) const;
         [[nodiscard]] int GetConstraintRowStartNode(int node) const;
 
