@@ -4,7 +4,6 @@
 
 #include "full_order_mpc.h"
 
-// TODO: Fix the new constraint violation issues
 
 int main() {
     using namespace torc::mpc;
@@ -22,6 +21,15 @@ int main() {
 
     cs.InsertSwing("right_toe", 0.3, 0.6);
     cs.InsertSwing("right_heel", 0.3, 0.6);
+
+    matrixx_t A_temp = matrixx_t::Identity(2, 2);
+    Eigen::Vector4d b_temp = Eigen::Vector4d::Zero();
+    b_temp << 10, 10, 10, 10;
+    for (const auto& frame : mpc.GetContactFrames()) {
+        for (int i = 0; i < cs.GetNumContacts(frame); i++) {
+            cs.SetPolytope(frame, i, A_temp, b_temp);
+        }
+    }
 
     const double apex_height = 0.08;
     const std::vector<double> foot_height = {0.01, 0.01, 0.01, 0.01};

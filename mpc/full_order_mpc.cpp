@@ -112,7 +112,7 @@ namespace torc::mpc {
         // Init polytope
         matrixx_t A_temp = matrixx_t::Identity(2, 2);
         vector4_t b_temp = vector4_t::Zero();
-        b_temp << 10, 20, 10, 50;
+        b_temp << 10, 10, 10, 10;
         std::vector<matrixx_t> A_vec(nodes_);
         std::vector<vectorx_t> b_vec(nodes_);
         for (int i = 0; i < nodes_; i++) {
@@ -505,17 +505,35 @@ namespace torc::mpc {
     }
 
     void FullOrderMpc::UpdateContactSchedule(const ContactSchedule& contact_schedule) {
-        // TODO: Also need to grab the foot polytope
         // Convert the contact schedule into the binary digits I need
         for (auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
             if (in_contact_.contains(frame)) {
+
+                const auto polytopes = contact_schedule.GetPolytopes(frame);
+
+                int contact_count = -1;
+                bool contact_counted = false;
+
+                // std::cout << "Polytopes size: " << polytopes.size() << std::endl;
+
                 // Break the continuous time contact schedule into each node
                 double time = 0;
                 for (int node = 0; node < nodes_; node++) {
                     if (contact_schedule.InContact(frame, time)) {
                         in_contact_[frame][node] = 1;
+                        if (!contact_counted) {
+                            contact_count++;
+                            contact_counted = true;
+                        }
+                        // std::cout << "Contact count: " << contact_count << std::endl;
+                        foot_polytope_[frame][node] = polytopes[contact_count].A_;
+                        ub_lb_polytope[frame][node] = polytopes[contact_count].b_;
                     } else {
                         in_contact_[frame][node] = 0;
+                        foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                        ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+
+                        contact_counted = false;
                     }
                     time += dt_[node];
                 }
@@ -1115,7 +1133,7 @@ namespace torc::mpc {
         // ad::ad_matrix_t A = ad::ad_matrix_t::Identity(POLYTOPE_SIZE, 2);
 
         for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
-            A.row(i) = qk_A_b.segment<2>(config_dim_ + i*2);
+            A.row(i) = qk_A_b.segment<2>(config_dim_ + i*2).transpose();
         }
 
         A.bottomRows<POLYTOPE_SIZE/2>() = -A.topRows<POLYTOPE_SIZE/2>();
@@ -1464,7 +1482,7 @@ namespace torc::mpc {
             vectorx_t p(constraint->GetParameterSize());
             // std::cout << "A row 0: " << foot_polytope_[frame][node].row(0) << std::endl;
             // std::cout << "A row 1: " << foot_polytope_[frame][node].row(1) << std::endl;
-            p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), 0, 0, 0, 0; //ub_lb_polytope[frame][node];
+            p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
 
             const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
             torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
@@ -1481,8 +1499,8 @@ namespace torc::mpc {
             vectorx_t y;
             constraint->GetFunctionValue(x_zero, p, y);
             for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
-                osqp_instance_.upper_bounds(row_start + i) = std::max(-y(i), -y(i + POLYTOPE_SIZE/2));
-                osqp_instance_.lower_bounds(row_start + i) = std::min(-y(i), -y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.upper_bounds(row_start + i) = std::max(-y(i), y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.lower_bounds(row_start + i) = std::min(-y(i), y(i + POLYTOPE_SIZE/2));
             }
 
             // std::cout << "y: " << y.transpose() << std::endl;

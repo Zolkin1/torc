@@ -12,8 +12,14 @@
 #include <Eigen/Core>
 
 namespace torc::mpc {
-    using matrix2x_t = Eigen::Matrix2Xd;
+    using matrixx_t = Eigen::MatrixXd;
     using vector4_t = Eigen::Vector4d;
+
+     struct ContactInfo {
+         matrixx_t A_;
+         vector4_t b_;
+     };
+
     /**
      * @brief Holds a contact schedule.
      *
@@ -39,6 +45,9 @@ namespace torc::mpc {
          */
         // void InsertContact(const std::string& frame, double start_time, double stop_time);
 
+        /**
+        * @brief Inserts a swing time.
+        */
         void InsertSwing(const std::string& frame, double start_time, double stop_time);
 
         void InsertSwingByDuration(const std::string& frame, double start_time, double duration);
@@ -93,14 +102,31 @@ namespace torc::mpc {
 
      // double GetLastContactTime(const std::string& frame);
         double GetLastSwingTime(const std::string& frame) const;
+
+        std::vector<ContactInfo> GetPolytopes(const std::string& frame) const;
+
+        void SetPolytope(const std::string& frame, int contact_num, const matrixx_t& A, const vector4_t& b);
+
+        int GetNumContacts(const std::string& frame) const;
+
+        ContactInfo GetDefaultContactInfo() const;
+
+        // TODO: Add a way to change the default
+
     protected:
          static double GetTime(const std::vector<double>& dt_vec, int node);
 
         std::map<std::string, std::vector<std::pair<double, double>>> frame_schedule_map;
 
+        // Vector has a length equal to the number of contacts
+        std::map<std::string, std::vector<ContactInfo>> contact_polytopes;
+
+        matrixx_t A_default_;
+        vector4_t b_default_;
+
         // Hold the polytope giving the foot constraint
-        std::map<std::string, std::vector<matrix2x_t>> A_;
-        std::map<std::string, std::vector<vector4_t>> ub_lb_;
+        // std::map<std::string, std::vector<matrix2x_t>> A_;
+        // std::map<std::string, std::vector<vector4_t>> ub_lb_;
     };
 }    // namespace torc::mpc
 

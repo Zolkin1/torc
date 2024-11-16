@@ -13,13 +13,18 @@
 namespace torc::mpc {
     ContactSchedule::ContactSchedule(const std::vector<std::string>& frames) {
         SetFrames(frames);
+        A_default_ = matrixx_t::Identity(2, 2);
+        b_default_ = vector4_t::Constant(10);
     }
 
 
     void ContactSchedule::SetFrames(const std::vector<std::string>& frames) {
         frame_schedule_map.clear();
+
         for (const auto& frame : frames) {
             frame_schedule_map.insert({frame, {}});
+            contact_polytopes.insert({frame, {}});
+            contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
         }
     }
 
@@ -37,11 +42,13 @@ namespace torc::mpc {
     void ContactSchedule::InsertSwing(const std::string& frame, double start_time, double stop_time) {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, stop_time);
+        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
     }
 
     void ContactSchedule::InsertSwingByDuration(const std::string& frame, double start_time, double duration) {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, start_time + duration);
+        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
     }
 
     bool ContactSchedule::InContact(const std::string& frame, double time) const {
@@ -68,6 +75,7 @@ namespace torc::mpc {
     void ContactSchedule::CleanContacts(double time_cutoff) {
         for (auto& [frame, contacts] : frame_schedule_map) {
             std::erase_if(contacts, [](const std::pair<double, double>& contact_pair) {return contact_pair.second < 0;});
+            contact_polytopes[frame].resize(GetNumContacts(frame));
         }
     }
 
@@ -259,6 +267,26 @@ namespace torc::mpc {
         }
     }
 
+    std::vector<ContactInfo> ContactSchedule::GetPolytopes(const std::string& frame) const {
+        return contact_polytopes.at(frame);
+    }
+
+    void ContactSchedule::SetPolytope(const std::string& frame, int contact_num, const matrixx_t& A, const vector4_t& b) {
+        contact_polytopes[frame][contact_num].A_ = A;
+        contact_polytopes[frame][contact_num].b_ = b;
+    }
+
+    int ContactSchedule::GetNumContacts(const std::string& frame) const {
+        return frame_schedule_map.at(frame).size() + 1;
+    }
+
+    ContactInfo ContactSchedule::GetDefaultContactInfo() const {
+        ContactInfo contact_info;
+        contact_info.A_ = A_default_;
+        contact_info.b_ = b_default_;
+
+        return contact_info;
+    }
 
 
 } // namespace torc::mpc
