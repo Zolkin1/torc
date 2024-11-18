@@ -112,7 +112,7 @@ namespace torc::mpc {
         // Init polytope
         matrixx_t A_temp = matrixx_t::Identity(2, 2);
         vector4_t b_temp = vector4_t::Zero();
-        b_temp << 10, 10, 10, 10;
+        b_temp << 10, 10, -10, -10;
         std::vector<matrixx_t> A_vec(nodes_);
         std::vector<vectorx_t> b_vec(nodes_);
         for (int i = 0; i < nodes_; i++) {
@@ -1138,7 +1138,8 @@ namespace torc::mpc {
 
         A.bottomRows<POLYTOPE_SIZE/2>() = -A.topRows<POLYTOPE_SIZE/2>();
 
-        const ad::ad_vector_t& b = qk_A_b.tail<POLYTOPE_SIZE>();        // ub then lb
+        ad::ad_vector_t b = qk_A_b.tail<POLYTOPE_SIZE>();        // ub then lb
+        b.tail<POLYTOPE_SIZE/2>() = -b.tail<POLYTOPE_SIZE/2>();
 
         const ad::ad_vector_t q = torc::models::ConvertdqToq(dqk, qkbar);
 
@@ -1152,6 +1153,9 @@ namespace torc::mpc {
 
         violation.resize(POLYTOPE_SIZE);
         violation = A*frame_pos.head<2>() - b;
+        // vector2_t x_temp;
+        // x_temp << 1, 1;
+        // violation = A*x_temp - b;
     }
 
 
@@ -1482,6 +1486,7 @@ namespace torc::mpc {
             vectorx_t p(constraint->GetParameterSize());
             // std::cout << "A row 0: " << foot_polytope_[frame][node].row(0) << std::endl;
             // std::cout << "A row 1: " << foot_polytope_[frame][node].row(1) << std::endl;
+            // std::cout << "b: " << ub_lb_polytope[frame][node].transpose() << std::endl;
             p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
 
             const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
@@ -1499,10 +1504,12 @@ namespace torc::mpc {
             vectorx_t y;
             constraint->GetFunctionValue(x_zero, p, y);
             for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
-                osqp_instance_.upper_bounds(row_start + i) = std::max(-y(i), y(i + POLYTOPE_SIZE/2));
-                osqp_instance_.lower_bounds(row_start + i) = std::min(-y(i), y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.upper_bounds(row_start + i) = std::max(y(i), -y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.lower_bounds(row_start + i) = std::min(y(i), -y(i + POLYTOPE_SIZE/2));
             }
 
+            robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+            // std::cout << frame << " position: " << robot_model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
             // std::cout << "y: " << y.transpose() << std::endl;
 
             row_start += POLYTOPE_SIZE/2;
@@ -1547,7 +1554,7 @@ namespace torc::mpc {
 
                 violation += GetCollisionViolation(qp_res, node);
 
-                violation += GetFootPolytopeViolation(qp_res, node);
+                // violation += GetFootPolytopeViolation(qp_res, node);
                 // std::cout << "Foot polytope constraint violation: " << GetFootPolytopeConstraint(qp_res, node) << std::endl;
             }
         }

@@ -24,7 +24,7 @@ int main() {
 
     matrixx_t A_temp = matrixx_t::Identity(2, 2);
     Eigen::Vector4d b_temp = Eigen::Vector4d::Zero();
-    b_temp << 10, 10, 10, 10;
+    b_temp << 10, 10, -10, -10;
     for (const auto& frame : mpc.GetContactFrames()) {
         for (int i = 0; i < cs.GetNumContacts(frame); i++) {
             cs.SetPolytope(frame, i, A_temp, b_temp);
