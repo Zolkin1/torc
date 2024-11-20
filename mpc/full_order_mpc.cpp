@@ -13,7 +13,7 @@
 #include "torc_timer.h"
 #include "pinocchio_interface.h"
 
-#define NAN_CHECKS 0
+#define NAN_CHECKS 1
 
 //  Can make the max force different for each contact, so I make sure the toe force is small (i.e. proportional to the ankle torque)
 // TODO: Consider removing the last torque and force variables (i.e. in the last node) - would make the problem slightly smaller
@@ -1153,6 +1153,9 @@ namespace torc::mpc {
 
         violation.resize(POLYTOPE_SIZE);
         violation = A*frame_pos.head<2>() - b;
+        // violation << frame_pos.head<2>(), -frame_pos.head<2>();
+        // violation = violation - b;
+
         // vector2_t x_temp;
         // x_temp << 1, 1;
         // violation = A*x_temp - b;
@@ -1554,8 +1557,8 @@ namespace torc::mpc {
 
                 violation += GetCollisionViolation(qp_res, node);
 
-                // violation += GetFootPolytopeViolation(qp_res, node);
-                // std::cout << "Foot polytope constraint violation: " << GetFootPolytopeConstraint(qp_res, node) << std::endl;
+                violation += GetFootPolytopeViolation(qp_res, node);
+                // std::cout << "Foot polytope constraint violation: " << GetFootPolytopeViolation(qp_res, node) << std::endl;
             }
         }
 
@@ -1785,6 +1788,8 @@ namespace torc::mpc {
             const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
             x << dqk;
 
+            // std::cout << "A row 0: " << foot_polytope_[frame].at(node).row(0) << std::endl;
+            // std::cout << "A row 1: " << foot_polytope_[frame].at(node).row(1) << std::endl;
             p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(),
                 foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
 
@@ -1792,6 +1797,10 @@ namespace torc::mpc {
             for (double yi : y) {
                 violation += yi*std::max(yi, 0.0);
             }
+        }
+
+        if (std::isinf(violation)) {
+            std::cout << "FootPolytope violation is inf.\n node:" << node << std::endl;
         }
 
         return violation;

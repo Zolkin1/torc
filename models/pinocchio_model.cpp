@@ -289,7 +289,7 @@ namespace torc::models {
                              pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx, ref));
             return state;
         }
-        throw std::runtime_error("Provided frame does not exist.");
+        throw std::runtime_error(frame + " does not exist.");
     }
 
      FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v, const pinocchio::ReferenceFrame& ref) {

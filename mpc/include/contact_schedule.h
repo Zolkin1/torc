@@ -111,8 +111,6 @@ namespace torc::mpc {
 
         ContactInfo GetDefaultContactInfo() const;
 
-        // TODO: Add a way to change the default
-
     protected:
          static double GetTime(const std::vector<double>& dt_vec, int node);
 
@@ -120,9 +118,6 @@ namespace torc::mpc {
 
         // Vector has a length equal to the number of contacts
         std::map<std::string, std::vector<ContactInfo>> contact_polytopes;
-
-        matrixx_t A_default_;
-        vector4_t b_default_;
 
         // Hold the polytope giving the foot constraint
         // std::map<std::string, std::vector<matrix2x_t>> A_;

@@ -13,8 +13,8 @@
 namespace torc::mpc {
     ContactSchedule::ContactSchedule(const std::vector<std::string>& frames) {
         SetFrames(frames);
-        A_default_ = matrixx_t::Identity(2, 2);
-        b_default_ = vector4_t::Constant(10);
+        // A_default_ = matrixx_t::Identity(2, 2);
+        // b_default_ = vector4_t::Constant(10);
     }
 
 
@@ -282,8 +282,10 @@ namespace torc::mpc {
 
     ContactInfo ContactSchedule::GetDefaultContactInfo() const {
         ContactInfo contact_info;
-        contact_info.A_ = A_default_;
-        contact_info.b_ = b_default_;
+
+        // TODO: Come back to these defaults
+        contact_info.A_ = matrixx_t::Identity(2, 2);
+        contact_info.b_ << 100, 100, -100, -100;
 
         return contact_info;
     }
