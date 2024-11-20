@@ -1312,15 +1312,14 @@ namespace torc::mpc {
             row_start += friction_cone_constraint_->GetRangeSize();
             col_start += CONTACT_3DOF;
 
-            // TODO: I think I can remove this
             // ----- Z Force Bounds ----- //
-            // DiagonalScalarMatrixToTriplet(in_contact_[frame][node]*1, row_start, col_start - 1, 1,
-            //     constraint_triplets_, constraint_triplet_idx_);
-            //
-            // osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*traj_.GetForce(node, frame)(2);
-            // osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*(max_grf_ - traj_.GetForce(node, frame)(2));
-            //
-            // row_start += 1;
+            DiagonalScalarMatrixToTriplet(in_contact_[frame][node]*1, row_start, col_start - 1, 1,
+                constraint_triplets_, constraint_triplet_idx_);
+
+            osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*traj_.GetForce(node, frame)(2);
+            osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*(max_grf_ - traj_.GetForce(node, frame)(2));
+
+            row_start += 1;
 
         }
     }
@@ -2459,8 +2458,8 @@ namespace torc::mpc {
             col_start += CONTACT_3DOF;
 
             // ----- Z force bounds ----- //
-            // MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
-            // row_start += 1;
+            MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
+            row_start += 1;
         }
     }
 
@@ -2857,8 +2856,8 @@ namespace torc::mpc {
 
 
     int FullOrderMpc::NumFrictionConeConstraintsNode() const {
-        return num_contact_locations_ * (1 + CONTACT_3DOF);
-        // return num_contact_locations_ * (1 + CONTACT_3DOF + 1);
+        // return num_contact_locations_ * (1 + CONTACT_3DOF);
+        return num_contact_locations_ * (1 + CONTACT_3DOF + 1);
     }
 
     int FullOrderMpc::NumConfigBoxConstraintsNode() const {
