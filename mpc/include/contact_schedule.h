@@ -111,8 +111,10 @@ namespace torc::mpc {
 
         ContactInfo GetDefaultContactInfo() const;
 
+        int GetContactIndex(const std::string& frame, double time) const;
+
     protected:
-         static double GetTime(const std::vector<double>& dt_vec, int node);
+        static double GetTime(const std::vector<double>& dt_vec, int node);
 
         std::map<std::string, std::vector<std::pair<double, double>>> frame_schedule_map;
 

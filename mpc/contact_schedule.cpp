@@ -74,7 +74,7 @@ namespace torc::mpc {
 
     void ContactSchedule::CleanContacts(double time_cutoff) {
         for (auto& [frame, contacts] : frame_schedule_map) {
-            std::erase_if(contacts, [](const std::pair<double, double>& contact_pair) {return contact_pair.second < 0;});
+            std::erase_if(contacts, [time_cutoff](const std::pair<double, double>& contact_pair) {return contact_pair.second < time_cutoff;});
             contact_polytopes[frame].resize(GetNumContacts(frame));
         }
     }
@@ -277,6 +277,7 @@ namespace torc::mpc {
     }
 
     int ContactSchedule::GetNumContacts(const std::string& frame) const {
+    // TODO: This is not correct over the time horizon
         return frame_schedule_map.at(frame).size() + 1;
     }
 
@@ -290,5 +291,17 @@ namespace torc::mpc {
         return contact_info;
     }
 
+    int ContactSchedule::GetContactIndex(const std::string& frame, double time) const {
+        // Loop through the swing times for the given frame
+        // Get the contact index for the stuff between the swings
+        const auto& swings = frame_schedule_map.at(frame);
+        for (int i = 0; i < swings.size(); i++) {
+            if (swings[i].first > time) {
+                return i;
+            }
+        }
+
+        return swings.size();
+    }
 
 } // namespace torc::mpc
