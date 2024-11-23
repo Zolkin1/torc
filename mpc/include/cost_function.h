@@ -36,7 +36,8 @@ namespace torc::mpc {
         VelocityTracking,
         TorqueReg,
         ForceReg,
-        ForwardKinematics
+        ForwardKinematics,
+        FootPolytope,
     };
 
     /**
@@ -52,6 +53,9 @@ namespace torc::mpc {
         std::string frame_name;
         std::string constraint_name;        // TODO: Change to cost name!
         ad::sparsity_pattern_t sp_pattern;
+        // For cost relaxation
+        double delta;
+        double mu;
     };
 
     class CostFunction {
@@ -136,6 +140,17 @@ namespace torc::mpc {
                             deriv_libs_path,
                             torc::ad::DerivativeOrder::FirstOrder, vel_size_, config_size_ + 2*POS_VARS,
                             compile_derivatives_));
+                } else if (data.type == FootPolytope) {
+                    if (data.weight.size() != POLYTOPE_SIZE) {
+                        throw std::runtime_error("Foot polytope weight has wrong size!");
+                    }
+
+                    cost_fcn_terms_.emplace(data.constraint_name, std::make_unique<torc::ad::CppADInterface>(
+                            std::bind(&CostFunction::FootPolytopeCost, this, model->GetFrameIdx(data.frame_name), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+                            name_ + data.constraint_name + "_mpc_polytope_cost",
+                            deriv_libs_path,
+                            torc::ad::DerivativeOrder::FirstOrder, vel_size_, config_size_ + POLYTOPE_SIZE + POLYTOPE_SIZE + 2 + POLYTOPE_SIZE,
+                            true)); //compile_derivatives_));
                 } else {
                     std::cerr << "Cost term is not recognized!" << std::endl;
                 }
@@ -250,6 +265,23 @@ namespace torc::mpc {
                 vectorx_t y;
                 cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
                 linear_term = 2*jac.transpose()*y;
+            } else if (data->type == FootPolytope) {
+                if (reference.size() != config_size_ || target.size() != 2*POLYTOPE_SIZE + 2) {
+                    throw std::runtime_error("[Cost Function] polytope approx reference or target has the wrong size! Expected "
+                    + std::to_string(cost_fcn_terms_[name]->GetParameterSize()) + " but got " + std::to_string(reference.size()) + "!");
+                }
+
+                matrixx_t jac;
+                cost_fcn_terms_[name]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
+                hessian_term = 2*hessian_term;
+
+                // hessian_term = hessian_term + 1e-5*matrixx_t::Identity(hessian_term.rows(), hessian_term.cols());       // Ensures that we are PSD
+
+                // std::cout << "hess: \n" << hessian_term << std::endl;
+
+                vectorx_t y;
+                cost_fcn_terms_[name]->GetFunctionValue(vectorx_t::Zero(vel_size_), p, y);
+                linear_term = 2*jac.transpose()*y;
             } else {
                 throw std::runtime_error("[Cost Function] Provided cost type not supported yet!");
             }
@@ -285,9 +317,13 @@ namespace torc::mpc {
             p << reference, target, data.weight;
             vectorx_t y = vectorx_t::Zero(cost_fcn_terms_.at(name)->GetRangeSize());
             cost_fcn_terms_.at(name)->GetFunctionValue(decision_var, p, y);
+
+            if (cost_fcn_terms_.at(name)->GetParameterSize() == config_size_ + POLYTOPE_SIZE + POLYTOPE_SIZE + 2 + POLYTOPE_SIZE) {
+                std::cout << "y: " << y.transpose() << std::endl;
+            }
+
             return y.squaredNorm();     // Assumes all the functions have the form of a norm
         }
-
 
     protected:
 //        static void ConvertJacobianToVectorSum(matrixx_t& jac, vectorx_t& linear_term) {
@@ -390,6 +426,46 @@ namespace torc::mpc {
             }
         }
 
+        void FootPolytopeCost(int frame_idx, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_A_b_delta_mu_weight, ad::ad_vector_t& polytope_cost) const {
+            const ad::ad_vector_t& qkbar = qk_A_b_delta_mu_weight.head(config_size_);
+            ad::ad_matrix_t A = ad::ad_matrix_t::Zero(POLYTOPE_SIZE, 2);
+            // ad::ad_matrix_t A = ad::ad_matrix_t::Identity(POLYTOPE_SIZE, 2);
+
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                A.row(i) = qk_A_b_delta_mu_weight.segment<2>(config_size_ + i*2).transpose();
+            }
+
+            A.bottomRows<POLYTOPE_SIZE/2>() = -A.topRows<POLYTOPE_SIZE/2>();
+
+            ad::ad_vector_t b = qk_A_b_delta_mu_weight.segment<POLYTOPE_SIZE>(config_size_ + POLYTOPE_SIZE);        // ub then lb
+            b.tail<POLYTOPE_SIZE/2>() = -b.tail<POLYTOPE_SIZE/2>();
+
+            const ad::ad_vector_t q = torc::models::ConvertdqToq(dqk, qkbar);
+
+            // Forward kinematics
+            pinocchio::forwardKinematics(ad_pin_model_, *ad_pin_data_, q);
+            pinocchio::updateFramePlacement(ad_pin_model_, *ad_pin_data_, frame_idx);
+
+            // Get frame position in world frame (data oMf)
+            ad::ad_vector_t frame_pos = ad_pin_data_->oMf.at(frame_idx).translation();
+
+            polytope_cost.resize(POLYTOPE_SIZE);
+            polytope_cost = A*frame_pos.head<2>() - b;
+            // polytope_cost.setZero();
+
+            // Now apply relaxed barrier
+            const ad::adcg_t& delta = qk_A_b_delta_mu_weight(config_size_ + 2*POLYTOPE_SIZE);
+            const ad::adcg_t& mu = qk_A_b_delta_mu_weight(config_size_ + 2*POLYTOPE_SIZE + 1);
+            for (auto& val : polytope_cost) {
+                ad::adcg_t relaxed_barrier = ((-val - 2*delta)/delta);
+                // relaxed_barrier = relaxed_barrier*relaxed_barrier;
+                relaxed_barrier = (relaxed_barrier*relaxed_barrier - 1)*mu/2 - mu*CppAD::log(delta);
+                ad::adcg_t barrier = -mu*CppAD::log(-val);
+                val = CppAD::CondExpGe(val, 0*-delta, relaxed_barrier, 0*barrier);
+                // val = -CppAD::log(-val + 1);
+            }
+        }
+
         /**
          * @brief Calculates the error frame location relative to a given location
          * @param dq
@@ -432,6 +508,9 @@ namespace torc::mpc {
         int input_size_{};
         int force_size_{};
         int nodes_{};
+
+        // TODO: Make this automatically match the variable in the MPC
+        static constexpr int POLYTOPE_SIZE = 4;
 
         // Using explicit function here seemed to cause memory leaks
         // Also unclear if it is the memory leaks or the type here, but the MPC is notably quicker now

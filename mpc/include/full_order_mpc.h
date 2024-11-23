@@ -423,6 +423,10 @@ namespace torc::mpc {
 
         std::vector<vectorx_t> cost_weights_;
 
+        // Cost Barrier Relaxations
+        double mu_;
+        double delta_;
+
         // Line search
         double alpha_;
         LineSearchCondition ls_condition_;

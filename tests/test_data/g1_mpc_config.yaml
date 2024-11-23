@@ -73,6 +73,10 @@ costs:
   - type: ForceRegularization
     name: "ForceReg"
     weight: [0.001, 0.001, 0.01]
+  - type: FootPolytope
+    name: "left_toe_polytope"
+    weight: [1, 1, 1, 1]
+    frame: "left_toe"
 contacts:
   contact_frames: ["left_toe", "left_heel", "right_toe", "right_heel"]
   hip_offsets: [0.145, 0.1164, -0.025, 0.1164, 0.145, 0.1164, -0.025, 0.1164,]

@@ -88,7 +88,7 @@ namespace torc::mpc {
             name_ + "_" + frame + "_foot_polytope_constraint",
             deriv_lib_path_,
             ad::DerivativeOrder::FirstOrder, vel_dim_,  config_dim_ + POLYTOPE_SIZE + POLYTOPE_SIZE,
-            true //compile_derivatves_  //TODO: Put back
+            compile_derivatves_  //TODO: Put back
             ));
         }
 
@@ -127,6 +127,10 @@ namespace torc::mpc {
 
         q_target_.SetSizes(robot_model_->GetConfigDim(), nodes_);
         v_target_.SetSizes(robot_model_->GetVelDim(), nodes_);
+
+        // TODO: Make not hard coded
+        mu_ = 1.3;
+        delta_ = 0.02;
     }
 
     FullOrderMpc::~FullOrderMpc() {
@@ -1587,7 +1591,7 @@ namespace torc::mpc {
 
                 violation += GetFootPolytopeViolation(qp_res, node);
                 double fvio = GetFootPolytopeViolation(qp_res, node);
-                // std::cout << "Foot polytope constraint violation: " << fvio << std::endl;
+                std::cout << "Foot polytope constraint violation: " << fvio << std::endl;
                 if (fvio > 100) {
                     throw std::runtime_error("Foot polytope violation exceeded max bounds!");
                 }
@@ -1896,6 +1900,10 @@ namespace torc::mpc {
                     int decision_idx = GetDecisionIdx(i, Configuration);
                     data.sp_pattern = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
                     AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
+                } else if (data.type == CostTypes::FootPolytope && i > 0) {
+                    int decision_idx = GetDecisionIdx(i, Configuration);
+                    data.sp_pattern = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
                 }
             }
         }
@@ -1943,7 +1951,7 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetConfiguration(node), GetConfigTarget(node),
                                            ws_->obj_config_vector, ws_->obj_config_mat, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
                             scaling * ws_->obj_config_vector;
 
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_,
@@ -1954,7 +1962,7 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetVelocity(node), GetVelTarget(node),
                                            ws_->obj_vel_vector, ws_->obj_vel_mat, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
                             scaling * ws_->obj_vel_vector;
 
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_,
@@ -1967,7 +1975,7 @@ namespace torc::mpc {
                         cost_.GetApproximation(traj_.GetForce(node, frame), force_target,
                                                ws_->obj_force_vector, ws_->obj_force_mat, data.constraint_name);
 
-                        osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
+                        osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) +=
                                 scaling * ws_->obj_force_vector;
 
                         MatrixToTripletWithSparsitySet(scaling * ws_->obj_force_mat, force_idx, force_idx, objective_triplets_,
@@ -1982,7 +1990,7 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetTau(node), tau_target,
                                            ws_->obj_tau_vector, ws_->obj_tau_mat, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) +=
                             scaling * ws_->obj_tau_vector;
 
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_,
@@ -1999,7 +2007,27 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetConfiguration(node), GetDesiredFramePos(node, data.frame_name),
                                            linear_term, hess_term, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
+                            scaling * linear_term;
+
+                    MatrixToTripletWithSparsitySet(scaling * hess_term, decision_idx, decision_idx, objective_triplets_,
+                                                   objective_triplet_idx_, data.sp_pattern);
+                } else if (data.type == CostTypes::FootPolytope && node > 0) {
+                    int decision_idx = GetDecisionIdx(node, Configuration);
+                    // std::string frame = contact_frames_[0];
+                    vectorx_t linear_term;
+                    matrixx_t hess_term;
+
+                    // Target = A, b, mu, delta
+                    vectorx_t target(2*POLYTOPE_SIZE + 2);
+                    target << foot_polytope_[data.frame_name][node].row(0).transpose(),
+                                        foot_polytope_[data.frame_name][node].row(1).transpose(),
+                                        ub_lb_polytope[data.frame_name][node], data.delta, data.mu;
+
+                    cost_.GetApproximation(traj_.GetConfiguration(node), target,
+                                           linear_term, hess_term, data.constraint_name);
+
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
                             scaling * linear_term;
 
                     MatrixToTripletWithSparsitySet(scaling * hess_term, decision_idx, decision_idx, objective_triplets_,
@@ -2069,6 +2097,15 @@ namespace torc::mpc {
                     vectorx_t pos_target = GetDesiredFramePos(node, data.frame_name);
                     cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
                                                            traj_.GetConfiguration(node), pos_target, data.constraint_name);
+                } else if (data.type == CostTypes::FootPolytope && node > 0) {
+                    vectorx_t target(2*POLYTOPE_SIZE + 2);
+                    target << foot_polytope_[data.frame_name][node].row(0).transpose(),
+                                        foot_polytope_[data.frame_name][node].row(1).transpose(),
+                                        ub_lb_polytope[data.frame_name][node], data.delta, data.mu;
+                    cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                                                           traj_.GetConfiguration(node), target, data.constraint_name);
+                    // std::cout << "Polytope cost: " << cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                    //                                         traj_.GetConfiguration(node), target, data.constraint_name) << std::endl;
                 }
             }
 
@@ -2121,6 +2158,14 @@ namespace torc::mpc {
                     cost_node += scale * cost_.GetTermCost(
                             q_zero,
                             traj.GetConfiguration(node), targets.fk_targets.at(data.constraint_name)[node], data.constraint_name);
+                } else if (data.type == CostTypes::FootPolytope) {
+                    throw std::runtime_error("Trajectory cost for FootPolytope not implemented!");
+                    // vectorx_t target(2*POLYTOPE_SIZE + 2);
+                    // target << foot_polytope_[data.frame_name][node].row(0).transpose(),
+                    //                     foot_polytope_[data.frame_name][node].row(1).transpose(),
+                    //                     ub_lb_polytope[data.frame_name][node], mu_, delta_;
+                    // cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                    //                                        traj_.GetConfiguration(node), target, data.constraint_name);
                 }
             }
 
@@ -2203,6 +2248,8 @@ namespace torc::mpc {
                     cost_data_[idx].type = CostTypes::ForceReg;
                 } else if (type == "ForwardKinematics") {
                     cost_data_[idx].type = CostTypes::ForwardKinematics;
+                } else if (type == "FootPolytope") {
+                    cost_data_[idx].type = CostTypes::FootPolytope;
                 } else {
                     throw std::runtime_error("Provided cost type does not exist!");
                 }
@@ -2223,8 +2270,16 @@ namespace torc::mpc {
                 throw std::runtime_error("Cost term must include a weight!");
             }
 
-            if (cost_term["frame"] && cost_data_[idx].type == ForwardKinematics) {
+            if (cost_term["frame"]) { // && (cost_data_[idx].type == ForwardKinematics || cost_data_[idx].type == FootPolytope)) {
                 cost_data_[idx].frame_name = cost_term["frame"].as<std::string>();
+            }
+
+            if (cost_term["mu"]) {
+                cost_data_[idx].mu = cost_term["mu"].as<double>();
+            }
+
+            if (cost_term["delta"]) {
+                cost_data_[idx].delta = cost_term["delta"].as<double>();
             }
 
             idx++;
