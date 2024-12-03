@@ -40,24 +40,23 @@ int main() {
     }
 
     // Print swing trajectory to csv for checking
-    std::ofstream traj_file;
-    traj_file.open("swing_traj.txt");
-    double t = 0.2;
-    for (int i = 0; i < 100; i++) {
-        double height = cs.GetSwingHeight(apex_height, foot_height[0], apex_time, t, 0.2, 0.5);
-        t += 0.3/100;
-        traj_file << height << ", " << t << std::endl;
-    }
+    // std::ofstream traj_file;
+    // traj_file.open("swing_traj.txt");
+    // double t = 0.2;
+    // for (int i = 0; i < 100; i++) {
+    //     double height = cs.GetSwingHeight(apex_height, foot_height[0], apex_time, t, 0.2, 0.5);
+    //     t += 0.3/100;
+    //     traj_file << height << ", " << t << std::endl;
+    // }
     std::cout << "Apex time: " << apex_time << " foot height: " << foot_height[0] << " start time: " << 0 << " end time: " << 0.3 << std::endl;
-    traj_file.close();
+    // traj_file.close();
 
     vectorx_t q_target, v_target;
     q_target.resize(g1.GetConfigDim());
     q_target << 0, 0, 0.793,
                 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0,
+                0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
                 0, 0, 0, 1.1,
                 0, 0, 0, 1.1;
 
@@ -66,9 +65,8 @@ int main() {
     v_target.resize(g1.GetVelDim());
     v_target << 0., 0, 0,
                 0, 0, 0,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0,
+                0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
                 0, 0, 0, 0,
                 0, 0, 0, 0;
     mpc.SetConstantVelTarget(v_target);
@@ -111,11 +109,11 @@ int main() {
 
     // mpc.Compute(q_target, v_target, traj);
 
-    // mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>());
-    // std::cout << "\nTargets:" << std::endl;
-    // for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
-    //     std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;
-    // }
+    mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>(), cs);
+    std::cout << "\nTargets:" << std::endl;
+    for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
+        std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;
+    }
 
     // q_target(0) += 0.2;
     mpc.ComputeNLP(q_target, v_target, traj);
@@ -131,7 +129,9 @@ int main() {
         // cs.ShiftSwings(-0.01);
         mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
 
-        mpc.ShiftWarmStart(0.01);
+        // mpc.ShiftWarmStart(0.01);
+
+        mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>(), cs);
 
         mpc.Compute(q_current, v_current, traj);
         // mpc.Compute(q_target, v_target, traj);

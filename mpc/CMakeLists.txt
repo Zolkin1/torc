@@ -8,7 +8,8 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/cost_function.h"
     "${MPC_INC}/contact_schedule.h"
     "${MPC_INC}/configuration_tracking_cost.h"
-    "${MPC_INC}/simple_trajectory.h")
+    "${MPC_INC}/simple_trajectory.h"
+    "${MPC_INC}/reference_generator.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -19,7 +20,8 @@ set(MPC_SOURCE_LIST
         cost_function.cpp
         contact_schedule.cpp
         configuration_tracking_cost.cpp
-        simple_trajectory.cpp)
+        simple_trajectory.cpp
+        reference_generator.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}

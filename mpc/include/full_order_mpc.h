@@ -16,6 +16,7 @@
 #include "contact_schedule.h"
 #include "cpp_ad_interface.h"
 #include "simple_trajectory.h"
+#include "reference_generator.h"
 
 // TODO: Need to consider thread safety and how to return data better. I think I can return more references
 
@@ -153,7 +154,7 @@ namespace torc::mpc {
         * @param pos is a 3-vector giving the the x,y,z positions of the base link
         * @param vel is a 3-vector in the form [xdot, ydot, yawdot] where yaw dot is the rotation about the z axis
         */
-        void GenerateCostReference(const vectorx_t& q, const vectorx_t& v, const vector3_t& vel);
+        void GenerateCostReference(const vectorx_t& q, const vectorx_t& v, const vector3_t& vel, const ContactSchedule& contact_schedule);
 
         SimpleTrajectory GetConfigTargets();
 
@@ -423,6 +424,9 @@ namespace torc::mpc {
 
         std::vector<vectorx_t> cost_weights_;
 
+        // Reference Generator
+        std::unique_ptr<ReferenceGenerator> reference_generator_;
+
         // Cost Barrier Relaxations
         double mu_;
         double delta_;
@@ -440,7 +444,7 @@ namespace torc::mpc {
         double ls_alpha_min_;
 
         // Model
-        std::unique_ptr<models::FullOrderRigidBody> robot_model_;
+        std::shared_ptr<models::FullOrderRigidBody> robot_model_;
         int vel_dim_;
         int config_dim_;
         int input_dim_;

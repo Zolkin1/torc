@@ -63,7 +63,7 @@ namespace torc::mpc {
         explicit CostFunction(const std::string& name)
             : name_(name), configured_(false), compile_derivatives_(true) {}
 
-        void Configure(const std::unique_ptr<torc::models::FullOrderRigidBody>& model,
+        void Configure(const std::shared_ptr<torc::models::FullOrderRigidBody>& model,
             bool compile_derivatives, std::vector<CostData> cost_data,
             std::filesystem::path deriv_libs_path) {
 
@@ -318,9 +318,9 @@ namespace torc::mpc {
             vectorx_t y = vectorx_t::Zero(cost_fcn_terms_.at(name)->GetRangeSize());
             cost_fcn_terms_.at(name)->GetFunctionValue(decision_var, p, y);
 
-            if (cost_fcn_terms_.at(name)->GetParameterSize() == config_size_ + POLYTOPE_SIZE + POLYTOPE_SIZE + 2 + POLYTOPE_SIZE) {
-                std::cout << "y: " << y.transpose() << std::endl;
-            }
+            // if (cost_fcn_terms_.at(name)->GetParameterSize() == config_size_ + POLYTOPE_SIZE + POLYTOPE_SIZE + 2 + POLYTOPE_SIZE) {
+            //     std::cout << "y: " << y.transpose() << std::endl;
+            // }
 
             return y.squaredNorm();     // Assumes all the functions have the form of a norm
         }

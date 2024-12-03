@@ -149,7 +149,7 @@ namespace torc::models {
         * @param frames corresponding frame names
         */
         vectorx_t InverseKinematics(const vectorx_t& base_config, const std::vector<vector3_t>& positions, const std::vector<std::string>& frames,
-            const vectorx_t& q_guess);
+            const vectorx_t& q_guess, bool use_floating_base=false);
 
         // DEBUG ------
         pinocchio::Model GetModel() const;
