@@ -56,6 +56,17 @@ namespace torc::mpc {
 
         [[nodiscard]] bool InSwing(const std::string& frame, double time) const;
 
+        /**
+         * @brief Get the duration of a swing given a time.
+         * @param frame the frame to consider
+         * @param time the time to check for swing time
+         * @return the time the foot is in the air given the current time. If the provided time is not in swing, a -1 is returned.
+         */
+        double GetSwingDuration(const std::string& frame, double time) const;
+
+        double GetFirstContactTime(const std::string& frame) const;
+
+        double GetSwingStartTime(const std::string& frame, double time) const;
 
         /**
          * @brief Shifts the entire contact schedule by a set amount.

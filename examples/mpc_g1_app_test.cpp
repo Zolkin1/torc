@@ -109,7 +109,14 @@ int main() {
 
     // mpc.Compute(q_target, v_target, traj);
 
-    mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>(), cs);
+    SimpleTrajectory q_target_traj(q_target.size(), mpc.GetNumNodes());
+    SimpleTrajectory v_target_traj(v_target.size(), mpc.GetNumNodes());
+    for (int node = 0; node < mpc.GetNumNodes(); node++) {
+        q_target_traj[node] = q_target;
+        v_target_traj[node] = v_target;
+    }
+
+    mpc.GenerateCostReference(q_target, q_target_traj, v_target_traj, cs);
     std::cout << "\nTargets:" << std::endl;
     for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
         std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;
@@ -131,7 +138,8 @@ int main() {
 
         // mpc.ShiftWarmStart(0.01);
 
-        mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>(), cs);
+        // TODO: Put back
+        // mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>(), cs);
 
         mpc.Compute(q_current, v_current, traj);
         // mpc.Compute(q_target, v_target, traj);

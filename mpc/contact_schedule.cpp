@@ -56,9 +56,46 @@ namespace torc::mpc {
             [time](const std::pair<double, double>& cs){return time <= cs.second && time >= cs.first;});
     }
 
-   bool ContactSchedule::InSwing(const std::string& frame, double time) const {
+    bool ContactSchedule::InSwing(const std::string& frame, double time) const {
        return !InContact(frame, time);
-   }
+    }
+
+    double ContactSchedule::GetSwingDuration(const std::string &frame, double time) const {
+        if (InContact(frame, time)) {
+            return -1;
+        }
+
+        int swing_idx = 0;
+        while (frame_schedule_map.at(frame).at(swing_idx).second < time) {
+            ++swing_idx;
+        }
+
+        return frame_schedule_map.at(frame).at(swing_idx).second - frame_schedule_map.at(frame).at(swing_idx).first;
+    }
+
+    double ContactSchedule::GetFirstContactTime(const std::string &frame) const {
+        return frame_schedule_map.at(frame).at(0).second;
+    }
+
+    double ContactSchedule::GetSwingStartTime(const std::string &frame, double time) const {
+        if (InContact(frame, time)) {
+            return -1;
+        }
+
+        const auto& swings = frame_schedule_map.at(frame);
+        int idx = swings.size() - 1;
+        double start = swings.at(idx).first;
+        if (swings[0].first > time) {
+            throw std::runtime_error("[Contact schedule] error getting swing start time!");
+        }
+
+        while (start > time) {
+            idx--;
+            start = swings.at(idx).first;
+        }
+
+        return start;
+    }
 
 
     void ContactSchedule::ShiftSwings(double shift) {

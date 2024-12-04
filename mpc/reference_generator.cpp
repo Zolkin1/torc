@@ -14,261 +14,254 @@ namespace torc::mpc {
         }
     }
 
-    // TODO: WIP. Not working!
-    // TODO: Incorporate the angular velocities
+    // TODO: Consider modulating the commanded velocity and position dependent on the polytopes.
+    //  e.g. if we are asked to walk off a polytope and no other polytope is selected then we should modulate the position
+    //  and velocity to keep the body in the polytope, which will make the optimization easier. Just need to be careful
+    //  that this is done correctly. Can also increase velocity/position if making ot over a big gap.
     std::pair<SimpleTrajectory, SimpleTrajectory> ReferenceGenerator::GenerateReference(const vectorx_t& q,
-                                                                                        const vectorx_t& v,
-                                                                                        const vector3_t& commanded_vel,
-                                                                                        const std::map<std::string, std::vector<double>>& swing_traj,
-                                                                                        const std::vector<double>& hip_offsets,
-                                                                                        const std::map<std::string, std::vector<int>>& in_contact,
-                                                                                        const ContactSchedule& contact_schedule) {
+        const SimpleTrajectory& q_target,
+        const SimpleTrajectory& v_target,
+        const std::map<std::string, std::vector<double>>& swing_traj,
+        const std::vector<double>& hip_offsets,
+        const ContactSchedule& contact_schedule) {
         if (hip_offsets.size() != 2*contact_frames_.size()) {
             throw std::runtime_error("Hip offsets size != 2*contact_frames_.size()");
         }
+
+        // NOTE: The commanded vel is assumed to be x-y-yaw
+
+        // std::cout << "q: " << q.transpose() << std::endl;
 
         SimpleTrajectory q_ref(config_size_, nodes_);
         SimpleTrajectory v_ref(vel_size_, nodes_);
 
         std::map<std::string, std::vector<double>> contact_midtimes;
-        std::map<std::string, std::vector<int>> contact_midtimes_nodes;
-        // std::vector<int> contact_nodes_all;
         std::vector<vector3_t> contact_base_positions;
         std::vector<vector3_t> ik_base_positions(nodes_);
 
         // First determine the nodes (and times) associated with the midpoints of the contacts
-        const auto contact_map = contact_schedule.GetScheduleMap();
+        const auto& contact_map = contact_schedule.GetScheduleMap();
         for (const auto& [frame, swings] : contact_map) {
             contact_midtimes.insert({frame, {}});
-            contact_midtimes_nodes.insert({frame, {}});
 
-            for (int i = 0; i < swings.size() + 1; i++) {
-                if (swings.size() > 0) {
-                    if (i == 0) {
-                        // Handle the contact midpoint before the first swing
-                        contact_midtimes[frame].emplace_back(std::min(
-                            std::max(0.0, swings[0].first - 0.15), end_time_ - 0.1)); // TODO: Remove the -0.01
-                    } else if (i == swings.size()) {
-                        // Handle the contact midpoint after the last swing
-                        contact_midtimes[frame].emplace_back(swings[i - 1].second + 0.15);
-                    } else {
-                        contact_midtimes[frame].emplace_back((swings[i+1].first + swings[i].second)/2.0);
-                    }
-                } else {
-                    contact_midtimes[frame].emplace_back(end_time_/2.0);
+            if (!swings.empty()) {
+                // Handle the contact midpoint before the first swing
+                contact_midtimes[frame].emplace_back(swings[0].first - 0.15);
+                // contact_midtimes[frame].emplace_back(std::max(0.0, swings[0].first - 0.15));
+                for (int i = 0; i < swings.size() - 1; i++) {
+                    contact_midtimes[frame].emplace_back((swings[i+1].first + swings[i].second)/2.0);
                 }
+                // Handle the contact midpoint after the last swing
+                contact_midtimes[frame].emplace_back(swings[swings.size() - 1].second + 0.15);
+            } else {
+                contact_midtimes[frame].emplace_back(end_time_/2.0);
             }
 
-            if (contact_midtimes[frame].size() <= 0) {
-                throw std::runtime_error("[Reference Generator] contact midtimes not filled correctly!");
-            }
-
-            for (int i = 0; i < contact_midtimes[frame].size(); i++) {
-                if (contact_midtimes[frame][i] <= end_time_ && contact_midtimes[frame][i] >= 0) {
-                    contact_midtimes_nodes[frame].emplace_back(GetNode(contact_midtimes[frame][i]));
-                    if (contact_midtimes_nodes[frame][contact_midtimes_nodes[frame].size()-1] >= nodes_) {
-                        throw std::runtime_error("[Reference Generator] Node is too large!");
-                    }
-                } else {
-                    std::cerr << "Contact mid time: " << contact_midtimes[frame][i] << " end time: " << end_time_ << std::endl;
+            // TODO: Remove after debugging
+            // std::cerr << "frame: " << frame << std::endl;
+            for (int i = 1; i < contact_midtimes[frame].size(); i++) {
+                // std::cout << "contact_midtimes[" << i << "]" << contact_midtimes[frame][i] << std::endl;
+                if (contact_midtimes[frame][i] <= contact_midtimes[frame][i-1]) {
+                    std::cerr << "i: " << i << std::endl;
+                    std::cerr << "contact_midtimes[frame][i]: " << contact_midtimes[frame][i] << std::endl;
+                    std::cerr << "contact_midtimes[frame][i-1]: " << contact_midtimes[frame][i-1] << std::endl;
+                    throw std::runtime_error("[Reference Generator] contact midtimes not monotonically increasing!");
                 }
-            }
-
-            if (contact_midtimes_nodes[frame].size() <= 0) {
-                throw std::runtime_error("[Reference Generator] contact midtimes nodes not filled correctly!");
+                // std::cerr << "contact_midtimes[frame]["<< i <<"]: " << contact_midtimes[frame][i] << std::endl;
+                // if (time > 10) {
+                //     std::cerr << "time: " << contact_midtimes[frame][contact_midtimes[frame].size()-1] << std::endl;
+                //     throw std::runtime_error("[RG] midtime too large!");
+                // }
             }
         }
 
-        // for (const auto& frame : contact_frames_) {
-        //     std::cout << frame << std::endl;
-        //     for (const auto& node : contact_midtimes_nodes[frame]) {
-        //         std::cout << node << ", ";
-        //     }
-        //     std::cout << std::endl;
-        // }
-
-
-        // for (const auto& [frame, times] : contact_midtimes) {
-        //     std::cout << frame << " mid contact times:" << std::endl;
-        //     for (const auto& t : times) {
-        //         std::cout << t << std::endl;
-        //     }
-        // }
-
+        // ------------------------------------------------------
         // Next, determine where the foot should be using the desired location and footstep constraints
-        // Determine the "commanded" positions
-        std::vector<vector3_t> commanded_pos(nodes_);
-        commanded_pos[0] = q.head<3>();
-        for (int i = 1; i < commanded_pos.size(); i++) {
-            commanded_pos[i] = commanded_pos[i - 1] + dt_[i]*commanded_vel;
-            // std::cout << "commanded pos: " << commanded_pos[i] << std::endl;
-        }
-
-        // Get the contact location based on the midpoints
-        // Interpolate between these during the swing phases
-        // Constant position during contacts
-        // Add hip offsets
-        std::map<std::string, std::vector<vector3_t>> foot_pos;
+        // ------------------------------------------------------
+        // Holds the position of the feet at the contact midpoints for each frame
+        std::map<std::string, std::vector<vector2_t>> contact_foot_pos;
+        std::map<std::string, std::vector<vector2_t>> node_foot_pos;
         model_->FirstOrderFK(q);
+        const auto& schedule = contact_schedule.GetScheduleMap();
         for (int j = 0; j < contact_frames_.size(); j++) {
             std::string& frame = contact_frames_[j];
-            foot_pos.insert({frame, {}});
-            foot_pos[frame].resize(nodes_);
+
+            contact_foot_pos.insert({frame, {}});
+            // contact_foot_pos[frame].resize(1);
+
+            node_foot_pos.insert({frame, {}});
 
             // Current foot position
-            foot_pos[frame][0] = model_->GetFrameState(frame).placement.translation();
+            // contact_foot_pos[frame][0] = model_->GetFrameState(frame).placement.translation().head<2>();
 
-            vector3_t hip_offset;
-            hip_offset << hip_offsets[2*j], hip_offsets[2*j + 1], 0;    // TODO: Change height
+            vector2_t hip_offset;
+            hip_offset << hip_offsets[2*j], hip_offsets[2*j + 1];
 
-            // Contact locations
-            for (const auto& node : contact_midtimes_nodes[frame]) {
-                if (node >= commanded_pos.size()) {
-                    throw std::runtime_error("[Reference generator] contact midpoint node calculation error.");
-                }
-                foot_pos[frame][node] = hip_offset + commanded_pos[node];
-            }
+            // Determine all contact locations for the given frame
+            for (int i = 0; i < contact_midtimes[frame].size(); i++) {
+                // Get the contact location based on the midpoints and hip offsets
+                // Get rotation matrix for the hip offsets
 
-            // Filling in the contact locations
-            int contact_idx = 0;
-            for (int node = 0; node < nodes_; node++) {
-                if (in_contact.at(frame)[node]) {
-                    std::cerr << frame << std::endl;
-                    std::cerr << "node: " << node << std::endl;
-                    std::cerr << "contact node size: " << contact_midtimes_nodes[frame].size() << std::endl;
-                    std::cerr << "contact node: " << contact_midtimes_nodes[frame][contact_idx] << std::endl;
-                    foot_pos[frame][node] = foot_pos[frame][contact_midtimes_nodes[frame][contact_idx]];
-                } else if ((node > 0 && in_contact.at(frame)[node - 1] && !in_contact.at(frame)[node]) || node == 0) {
-                    contact_idx++;
-                }
-            }
+                if (contact_midtimes[frame][i] >= 0) {
+                    vectorx_t q_command = GetCommandedConfig(contact_midtimes[frame][i], q_target, v_target);
+                    const quat_t quat(q_command.segment<4>(3));
+                    const matrix3_t R = quat.toRotationMatrix();
 
-            vector2_t next_foothold, prev_foothold;
-            int swing_start = 0;
-            int swing_end = 0;
-            for (int node = 0; node < nodes_; node++) {
-                // Is this node the start of a swing?
-                if ((node == 0 && !in_contact.at(frame)[node]) ||
-                    (node > 0 && (!in_contact.at(frame)[node] && in_contact.at(frame)[node-1]))) {
-                    swing_start = node;
-                }
-
-                // If it is, determine the end of the swing
-                if (swing_start == node) {
-                    swing_end = swing_start;
-                    while (swing_end < nodes_ && !in_contact.at(frame).at(swing_end)) {
-                        swing_end++;
-                    }
-                }
-
-                // Dealing with running out of nodes
-                if (swing_end == nodes_) {
-                    // swing_end += 5; // TODO: Deal with this better, for now just extending it a bit
-                    // TODO: Consider changing how this next foothold is computed
-                    next_foothold = prev_foothold + dt_[1]*(swing_end - swing_start)*commanded_vel.head<2>();
+                    contact_foot_pos[frame].emplace_back(R.topLeftCorner<2,2>()*hip_offset
+                        + q_command.head<2>());
                 } else {
-                    next_foothold = foot_pos[frame].at(swing_end).head<2>();
-                }
-
-                // If in a swing phase (between swing_start and swing_end) then interpolate on location
-                if (!in_contact.at(frame)[node]) {
-                    vector2_t swing_location = prev_foothold + (next_foothold - prev_foothold)*(static_cast<double>(node - swing_start)/static_cast<double>(swing_end - swing_start));
-                    foot_pos[frame][node] << swing_location(0), swing_location(1), swing_traj.at(frame)[node];
+                    contact_midtimes[frame].erase(contact_midtimes[frame].begin() + i);
+                    i--;
                 }
             }
 
-            // std::cout << frame << " foot_pos[" << 0 << "]: " << foot_pos[frame][0].transpose() << std::endl;
+            // TODO: Remove after debugging
+            // std::cout << "frame: " << frame << std::endl;
+            // for (int i = 0; i < contact_foot_pos[frame].size(); i++) {
+            //     std::cout << "foot pos: " << contact_foot_pos[frame][i].transpose() << " time: " << contact_midtimes[frame][i] << std::endl;
+            // }
+
+            int current_contact_idx = 0;
+            for (int node = 0; node < nodes_; node++) {
+                // std::cout << "node: " << node << " contact idx: " << current_contact_idx << std::endl;
+                // Get the contact positions in front and behind the current time
+                double time = GetTime(node);
+
+                // if (contact_midtimes[frame][current_contact_idx] > time) {
+                //     std::cout << "time: " << time << std::endl;
+                //     std::cout << "current contact idx: " << current_contact_idx << std::endl;
+                //     std::cout << "node: " << node << std::endl;
+                // }
+
+                // Check if we are in swing
+                if (contact_schedule.InSwing(frame, time)) {
+                    if (node > 0 && contact_schedule.InContact(frame, GetTime(node - 1))) {
+                        current_contact_idx++;
+                    }
+                    // std::cerr << "[Reference Generator] midtimes size: " << contact_midtimes[frame].size() << std::endl;
+                    // Get the index for the next contact
+                    // int next_contact_idx = 0;
+                    // while (contact_midtimes[frame].at(next_contact_idx) <= time) {
+                    //     next_contact_idx++;
+                    // }
+
+                    if (current_contact_idx < 0) {
+                        throw std::runtime_error("[Reference Generator] contact index issue! "
+                                                 "Contact idx: " + std::to_string(current_contact_idx) + " time: " + std::to_string(time));
+                    }
+
+                    // TODO: Remove after debugging
+                    // std::cerr << "next_contact_idx: " << next_contact_idx << std::endl;
+
+                    // TODO: Remove after debugging
+                    // std::cout << "swing duration: " << swing_duration << std::endl;
+                    // std::cout << "swing start: " << swing_start << std::endl;
+                    // std::cout << "lambda: " << lambda << std::endl;
+                    // std::cout << "time: " << time << std::endl;
+                    vector2_t swing_intermediate_pos;
+                    if (current_contact_idx > 0) {
+                        double swing_duration = contact_schedule.GetSwingDuration(frame, time);
+                        double swing_start = contact_schedule.GetSwingStartTime(frame, time);
+                        double lambda = (time - swing_start)/(swing_duration);
+
+                        if (lambda > 1 || lambda < 0) {
+                            throw std::runtime_error("[Reference Generator] lambda issue!");
+                        }
+
+                        swing_intermediate_pos = lambda*contact_foot_pos[frame].at(current_contact_idx)
+                            + (1-lambda)*contact_foot_pos[frame][current_contact_idx-1];
+                    } else if (current_contact_idx == 0) {
+                        double swing_duration = contact_schedule.GetFirstContactTime(frame);
+                        double swing_start = 0;
+                        double lambda = (time - swing_start)/(swing_duration);
+
+                        swing_intermediate_pos = lambda*contact_foot_pos[frame][current_contact_idx]
+                            + (1-lambda)*model_->GetFrameState(frame).placement.translation().head<2>();
+                    }
+
+                    node_foot_pos[frame].emplace_back(swing_intermediate_pos);
+                } else {
+                    if (!contact_schedule.InContact(frame, GetTime(node))) {
+                        throw std::runtime_error("[Reference Generator] should be in contact!");
+                    }
+
+                    if (node == 0) {
+                        contact_foot_pos[frame].at(current_contact_idx) = model_->GetFrameState(frame).placement.translation().head<2>();
+                    }
+
+                    node_foot_pos[frame].emplace_back(contact_foot_pos[frame].at(current_contact_idx));
+
+                    // if (contact_midtimes[frame][current_contact_idx] > end_time_) {
+                    //     std::cerr << "end time: " << end_time_ << std::endl;
+                    //     std::cerr << "node: " << node << std::endl;
+                    //     std::cerr << "contact_midtimes[frame][current_contact_idx]: " << contact_midtimes[frame][current_contact_idx] << std::endl;
+                    //     throw std::runtime_error("[Reference Generator] contact index issue!");
+                    // }
+                }
+            }
+            if (node_foot_pos[frame].size() != nodes_) {
+                throw std::runtime_error("[Reference Generator] node_foot_pos size != nodes_");
+            }
         }
 
-        // Print current foot positions for debugging
-        // model_->FirstOrderFK(q);
+
+        // Print for debugging
         // for (const auto& frame : contact_frames_) {
-        //     std::cout << frame << ": " << model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
+        //     std::cout << frame << ": " << std::endl;
+        //     for (int node = 0; node < nodes_; node++) {
+        //         std::cout << node_foot_pos[frame][node].transpose() << ", " << contact_schedule.InContact(frame, GetTime(node)) << std::endl;
+        //     }
         // }
 
         // Then do IK on the floating base and leg joints to find a position that fits this step location
         vectorx_t base_config(7);
-        std::vector<int> contact_nodes_all;
-        std::vector<std::vector<std::string>> frames(nodes_);
-        std::vector<std::vector<vector3_t>> foot_pos_vec(nodes_);
-        // for (const auto& frame : contact_frames_) {
-        for (int node = 0; node < nodes_; node++) {
-            for (const auto& frame : contact_frames_) {
-                if (std::find(contact_midtimes_nodes[frame].begin(), contact_midtimes_nodes[frame].end(), node)
-                    != contact_midtimes_nodes[frame].end()) {
-                    if (contact_nodes_all.empty() || std::find(contact_nodes_all.begin(), contact_nodes_all.end(), node)
-                        == contact_nodes_all.end()) {
-                        contact_nodes_all.emplace_back(node);
-                        // std::cout << "inserting node: " << node << std::endl;
+        vectorx_t q_ik;
+
+        // TODO: May want to do this IK with the floating base when the leg is the most extended, not on the midtime points!
+        // TODO: Probably want to do this for both the end of the swing points (most extended) and the mid points of the contacts
+        std::vector<std::pair<double, vector3_t>> times_and_bases;
+        std::vector<double> base_times;
+        // For all the contact frames
+        for (const auto& frame : contact_frames_) {
+            // For all the contact midpoint times
+            for (const auto& time : contact_midtimes[frame]) {
+                // Only check if we haven't used this time
+                if (std::find(base_times.begin(), base_times.end(), time) == base_times.end() && time < end_time_ && time >= 0) {
+                    const int node = GetNode(time);
+
+                    // Determine all feet locations at the give time
+                    std::vector<vector3_t> foot_pos(contact_frames_.size());
+                    for (int j = 0; j < contact_frames_.size(); j++) {
+                        foot_pos[j] << node_foot_pos[contact_frames_[j]][node], swing_traj.at(frame)[node];
                     }
-                    frames[node].emplace_back(frame);
-                    foot_pos_vec[node].emplace_back(foot_pos[frame][node]);
-                    // std::cout << "Contact at: frame " << frame << ", node: " << node << std::endl;
+
+
+                    base_config << GetCommandedConfig(time, q_target, v_target).head<7>();
+                    std::cout << "Base config: " << base_config.transpose() << std::endl;
+
+                    // IK
+                    // TODO: Put back to true!
+                    q_ik = model_->InverseKinematics(base_config, foot_pos, contact_frames_, q, false);
+                    // q_ik = vectorx_t::Zero(config_size_);
+
+                    // Record base and time
+                    times_and_bases.emplace_back(time, q_ik.head<3>());
+                    base_times.emplace_back(time);
+                    // std::cout << "output base: " << q_ik.head<3>().transpose() << std::endl;
                 }
             }
         }
 
-        for (const auto& node : contact_nodes_all) {
-            base_config << commanded_pos[node], q.segment<4>(3);
-            q_ref[node] = model_->InverseKinematics(base_config, foot_pos_vec[node], frames[node], q, true);
-            contact_base_positions.emplace_back(q_ref[node].head<3>());
-            // std::cout << "Contact base position: " << contact_base_positions[contact_base_positions.size() - 1] << std::endl;
-
-            // Print positions for debugging
-            // std::cout << "After IK:" << std::endl;
-            // model_->FirstOrderFK(q_ref[node]);
-            // for (const auto& frame : contact_frames_) {
-            //     std::cout << frame << ": " << model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
-            // }
-            // std::cout << "desired:" << std::endl;
-            // for (const auto& pos: foot_pos_vec[node]) {
-            //     std::cout << pos.transpose() << std::endl;
-            // }
-            // std::cout << std::endl;
-        }
-
-        //     for (int i = 0; i < contact_midtimes_nodes[frame].size(); i++) {
-        //         int node = contact_midtimes_nodes[frame][i];
-        //         contact_nodes_all.emplace_back(node);
-        //         base_config << commanded_pos[node], q.segment<4>(3);
-        //         foot_pos_vec[0] = foot_pos[node];
-        //         q_ref[node] = model_->InverseKinematics(base_config, foot_pos_vec, frames, q, true);
-        //         contact_base_positions.emplace_back(q_ref[node].head<3>());
-        //     }
+        // Now sort on the times so we can interpolate
+        auto time_sort = [](std::pair<double, vector3_t> p1, std::pair<double, vector3_t> p2) {
+            return p1.first < p2.first;
+        };
+        std::sort(times_and_bases.begin(), times_and_bases.end(), time_sort);
+        // std::cout << "sorted bases:" << std::endl;
+        // for (const auto& tb : times_and_bases) {
+        //     std::cout << tb.first << std::endl;
+        //     // std::cout << tb.second.transpose() << std::endl;
         // }
-
-        // std::cout << "contact_nodes_all.size(): " << contact_nodes_all.size() << std::endl;
-
-        // std::cout << "q: " << q.transpose() << std::endl;
-
-        //////
-        // Then interpolate between floating base positions to get a floating base trajectory
-        ik_base_positions[0] = q.head<3>();
-        int contact_idx = 0;
-        for (int i = 0; i < nodes_; i++) {
-            if (contact_idx == 0) {
-                int contact_node = contact_nodes_all[contact_idx];
-                double lambda = (static_cast<float>(i*contact_node))/(contact_node*contact_node);
-                // std::cout << "lambda: " << lambda << ", contact idx: " << contact_idx << " contact node: " << contact_node << std::endl;
-                // TODO: Check
-                ik_base_positions[i] = lambda*contact_base_positions[contact_idx] + (1 - lambda)*ik_base_positions[0];
-            } else {
-                float prev_contact_node = contact_nodes_all[contact_idx - 1];
-                float next_contact_node = contact_nodes_all[contact_idx];
-                float contact_node_diff = (next_contact_node - prev_contact_node);
-                double lambda = ((i - prev_contact_node)*contact_node_diff)/(contact_node_diff*contact_node_diff);
-                // TODO: Check
-                // std::cout << "lambda: " << lambda << ", contact idx: " << contact_idx << " next_contact_node: " << next_contact_node << std::endl;
-                ik_base_positions[i] = lambda*contact_base_positions[contact_idx] + (1 - lambda)*contact_base_positions[contact_idx - 1];
-            }
-
-            // std::cout << "ik_base_positions: " << ik_base_positions[i].transpose() << std::endl;
-
-            if (i >= contact_nodes_all[contact_idx]) {
-                contact_idx++;
-                // std::cout << "contact idx: " << contact_idx << std::endl;
-            }
-        }
 
         // TODO: Debug
         // Lastly, run IK on the intermediate nodes with the fixed floating base positions
@@ -277,22 +270,22 @@ namespace torc::mpc {
         for (int i = 1; i < nodes_; i++) {
             for (int j = 0; j < contact_frames_.size(); j++) {
                 const auto& frame = contact_frames_[j];
-                end_effectors_pos[j] << foot_pos[frame][i].head<2>(), swing_traj.at(frame)[i];
+                end_effectors_pos[j] << node_foot_pos[frame][i].head<2>(), swing_traj.at(frame)[i];
             }
+
             // TODO: Put back
-            // base_config << ik_base_positions[i], q.segment<4>(3);
-            base_config << commanded_pos[i], q.segment<4>(3);
+            // base_config << GetBasePositionInterp(GetTime(i), times_and_bases, q), q.segment<4>(3);
+            base_config << GetCommandedConfig(i, q_target).head<7>();
+            // std::cout << "Base config second time: " << base_config.transpose() << std::endl;
             q_ref[i] = model_->InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
-            if (q_ref[i].norm() > 100) {
-                throw std::runtime_error("q_ref[i] > 100");
-            }
         }
+        std::cout << std::endl << std::endl;
 
         // Return
-        // for (int node = 0; node < nodes_; node++) {
-        //     q_ref[node] = q;
-        //     v_ref[node] = vectorx_t::Zero(vel_size_);
-        // }
+        for (int node = 0; node < nodes_; node++) {
+            // q_ref[node] = q;
+            v_ref[node] = v_target[node];
+        }
         return {q_ref, v_ref};
     }
 
@@ -319,5 +312,73 @@ namespace torc::mpc {
 
         return i-1;
     }
+
+    double ReferenceGenerator::GetTime(int node) {
+        double t = 0;
+        int i = 0;
+        while (i < node) {
+            t += dt_[i];
+            i++;
+        }
+
+        return t;
+    }
+
+    vectorx_t ReferenceGenerator::GetCommandedConfig(double time, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target) {
+        if (time <= end_time_) {
+            double t = 0;
+            int i = 0;
+            while (t <= time) {
+                t += dt_[i];
+                i++;
+            }
+
+            double lambda;
+            if (i > 0) {
+                t = t - dt_[i-1];
+                lambda = (time - t) / dt_[i-1];
+            } else {
+                lambda = (time - t)/dt_[i];
+            }
+
+            // Interpolate between the two closest points
+            if (lambda > 1.01 || lambda < 0) {
+                std::cerr << "time: " << time << ", t: " <<  t << ", lambda: " << lambda << ", dt: " << dt_[i] << std::endl;
+                throw std::runtime_error("[Reference Generator] Lambda error!");
+            }
+            vectorx_t commanded_pos = lambda*q_target[i] + (1 - lambda)*q_target[i-1];
+
+            return commanded_pos;
+        } else {
+            vectorx_t commanded_pos = q_target[nodes_ - 1]; // TODO: Put back! + (time - end_time_)*v_target[nodes_ - 1];
+            return commanded_pos;
+        }
+    }
+
+    vectorx_t ReferenceGenerator::GetCommandedConfig(int node, const SimpleTrajectory &q_target) {
+        return q_target[node];
+    }
+
+
+    vector3_t ReferenceGenerator::GetBasePositionInterp(double time,
+        const std::vector<std::pair<double, vector3_t>>& times_and_bases, const vectorx_t& q_init) {
+        int i = 0;
+        while (i < times_and_bases.size() && times_and_bases.at(i).first < time) {
+            i++;
+        }
+
+        if (i == 0) {
+            // Interpolate from current base configuration
+            double lambda = (time)/(times_and_bases[i].first);
+            return lambda*times_and_bases[i].second + (1-lambda)*q_init.head<3>();
+        }
+        if (i == times_and_bases.size()) {
+            return times_and_bases[i-1].second;
+        }
+
+        double lambda = (time - times_and_bases[i-1].first)/(times_and_bases[i].first - times_and_bases[i-1].first);
+        return lambda*times_and_bases[i].second + (1-lambda)*times_and_bases[i-1].second;
+    }
+
 
 }

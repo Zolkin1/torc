@@ -700,6 +700,8 @@ namespace torc::models {
                 Jlin = J.topRows<3>();
                 if (!use_floating_base) {
                     Jlin.leftCols<FLOATING_VEL>().setZero();
+                } else {
+                    Jlin.leftCols<2>().setZero();
                 }
 
                 for (int j = 0; j < Jlin.cols(); j++) {
@@ -711,11 +713,13 @@ namespace torc::models {
                 matrix3x_t JJt;
                 JJt.noalias() = Jlin * Jlin.transpose();
                 // TODO: Consider putting damping back in
-                // JJt.diagonal().array() += DAMP;
+                JJt.diagonal().array() += DAMP;
 
                 v.noalias() = -Jlin.transpose() * JJt.ldlt().solve(error);
                 if (!use_floating_base) {
                     v.head<FLOATING_VEL>().setZero();
+                } else {
+                    v.head<2>().setZero();
                 }
                 double alpha = 1;
                 while (alpha >= DT) {

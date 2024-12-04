@@ -18,6 +18,7 @@ namespace torc::mpc {
     using vector3_t = Eigen::Vector3d;
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
+    using matrix3_t = Eigen::Matrix3d;
 
     /**
     * @brief Generate references for MPC given the user input and desired footholds.
@@ -27,9 +28,12 @@ namespace torc::mpc {
         ReferenceGenerator(int nodes, int config_size, int vel_size, std::vector<std::string> contact_frames,
             std::vector<double> dt, std::shared_ptr<models::FullOrderRigidBody> model);
 
-        std::pair<SimpleTrajectory, SimpleTrajectory> GenerateReference(const vectorx_t& q, const vectorx_t& v,
-            const vector3_t& commanded_vel, const std::map<std::string, std::vector<double>>& swing_traj,
-            const std::vector<double>& hip_offsets, const std::map<std::string, std::vector<int>>& in_contact,
+        std::pair<SimpleTrajectory, SimpleTrajectory> GenerateReference(
+            const vectorx_t& q,
+            const SimpleTrajectory& q_target,
+            const SimpleTrajectory& v_target,
+            const std::map<std::string, std::vector<double>>& swing_traj,
+            const std::vector<double>& hip_offsets,
             const ContactSchedule& contact_schedule);
 
     protected:
@@ -40,6 +44,20 @@ namespace torc::mpc {
          * @return the node index
          */
         int GetNode(double time);
+
+        double GetTime(int node);
+
+        vectorx_t GetCommandedConfig(double time, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target);
+
+        vectorx_t GetCommandedConfig(int node, const SimpleTrajectory& q_target);
+        /**
+         * @brief
+         * @param time
+         * @param times_and_bases must be sorted by time
+         * @return
+         */
+        static vector3_t GetBasePositionInterp(double time, const std::vector<std::pair<double, vector3_t>>& times_and_bases,
+             const vectorx_t& q_init);
 
         int nodes_;
         int config_size_;
