@@ -16,6 +16,7 @@ namespace torc::mpc {
     using vectorx_t = Eigen::VectorXd;
     using vector2_t = Eigen::Vector2d;
     using vector3_t = Eigen::Vector3d;
+    using vector4_t = Eigen::Vector4d;
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3_t = Eigen::Matrix3d;
@@ -59,6 +60,8 @@ namespace torc::mpc {
         vectorx_t GetBasePositionInterp(double time, const std::vector<std::pair<double, vectorx_t>>& times_and_bases,
             const SimpleTrajectory& q_target,
             const vectorx_t& q_init);
+
+        void ProjectOnPolytope(vector2_t& foot_position, ContactInfo& polytope);
 
         int nodes_;
         int config_size_;

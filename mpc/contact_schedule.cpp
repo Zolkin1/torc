@@ -309,6 +309,9 @@ namespace torc::mpc {
     }
 
     void ContactSchedule::SetPolytope(const std::string& frame, int contact_num, const matrixx_t& A, const vector4_t& b) {
+        if (contact_num >= GetNumContacts(frame)) {
+            throw std::runtime_error("[Contact schedule] Invalid contact num!");
+        }
         contact_polytopes[frame][contact_num].A_ = A;
         contact_polytopes[frame][contact_num].b_ = b;
     }

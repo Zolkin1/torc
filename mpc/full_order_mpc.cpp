@@ -783,9 +783,14 @@ namespace torc::mpc {
     // TODO: Consider moving this to a different class along with the swing trajectory generation
     void FullOrderMpc::GenerateCostReference(const vectorx_t& q_current, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target,
         const ContactSchedule& contact_schedule) {
+        utils::TORCTimer timer;
+        timer.Tic();
+        // Note this is clocking in at about 0.55-0.6ms when walking around
         auto [qt, vt] = reference_generator_->GenerateReference(q_current, q_target, v_target,
             swing_traj_, hip_offsets_, contact_schedule);
 
+        timer.Toc();
+        // std::cout << "Reference gen took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
         q_target_ = qt;
         v_target_ = vt;
     }
