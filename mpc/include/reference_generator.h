@@ -56,8 +56,9 @@ namespace torc::mpc {
          * @param times_and_bases must be sorted by time
          * @return
          */
-        static vector3_t GetBasePositionInterp(double time, const std::vector<std::pair<double, vector3_t>>& times_and_bases,
-             const vectorx_t& q_init);
+        vectorx_t GetBasePositionInterp(double time, const std::vector<std::pair<double, vectorx_t>>& times_and_bases,
+            const SimpleTrajectory& q_target,
+            const vectorx_t& q_init);
 
         int nodes_;
         int config_size_;

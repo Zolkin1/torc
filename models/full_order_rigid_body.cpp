@@ -653,7 +653,7 @@ namespace torc::models {
 
         // Define constants for the optimization
         constexpr double THRESHOLD = 1e-3;
-        constexpr int IT_MAX = 1e3; //5e2;
+        constexpr int IT_MAX = 5e2;
         constexpr double DT = 1e-2;
         constexpr double DAMP = 1e-6;
 

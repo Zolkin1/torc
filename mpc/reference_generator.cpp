@@ -219,14 +219,14 @@ namespace torc::mpc {
 
         // TODO: May want to do this IK with the floating base when the leg is the most extended, not on the midtime points!
         // TODO: Probably want to do this for both the end of the swing points (most extended) and the mid points of the contacts
-        std::vector<std::pair<double, vector3_t>> times_and_bases;
+        std::vector<std::pair<double, vectorx_t>> times_and_bases;
         std::vector<double> base_times;
         // For all the contact frames
         for (const auto& frame : contact_frames_) {
             // For all the contact midpoint times
             for (const auto& time : contact_midtimes[frame]) {
                 // Only check if we haven't used this time
-                if (std::find(base_times.begin(), base_times.end(), time) == base_times.end() && time < end_time_ && time >= 0) {
+                if (std::find(base_times.begin(), base_times.end(), time) == base_times.end() && time <= end_time_ && time >= 0) {
                     const int node = GetNode(time);
 
                     // Determine all feet locations at the give time
@@ -236,8 +236,8 @@ namespace torc::mpc {
                     }
 
 
-                    base_config << GetCommandedConfig(time, q_target, v_target).head<7>();
-                    std::cout << "Base config: " << base_config.transpose() << std::endl;
+                    base_config << GetCommandedConfig(GetNode(time), q_target).head<7>();
+                    // std::cout << "Base config: " << base_config.transpose() << ", time: " << time << ", end time: " << end_time_ << std::endl;
 
                     // IK
                     // TODO: Put back to true!
@@ -245,7 +245,7 @@ namespace torc::mpc {
                     // q_ik = vectorx_t::Zero(config_size_);
 
                     // Record base and time
-                    times_and_bases.emplace_back(time, q_ik.head<3>());
+                    times_and_bases.emplace_back(time, q_ik.head<7>());
                     base_times.emplace_back(time);
                     // std::cout << "output base: " << q_ik.head<3>().transpose() << std::endl;
                 }
@@ -253,7 +253,7 @@ namespace torc::mpc {
         }
 
         // Now sort on the times so we can interpolate
-        auto time_sort = [](std::pair<double, vector3_t> p1, std::pair<double, vector3_t> p2) {
+        auto time_sort = [](std::pair<double, vectorx_t> p1, std::pair<double, vectorx_t> p2) {
             return p1.first < p2.first;
         };
         std::sort(times_and_bases.begin(), times_and_bases.end(), time_sort);
@@ -263,7 +263,6 @@ namespace torc::mpc {
         //     // std::cout << tb.second.transpose() << std::endl;
         // }
 
-        // TODO: Debug
         // Lastly, run IK on the intermediate nodes with the fixed floating base positions
         q_ref[0] = q;
         std::vector<vector3_t> end_effectors_pos(contact_frames_.size());
@@ -274,12 +273,11 @@ namespace torc::mpc {
             }
 
             // TODO: Put back
-            // base_config << GetBasePositionInterp(GetTime(i), times_and_bases, q), q.segment<4>(3);
-            base_config << GetCommandedConfig(i, q_target).head<7>();
+            base_config << GetBasePositionInterp(GetTime(i), times_and_bases, q_target, q).head<7>();
+            // base_config << GetCommandedConfig(i, q_target).head<7>();
             // std::cout << "Base config second time: " << base_config.transpose() << std::endl;
             q_ref[i] = model_->InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
         }
-        std::cout << std::endl << std::endl;
 
         // Return
         for (int node = 0; node < nodes_; node++) {
@@ -333,20 +331,23 @@ namespace torc::mpc {
                 i++;
             }
 
-            double lambda;
             if (i > 0) {
-                t = t - dt_[i-1];
-                lambda = (time - t) / dt_[i-1];
-            } else {
-                lambda = (time - t)/dt_[i];
+                i = i - 1;
+                t = t - dt_[i];
             }
+
+            double lambda = (time - t) / dt_[i];
+
+            // if (time > 0.78) {
+            //     std::cerr << "time: " << time << ", t: " << t << ", i: " << i << ", lambda: " << lambda << std::endl;
+            // }
 
             // Interpolate between the two closest points
             if (lambda > 1.01 || lambda < 0) {
                 std::cerr << "time: " << time << ", t: " <<  t << ", lambda: " << lambda << ", dt: " << dt_[i] << std::endl;
                 throw std::runtime_error("[Reference Generator] Lambda error!");
             }
-            vectorx_t commanded_pos = lambda*q_target[i] + (1 - lambda)*q_target[i-1];
+            vectorx_t commanded_pos = q_target[i]; //lambda*q_target[i] + (1 - lambda)*q_target[i-1];
 
             return commanded_pos;
         } else {
@@ -359,9 +360,8 @@ namespace torc::mpc {
         return q_target[node];
     }
 
-
-    vector3_t ReferenceGenerator::GetBasePositionInterp(double time,
-        const std::vector<std::pair<double, vector3_t>>& times_and_bases, const vectorx_t& q_init) {
+    vectorx_t ReferenceGenerator::GetBasePositionInterp(double time,
+        const std::vector<std::pair<double, vectorx_t>>& times_and_bases, const SimpleTrajectory& q_target, const vectorx_t& q_init) {
         int i = 0;
         while (i < times_and_bases.size() && times_and_bases.at(i).first < time) {
             i++;
@@ -370,15 +370,24 @@ namespace torc::mpc {
         if (i == 0) {
             // Interpolate from current base configuration
             double lambda = (time)/(times_and_bases[i].first);
-            return lambda*times_and_bases[i].second + (1-lambda)*q_init.head<3>();
+            if (lambda > 1.0 || lambda < 0) {
+                std::cerr << "time: " << time << ", lambda: " << lambda << std::endl;
+                throw std::runtime_error("[Reference Generator] Lambda error!");
+            }
+            return lambda*times_and_bases[i].second + (1-lambda)*q_init.head<7>();
         }
         if (i == times_and_bases.size()) {
-            return times_and_bases[i-1].second;
+            // When we are not between any two midpoints, we want to interpolate between the last mid point and the last commanded value
+            double lambda = (time - times_and_bases[i-1].first)/(end_time_ - times_and_bases[i-1].first);
+
+            return lambda*GetCommandedConfig(nodes_-1, q_target) + (1-lambda)*times_and_bases[i-1].second;
         }
 
         double lambda = (time - times_and_bases[i-1].first)/(times_and_bases[i].first - times_and_bases[i-1].first);
-        return lambda*times_and_bases[i].second + (1-lambda)*times_and_bases[i-1].second;
+        if (lambda > 1.0 || lambda < 0) {
+            std::cerr << "time: " << time << ", lambda: " << lambda << std::endl;
+            throw std::runtime_error("[Reference Generator] Lambda error!");
+        }
+        return lambda*times_and_bases.at(i).second + (1-lambda)*times_and_bases.at(i-1).second;
     }
-
-
 }
