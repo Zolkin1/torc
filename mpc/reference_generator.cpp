@@ -12,6 +12,22 @@ namespace torc::mpc {
         for (const auto d : dt_) {
             end_time_ += d;
         }
+
+        // Initialize OSQP
+        matrixx_t A_temp = matrixx_t::Identity(2, 2);   // For now only in the plane
+        vector2_t b_temp = vector2_t::Zero();
+        vector2_t q_temp = vector2_t::Zero();
+        osqp_instance_.objective_matrix = A_temp.sparseView();
+        osqp_instance_.objective_vector = q_temp;
+        osqp_instance_.constraint_matrix = A_temp.sparseView();
+        osqp_instance_.lower_bounds = b_temp;
+        osqp_instance_.upper_bounds = b_temp;
+
+        osqp_settings_.verbose = false;
+        auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
+        if (!status.ok()) {
+            throw std::runtime_error("[Reference Generator] Could not initialize OSQP!");
+        }
     }
 
     // TODO: I still get some IK errors when traveling around 1m/s. Need to investigate
@@ -21,8 +37,8 @@ namespace torc::mpc {
     //  and velocity to keep the body in the polytope, which will make the optimization easier. Just need to be careful
     //  that this is done correctly. Can also increase velocity/position if making ot over a big gap.
     std::pair<SimpleTrajectory, SimpleTrajectory> ReferenceGenerator::GenerateReference(const vectorx_t& q,
-        const SimpleTrajectory& q_target,
-        const SimpleTrajectory& v_target,
+        SimpleTrajectory q_target, // TODO: Should I use a reference instead?
+        SimpleTrajectory v_target,
         const std::map<std::string, std::vector<double>>& swing_traj,
         const std::vector<double>& hip_offsets,
         const ContactSchedule& contact_schedule) {
@@ -66,6 +82,7 @@ namespace torc::mpc {
         // -------------------------------------------------- //
         // Holds the position of the feet at the contact midpoints for each frame
         std::map<std::string, std::vector<vector2_t>> contact_foot_pos;
+        std::map<double, vector2_t> base_pos;
         std::map<std::string, std::vector<vector2_t>> node_foot_pos;
         model_->FirstOrderFK(q);
         const auto& schedule = contact_schedule.GetScheduleMap();
@@ -73,7 +90,6 @@ namespace torc::mpc {
             std::string& frame = contact_frames_[j];
 
             contact_foot_pos.insert({frame, {}});
-
             node_foot_pos.insert({frame, {}});
 
             vector2_t hip_offset;
@@ -85,7 +101,8 @@ namespace torc::mpc {
                 // Get rotation matrix for the hip offsets
 
                 if (contact_midtimes[frame][i] >= 0) {
-                    vectorx_t q_command = GetCommandedConfig(contact_midtimes[frame][i], q_target, v_target);
+                    double time = contact_midtimes[frame][i];
+                    vectorx_t q_command = GetCommandedConfig(time, q_target, v_target);
                     const quat_t quat(q_command.segment<4>(3));
                     const matrix3_t R = quat.toRotationMatrix();
 
@@ -94,7 +111,14 @@ namespace torc::mpc {
 
                     // Project onto the polytope
                     // Note that the desired polytope is already given
-                    ProjectOnPolytope(contact_foot_pos[frame].back(), contact_schedule.GetPolytopes(frame).at(i));
+                    bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(), contact_schedule.GetPolytopes(frame).at(i));
+                    if (time < end_time_ && !base_pos.contains(time)) {
+                        if (projected) {
+                            base_pos.insert({time, contact_foot_pos[frame].back() - R.topLeftCorner<2,2>()*hip_offset});
+                        } else {
+                            base_pos.insert({time, q_target[GetNode(time)].head<2>()});
+                        }
+                    }
                 } else {
                     contact_midtimes[frame].erase(contact_midtimes[frame].begin() + i);
                     i--;
@@ -158,6 +182,18 @@ namespace torc::mpc {
 
         vectorx_t base_config(7);
         vectorx_t q_ik;
+
+        // -------------------------------------------------- //
+        // -------------------------------------------------- //
+        // Now adjust the configuration targets by interpolating through the base positions
+        // -------------------------------------------------- //
+        // -------------------------------------------------- //
+        const quat_t quat(q_target[nodes_-1].segment<4>(3));
+        const matrix3_t R_end = quat.toRotationMatrix();
+        const vector2_t v_end_command = R_end.topLeftCorner<2,2>()*v_target[nodes_-1].head<2>();
+        for (int node = 0; node < nodes_; node++) {
+            q_target[node].head<2>() = InterpolateBasePositions(node, base_pos, q.head<2>(), v_end_command);
+        }
 
         // -------------------------------------------------- //
         // -------------------------------------------------- //
@@ -231,6 +267,7 @@ namespace torc::mpc {
         // -------------------------------------------------- //
         // -------------------------------------------------- //
         for (int node = 0; node < nodes_; node++) {
+            // TODO: Recompute the velocities given the configuration targets (which may be modified)
             v_ref[node] = v_target[node];
         }
 
@@ -335,7 +372,7 @@ namespace torc::mpc {
         return lambda*times_and_bases.at(i).second + (1-lambda)*times_and_bases.at(i-1).second;
     }
 
-    void ReferenceGenerator::ProjectOnPolytope(vector2_t &foot_position, ContactInfo &polytope) {
+    bool ReferenceGenerator::ProjectOnPolytope(vector2_t &foot_position, ContactInfo &polytope) {
         // std::cerr << "A:\n" << polytope.A_ << std::endl;
         // std::cerr << "b:\n" << polytope.b_ << std::endl;
 
@@ -363,8 +400,84 @@ namespace torc::mpc {
 
         if (!in_polytope) {
             // Not in the polytope, must project
-            // TODO: Project
-            throw std::runtime_error("[Reference Generator] Implement projection onto the polytope!");
+            // Update constraint matrix
+            auto status = osqp_solver_.UpdateConstraintMatrix(polytope.A_.sparseView());
+            if (!status.ok()) {
+                throw std::runtime_error("[Reference Generator] UpdateConstraintMatrix failed!");
+            }
+
+            vector2_t lb, ub;
+            lb << std::min(polytope.b_(0), polytope.b_(2)), std::min(polytope.b_(1), polytope.b_(3));
+            ub << std::max(polytope.b_(0), polytope.b_(2)), std::max(polytope.b_(1), polytope.b_(3));
+
+            status = osqp_solver_.SetBounds(lb, ub);
+            if (!status.ok()) {
+                throw std::runtime_error("[Reference Generator] SetBounds failed!");
+            }
+
+            status = osqp_solver_.SetObjectiveVector(-foot_position);
+            if (!status.ok()) {
+                throw std::runtime_error("[Reference Generator] SetObjectiveVector failed!");
+            }
+
+            auto solve_status = osqp_solver_.Solve();
+
+            if (solve_status == osqp::OsqpExitCode::kPrimalInfeasible || solve_status == osqp::OsqpExitCode::kPrimalInfeasibleInaccurate) {
+                std::cerr << "[Reference Generator] Infeasible!" << std::endl;
+                throw std::runtime_error("Infeasible!");
+            } else if (solve_status != osqp::OsqpExitCode::kOptimal) {
+                std::cerr << "[Reference Generator] projection not solved correctly!" << std::endl;
+                throw std::runtime_error("Projection not solved correctly!");
+            }
+
+            // Assign the projected value
+            foot_position = osqp_solver_.primal_solution();
+
+            return true;
+        } else {
+            return false;
         }
     }
+
+    vector2_t ReferenceGenerator::InterpolateBasePositions(int node, const std::map<double, vector2_t> &base_pos,
+        const vector2_t &current_pos, const vector2_t& end_vel_command) {
+        double interp_time = GetTime(node);
+
+        const auto next_it = base_pos.upper_bound(interp_time);
+        auto past_it = next_it;
+        --past_it;
+
+        if (next_it != base_pos.end() && next_it != base_pos.begin()) {
+            double last_base_pos_time = past_it->first;
+            double next_base_pos_time = next_it->first;
+
+            double lambda = (interp_time - last_base_pos_time)/(next_base_pos_time - last_base_pos_time);
+            if (lambda < 0 || lambda > 1) {
+                throw std::runtime_error("1");
+            }
+            return (1-lambda)*past_it->second + lambda*next_it->second;
+
+        } else if (next_it == base_pos.begin()) {
+            double last_base_pos_time = 0;
+            double next_base_pos_time = next_it->first;
+
+            double lambda = (interp_time - last_base_pos_time)/(next_base_pos_time - last_base_pos_time);
+            if (lambda < 0 || lambda > 1) {
+                throw std::runtime_error("2");
+            }
+            return (1-lambda)*current_pos + lambda*next_it->second;
+
+        } else {
+            double last_base_pos_time = past_it->first;
+            double next_base_pos_time = end_time_;
+
+            double lambda = (interp_time - last_base_pos_time)/(next_base_pos_time - last_base_pos_time);
+            if (lambda < 0 || lambda > 1) {
+                throw std::runtime_error("3");
+            }
+            // TODO: Rotate the vel command
+            return (1-lambda)*past_it->second + lambda*(past_it->second + end_vel_command*(end_time_ - last_base_pos_time));
+        }
+    }
+
 }

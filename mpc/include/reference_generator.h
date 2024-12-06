@@ -8,6 +8,8 @@
 #include <vector>
 #include <Eigen/Core>
 
+#include "osqp++.h"
+
 #include "full_order_rigid_body.h"
 #include "simple_trajectory.h"
 #include "contact_schedule.h"
@@ -31,8 +33,8 @@ namespace torc::mpc {
 
         std::pair<SimpleTrajectory, SimpleTrajectory> GenerateReference(
             const vectorx_t& q,
-            const SimpleTrajectory& q_target,
-            const SimpleTrajectory& v_target,
+            SimpleTrajectory q_target,
+            SimpleTrajectory v_target,
             const std::map<std::string, std::vector<double>>& swing_traj,
             const std::vector<double>& hip_offsets,
             const ContactSchedule& contact_schedule);
@@ -61,7 +63,16 @@ namespace torc::mpc {
             const SimpleTrajectory& q_target,
             const vectorx_t& q_init);
 
-        void ProjectOnPolytope(vector2_t& foot_position, ContactInfo& polytope);
+        /**
+         * @brief
+         * @param foot_position the positition of the foot. This is modified if a projection occurs.
+         * @param polytope
+         * @return a boolean flag indicating if a projection took place
+         */
+        bool ProjectOnPolytope(vector2_t& foot_position, ContactInfo& polytope);
+
+        vector2_t InterpolateBasePositions(int node, const std::map<double, vector2_t>& base_pos,
+            const vector2_t &current_pos, const vector2_t& end_vel_command);
 
         int nodes_;
         int config_size_;
@@ -73,6 +84,11 @@ namespace torc::mpc {
         std::vector<std::string> contact_frames_;
 
         std::shared_ptr<models::FullOrderRigidBody> model_;
+
+        // OSQP Interface
+        osqp::OsqpInstance osqp_instance_;
+        osqp::OsqpSolver osqp_solver_;
+        osqp::OsqpSettings osqp_settings_;
     };
 }
 
