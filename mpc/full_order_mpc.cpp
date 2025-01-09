@@ -818,26 +818,26 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
-                // AddIntegrationConstraint(node);
+                AddIntegrationConstraint(node);
             }
 
             if (node < nodes_full_dynamics_) {
-                // AddIDConstraint(node, true);
+                AddIDConstraint(node, true);
                 AddTorqueBoxConstraint(node);
             } else if (node < nodes_ - 1) {
-                // AddIDConstraint(node, false);
+                AddIDConstraint(node, false);
             }
 
             AddFrictionConeConstraint(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicConstraint(node);
+                AddHolonomicConstraint(node);
                 AddVelocityBoxConstraint(node);
 
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxConstraint(node);
-                // AddSwingHeightConstraint(node);
+                AddSwingHeightConstraint(node);
 
                 AddCollisionConstraint(node);
 
@@ -1199,13 +1199,13 @@ namespace torc::mpc {
             col_start += CONTACT_3DOF;
 
             // ----- Z Force Bounds ----- //
-            DiagonalScalarMatrixToTriplet(in_contact_[frame][node]*1, row_start, col_start - 1, 1,
-                constraint_triplets_, constraint_triplet_idx_);
-
-            osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*traj_.GetForce(node, frame)(2);
-            osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*(max_grf_ - traj_.GetForce(node, frame)(2));
-
-            row_start += 1;
+            // DiagonalScalarMatrixToTriplet(in_contact_[frame][node]*1, row_start, col_start - 1, 1,
+            //     constraint_triplets_, constraint_triplet_idx_);
+            //
+            // osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*traj_.GetForce(node, frame)(2);
+            // osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*(max_grf_ - traj_.GetForce(node, frame)(2));
+            //
+            // row_start += 1;
 
         }
     }
@@ -1446,16 +1446,16 @@ namespace torc::mpc {
             // Dynamics related constraints don't happen in the last node
             // std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
-                // violation += GetIntegrationViolation(qp_res, node);
+                violation += GetIntegrationViolation(qp_res, node);
                 // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
-                // violation += GetIDViolation(qp_res, node, true);
+                violation += GetIDViolation(qp_res, node, true);
                 // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                 // violation += GetIDViolation(qp_res, node, false);
+                 violation += GetIDViolation(qp_res, node, false);
             }
 
             // std::cout << "Friction cone violation: " << GetFrictionViolation(qp_res, node) << std::endl;
@@ -1465,12 +1465,12 @@ namespace torc::mpc {
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
-                // violation += GetHolonomicViolation(qp_res, node);
+                violation += GetHolonomicViolation(qp_res, node);
                 // std::cout << "Holonomic constraint violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetVelocityBoxViolation(qp_res, node);
 
                 violation += GetConfigurationBoxViolation(qp_res, node);
-                // violation += GetSwingHeightViolation(qp_res, node);
+                violation += GetSwingHeightViolation(qp_res, node);
 
                 violation += GetCollisionViolation(qp_res, node);
 
@@ -2261,25 +2261,25 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_; node++) {
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
-                // AddIntegrationPattern(node);
+                AddIntegrationPattern(node);
             }
             if (node < nodes_full_dynamics_) {
-                // AddIDPattern(node, true);
+                AddIDPattern(node, true);
                 AddTorqueBoxPattern(node);
             } else if (node < nodes_ - 1) {
-                // AddIDPattern(node, false);
+                AddIDPattern(node, false);
             }
 
             AddFrictionConePattern(node);
 
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
-                // AddHolonomicPattern(node);
+                AddHolonomicPattern(node);
                 AddVelocityBoxPattern(node);
 
                 // The second configuration can be effected by the second velocity
                 AddConfigurationBoxPattern(node);
-                // AddSwingHeightPattern(node);
+                AddSwingHeightPattern(node);
 
                 AddCollisionPattern(node);
 
@@ -2431,8 +2431,8 @@ namespace torc::mpc {
             col_start += CONTACT_3DOF;
 
             // ----- Z force bounds ----- //
-            MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
-            row_start += 1;
+            // MatrixToNewTriplet(id.topLeftCorner<1,1>(), row_start, col_start - 1, constraint_triplets_);
+            // row_start += 1;
         }
     }
 
@@ -2655,7 +2655,8 @@ namespace torc::mpc {
 
                 row += NumCollisionConstraintsNode();
 
-                row += NumFootPolytopeConstraintsNode();
+                // TODO: Put back
+                // row += NumFootPolytopeConstraintsNode();
             }
         }
 
