@@ -841,7 +841,7 @@ namespace torc::mpc {
 
                 AddCollisionConstraint(node);
 
-                // AddFootPolytopeConstraint(node);
+                AddFootPolytopeConstraint(node);
             }
         }
 
@@ -1474,9 +1474,11 @@ namespace torc::mpc {
 
                 violation += GetCollisionViolation(qp_res, node);
 
-                // violation += GetFootPolytopeViolation(qp_res, node);
+                violation += GetFootPolytopeViolation(qp_res, node);
                 // double fvio = GetFootPolytopeViolation(qp_res, node);
-                // std::cout << "Foot polytope constraint violation: " << fvio << std::endl;
+                // if (fvio > 0.01) {
+                //     std::cout << "Foot polytope constraint violation: " << fvio << std::endl;
+                // }
                 // if (fvio > 100) {
                 //     throw std::runtime_error("Foot polytope violation exceeded max bounds!");
                 // }
@@ -2283,7 +2285,7 @@ namespace torc::mpc {
 
                 AddCollisionPattern(node);
 
-                // AddFootPolytopePattern(node);
+                AddFootPolytopePattern(node);
             }
         }
 
@@ -2655,8 +2657,7 @@ namespace torc::mpc {
 
                 row += NumCollisionConstraintsNode();
 
-                // TODO: Put back
-                // row += NumFootPolytopeConstraintsNode();
+                row += NumFootPolytopeConstraintsNode();
             }
         }
 

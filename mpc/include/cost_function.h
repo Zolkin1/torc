@@ -461,7 +461,7 @@ namespace torc::mpc {
                 // relaxed_barrier = relaxed_barrier*relaxed_barrier;
                 relaxed_barrier = (relaxed_barrier*relaxed_barrier - 1)*mu/2 - mu*CppAD::log(delta);
                 ad::adcg_t barrier = -mu*CppAD::log(-val);
-                val = CppAD::CondExpGe(val, 0*-delta, relaxed_barrier, 0*barrier);
+                val = CppAD::CondExpGe(val, -delta, relaxed_barrier, barrier);
                 // val = -CppAD::log(-val + 1);
             }
         }
