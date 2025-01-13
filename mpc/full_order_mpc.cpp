@@ -755,10 +755,10 @@ namespace torc::mpc {
 
         // TODO: Why does the quad MPC not just pass out the target when there are no other constraints?
         // TODO: Remove
-        for (int node = 0; node < q_target_.GetNumNodes(); ++node) {
-            traj_out.SetConfiguration(node, q_target_[node]);
-            traj_out.SetVelocity(node, v_target_[node]);
-        }
+        // for (int node = 0; node < q_target_.GetNumNodes(); ++node) {
+        //     traj_out.SetConfiguration(node, q_target_[node]);
+        //     traj_out.SetVelocity(node, v_target_[node]);
+        // }
 
         traj_ = traj_out;
 
@@ -1483,16 +1483,16 @@ namespace torc::mpc {
             // Dynamics related constraints don't happen in the last node
             // std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
-                // violation += GetIntegrationViolation(qp_res, node);
+                violation += GetIntegrationViolation(qp_res, node);
                 // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
-                // violation += GetIDViolation(qp_res, node, true);
+                violation += GetIDViolation(qp_res, node, true);
                 // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                 // violation += GetIDViolation(qp_res, node, false);
+                 violation += GetIDViolation(qp_res, node, false);
             }
 
             // std::cout << "Friction cone violation: " << GetFrictionViolation(qp_res, node) << std::endl;
@@ -1502,16 +1502,16 @@ namespace torc::mpc {
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
-                // violation += GetHolonomicViolation(qp_res, node);
+                violation += GetHolonomicViolation(qp_res, node);
                 // std::cout << "Holonomic constraint violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetVelocityBoxViolation(qp_res, node);
 
                 violation += GetConfigurationBoxViolation(qp_res, node);
-                // violation += GetSwingHeightViolation(qp_res, node);
+                violation += GetSwingHeightViolation(qp_res, node);
 
                 violation += GetCollisionViolation(qp_res, node);
 
-                // violation += GetFootPolytopeViolation(qp_res, node);
+                violation += GetFootPolytopeViolation(qp_res, node);
                 // double fvio = GetFootPolytopeViolation(qp_res, node);
                 // if (fvio > 0.001) {
                 //     std::cout << "Foot polytope constraint violation: " << fvio << std::endl;
