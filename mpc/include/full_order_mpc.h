@@ -358,6 +358,10 @@ namespace torc::mpc {
         void ConvertdqToq(const vectorx_t& dq, const vectorx_t& q_ref, vectorx_t& q) const;
 
         double GetTime(int node) const;
+
+    // ----- Polytope functions ----- //
+        double GetPolytopeConvergence(const std::string& frame, double time, const ContactSchedule& cs) const;
+
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
         [[nodiscard]] int NumIDConstraintsNode() const;
@@ -458,6 +462,8 @@ namespace torc::mpc {
         // Hold the polytope giving the foot constraint
         std::map<std::string, std::vector<matrixx_t>> foot_polytope_;
         std::map<std::string, std::vector<vectorx_t>> ub_lb_polytope;
+        double polytope_delta_;     // Polytope backoff for robustness
+        double polytope_shrinking_rad_;     // Size of the shrinking radius at its biggest point
         // ContactSchedule cs_;
 
         // dt's

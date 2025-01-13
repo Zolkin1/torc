@@ -29,7 +29,7 @@ namespace torc::mpc {
     class ReferenceGenerator {
     public:
         ReferenceGenerator(int nodes, int config_size, int vel_size, std::vector<std::string> contact_frames,
-            std::vector<double> dt, std::shared_ptr<models::FullOrderRigidBody> model);
+            std::vector<double> dt, std::shared_ptr<models::FullOrderRigidBody> model, double polytope_delta);
 
         std::pair<SimpleTrajectory, SimpleTrajectory> GenerateReference(
             const vectorx_t& q,
@@ -77,6 +77,8 @@ namespace torc::mpc {
         int nodes_;
         int config_size_;
         int vel_size_;
+
+        double polytope_delta_;
 
         std::vector<double> dt_;
         double end_time_;

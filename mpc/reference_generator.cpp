@@ -6,12 +6,14 @@
 
 namespace torc::mpc {
     ReferenceGenerator::ReferenceGenerator(int nodes, int config_size, int vel_size, std::vector<std::string> contact_frames,
-                                           std::vector<double> dt, std::shared_ptr<models::FullOrderRigidBody> model)
+                                           std::vector<double> dt, std::shared_ptr<models::FullOrderRigidBody> model, double polytope_delta)
     : nodes_(nodes), config_size_(config_size), vel_size_(vel_size), dt_(std::move(dt)), contact_frames_(contact_frames), model_(std::move(model)) {
         end_time_ = 0;
         for (const auto d : dt_) {
             end_time_ += d;
         }
+
+        polytope_delta_ = polytope_delta;
 
         // Initialize OSQP
         matrixx_t A_temp = matrixx_t::Identity(2, 2);   // For now only in the plane
@@ -61,17 +63,34 @@ namespace torc::mpc {
         for (const auto& [frame, swings] : contact_map) {
             contact_midtimes.insert({frame, {}});
 
+            double swing_time = swings[0].second - swings[0].first;
             if (!swings.empty()) {
                 // Handle the contact midpoint before the first swing
-                contact_midtimes[frame].emplace_back(swings[0].first - 0.15);
+                contact_midtimes[frame].emplace_back(swings[0].first - swing_time/2.0);
                 // contact_midtimes[frame].emplace_back(std::max(0.0, swings[0].first - 0.15));
                 for (int i = 0; i < swings.size() - 1; i++) {
                     contact_midtimes[frame].emplace_back((swings[i+1].first + swings[i].second)/2.0);
                 }
                 // Handle the contact midpoint after the last swing
-                contact_midtimes[frame].emplace_back(swings[swings.size() - 1].second + 0.15);
+                contact_midtimes[frame].emplace_back(swings[swings.size() - 1].second + swing_time/2.0);
             } else {
                 contact_midtimes[frame].emplace_back(end_time_/2.0);
+            }
+
+            // std::cout << "frame: " << frame << std::endl;
+            // for (const auto& time : contact_midtimes[frame]) {
+            //     std::cout << time << " ";
+            // }
+            // std::cout << std::endl;
+        }
+
+        // Remove all negative time contacts
+        for (auto& [frame, midtimes] : contact_midtimes) {
+            for (int i = 0; i < midtimes.size(); i++) {
+                if (midtimes[i] < 0) {
+                    midtimes.erase(midtimes.begin() + i);
+                    i--;
+                }
             }
         }
 
@@ -113,15 +132,15 @@ namespace torc::mpc {
                     // Note that the desired polytope is already given
                     bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(), contact_schedule.GetPolytopes(frame).at(i));
                     if (time < end_time_ && !base_pos.contains(time)) {
-                        if (projected) {
-                            base_pos.insert({time, contact_foot_pos[frame].back() - R.topLeftCorner<2,2>()*hip_offset});
-                        } else {
+                        // This was removed because otherwise the foot would never get a chance to move to the next stone
+                        // if (projected) {
+                        //     base_pos.insert({time, contact_foot_pos[frame].back() - R.topLeftCorner<2,2>()*hip_offset});
+                        // } else {
                             base_pos.insert({time, q_target[GetNode(time)].head<2>()});
-                        }
+                        // }
                     }
                 } else {
-                    contact_midtimes[frame].erase(contact_midtimes[frame].begin() + i);
-                    i--;
+                    throw std::runtime_error("Negative time!");
                 }
             }
 
@@ -154,9 +173,16 @@ namespace torc::mpc {
                         swing_intermediate_pos = lambda*contact_foot_pos[frame].at(current_contact_idx)
                             + (1-lambda)*contact_foot_pos[frame][current_contact_idx-1];
                     } else if (current_contact_idx == 0) {
-                        double swing_duration = contact_schedule.GetFirstContactTime(frame);
+                        double swing_duration = contact_schedule.GetSwingDuration(frame, time); //contact_schedule.GetFirstContactTime(frame);
                         double swing_start = 0;
                         double lambda = (time - swing_start)/(swing_duration);
+
+                        if (lambda > 1 || lambda < 0) {
+                            std::cerr << "lambda: " << lambda << std::endl;
+                            std::cerr << "swing_duration: " << swing_duration << std::endl;
+                            std::cerr << "swing_start: " << swing_start << std::endl;
+                            throw std::runtime_error("[Reference Generator] lambda issue!");
+                        }
 
                         swing_intermediate_pos = lambda*contact_foot_pos[frame][current_contact_idx]
                             + (1-lambda)*model_->GetFrameState(frame).placement.translation().head<2>();
@@ -169,6 +195,7 @@ namespace torc::mpc {
                     }
 
                     if (node == 0) {
+                        model_->FirstOrderFK(q);
                         contact_foot_pos[frame].at(current_contact_idx) = model_->GetFrameState(frame).placement.translation().head<2>();
                     }
 
@@ -253,12 +280,14 @@ namespace torc::mpc {
             for (int j = 0; j < contact_frames_.size(); j++) {
                 const auto& frame = contact_frames_[j];
                 end_effectors_pos[j] << node_foot_pos[frame][i].head<2>(), swing_traj.at(frame)[i];
+                // std::cout << "j: " << j << ", ee pos: " << end_effectors_pos[j].transpose() << std::endl;
             }
 
             // TODO: Put back
             // base_config << GetBasePositionInterp(GetTime(i), times_and_bases, q_target, q).head<7>();
             base_config << GetCommandedConfig(i, q_target).head<7>();
             q_ref[i] = model_->InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
+            // std::cout << "i: " << i << ", qref: " << q_ref[i].transpose() << std::endl;
         }
 
         // -------------------------------------------------- //
@@ -384,15 +413,20 @@ namespace torc::mpc {
             throw std::runtime_error("[Reference Generator] polytope b is empty!");
         }
 
+        vector4_t polytope_margin;
+        polytope_margin << 1, 1, -1, -1;
+        polytope_margin *= polytope_delta_;
+        vector4_t b_modified = polytope.b_ - polytope_margin;
+
         vector2_t c = polytope.A_*foot_position;
         bool in_polytope = true;
         for (int i = 0; i < polytope.b_.size(); i++) {
             if (i < c.size()) {
-                if (c(i) > polytope.b_(i)) {
+                if (c(i) > b_modified(i)) {
                     in_polytope = false;
                 }
             } else {
-                if (c(i - c.size()) < polytope.b_(i)) {
+                if (c(i - c.size()) < b_modified(i)) {
                     in_polytope = false;
                 }
             }
@@ -407,8 +441,8 @@ namespace torc::mpc {
             }
 
             vector2_t lb, ub;
-            lb << std::min(polytope.b_(0), polytope.b_(2)), std::min(polytope.b_(1), polytope.b_(3));
-            ub << std::max(polytope.b_(0), polytope.b_(2)), std::max(polytope.b_(1), polytope.b_(3));
+            lb << std::min(b_modified(0), b_modified(2)), std::min(b_modified(1), b_modified(3));
+            ub << std::max(b_modified(0), b_modified(2)), std::max(b_modified(1), b_modified(3));
 
             status = osqp_solver_.SetBounds(lb, ub);
             if (!status.ok()) {

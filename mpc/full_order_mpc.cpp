@@ -56,7 +56,7 @@ namespace torc::mpc {
 
         // Create the reference generator
         reference_generator_ = std::make_unique<ReferenceGenerator>(nodes_, config_dim_, vel_dim_, contact_frames_,
-            dt_, robot_model_);
+            dt_, robot_model_, polytope_delta_);
 
         // ---------- Create the ad functions ---------- //
         integration_constraint_ = std::make_unique<ad::CppADInterface>(
@@ -299,7 +299,8 @@ namespace torc::mpc {
         friction_coef_ = constraint_settings["friction_coef"].as<double>();
         max_grf_ = constraint_settings["max_grf"].as<double>();
         friction_margin_ = (constraint_settings["friction_margin"] ? constraint_settings["friction_margin"].as<double>() : 0.05);
-
+        polytope_delta_ = (constraint_settings["polytope_delta"] ? constraint_settings["polytope_delta"].as<double>() : 0.0);
+        polytope_shrinking_rad_ = (constraint_settings["polytope_shrinking_rad"] ? constraint_settings["polytope_shrinking_rad"].as<double>() : 0.4);
         ParseCollisionYaml(constraint_settings["collisions"]);
 
         // ---------- Cost Settings ---------- //
@@ -388,6 +389,8 @@ namespace torc::mpc {
             std::cout << "\tFriction coefficient: " << friction_coef_ << std::endl;
             std::cout << "\tFriction margin: " << friction_margin_ << std::endl;
             std::cout << "\tMaximum ground reaction force: " << max_grf_ << std::endl;
+            std::cout << "\tPolytope delta: " << polytope_delta_ << std::endl;
+            std::cout << "\tPolytope shrinking rad: " << polytope_shrinking_rad_ << std::endl;
 
             std::cout << "Costs:" << std::endl;
             for (const auto& data : cost_data_) {
@@ -514,6 +517,13 @@ namespace torc::mpc {
 
     void FullOrderMpc::UpdateContactSchedule(const ContactSchedule& contact_schedule) {
         // Convert the contact schedule into the binary digits I need
+        vector4_t polytope_delta;
+        polytope_delta << polytope_delta_, polytope_delta_, -polytope_delta_, -polytope_delta_;
+        // std::cerr << "POLYTOPE DELTA: " << polytope_delta.transpose() << std::endl;
+
+        vector4_t polytope_convergence_scalar;
+        polytope_convergence_scalar << 1, 1, -1, -1;
+
         for (auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
             if (in_contact_.contains(frame)) {
 
@@ -525,19 +535,25 @@ namespace torc::mpc {
 
                 // Break the continuous time contact schedule into each node
                 double time = 0;
+                int contact_idx = 0;
                 for (int node = 0; node < nodes_; node++) {
                     if (contact_schedule.InContact(frame, time)) {
                         in_contact_[frame][node] = 1;
 
                         // std::cout << "Contact count: " << contact_count << std::endl;
                         // TODO: Fix. Given how the number of contacts is computed, unless that is changed, we cannot naievly index like this
-                        int contact_idx = contact_schedule.GetContactIndex(frame, time);
+                        contact_idx = contact_schedule.GetContactIndex(frame, time);
                         foot_polytope_[frame][node] = polytopes[contact_idx].A_;
-                        ub_lb_polytope[frame][node] = polytopes[contact_idx].b_;
+                        ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta;
                     } else {
                         in_contact_[frame][node] = 0;
-                        foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
-                        ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+                        if (contact_idx + 1 < polytopes.size()) {
+                            foot_polytope_[frame][node] = polytopes[contact_idx].A_;
+                            ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
+                        } else {
+                            foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                            ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+                        }
 
                         contact_counted = false;
                     }
@@ -549,6 +565,17 @@ namespace torc::mpc {
         }
 
     }
+
+    double FullOrderMpc::GetPolytopeConvergence(const std::string &frame, double time, const ContactSchedule &cs) const {
+        // Compute time left until the next contact
+        double swing_dur = cs.GetSwingDuration(frame, time);
+        double start_time = cs.GetSwingStartTime(frame, time);
+        double lambda = 1 - ((time - start_time) / swing_dur);
+
+        // Multiply range by a positive number
+        return lambda*polytope_shrinking_rad_;
+    }
+
 
     void FullOrderMpc::UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
             std::vector<double> end_height, double apex_time) {
@@ -725,6 +752,13 @@ namespace torc::mpc {
              solve_timer.Duration<std::chrono::microseconds>().count()/1000.0);
 
         // std::cout << "Update timer: " << update_mats_timer.Duration<std::chrono::microseconds>().count()/1000.0 << std::endl;
+
+        // TODO: Why does the quad MPC not just pass out the target when there are no other constraints?
+        // TODO: Remove
+        for (int node = 0; node < q_target_.GetNumNodes(); ++node) {
+            traj_out.SetConfiguration(node, q_target_[node]);
+            traj_out.SetVelocity(node, v_target_[node]);
+        }
 
         traj_ = traj_out;
 
@@ -1368,41 +1402,6 @@ namespace torc::mpc {
 
         // TODO: Double check all of this
         // TODO: Might be able to get away with only enforcing this on one contact per foot (only if needed)
-        // for (const auto& [frame, constraint] : foot_polytope_constraint_) {
-        //     matrixx_t jac;
-        //     vectorx_t x_zero = vectorx_t::Zero(constraint->GetDomainSize());
-        //     vectorx_t p(constraint->GetParameterSize());
-        //     // std::cout << "A row 0: " << foot_polytope_[frame][node].row(0) << std::endl;
-        //     // std::cout << "A row 1: " << foot_polytope_[frame][node].row(1) << std::endl;
-        //     // std::cout << "b: " << ub_lb_polytope[frame][node].transpose() << std::endl;
-        //     p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
-        //
-        //     const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
-        //     torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
-        //     for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
-        //         sparsity_head[i] = sparsity[i];
-        //     }
-        //
-        //     // TODO: For now the way it is programmed the polytope must be in the x-y plane. Expand to support the polytope on different planes.
-        //     constraint->GetJacobian(x_zero, p, jac);
-        //     // Only need to put the top POLYTOPE_SIZE/2 rows into the matrix because the bottom rows are covered by the double-sided constraints
-        //     MatrixToTripletWithSparsitySet(jac.topRows<POLYTOPE_SIZE/2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity_head);
-        //
-        //     // Bounds
-        //     vectorx_t y;
-        //     constraint->GetFunctionValue(x_zero, p, y);
-        //     for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
-        //         osqp_instance_.upper_bounds(row_start + i) = std::max(y(i), -y(i + POLYTOPE_SIZE/2));
-        //         osqp_instance_.lower_bounds(row_start + i) = std::min(y(i), -y(i + POLYTOPE_SIZE/2));
-        //     }
-        //
-        //     robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
-        //     // std::cout << frame << " position: " << robot_model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
-        //     // std::cout << "y: " << y.transpose() << std::endl;
-        //
-        //     row_start += POLYTOPE_SIZE/2;
-        // }
-
         for (const auto& [frame, constraint] : foot_polytope_constraint_) {
             matrixx_t jac;
             vectorx_t x_zero = vectorx_t::Zero(constraint->GetDomainSize());
@@ -1413,26 +1412,64 @@ namespace torc::mpc {
             p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
 
             const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
+            torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                sparsity_head[i] = sparsity[i];
+            }
 
             // TODO: For now the way it is programmed the polytope must be in the x-y plane. Expand to support the polytope on different planes.
             constraint->GetJacobian(x_zero, p, jac);
             // Only need to put the top POLYTOPE_SIZE/2 rows into the matrix because the bottom rows are covered by the double-sided constraints
-            MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+            MatrixToTripletWithSparsitySet(jac.topRows<POLYTOPE_SIZE/2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity_head);
 
             // Bounds
             vectorx_t y;
             constraint->GetFunctionValue(x_zero, p, y);
-            for (int i = 0; i < POLYTOPE_SIZE; i++) {
-                osqp_instance_.upper_bounds(row_start + i) = -y(i);
-                osqp_instance_.lower_bounds(row_start + i) = -10000;
+            // std::cout << "y: " << y.transpose() << std::endl;
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                // osqp_instance_.upper_bounds(row_start + i) = std::max(y(i), -y(i + POLYTOPE_SIZE/2));
+                // osqp_instance_.lower_bounds(row_start + i) = std::min(y(i), -y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.upper_bounds(row_start + i) = std::max(-y(i), y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.lower_bounds(row_start + i) = std::min(-y(i), y(i + POLYTOPE_SIZE/2));
             }
 
-            robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+            // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
             // std::cout << frame << " position: " << robot_model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
             // std::cout << "y: " << y.transpose() << std::endl;
 
-            row_start += POLYTOPE_SIZE;
+            row_start += POLYTOPE_SIZE/2;
         }
+
+        // for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+        //     matrixx_t jac;
+        //     vectorx_t x_zero = vectorx_t::Zero(constraint->GetDomainSize());
+        //     vectorx_t p(constraint->GetParameterSize());
+        //     // std::cout << "A row 0: " << foot_polytope_[frame][node].row(0) << std::endl;
+        //     // std::cout << "A row 1: " << foot_polytope_[frame][node].row(1) << std::endl;
+        //     // std::cout << "b: " << ub_lb_polytope[frame][node].transpose() << std::endl;
+        //     p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
+        //
+        //     const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
+        //
+        //     // TODO: For now the way it is programmed the polytope must be in the x-y plane. Expand to support the polytope on different planes.
+        //     constraint->GetJacobian(x_zero, p, jac);
+        //     // Only need to put the top POLYTOPE_SIZE/2 rows into the matrix because the bottom rows are covered by the double-sided constraints
+        //     MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+        //
+        //     // Bounds
+        //     vectorx_t y;
+        //     constraint->GetFunctionValue(x_zero, p, y);
+        //     for (int i = 0; i < POLYTOPE_SIZE; i++) {
+        //         osqp_instance_.upper_bounds(row_start + i) = -y(i);
+        //         osqp_instance_.lower_bounds(row_start + i) = -10000;
+        //     }
+        //
+        //     // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+        //     // std::cout << frame << " position: " << robot_model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
+        //     // std::cout << "y: " << y.transpose() << std::endl;
+        //
+        //     row_start += POLYTOPE_SIZE;
+        // }
     }
 
     // -------------------------------------- //
@@ -1446,16 +1483,16 @@ namespace torc::mpc {
             // Dynamics related constraints don't happen in the last node
             // std::cout << "Node: " << node << std::endl;
             if (node < nodes_ - 1) {
-                violation += GetIntegrationViolation(qp_res, node);
+                // violation += GetIntegrationViolation(qp_res, node);
                 // std::cout << "Integration violation: " << GetIntegrationViolation(qp_res, node) << std::endl;
             }
 
             if (node < nodes_full_dynamics_) {
-                violation += GetIDViolation(qp_res, node, true);
+                // violation += GetIDViolation(qp_res, node, true);
                 // std::cout << "Dynamics violation: " << GetIDViolation(qp_res, node, true) << std::endl;
                 violation += GetTorqueBoxViolation(qp_res, node);
             } else if (node < nodes_ - 1) {
-                 violation += GetIDViolation(qp_res, node, false);
+                 // violation += GetIDViolation(qp_res, node, false);
             }
 
             // std::cout << "Friction cone violation: " << GetFrictionViolation(qp_res, node) << std::endl;
@@ -1465,18 +1502,18 @@ namespace torc::mpc {
             if (node > 0) {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
-                violation += GetHolonomicViolation(qp_res, node);
+                // violation += GetHolonomicViolation(qp_res, node);
                 // std::cout << "Holonomic constraint violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetVelocityBoxViolation(qp_res, node);
 
                 violation += GetConfigurationBoxViolation(qp_res, node);
-                violation += GetSwingHeightViolation(qp_res, node);
+                // violation += GetSwingHeightViolation(qp_res, node);
 
                 violation += GetCollisionViolation(qp_res, node);
 
-                violation += GetFootPolytopeViolation(qp_res, node);
+                // violation += GetFootPolytopeViolation(qp_res, node);
                 // double fvio = GetFootPolytopeViolation(qp_res, node);
-                // if (fvio > 0.01) {
+                // if (fvio > 0.001) {
                 //     std::cout << "Foot polytope constraint violation: " << fvio << std::endl;
                 // }
                 // if (fvio > 100) {
@@ -2518,16 +2555,16 @@ namespace torc::mpc {
         for (const auto& [frame, constraint] : foot_polytope_constraint_) {
             const auto sparsity = constraint->GetJacobianSparsityPatternSet();
             // TODO: Remove
-            AddSparsitySet(sparsity, row_start, col_start, constraint_triplets_);
-            row_start += POLYTOPE_SIZE;
+            // AddSparsitySet(sparsity, row_start, col_start, constraint_triplets_);
+            // row_start += POLYTOPE_SIZE;
 
             // TODO: Put back
-            // torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
-            // for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
-            //     sparsity_head[i] = sparsity[i];
-            // }
-            // AddSparsitySet(sparsity_head, row_start, col_start, constraint_triplets_);
-            // row_start += POLYTOPE_SIZE/2;
+            torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                sparsity_head[i] = sparsity[i];
+            }
+            AddSparsitySet(sparsity_head, row_start, col_start, constraint_triplets_);
+            row_start += POLYTOPE_SIZE/2;
         }
     }
 
@@ -2865,8 +2902,8 @@ namespace torc::mpc {
     }
 
     int FullOrderMpc::NumFootPolytopeConstraintsNode() const {
-        // return (POLYTOPE_SIZE/2)*num_contact_locations_;
-        return (POLYTOPE_SIZE)*num_contact_locations_;
+        return (POLYTOPE_SIZE/2)*num_contact_locations_;
+        // return (POLYTOPE_SIZE)*num_contact_locations_;
     }
 
     // Other functions

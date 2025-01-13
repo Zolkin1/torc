@@ -52,6 +52,7 @@ constraints:
       frame2: "waist_support_link"
       radius1: 0.06
       radius2: 0.06
+  polytope_delta: 0.02
 costs:
   - type: ConfigurationTracking
     name: "ConfigTracking"
