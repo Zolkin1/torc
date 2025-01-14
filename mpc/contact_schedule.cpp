@@ -68,9 +68,27 @@ namespace torc::mpc {
         int swing_idx = 0;
         while (frame_schedule_map.at(frame).at(swing_idx).second < time) {
             swing_idx++;
+            // DEBUG CHECK
+            if (swing_idx > frame_schedule_map.at(frame).size()) {
+                throw std::runtime_error("[ContactSchedule::GetSwingDuration] swing idx too large!");
+            }
         }
 
         return frame_schedule_map.at(frame).at(swing_idx).second - frame_schedule_map.at(frame).at(swing_idx).first;
+    }
+
+    double ContactSchedule::GetNextSwingDuration(const std::string &frame, double time) const {
+        double min_start_diff = 100;
+        std::pair<double, double> start_end;
+        for (const auto& [start, end] : frame_schedule_map.at(frame)) {
+            if (start > time && start - time < min_start_diff) {
+                min_start_diff = start - time;
+                start_end.first = start;
+                start_end.second = end;
+            }
+        }
+
+        return start_end.second - start_end.first;
     }
 
     double ContactSchedule::GetFirstContactTime(const std::string &frame) const {

@@ -33,11 +33,13 @@ namespace torc::mpc {
 
         std::pair<SimpleTrajectory, SimpleTrajectory> GenerateReference(
             const vectorx_t& q,
+            const vectorx_t& v,
             SimpleTrajectory q_target,
             SimpleTrajectory v_target,
             const std::map<std::string, std::vector<double>>& swing_traj,
             const std::vector<double>& hip_offsets,
-            const ContactSchedule& contact_schedule);
+            const ContactSchedule& contact_schedule,
+            std::map<std::string, std::vector<vector2_t>>& contact_foot_pos);
 
     protected:
     private:

@@ -64,6 +64,8 @@ namespace torc::mpc {
          */
         double GetSwingDuration(const std::string& frame, double time) const;
 
+        double GetNextSwingDuration(const std::string& frame, double time) const;
+
         double GetFirstContactTime(const std::string& frame) const;
 
         double GetSwingStartTime(const std::string& frame, double time) const;

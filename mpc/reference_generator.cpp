@@ -38,12 +38,13 @@ namespace torc::mpc {
     //  e.g. if we are asked to walk off a polytope and no other polytope is selected then we should modulate the position
     //  and velocity to keep the body in the polytope, which will make the optimization easier. Just need to be careful
     //  that this is done correctly. Can also increase velocity/position if making ot over a big gap.
-    std::pair<SimpleTrajectory, SimpleTrajectory> ReferenceGenerator::GenerateReference(const vectorx_t& q,
+    std::pair<SimpleTrajectory, SimpleTrajectory> ReferenceGenerator::GenerateReference(const vectorx_t& q, const vectorx_t& v,
         SimpleTrajectory q_target, // TODO: Should I use a reference instead?
         SimpleTrajectory v_target,
         const std::map<std::string, std::vector<double>>& swing_traj,
         const std::vector<double>& hip_offsets,
-        const ContactSchedule& contact_schedule) {
+        const ContactSchedule& contact_schedule,
+        std::map<std::string, std::vector<vector2_t>>& des_foot_pos) {
         if (hip_offsets.size() != 2*contact_frames_.size()) {
             throw std::runtime_error("Hip offsets size != 2*contact_frames_.size()");
         }
@@ -82,6 +83,18 @@ namespace torc::mpc {
             //     std::cout << time << " ";
             // }
             // std::cout << std::endl;
+
+            // DEBUG CHECK
+            if (contact_schedule.GetPolytopes(frame).size() != contact_midtimes[frame].size()) {
+                throw std::runtime_error("[Reference generator] Polytopes size != contact_midtimes.size()");
+            }
+            // DEBUG CHECK
+            if (contact_midtimes[frame].size() != contact_schedule.GetNumContacts(frame)) {
+                std::cerr << "frame: " << frame << std::endl;
+                std::cerr << "contact_midtimes size: " << contact_midtimes[frame].size() << std::endl;
+                std::cerr << "num contacts: " << contact_schedule.GetNumContacts(frame) << std::endl;
+                throw std::runtime_error("[Reference generator] NumContacts != contact_midtimes.size()");
+            }
         }
 
         // Remove all negative time contacts
@@ -94,6 +107,7 @@ namespace torc::mpc {
             }
         }
 
+
         // -------------------------------------------------- //
         // -------------------------------------------------- //
         // Compute the x-y position of the feet at every node
@@ -102,14 +116,15 @@ namespace torc::mpc {
         // Holds the position of the feet at the contact midpoints for each frame
         std::map<std::string, std::vector<vector2_t>> contact_foot_pos;
         std::map<double, vector2_t> base_pos;
-        std::map<std::string, std::vector<vector2_t>> node_foot_pos;
+        des_foot_pos.clear();
+        // std::map<std::string, std::vector<vector2_t>> des_foot_pos;
         model_->FirstOrderFK(q);
         const auto& schedule = contact_schedule.GetScheduleMap();
         for (int j = 0; j < contact_frames_.size(); j++) {
             std::string& frame = contact_frames_[j];
 
             contact_foot_pos.insert({frame, {}});
-            node_foot_pos.insert({frame, {}});
+            des_foot_pos.insert({frame, {}});
 
             vector2_t hip_offset;
             hip_offset << hip_offsets[2*j], hip_offsets[2*j + 1];
@@ -128,8 +143,17 @@ namespace torc::mpc {
                     contact_foot_pos[frame].emplace_back(R.topLeftCorner<2,2>()*hip_offset
                         + q_command.head<2>());
 
+                    // Raibert Heuristic
+                    if (i == 0) {
+                        // For now just in the plane
+                        constexpr double g = 9.81;
+                        const double hnom = q_target[0][2];
+                        contact_foot_pos[frame].back() = contact_foot_pos[frame].back() + R.topLeftCorner<2,2>()*std::sqrt(hnom/g)*(v.head<2>() - v_target[0].head<2>());
+                    }
+
                     // Project onto the polytope
                     // Note that the desired polytope is already given
+                    // TODO: After we delete the contact midtimes, then the indexing doesn't align with the polytopes!
                     bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(), contact_schedule.GetPolytopes(frame).at(i));
                     if (time < end_time_ && !base_pos.contains(time)) {
                         // This was removed because otherwise the foot would never get a chance to move to the next stone
@@ -144,6 +168,10 @@ namespace torc::mpc {
                 }
             }
 
+            if (contact_foot_pos[frame].size() != contact_midtimes[frame].size()) {
+                throw std::runtime_error("[Reference generator] FootPos size != contact_midtimes.size()");
+            }
+
             int current_contact_idx = 0;
             for (int node = 0; node < nodes_; node++) {
                 // Get the contact positions in front and behind the current time
@@ -152,6 +180,7 @@ namespace torc::mpc {
                 // Check if we are in swing
                 if (contact_schedule.InSwing(frame, time)) {
                     if (node > 0 && contact_schedule.InContact(frame, GetTime(node - 1))) {
+                        // std::cerr << "[" << frame << "] " << "updating contact idx at node " << node << "(time " << time << ")" << std::endl;
                         current_contact_idx++;
                     }
 
@@ -168,6 +197,20 @@ namespace torc::mpc {
 
                         if (lambda > 1 || lambda < 0) {
                             throw std::runtime_error("[Reference Generator] lambda issue!");
+                        }
+
+                        // DEBUG CHECK
+                        if (contact_foot_pos[frame].size() <= current_contact_idx) {
+                            std::cerr << "current_contact_idx: " << current_contact_idx << std::endl;
+                            std::cerr << "contact_foot_pos.size(): " << contact_foot_pos[frame].size() << std::endl;
+                            std::cerr << "num contacts: " << contact_schedule.GetNumContacts(frame) << std::endl;
+                            std::cerr << "node: " << node << " frame: " << frame << " time: " << time << std::endl;
+                            std::cerr << "contact mid times: " << std::endl;
+                            for (int k = 0; k < contact_midtimes[frame].size(); k++) {
+                                std::cerr << contact_midtimes[frame][k] << ", ";
+                            }
+                            std::cerr << std::endl;
+                            throw std::runtime_error("[Reference Generator] contact_foot_pos size issue!");
                         }
 
                         swing_intermediate_pos = lambda*contact_foot_pos[frame].at(current_contact_idx)
@@ -201,21 +244,41 @@ namespace torc::mpc {
                         // }
                     }
 
-                    node_foot_pos[frame].emplace_back(swing_intermediate_pos);
+                    des_foot_pos[frame].emplace_back(swing_intermediate_pos);
                 } else {
                     if (!contact_schedule.InContact(frame, GetTime(node))) {
                         throw std::runtime_error("[Reference Generator] should be in contact!");
                     }
+                    // DEBUG CHECK
+                    if (contact_foot_pos[frame].size() <= current_contact_idx) {
+                        std::cerr << "current_contact_idx: " << current_contact_idx << std::endl;
+                        std::cerr << "contact_foot_pos.size(): " << contact_foot_pos[frame].size() << std::endl;
+                        std::cerr << "num contacts: " << contact_schedule.GetNumContacts(frame) << std::endl;
+                        std::cerr << "node: " << node << " frame: " << frame << " time: " << time << std::endl;
+                        std::cerr << "contact mid times: " << std::endl;
+                        for (int k = 0; k < contact_midtimes[frame].size(); k++) {
+                            std::cerr << contact_midtimes[frame][k] << ", ";
+                        }
+                        std::cerr << std::endl;
+                        throw std::runtime_error("[Reference Generator] contact_foot_pos size issue!");
+                    }
 
                     if (node == 0) {
                         model_->FirstOrderFK(q);
-                        contact_foot_pos[frame].at(current_contact_idx) = model_->GetFrameState(frame).placement.translation().head<2>();
+                        double next_swing_duration = contact_schedule.GetNextSwingDuration(frame, time);
+                        // If we deleted the contact mid time but it is still in use then we need to make a position for it
+                        if (contact_midtimes[frame].at(current_contact_idx) > time + next_swing_duration) {
+                            // Insert a contact_foot_pos at the front with the current position
+                            contact_foot_pos[frame].insert(contact_foot_pos[frame].begin(), model_->GetFrameState(frame).placement.translation().head<2>());
+                        } else {
+                            contact_foot_pos[frame].at(current_contact_idx) = model_->GetFrameState(frame).placement.translation().head<2>();
+                        }
                     }
 
-                    node_foot_pos[frame].emplace_back(contact_foot_pos[frame].at(current_contact_idx));
+                    des_foot_pos[frame].emplace_back(contact_foot_pos[frame].at(current_contact_idx));
                 }
             }
-            if (node_foot_pos[frame].size() != nodes_) {
+            if (des_foot_pos[frame].size() != nodes_) {
                 throw std::runtime_error("[Reference Generator] node_foot_pos size != nodes_");
             }
         }
@@ -315,7 +378,7 @@ namespace torc::mpc {
         for (int i = 1; i < nodes_; i++) {
             for (int j = 0; j < contact_frames_.size(); j++) {
                 const auto& frame = contact_frames_[j];
-                end_effectors_pos[j] << node_foot_pos[frame][i].head<2>(), swing_traj.at(frame)[i];
+                end_effectors_pos[j] << des_foot_pos[frame][i].head<2>(), swing_traj.at(frame)[i];
                 // std::cout << "j: " << j << ", ee pos: " << end_effectors_pos[j].transpose() << std::endl;
             }
 
@@ -332,8 +395,8 @@ namespace torc::mpc {
         // -------------------------------------------------- //
         // -------------------------------------------------- //
         for (int node = 0; node < nodes_; node++) {
-            // TODO: Recompute the velocities given the configuration targets (which may be modified)
-            v_ref[node] = v_target[node];
+            // TODO: Should I keep the 0?
+            v_ref[node] = 0*v_target[node];
         }
 
         // -------------------------------------------------- //
