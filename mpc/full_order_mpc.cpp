@@ -479,6 +479,8 @@ namespace torc::mpc {
 
         // Create A sparsity pattern to configure OSQP with
         CreateConstraintSparsityPattern();
+        std::cout << "nnz(A): " << constraint_triplets_.size() << std::endl;
+        std::cout << "sparsity factor: " << static_cast<double>(constraint_triplets_.size()) / static_cast<double>(GetNumConstraints() * GetNumDecisionVars()) << std::endl;
 
         // Copy into constraints, which is what will be updated throughout the code
         // FromTriplets destroys the object, and osqp-cpp uses a reference to osqp_instance_, so we can't destroy it.
@@ -548,8 +550,10 @@ namespace torc::mpc {
                     } else {
                         in_contact_[frame][node] = 0;
                         if (contact_idx + 1 < polytopes.size()) {
-                            foot_polytope_[frame][node] = polytopes[contact_idx].A_;
-                            ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
+                            foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                            ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+                            // foot_polytope_[frame][node] = polytopes[contact_idx].A_;
+                            // ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
                         } else {
                             foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
                             ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
@@ -592,7 +596,7 @@ namespace torc::mpc {
         }
     }
 
-    void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time) {
+    void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
 

@@ -95,7 +95,7 @@ namespace torc::mpc {
          *
          * @return
          */
-        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time = 0);
+        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
 
         void ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
 

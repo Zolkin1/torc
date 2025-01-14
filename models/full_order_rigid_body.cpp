@@ -652,7 +652,7 @@ namespace torc::models {
         const vectorx_t upper_joint_lims = GetUpperConfigLimits();
 
         // Define constants for the optimization
-        constexpr double THRESHOLD = 1e-3;
+        constexpr double THRESHOLD = 1e-4; //3
         constexpr int IT_MAX = 5e2;
         constexpr double DT = 1e-2;
         constexpr double DAMP = 1e-6;
