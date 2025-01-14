@@ -819,13 +819,13 @@ namespace torc::mpc {
     }
 
     // TODO: Consider moving this to a different class along with the swing trajectory generation
-    void FullOrderMpc::GenerateCostReference(const vectorx_t& q_current, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target,
+    void FullOrderMpc::GenerateCostReference(const vectorx_t& q_current, const vectorx_t& v_current, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target,
         const ContactSchedule& contact_schedule) {
         utils::TORCTimer timer;
         timer.Tic();
         // Note this is clocking in at about 0.55-0.6ms when walking around
-        auto [qt, vt] = reference_generator_->GenerateReference(q_current, q_target, v_target,
-            swing_traj_, hip_offsets_, contact_schedule);
+        auto [qt, vt] = reference_generator_->GenerateReference(q_current, v_current, q_target, v_target,
+            swing_traj_, hip_offsets_, contact_schedule, des_foot_pos_);
 
         timer.Toc();
         // std::cout << "Reference gen took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
@@ -2130,14 +2130,18 @@ namespace torc::mpc {
         return force_target;
     }
 
-    // TODO: Consider removing or at least moving this function
     vector3_t FullOrderMpc::GetDesiredFramePos(int node, std::string frame) {
-        vector3_t frame_pos;
-
-        // TODO: Implement raibert heuristic
-        frame_pos.setZero();
-
-        return frame_pos;
+        if (!des_foot_pos_.contains(frame)) {
+            std::cerr << "Desired frame " << frame << std::endl;
+            std::cerr << "Possible frames:" << std::endl;
+            for (const auto& [frame, positions] : des_foot_pos_) {
+                std::cerr << frame << std::endl;
+            }
+            throw std::runtime_error("[GetDesiredFramePos] frame not in the map!");
+        }
+        vector3_t desired_pos;
+        desired_pos << des_foot_pos_.at(frame)[node], swing_traj_.at(frame)[node];
+        return desired_pos;
     }
 
     vectorx_t FullOrderMpc::GetConfigTarget(int node) {

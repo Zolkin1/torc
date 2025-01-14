@@ -97,12 +97,15 @@ namespace torc::mpc {
             }
         }
 
+        std::map<std::string, int> polytope_idx_offset;     // Account for the deleted times when accessing the polytopes
         // Remove all negative time contacts
         for (auto& [frame, midtimes] : contact_midtimes) {
+            polytope_idx_offset.insert({frame, 0});
             for (int i = 0; i < midtimes.size(); i++) {
                 if (midtimes[i] < 0) {
                     midtimes.erase(midtimes.begin() + i);
                     i--;
+                    polytope_idx_offset[frame]++;
                 }
             }
         }
@@ -152,9 +155,7 @@ namespace torc::mpc {
                     }
 
                     // Project onto the polytope
-                    // Note that the desired polytope is already given
-                    // TODO: After we delete the contact midtimes, then the indexing doesn't align with the polytopes!
-                    bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(), contact_schedule.GetPolytopes(frame).at(i));
+                    bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(), contact_schedule.GetPolytopes(frame).at(i + polytope_idx_offset[frame]));
                     if (time < end_time_ && !base_pos.contains(time)) {
                         // This was removed because otherwise the foot would never get a chance to move to the next stone
                         // if (projected) {
@@ -397,6 +398,7 @@ namespace torc::mpc {
         for (int node = 0; node < nodes_; node++) {
             // TODO: Should I keep the 0?
             v_ref[node] = 0*v_target[node];
+            v_ref[node].head<6>() = v_target[node].head<6>();
         }
 
         // -------------------------------------------------- //

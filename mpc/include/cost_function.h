@@ -136,7 +136,7 @@ namespace torc::mpc {
 
                     cost_fcn_terms_.emplace(data.constraint_name, std::make_unique<torc::ad::CppADInterface>(
                             std::bind(&CostFunction::FkCost, this, model->GetFrameIdx(data.frame_name), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
-                            name_ + data.constraint_name + "_mpc_force_reg_cost",
+                            name_ + data.constraint_name + "_mpc_fk_cost",
                             deriv_libs_path,
                             torc::ad::DerivativeOrder::FirstOrder, vel_size_, config_size_ + 2*POS_VARS,
                             compile_derivatives_));
@@ -249,7 +249,7 @@ namespace torc::mpc {
                 cost_fcn_terms_[name]->GetGaussNewton(vectorx_t::Zero(vel_size_), p, jac, hessian_term);
                 hessian_term = 2*hessian_term;
 
-                hessian_term = hessian_term + 1e-5*matrixx_t::Identity(hessian_term.rows(), hessian_term.cols());       // Ensures that we are PSD
+                // hessian_term = hessian_term + 1e-5*matrixx_t::Identity(hessian_term.rows(), hessian_term.cols());       // Ensures that we are PSD
 
                 // ----- PSD Checks
                 // if (!hessian_term.isApprox(hessian_term.transpose())) {
@@ -469,7 +469,7 @@ namespace torc::mpc {
         /**
          * @brief Calculates the error frame location relative to a given location
          * @param dq
-         * @param q_xyzdes
+         * @param q_xyzdes_weight
          * @param frame_error
          */
         void FkCost(int frame_idx,
