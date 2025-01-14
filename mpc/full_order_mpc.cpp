@@ -550,10 +550,10 @@ namespace torc::mpc {
                     } else {
                         in_contact_[frame][node] = 0;
                         if (contact_idx + 1 < polytopes.size()) {
-                            foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
-                            ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
-                            // foot_polytope_[frame][node] = polytopes[contact_idx].A_;
-                            // ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
+                            // foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                            // ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+                            foot_polytope_[frame][node] = polytopes[contact_idx].A_;
+                            ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
                         } else {
                             foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
                             ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
