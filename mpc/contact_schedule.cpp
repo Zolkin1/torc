@@ -67,7 +67,7 @@ namespace torc::mpc {
 
         int swing_idx = 0;
         while (frame_schedule_map.at(frame).at(swing_idx).second < time) {
-            ++swing_idx;
+            swing_idx++;
         }
 
         return frame_schedule_map.at(frame).at(swing_idx).second - frame_schedule_map.at(frame).at(swing_idx).first;
@@ -129,17 +129,28 @@ namespace torc::mpc {
             double time = GetTime(dt_vec, node);
 
             // Check if we are in swing
-            bool in_swing = false;
-            for (const auto& [start, end] : frame_schedule_map.at(frame)) {
-                if (time >= start && time <= end) {
-                    swing_traj[node] = GetSwingHeight(apex_height, end_height, apex_time, time, start, end);
-                    in_swing = true;
-                    break;
+            if (InSwing(frame, time)) {
+                for (const auto& [start, end] : frame_schedule_map.at(frame)) {
+                    if (time >= start && time <= end) {
+                        swing_traj[node] = GetSwingHeight(apex_height, end_height, apex_time, time, start, end);
+                        break;
+                    }
                 }
             }
-
-            if (!in_swing) {
+            if (!InSwing(frame, time)) {
                 swing_traj[node] = end_height;
+            }
+        }
+
+        // DEBUG CHECK
+        for (int node = 0; node < nodes; node++) {
+            double time = GetTime(dt_vec, node);
+            if (InSwing(frame, time) && swing_traj[node] < end_height) {
+                std::cerr << "Time: " << time << std::endl;
+                std::cerr << "frame: " << frame << std::endl;
+                std::cerr << "swing height: " << swing_traj[node] << std::endl;
+                std::cerr << "end height: " << end_height << std::endl;
+                throw std::runtime_error("[Contact schedule] error generating the swing traj!");
             }
         }
 
@@ -280,10 +291,16 @@ namespace torc::mpc {
     double ContactSchedule::GetSwingHeight(double apex_height, double ground_height, double apex_time, double time,
         double start_time, double end_time) {
         if (time < start_time) {
-            throw std::runtime_error("Provided time is before the start of the swing!");
+            std::cerr << "start time: " << start_time << std::endl;
+            std::cerr << "end time: " << end_time << std::endl;
+            std::cerr << "time: " << time << std::endl;
+            throw std::runtime_error("[Contact Schedule] Provided time is before the start of the swing!");
         }
         if (time > end_time) {
-            throw std::runtime_error("Provided time is after the end of the swing!");
+            std::cerr << "start time: " << start_time << std::endl;
+            std::cerr << "end time: " << end_time << std::endl;
+            std::cerr << "time: " << time << std::endl;
+            throw std::runtime_error("[Contact Schedule] Provided time is after the end of the swing!");
         }
 
         const double apex_time_abs = apex_time*(end_time - start_time) + start_time;

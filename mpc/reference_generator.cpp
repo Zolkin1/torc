@@ -161,8 +161,8 @@ namespace torc::mpc {
                     }
 
                     vector2_t swing_intermediate_pos;
+                    double swing_duration = contact_schedule.GetSwingDuration(frame, time);
                     if (current_contact_idx > 0) {
-                        double swing_duration = contact_schedule.GetSwingDuration(frame, time);
                         double swing_start = contact_schedule.GetSwingStartTime(frame, time);
                         double lambda = (time - swing_start)/(swing_duration);
 
@@ -172,9 +172,14 @@ namespace torc::mpc {
 
                         swing_intermediate_pos = lambda*contact_foot_pos[frame].at(current_contact_idx)
                             + (1-lambda)*contact_foot_pos[frame][current_contact_idx-1];
+                        // if (node < nodes_ - 1 && contact_schedule.InContact(frame, GetTime(node + 1))) {
+                        //     std::cerr << "frame " << frame << " node " << node << std::endl;
+                        //     std::cerr << "lambda: " << lambda << std::endl;
+                        //     std::cerr << "swing pos: " << swing_intermediate_pos.transpose() << std::endl;
+                        //     std::cerr << "next contact: " << contact_foot_pos[frame][current_contact_idx].transpose() << std::endl;
+                        // }
                     } else if (current_contact_idx == 0) {
-                        double swing_duration = contact_schedule.GetSwingDuration(frame, time); //contact_schedule.GetFirstContactTime(frame);
-                        double swing_start = 0;
+                        double swing_start = contact_schedule.GetSwingStartTime(frame, time);
                         double lambda = (time - swing_start)/(swing_duration);
 
                         if (lambda > 1 || lambda < 0) {
@@ -186,6 +191,14 @@ namespace torc::mpc {
 
                         swing_intermediate_pos = lambda*contact_foot_pos[frame][current_contact_idx]
                             + (1-lambda)*model_->GetFrameState(frame).placement.translation().head<2>();
+
+                        // if (node < nodes_ - 1 && contact_schedule.InContact(frame, GetTime(node + 1))) {
+                        //     std::cerr << "frame " << frame << " node " << node << std::endl;
+                        //     std::cerr << "time: " << time << " swing start: " << swing_start << " swing duration: " << swing_duration << std::endl;
+                        //     std::cerr << "lambda: " << lambda << std::endl;
+                        //     std::cerr << "swing pos: " << swing_intermediate_pos.transpose() << std::endl;
+                        //     std::cerr << "next contact: " << contact_foot_pos[frame][current_contact_idx].transpose() << std::endl;
+                        // }
                     }
 
                     node_foot_pos[frame].emplace_back(swing_intermediate_pos);
@@ -209,6 +222,29 @@ namespace torc::mpc {
 
         vectorx_t base_config(7);
         vectorx_t q_ik;
+
+        // DEBUG CHECK
+        // for (const auto& [frame, positions] : node_foot_pos) {
+        //     for (int node = 0; node < nodes_ - 1; node++) {
+        //         if (contact_schedule.InContact(frame, GetTime(node)) && contact_schedule.InContact(frame, GetTime(node + 1))) {
+        //             if (node_foot_pos[frame][node] != node_foot_pos[frame][node + 1]) {
+        //                 std::cerr << "Frame: " << frame << " Node 1: " << node << " Node 2: " << node + 1 << std::endl;
+        //                 std::cerr << "Position 1: " << positions[node].transpose() << std::endl;
+        //                 std::cerr << "Position 2: " << positions[node + 1].transpose() << std::endl;
+        //                 throw std::runtime_error("[Reference Generator] node_foot_pos size issue!");
+        //             }
+        //         }
+        //
+        //         if (contact_schedule.InContact(frame, GetTime(node + 1)) && contact_schedule.InSwing(frame, GetTime(node))) {
+        //             if ((node_foot_pos[frame][node] - node_foot_pos[frame][node + 1]).norm() > 0.095) {
+        //                 std::cerr << "Frame: " << frame << " Node 1: " << node << " Node 2: " << node + 1 << std::endl;
+        //                 std::cerr << "Position 1: " << positions[node].transpose() << std::endl;
+        //                 std::cerr << "Position 2: " << positions[node + 1].transpose() << std::endl;
+        //                 throw std::runtime_error("[Reference Generator] swing traj not ending near contact position!");
+        //             }
+        //         }
+        //     }
+        // }
 
         // -------------------------------------------------- //
         // -------------------------------------------------- //
