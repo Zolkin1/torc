@@ -173,7 +173,7 @@ namespace torc::mpc {
 
             int node_type = 0;
             if (general_settings["node_dt_type"]) {
-                if (general_settings["node_dt_type"].as<std::string>() == "SmallFirst") {
+                if (general_settings["node_dt_type"].as<std::string>() == "two_groups") {
                     node_type = 1;
                 } else if (general_settings["node_dt_type"].as<std::string>() == "Adaptive") {
                     throw std::runtime_error("Adaptive node dt not implemented yet!");
@@ -194,19 +194,23 @@ namespace torc::mpc {
                     throw std::runtime_error("Node dt not specified!");
                 }
             } else if (node_type == 1) {
-                if (general_settings["node_dt"]) {
-                    const auto dt = general_settings["node_dt"].as<double>();
+                if (general_settings["node_group_1_n"] && general_settings["node_group_2_n"]
+                        && general_settings["node_dt_1"] && general_settings["node_dt_2"]) {
                     dt_.resize(nodes_);
-                    for (double & it : dt_) {
-                        it = dt;
+
+                    if (general_settings["node_group_1_n"].as<int>() + general_settings["node_group_2_n"].as<int>() != nodes_) {
+                        throw std::runtime_error("Node groups don't sum to the nodes!");
+                    }
+
+                    for (int i = 0; i < general_settings["node_group_1_n"].as<int>(); i++) {
+                        dt_[i] = general_settings["node_dt_1"].as<double>();
+                    }
+
+                    for (int i = general_settings["node_group_1_n"].as<int>(); i < general_settings["node_group_2_n"].as<int>() + general_settings["node_group_1_n"].as<int>(); i++) {
+                        dt_[i] = general_settings["node_dt_2"].as<double>();
                     }
                 } else {
-                    throw std::runtime_error("Node dt not specified!");
-                }
-                if (general_settings["first_node_dt"]) {
-                    dt_[0] = general_settings["first_node_dt"].as<double>();
-                } else {
-                    throw std::runtime_error("You selected node dt type as 'SmallFirst' but did not provide a first node dt!");
+                    throw std::runtime_error("Node group 1 or 2 n not specified or the dt's are not specified!");
                 }
             }
 

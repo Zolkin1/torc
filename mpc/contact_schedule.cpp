@@ -43,12 +43,14 @@ namespace torc::mpc {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, stop_time);
         contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
+        contact_polytopes[frame].back() = GetDefaultContactInfo();
     }
 
     void ContactSchedule::InsertSwingByDuration(const std::string& frame, double start_time, double duration) {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, start_time + duration);
         contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
+        contact_polytopes[frame].back() = GetDefaultContactInfo();
     }
 
     bool ContactSchedule::InContact(const std::string& frame, double time) const {
@@ -369,6 +371,9 @@ namespace torc::mpc {
     int ContactSchedule::GetContactIndex(const std::string& frame, double time) const {
         // Loop through the swing times for the given frame
         // Get the contact index for the stuff between the swings
+        if (InSwing(frame, time)) {
+            throw std::runtime_error("[ContactSchedule::GetContactIndedx] Time provided is in a swing!");
+        }
         const auto& swings = frame_schedule_map.at(frame);
         for (int i = 0; i < swings.size(); i++) {
             if (swings[i].first > time) {
