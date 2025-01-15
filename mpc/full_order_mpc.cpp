@@ -530,14 +530,10 @@ namespace torc::mpc {
         vector4_t polytope_convergence_scalar;
         polytope_convergence_scalar << 1, 1, -1, -1;
 
-        for (auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
+        for (const auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
             if (in_contact_.contains(frame)) {
 
-                const auto polytopes = contact_schedule.GetPolytopes(frame);
-
-                bool contact_counted = false;
-
-                // std::cout << "Polytopes size: " << polytopes.size() << std::endl;
+                const auto& polytopes = contact_schedule.GetPolytopes(frame);
 
                 // Break the continuous time contact schedule into each node
                 double time = 0;
@@ -546,24 +542,23 @@ namespace torc::mpc {
                     if (contact_schedule.InContact(frame, time)) {
                         in_contact_[frame][node] = 1;
 
-                        // std::cout << "Contact count: " << contact_count << std::endl;
-                        // TODO: Fix. Given how the number of contacts is computed, unless that is changed, we cannot naievly index like this
                         contact_idx = contact_schedule.GetContactIndex(frame, time);
-                        foot_polytope_[frame][node] = polytopes[contact_idx].A_;
-                        ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta;
+                        // TODO: Put back - solve issue with feet dragging to another polytope!
+                        // foot_polytope_[frame][node] = polytopes[contact_idx].A_;
+                        // ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta;
+                        foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                        ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
                     } else {
                         in_contact_[frame][node] = 0;
                         if (contact_idx + 1 < polytopes.size()) {
-                            // foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
-                            // ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
-                            foot_polytope_[frame][node] = polytopes[contact_idx].A_;
-                            ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
+                            foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                            ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+                            // foot_polytope_[frame][node] = polytopes[contact_idx].A_;
+                            // ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
                         } else {
                             foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
                             ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
                         }
-
-                        contact_counted = false;
                     }
                     time += dt_[node];
                 }
