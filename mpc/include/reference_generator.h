@@ -38,6 +38,7 @@ namespace torc::mpc {
             SimpleTrajectory v_target,
             const std::map<std::string, std::vector<double>>& swing_traj,
             const std::vector<double>& hip_offsets,
+            const std::vector<std::string>& hip_frame_names,
             const ContactSchedule& contact_schedule,
             std::map<std::string, std::vector<vector2_t>>& contact_foot_pos);
 

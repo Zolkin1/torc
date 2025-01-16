@@ -46,6 +46,19 @@ namespace torc::models {
         contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
     }
 
+    FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+            const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values,
+            std::vector<std::string> new_frame_names, std::vector<vector3_t> new_frame_positions)
+    : PinocchioModel(name, model_path, HybridSystemImpulse, joint_skip_names, joint_skip_values,
+        new_frame_names, new_frame_positions) {
+        std::vector<std::string> unactuated_joints;
+        unactuated_joints.emplace_back("root_joint");
+
+        CreateActuationMatrix(unactuated_joints);
+
+        contact_data_ = std::make_unique<pinocchio::Data>(pin_model_);
+    }
+
     FullOrderRigidBody::FullOrderRigidBody(const torc::models::FullOrderRigidBody& other)
         : PinocchioModel(other.name_, other.model_path_, HybridSystemImpulse) {
         n_input_ = other.n_input_;
@@ -775,6 +788,89 @@ namespace torc::models {
         // }
 
         return q;
+    }
+
+    quat_t FullOrderRigidBody::PoseFit(const vector3_t &base_position, const quat_t& quat_guess, const std::vector<vector3_t> &frame_positions, const std::vector<std::string> &frames) {
+        // IK But for only the base
+        // Define constants for the optimization
+        constexpr double THRESHOLD = 4e-3; //3
+        constexpr int IT_MAX = 150; //5e2;
+        constexpr double DT = 1e-2;
+        constexpr double DAMP = 1e-6;
+
+        vectorx_t q = GetNeutralConfig();
+        q.head<3>() = base_position;
+        q.segment<4>(3) = quat_guess.coeffs();
+
+        matrix6x_t J = matrix6x_t::Zero(6, GetVelDim());
+        matrix6x_t Jtemp = matrix6x_t::Zero(6, GetVelDim());
+        matrix3x_t J_lin_terms = matrix3x_t::Zero(3, GetVelDim());
+        vectorx_t v = vectorx_t::Zero(GetVelDim());
+
+        v.setZero();
+
+        for (int i = 0; i < IT_MAX; i++) {
+            pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+            vector3_t error = vector3_t::Zero();
+
+            // Compute cost
+            for (int ee = 0; ee < frame_positions.size(); ee++) {
+                const int frame_idx = GetFrameIdx(frames[ee]);
+                error += -frame_positions[ee] + pin_data_->oMf[frame_idx].translation();
+            }
+
+            // Check for convergence
+            if (error.norm() <= THRESHOLD) {
+                break;
+            } else if (i == IT_MAX - 1) {
+                std::cout << "[IK] Pose fit failed! Error: " << error.norm() << std::endl;
+                std::cout << "q: " << q.transpose() << std::endl;
+                std::cout << ", iteration: " << i << ", error: " << error.transpose() << ", error norm: " << error.norm() << std::endl;
+                std::cout << "Resulting quat: " << q.segment<4>(3).transpose() << std::endl;
+                std::cout << std::endl;
+            }
+
+            J.setZero();
+            Jtemp.setZero();
+            // Compute jacobian of the cost
+            for (int ee = 0; ee < frame_positions.size(); ee++) {
+                const int frame_idx = GetFrameIdx(frames[ee]);
+                pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, Jtemp); // TODO: DO I need to change the frame?
+                J += Jtemp;
+            }
+
+            J_lin_terms = J.topRows<3>();
+            // TOOD: Maybe I should let the position be adjusted
+            // J_lin_terms.leftCols<3>().setZero();    // Don't want to the position to be adjusted
+
+            matrix3x_t JJt;
+            JJt.noalias() = J_lin_terms * J_lin_terms.transpose();
+            JJt.diagonal().array() += DAMP;
+
+            v.noalias() = -J_lin_terms.transpose() * JJt.ldlt().solve(error);
+            double alpha = 1;
+            while (alpha >= DT) {
+                q = pinocchio::integrate(pin_model_, q, v*alpha);
+                pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+                q = pinocchio::integrate(pin_model_, q, -v*alpha);
+
+                vector3_t error_ls = vector3_t::Zero();
+                for (int ee = 0; ee < frame_positions.size(); ee++) {
+                    const int frame_idx = GetFrameIdx(frames[ee]);
+                    error_ls += -frame_positions[ee] + pin_data_->oMf[frame_idx].translation();
+                }
+
+                if (error_ls.norm() < error.norm()) {
+                    break;
+                }
+
+                alpha *= 0.5;
+            }
+        }
+        std::cout << "des position: " << base_position.transpose() << std::endl;
+        std::cout << "Resulting floating base: " << q.head<7>().transpose() << std::endl;
+        // std::cout << "Resulting quat: " << q.segment<4>(3).transpose() << std::endl;
+        return static_cast<quat_t>(q.segment<4>(3));
     }
 
     // DEBUG ------

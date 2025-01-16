@@ -136,7 +136,7 @@ namespace torc::mpc {
         }
     }
 
-    void ContactSchedule::CreateSwingTraj(const std::string& frame, double apex_height, double end_height,
+    void ContactSchedule::CreateSwingTraj(const std::string& frame, double apex_height, double height_offset,
         double apex_time, const std::vector<double>& dt_vec, std::vector<double>& swing_traj) const {
         if (apex_time < 0 || apex_time > 1) {
             throw std::invalid_argument("Apex time must be between 0 and 1!");
@@ -152,121 +152,24 @@ namespace torc::mpc {
             if (InSwing(frame, time)) {
                 for (const auto& [start, end] : frame_schedule_map.at(frame)) {
                     if (time >= start && time <= end) {
-                        swing_traj[node] = GetSwingHeight(apex_height, end_height, apex_time, time, start, end);
+                        const int next_contact_idx = GetContactIndex(frame, end + 0.001);
+                        const double end_height = contact_polytopes.at(frame).at(next_contact_idx).height_ + height_offset;
+                        const double apex_height_adjusted = apex_height + end_height;
+
+                        const int prev_contact_idx = GetContactIndex(frame, start - 0.001);
+                        const double start_height = contact_polytopes.at(frame).at(prev_contact_idx).height_ + height_offset;
+
+                        swing_traj[node] = GetSwingHeight(apex_height_adjusted, end_height, start_height, apex_time, time, start, end);
                         break;
                     }
                 }
             }
             if (!InSwing(frame, time)) {
+                const int contact_idx = GetContactIndex(frame, time);
+                const double end_height = contact_polytopes.at(frame)[contact_idx].height_ + height_offset;
                 swing_traj[node] = end_height;
             }
         }
-
-        // DEBUG CHECK
-        for (int node = 0; node < nodes; node++) {
-            double time = GetTime(dt_vec, node);
-            if (InSwing(frame, time) && swing_traj[node] < end_height) {
-                std::cerr << "Time: " << time << std::endl;
-                std::cerr << "frame: " << frame << std::endl;
-                std::cerr << "swing height: " << swing_traj[node] << std::endl;
-                std::cerr << "end height: " << end_height << std::endl;
-                throw std::runtime_error("[Contact schedule] error generating the swing traj!");
-            }
-        }
-
-
-        // bool first_in_swing = true;
-        // double swing_start = 0;
-        // double swing_time = 0;
-        // double start_height = end_height;
-        //
-        // //Go through if its contact or not at each node
-        // for (int node = 0; node < nodes; node++) {
-        //     // std::cout << "frame: " << frame << std::endl;
-        //     // std::cout << "node: " << node << std::endl;
-        //     // std::cout << "in contact: " << in_contact_[frame][node] << std::endl;
-        //     double time = GetTime(dt_vec, node);
-        //     if (InContact(frame, time)) {
-        //         // In contact, set to the lowest height
-        //         swing_traj[node] = end_height;
-        //         first_in_swing = true; // Set to true for the next time it is in swing
-        //     } else {
-        //         if (first_in_swing) {
-        //             swing_start = GetTime(dt_vec, node);
-        //
-        //             // Determine when we next make contact
-        //             // Search for the next start after the current time
-        //             double smallest_start = 1e10;
-        //             for (const auto& [start, end] : frame_schedule_map.at(frame)) {
-        //                 if (start > swing_start && start < smallest_start) {
-        //                     smallest_start = start;
-        //                 }
-        //             }
-        //
-        //             if (smallest_start != 1e10) {
-        //                 swing_time = smallest_start - swing_start;
-        //             } else {
-        //                 // Assume it continues for 0.2 seconds more since there is not another contact
-        //                 swing_time = GetTime(dt_vec, nodes - 1) + 0.2 - swing_start;
-        //             }
-        //         }
-        //
-        //         if (swing_start == 0) {
-        //             // Get the largest negative end contact -- note that these are deleted with CleanContacts!
-        //             // Get the smallest start contact
-        //             double large_end = -1e10;
-        //             double small_start = 1e10;
-        //             for (const auto& [start, end] : frame_schedule_map.at(frame)) {
-        //                 if (end < 0 && end > large_end) {
-        //                     large_end = end;
-        //                 }
-        //                 if (start > 0 && start < small_start) {
-        //                     small_start = start;
-        //                 }
-        //             }
-        //
-        //             if (large_end == -1e10) {
-        //                 large_end = 0;
-        //             }
-        //
-        //             if (small_start == 1e10) {
-        //                 small_start = 0.2;
-        //             }
-        //
-        //             swing_time = small_start - large_end;
-        //
-        //             // Determine which part of the trajectory we are on
-        //             const double swing_start_real = large_end;
-        //
-        //             if (time < swing_time*apex_time + swing_start_real) {
-        //                 // First half of the trajectory
-        //                 swing_traj[node] = end_height
-        //                     - std::pow(apex_time*swing_time, -2) * (3*(end_height - apex_height))*(std::pow(time - swing_start_real, 2))
-        //                     + std::pow(apex_time*swing_time, -3) * 2*(end_height - apex_height) * std::pow(time - swing_start_real, 3);
-        //             } else {
-        //                 // SecondOrder half
-        //                 swing_traj[node] = apex_height
-        //                     - std::pow(swing_time*(1 - apex_time), -2) * (3*(apex_height - end_height))*(std::pow(time - (apex_time*swing_time + swing_start_real), 2))
-        //                     + std::pow(swing_time*(1 - apex_time), -3) * 2*(apex_height - end_height) * std::pow(time - (apex_time*swing_time + swing_start_real), 3);
-        //             }
-        //         } else {
-        //             // Determine which spline to use
-        //             if (time < swing_time*apex_time + swing_start) {
-        //                 // First half of trajectory
-        //                 swing_traj[node] = end_height
-        //                     - std::pow(apex_time*swing_time, -2) * (3*(end_height - apex_height))*(std::pow(time - swing_start, 2))
-        //                     + std::pow(apex_time*swing_time, -3) * 2*(end_height - apex_height) * std::pow(time - swing_start, 3);
-        //             } else {
-        //                 // Use the second half spline
-        //                 swing_traj[node] = apex_height
-        //                     - std::pow(swing_time*(1 - apex_time), -2) * (3*(apex_height - end_height))*(std::pow(time - (apex_time*swing_time + swing_start), 2))
-        //                     + std::pow(swing_time*(1 - apex_time), -3) * 2*(apex_height - end_height) * std::pow(time - (apex_time*swing_time + swing_start), 3);
-        //             }
-        //         }
-        //
-        //         first_in_swing = false;
-        //     }
-        // }
     }
 
     double ContactSchedule::GetTime(const std::vector<double>& dt_vec, int node) {
@@ -308,7 +211,7 @@ namespace torc::mpc {
         return last_time;
     }
 
-    double ContactSchedule::GetSwingHeight(double apex_height, double ground_height, double apex_time, double time,
+    double ContactSchedule::GetSwingHeight(double apex_height, double end_height, double start_height, double apex_time, double time,
         double start_time, double end_time) {
         if (time < start_time) {
             std::cerr << "start time: " << start_time << std::endl;
@@ -330,14 +233,14 @@ namespace torc::mpc {
 
         if (time < apex_time_abs) {
             // First spline
-            return ground_height
-                    - std::pow(apex_time*swing_time, -2) * 3 * (ground_height - apex_height) * (std::pow(time - start_time, 2))
-                    + std::pow(apex_time*swing_time, -3) * 2 * (ground_height - apex_height) * std::pow(time - start_time, 3);
+            return start_height
+                    - std::pow(apex_time*swing_time, -2) * 3 * (start_height - apex_height) * (std::pow(time - start_time, 2))
+                    + std::pow(apex_time*swing_time, -3) * 2 * (start_height - apex_height) * std::pow(time - start_time, 3);
         } else {
             // Second spline
             return apex_height
-                    - std::pow(end_time - apex_time_abs, -2) * 3 * (-ground_height + apex_height) * std::pow(time - apex_time_abs, 2)
-                    + std::pow(end_time - apex_time_abs, -3) * 2 * (-ground_height + apex_height) * std::pow(time - apex_time_abs, 3);
+                    - std::pow(end_time - apex_time_abs, -2) * 3 * (-end_height + apex_height) * std::pow(time - apex_time_abs, 2)
+                    + std::pow(end_time - apex_time_abs, -3) * 2 * (-end_height + apex_height) * std::pow(time - apex_time_abs, 3);
         }
     }
 
@@ -345,12 +248,13 @@ namespace torc::mpc {
         return contact_polytopes.at(frame);
     }
 
-    void ContactSchedule::SetPolytope(const std::string& frame, int contact_num, const matrixx_t& A, const vector4_t& b) {
+    void ContactSchedule::SetPolytope(const std::string& frame, int contact_num, const matrixx_t& A, const vector4_t& b, double height) {
         if (contact_num >= GetNumContacts(frame)) {
             throw std::runtime_error("[Contact schedule] Invalid contact num!");
         }
         contact_polytopes[frame][contact_num].A_ = A;
         contact_polytopes[frame][contact_num].b_ = b;
+        contact_polytopes[frame][contact_num].height_ = height;
     }
 
     int ContactSchedule::GetNumContacts(const std::string& frame) const {
@@ -364,6 +268,7 @@ namespace torc::mpc {
         // TODO: Come back to these defaults
         contact_info.A_ = matrixx_t::Identity(2, 2);
         contact_info.b_ << 100, 100, -100, -100;
+        contact_info.height_ = 0;
 
         return contact_info;
     }
@@ -383,5 +288,23 @@ namespace torc::mpc {
 
         return swings.size();
     }
+
+    double ContactSchedule::GetInterpolatedHeight(const std::string &frame, double time) const {
+        if (InContact(frame, time)) {
+            const int contact_idx = GetContactIndex(frame, time);
+            return contact_polytopes.at(frame)[contact_idx].height_;
+        }
+
+        const double start = GetSwingStartTime(frame, time);
+        const double end = start + GetSwingDuration(frame, time);
+
+        const int prev_contact_idx = GetContactIndex(frame, start - 0.001);
+        const int next_contact_idx = GetContactIndex(frame, end + 0.001);
+        const double h1 = contact_polytopes.at(frame)[prev_contact_idx].height_;
+        const double h2 = contact_polytopes.at(frame)[next_contact_idx].height_;
+
+        return h1 + (h2 - h1) * (time - start) / (end - start);
+    }
+
 
 } // namespace torc::mpc

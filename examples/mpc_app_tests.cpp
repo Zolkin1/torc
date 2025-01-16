@@ -52,7 +52,7 @@ int main() {
     traj_file.open("swing_traj.txt");
     double t = 0.2;
     for (int i = 0; i < 100; i++) {
-        double height = cs.GetSwingHeight(apex_height, foot_height[0], apex_time, t, 0.2, 0.5);
+        double height = cs.GetSwingHeight(apex_height, foot_height[0], foot_height[0], apex_time, t, 0.2, 0.5);
         t += 0.3/100;
         traj_file << height << ", " << t << std::endl;
     }

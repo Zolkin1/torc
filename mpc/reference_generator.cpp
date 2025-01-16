@@ -43,6 +43,7 @@ namespace torc::mpc {
         SimpleTrajectory v_target,
         const std::map<std::string, std::vector<double>>& swing_traj,
         const std::vector<double>& hip_offsets,
+        const std::vector<std::string>& hip_frame_names,
         const ContactSchedule& contact_schedule,
         std::map<std::string, std::vector<vector2_t>>& des_foot_pos) {
         if (hip_offsets.size() != 2*contact_frames_.size()) {
@@ -131,6 +132,12 @@ namespace torc::mpc {
 
             vector2_t hip_offset;
             hip_offset << hip_offsets[2*j], hip_offsets[2*j + 1];
+            // TODO: Would need to get the frame state in the base frame coordinates
+            // if ((model_->GetFrameState(hip_frame_names[j]).placement.translation().head<2>() - q.head<2>() - hip_offset).norm() > 1e-4) {
+            //     std::cerr << "hip offset: " << hip_offset.transpose() << std::endl;
+            //     std::cerr << "hip offset pinocchio: " << (model_->GetFrameState(hip_frame_names[j]).placement.translation().head<2>() - q.head<2>()).transpose() << std::endl;
+            //     throw std::runtime_error("[Reference Generator] Hip offset does not match pinocchio offset!");
+            // }
 
             // Determine all contact locations for the given frame
             for (int i = 0; i < contact_midtimes[frame].size(); i++) {
@@ -157,12 +164,7 @@ namespace torc::mpc {
                     // Project onto the polytope
                     bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(), contact_schedule.GetPolytopes(frame).at(i + polytope_idx_offset[frame]));
                     if (time < end_time_ && !base_pos.contains(time)) {
-                        // This was removed because otherwise the foot would never get a chance to move to the next stone
-                        // if (projected) {
-                        //     base_pos.insert({time, contact_foot_pos[frame].back() - R.topLeftCorner<2,2>()*hip_offset});
-                        // } else {
-                            base_pos.insert({time, q_target[GetNode(time)].head<2>()});
-                        // }
+                        base_pos.insert({time, q_target[GetNode(time)].head<2>()});
                     }
                 } else {
                     throw std::runtime_error("Negative time!");
@@ -315,58 +317,12 @@ namespace torc::mpc {
         // Now adjust the configuration targets by interpolating through the base positions
         // -------------------------------------------------- //
         // -------------------------------------------------- //
-        const quat_t quat(q_target[nodes_-1].segment<4>(3));
-        const matrix3_t R_end = quat.toRotationMatrix();
-        const vector2_t v_end_command = R_end.topLeftCorner<2,2>()*v_target[nodes_-1].head<2>();
-        for (int node = 0; node < nodes_; node++) {
-            q_target[node].head<2>() = InterpolateBasePositions(node, base_pos, q.head<2>(), v_end_command);
-        }
-
-        // -------------------------------------------------- //
-        // -------------------------------------------------- //
-        // Adjust base position to avoid IK issues (for now skipping)
-        // -------------------------------------------------- //
-        // -------------------------------------------------- //
-        // // Then do IK on the floating base and leg joints to find a position that fits this step location
-        //
-        // // TODO: May want to do this IK with the floating base when the leg is the most extended, not on the midtime points!
-        // // TODO: Probably want to do this for both the end of the swing points (most extended) and the mid points of the contacts
-        // std::vector<std::pair<double, vectorx_t>> times_and_bases;
-        // std::vector<double> base_times;
-        // // For all the contact frames
-        // for (const auto& frame : contact_frames_) {
-        //     // For all the contact midpoint times
-        //     for (const auto& time : contact_midtimes[frame]) {
-        //         // Only check if we haven't used this time
-        //         if (std::find(base_times.begin(), base_times.end(), time) == base_times.end() && time <= end_time_ && time >= 0) {
-        //             const int node = GetNode(time);
-        //
-        //             // Determine all feet locations at the give time
-        //             std::vector<vector3_t> foot_pos(contact_frames_.size());
-        //             for (int j = 0; j < contact_frames_.size(); j++) {
-        //                 foot_pos[j] << node_foot_pos[contact_frames_[j]][node], swing_traj.at(frame)[node];
-        //             }
-        //
-        //
-        //             base_config << GetCommandedConfig(GetNode(time), q_target).head<7>();
-        //             // std::cout << "Base config: " << base_config.transpose() << ", time: " << time << ", end time: " << end_time_ << std::endl;
-        //
-        //             // IK
-        //             // TODO: Put back to true!
-        //             q_ik = model_->InverseKinematics(base_config, foot_pos, contact_frames_, q, false);
-        //
-        //             // Record base and time
-        //             times_and_bases.emplace_back(time, q_ik.head<7>());
-        //             base_times.emplace_back(time);
-        //         }
-        //     }
+        // const quat_t quat(q_target[nodes_-1].segment<4>(3));
+        // const matrix3_t R_end = quat.toRotationMatrix();
+        // const vector2_t v_end_command = R_end.topLeftCorner<2,2>()*v_target[nodes_-1].head<2>();
+        // for (int node = 0; node < nodes_; node++) {
+        //     q_target[node].head<2>() = InterpolateBasePositions(node, base_pos, q.head<2>(), v_end_command);
         // }
-        //
-        // // Now sort on the times so we can interpolate
-        // auto time_sort = [](std::pair<double, vectorx_t> p1, std::pair<double, vectorx_t> p2) {
-        //     return p1.first < p2.first;
-        // };
-        // std::sort(times_and_bases.begin(), times_and_bases.end(), time_sort);
 
         // -------------------------------------------------- //
         // -------------------------------------------------- //
@@ -375,17 +331,36 @@ namespace torc::mpc {
         // -------------------------------------------------- //
         // Lastly, run IK on the intermediate nodes with the fixed floating base positions
         q_ref[0] = q;
+        std::vector<vector3_t> hip_positions(hip_offsets.size()/2);
         std::vector<vector3_t> end_effectors_pos(contact_frames_.size());
         for (int i = 1; i < nodes_; i++) {
+            vectorx_t q_command = GetCommandedConfig(i, q_target);
             for (int j = 0; j < contact_frames_.size(); j++) {
                 const auto& frame = contact_frames_[j];
                 end_effectors_pos[j] << des_foot_pos[frame][i].head<2>(), swing_traj.at(frame)[i];
                 // std::cout << "j: " << j << ", ee pos: " << end_effectors_pos[j].transpose() << std::endl;
+
+                const quat_t quat(q_command.segment<4>(3));
+                const matrix3_t R = quat.toRotationMatrix();
+                vector2_t hip_offsets_2vec;
+                hip_offsets_2vec << hip_offsets[2*j], hip_offsets[2*j+1];
+                // TODO: Consider a better way to get the height
+                const double height = contact_schedule.GetInterpolatedHeight(frame, GetTime(i));
+                std::cout << "height: " << height << std::endl;
+                hip_positions[j] << R.topLeftCorner<2,2>()*hip_offsets_2vec + q_command.head<2>(), q_command[2] + height;
             }
+
+            // TODO: Issues:
+            //  - Can't rotate
+            //  - Stepping up is causing weird things to happen - prob an issue with the height
+            //  - I think I need the position terms to move in the pose fit
 
             // TODO: Put back
             // base_config << GetBasePositionInterp(GetTime(i), times_and_bases, q_target, q).head<7>();
-            base_config << GetCommandedConfig(i, q_target).head<7>();
+            base_config << q_command.head<7>();
+            base_config.segment<4>(3) = model_->PoseFit(base_config.head<3>(), static_cast<quat_t>(q_ref[i-1].segment<4>(3)),
+                hip_positions, hip_frame_names).coeffs();
+
             q_ref[i] = model_->InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
             // std::cout << "i: " << i << ", qref: " << q_ref[i].transpose() << std::endl;
         }

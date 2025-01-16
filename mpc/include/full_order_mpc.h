@@ -303,6 +303,7 @@ namespace torc::mpc {
 
         void ParseCostYaml(const YAML::Node& cost_settings);
         void ParseCollisionYaml(const YAML::Node& collision_settings);
+        void ParseContactSettings(const std::filesystem::path& path);
 
     // ----- Sparsity Pattern Creation ----- //
         /**
@@ -512,6 +513,8 @@ namespace torc::mpc {
         std::vector<double> joint_skip_values_{};
 
         // std::map<std::string, std::vector<double>> swing_traj_;
+
+        std::vector<std::string> new_frame_names_;
 
     private:
     };

@@ -39,6 +39,10 @@ namespace torc::models {
         FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
             const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values);
 
+        FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path,
+            const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values,
+            std::vector<std::string> new_frame_names, std::vector<vector3_t> new_frame_positions);
+
         FullOrderRigidBody(const FullOrderRigidBody& other);
 
         [[nodiscard]] int GetStateDim() const override;
@@ -150,6 +154,8 @@ namespace torc::models {
         */
         vectorx_t InverseKinematics(const vectorx_t& base_config, const std::vector<vector3_t>& positions, const std::vector<std::string>& frames,
             const vectorx_t& q_guess, bool use_floating_base=false);
+
+        quat_t PoseFit(const vector3_t& base_position, const quat_t& quat_guess, const std::vector<vector3_t>& frame_positions, const std::vector<std::string>& frames);
 
         // DEBUG ------
         pinocchio::Model GetModel() const;

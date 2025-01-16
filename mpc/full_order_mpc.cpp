@@ -33,11 +33,29 @@ namespace torc::mpc {
             throw std::runtime_error("Robot file does not exist!");
         }
 
-        if (joint_skip_names_.empty()) {
-            robot_model_ = std::make_shared<models::FullOrderRigidBody>("mpc_robot", model_path);
-        } else {
-            robot_model_ = std::make_shared<models::FullOrderRigidBody>("mpc_robot", model_path, joint_skip_names_, joint_skip_values_);
+        // TODO: Read in hip offsets
+        ParseContactSettings(config_file_);
+        std::vector<vector3_t> transforms;
+        for (int i = 0; i < hip_offsets_.size()/2; i++) {
+            const std::string new_name = "custom_hip_frame_" + std::to_string(i);
+            new_frame_names_.push_back(new_name);
+            transforms.push_back(vector3_t(hip_offsets_[2*i], hip_offsets_[2*i + 1], 0));
         }
+
+        // if (joint_skip_names_.empty()) {
+        //     robot_model_ = std::make_shared<models::FullOrderRigidBody>("mpc_robot", model_path);
+        // } else {
+        robot_model_ = std::make_shared<models::FullOrderRigidBody>("mpc_robot", model_path,
+            joint_skip_names_, joint_skip_values_,
+            new_frame_names_, transforms);
+        // }
+
+        std::cout << "frame idx for: " << new_frame_names_[0] << ": " << robot_model_->GetFrameIdx(new_frame_names_[0]) << std::endl;
+        if (robot_model_->GetFrameIdx(new_frame_names_[0]) < 0) {
+            throw std::runtime_error("Frame not added correctly!");
+        }
+
+        std::cerr << "ROBOT MODEL SUCCESSFULLY CREATED" << std::endl;
 
         vel_dim_ = robot_model_->GetVelDim();
         config_dim_ = robot_model_->GetConfigDim();
@@ -92,7 +110,7 @@ namespace torc::mpc {
             name_ + "_" + frame + "_foot_polytope_constraint",
             deriv_lib_path_,
             ad::DerivativeOrder::FirstOrder, vel_dim_,  config_dim_ + POLYTOPE_SIZE + POLYTOPE_SIZE,
-            compile_derivatves_  //TODO: Put back
+            compile_derivatves_
             ));
         }
 
@@ -315,29 +333,6 @@ namespace torc::mpc {
 
         ParseCostYaml(cost_settings);
 
-        // ---------- Contact Settings ---------- //
-        if (!config["contacts"]) {
-            throw std::runtime_error("No contact settings provided!");
-        }
-        YAML::Node contact_settings = config["contacts"];
-        contact_frames_ = contact_settings["contact_frames"].as<std::vector<std::string>>();
-        num_contact_locations_ = contact_frames_.size();
-        for (const auto& frame : contact_frames_) {
-            std::vector<double> swing_traj;
-            swing_traj.resize(nodes_);
-            swing_traj_.insert(std::pair<std::string, std::vector<double>>(frame, swing_traj));
-
-            // Set everything to not in contact
-            in_contact_[frame] = std::vector<int>(nodes_);
-        }
-
-        if (contact_settings["hip_offsets"]) {
-            hip_offsets_ = contact_settings["hip_offsets"].as<std::vector<double>>();
-            if (hip_offsets_.size() != 2*contact_frames_.size()) {
-                throw std::runtime_error("Invalid number of hip offsets provided! Must match the number of contacts x 2!");
-            }
-        }
-
         // ---------- Line Search Settings ---------- //
         if (!config["line_search"]) {
             throw std::runtime_error("No line search setting provided!");
@@ -352,6 +347,10 @@ namespace torc::mpc {
             ls_gamma_phi_ = (ls_settings["cost_reduction_mult"] ? ls_settings["cost_reduction_mult"].as<double>() : 1e-6);
         }
 
+        // Contacts
+        for (const auto& frame : contact_frames_) {
+            in_contact_[frame] = std::vector<int>(nodes_);
+        }
 
         if (verbose_) {
             using std::setw;
@@ -582,7 +581,7 @@ namespace torc::mpc {
 
     void FullOrderMpc::UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
             std::vector<double> end_height, double apex_time) {
-        UpdateContactSchedule(contact_schedule);
+        UpdateContactSchedule(contact_schedule);    // Cause of the error
 
         if (end_height.size() != num_contact_locations_) {
             throw std::runtime_error("end_height size does not match the number of contacts in the MPC!");
@@ -817,14 +816,13 @@ namespace torc::mpc {
         }
     }
 
-    // TODO: Consider moving this to a different class along with the swing trajectory generation
     void FullOrderMpc::GenerateCostReference(const vectorx_t& q_current, const vectorx_t& v_current, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target,
         const ContactSchedule& contact_schedule) {
         utils::TORCTimer timer;
         timer.Tic();
         // Note this is clocking in at about 0.55-0.6ms when walking around
         auto [qt, vt] = reference_generator_->GenerateReference(q_current, v_current, q_target, v_target,
-            swing_traj_, hip_offsets_, contact_schedule, des_foot_pos_);
+            swing_traj_, hip_offsets_, new_frame_names_, contact_schedule, des_foot_pos_);
 
         timer.Toc();
         // std::cout << "Reference gen took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
@@ -2245,6 +2243,38 @@ namespace torc::mpc {
             radii_.emplace_back(r1, r2);
         }
 
+    }
+
+    void FullOrderMpc::ParseContactSettings(const std::filesystem::path &path) {
+        YAML::Node config;
+        try {
+            config = YAML::LoadFile(config_file_);
+        } catch (...) {
+            throw std::runtime_error("Could not load the configuration file!");
+        }
+
+        // ---------- Contact Settings ---------- //
+        if (!config["contacts"]) {
+            throw std::runtime_error("No contact settings provided!");
+        }
+        YAML::Node contact_settings = config["contacts"];
+        contact_frames_ = contact_settings["contact_frames"].as<std::vector<std::string>>();
+        num_contact_locations_ = contact_frames_.size();
+        for (const auto& frame : contact_frames_) {
+            std::vector<double> swing_traj;
+            swing_traj.resize(nodes_);
+            swing_traj_.insert(std::pair<std::string, std::vector<double>>(frame, swing_traj));
+
+            // Set everything to not in contact
+            // in_contact_[frame] = std::vector<int>(nodes_);
+        }
+
+        if (contact_settings["hip_offsets"]) {
+            hip_offsets_ = contact_settings["hip_offsets"].as<std::vector<double>>();
+            if (hip_offsets_.size() != 2*contact_frames_.size()) {
+                throw std::runtime_error("Invalid number of hip offsets provided! Must match the number of contacts x 2!");
+            }
+        }
     }
 
 

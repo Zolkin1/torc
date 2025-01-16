@@ -42,12 +42,27 @@ namespace torc::models {
         CreatePinModel(true, joint_skip_names, joint_skip_values);
     }
 
+    PinocchioModel::PinocchioModel(const std::string &name, const std::filesystem::path &model_path,
+        const SystemType &system_type, const std::vector<std::string> &joint_skip_names,
+        const std::vector<double> &joint_skip_values, const std::vector<std::string> &new_frame_names,
+        const std::vector<vector3_t> &frame_translations)
+            : BaseModel(name, system_type), model_path_(model_path) {
+        CreatePinModel(true, joint_skip_names, joint_skip_values, new_frame_names, frame_translations);
+    }
 
-    void PinocchioModel::CreatePinModel(bool urdf_model, const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_values) {
+
+    void PinocchioModel::CreatePinModel(bool urdf_model, const std::vector<std::string>& joint_skip_names,
+        const std::vector<double>& joint_values, const std::vector<std::string>& new_frame_names,
+        const std::vector<vector3_t> &frame_translations) {
         // Verify that the given file exists
         if (!std::filesystem::exists(model_path_)) {
             throw std::runtime_error("Provided model file does not exist.");
         }
+
+        if (new_frame_names.size() != frame_translations.size()) {
+            throw std::runtime_error("When adding new frames, provided number of frames does not match the number of translations!");
+        }
+
         if (joint_skip_names.empty()) {
             // Create the pinocchio model from the file
             pin_model_ = pinocchio::Model();
@@ -57,8 +72,15 @@ namespace torc::models {
                 if (model_path_.extension() != ".urdf") {
                     throw std::runtime_error("Provided urdf does not end in a .urdf");
                 }
+
                 // Normal model
                 pinocchio::urdf::buildModel(model_path_, pinocchio::JointModelFreeFlyer(), pin_model_);
+
+                if (!new_frame_names.empty()) {
+                    for (int i = 0; i < new_frame_names.size(); i++) {
+                        AddFrameToBase(new_frame_names[i], frame_translations[i]);
+                    }
+                }
 
                 // AD Model
                 pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
@@ -93,6 +115,12 @@ namespace torc::models {
             // Normal model
             pin_model_ = pinocchio::buildReducedModel(temp_model, joint_ids, q);
 
+            if (!new_frame_names.empty()) {
+                for (int i = 0; i < new_frame_names.size(); i++) {
+                    AddFrameToBase(new_frame_names[i], frame_translations[i]);
+                }
+            }
+
             // AD Model
             pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
         }
@@ -102,6 +130,35 @@ namespace torc::models {
 
         // AD data
         pin_ad_data_ = std::make_shared<ad_pin_data_t>(pin_ad_model_);
+
+        // Verify new frames
+        if (!new_frame_names.empty()) {
+            for (int i = 0; i < new_frame_names.size(); i++) {
+                if (GetFrameIdx(new_frame_names[i]) < 0) {
+                    std::cerr << "frame in the pin mode: " << pin_model_.getFrameId(new_frame_names[i]) << std::endl;
+                    throw std::runtime_error(new_frame_names[i] + " was not added properly!");
+                }
+            }
+        }
+    }
+
+    void PinocchioModel::AddFrameToBase(const std::string &name, const vector3_t &translation) {
+        pinocchio::Frame new_frame;
+        new_frame.name = std::move(name);
+        new_frame.placement = pinocchio::SE3::Identity();
+        new_frame.placement.translation() = translation;
+        new_frame.inertia = pinocchio::Inertia();
+        new_frame.inertia.setZero();
+        new_frame.parentFrame = 2;
+        new_frame.parentJoint = 1;
+        new_frame.type = pinocchio::OP_FRAME;
+
+        int idx = pin_model_.addFrame(new_frame);
+        std::cerr << "New frame added with idx: " << idx << std::endl;
+        std::cerr << "Retrieving the index: " << pin_model_.getFrameId(name) << std::endl;
+        if (idx < 0) {
+            throw std::runtime_error("Error adding frame to model.");
+        }
     }
 
     long PinocchioModel::GetNumInputs() const {

@@ -39,6 +39,12 @@ namespace torc::models {
                const SystemType& system_type,
                const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values);
 
+        PinocchioModel(const std::string& name,
+               const std::filesystem::path& model_path,
+               const SystemType& system_type,
+               const std::vector<std::string>& joint_skip_names, const std::vector<double>& joint_skip_values,
+               const std::vector<std::string>& new_frame_names, const std::vector<vector3_t>& frame_translations);
+
         PinocchioModel(const PinocchioModel& other);
 
         [[nodiscard]] virtual vectorx_t InputsToTau(const vectorx_t& input) const = 0;
@@ -149,7 +155,12 @@ namespace torc::models {
         static const std::string ROOT_JOINT;
 
     private:
-        void CreatePinModel(bool urdf_model, const std::vector<std::string>& joint_skip_names={}, const std::vector<double>& joint_values={});
+        void CreatePinModel(bool urdf_model, const std::vector<std::string>& joint_skip_names={},
+            const std::vector<double>& joint_values={}, const std::vector<std::string>& new_frame_names={},
+            const std::vector<vector3_t>& frame_translations={});
+
+        void AddFrameToBase(const std::string& name, const vector3_t& translation);
+
     };
 } // torc::models
 

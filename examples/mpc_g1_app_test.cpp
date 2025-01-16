@@ -27,7 +27,7 @@ int main() {
     b_temp << 10, 10, -10, -10;
     for (const auto& frame : mpc.GetContactFrames()) {
         for (int i = 0; i < cs.GetNumContacts(frame); i++) {
-            cs.SetPolytope(frame, i, A_temp, b_temp);
+            cs.SetPolytope(frame, i, A_temp, b_temp, 0);
         }
     }
 
