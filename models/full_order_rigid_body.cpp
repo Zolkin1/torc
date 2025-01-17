@@ -13,6 +13,8 @@
 
 #include "full_order_rigid_body.h"
 
+#include "pinocchio_interface.h"
+
 namespace torc::models {
     FullOrderRigidBody::FullOrderRigidBody(const std::string& name, const std::filesystem::path& model_path, bool urdf_model)
         : PinocchioModel(name, model_path, HybridSystemImpulse, urdf_model) {
@@ -739,7 +741,6 @@ namespace torc::models {
                     q = pinocchio::integrate(pin_model_, q, v*alpha);
                     pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
                     q = pinocchio::integrate(pin_model_, q, -v*alpha);
-
                     const vector3_t error_ls = positions[ee] - pin_data_->oMf[frame_idx].translation();
 
                     if (error_ls.norm() < error.norm()) {
@@ -790,88 +791,185 @@ namespace torc::models {
         return q;
     }
 
-    quat_t FullOrderRigidBody::PoseFit(const vector3_t &base_position, const quat_t& quat_guess, const std::vector<vector3_t> &frame_positions, const std::vector<std::string> &frames) {
-        // IK But for only the base
-        // Define constants for the optimization
-        constexpr double THRESHOLD = 4e-3; //3
-        constexpr int IT_MAX = 150; //5e2;
-        constexpr double DT = 1e-2;
-        constexpr double DAMP = 1e-6;
+    // vector7_t FullOrderRigidBody::PoseFit(vector3_t heading_point, vector3_t base_pos,
+    //     const std::vector<vector3_t> &frame_positions, const std::vector<std::string> &frames) {
+    //     // TODO: Need to consider how this will work with the biped when we only have 2 hips
+    //     // (1) Fit plane to hip data
+    //     matrixx_t A = matrixx_t::Zero(frames.size(), 4);
+    //     vectorx_t b = vectorx_t::Zero(frames.size());
+    //
+    //     for (int ee = 0; ee < frames.size(); ee++) {
+    //         A.row(ee) << frame_positions[ee](0), frame_positions[ee](1), frame_positions[ee](2), 1;
+    //         b(ee) = 0;
+    //     }
+    //
+    //     // Compute pseudo inverse
+    //     matrixx_t AtA;
+    //     AtA.noalias() = A.transpose()*A;
+    //
+    //     // Solve for the plane variables
+    //     vector4_t plane_vars = AtA.ldlt().solve(A.transpose()*b);
+    //
+    //     // Normal
+    //     vector3_t plane_normal = plane_vars.head<3>();  // TODO: Check
+    //     plane_normal.normalize();
+    //
+    //     // (2) Project the base position onto the plane
+    //     // Point on the plane:
+    //     vector3_t point_on_plane = vector3_t::Zero();
+    //     for (int i = 0; i < plane_normal.size(); i++) {
+    //         if (plane_vars(i) > 0) {
+    //             point_on_plane(i) = plane_vars(3)/plane_vars(i);
+    //             break;
+    //         }
+    //     }
+    //
+    //     vector3_t v = base_pos - point_on_plane;
+    //     base_pos = v - v.dot(plane_normal)*plane_normal;
+    //
+    //     // (3) Project heading point onto the fit plane
+    //     v = heading_point - point_on_plane;
+    //     heading_point = v - v.dot(plane_normal)*plane_normal;
+    //
+    //     // (4) x-axis is the difference in these points
+    //     vector3_t x_axis = heading_point - base_pos;
+    //     x_axis.normalize();
+    //
+    //     // (5) compute y-axis
+    //     vector3_t y_axis = plane_normal.cross(x_axis);  // TODO: Is this right or do I need the negative?
+    //     y_axis.normalize();
+    //
+    //     // (6) compute quaternion
+    //     matrix3_t R;
+    //     R.col(0) = x_axis;
+    //     R.col(1) = y_axis;
+    //     R.col(2) = plane_normal;
+    //
+    //     quat_t q(R);
+    //
+    //     vector7_t q_ret = vector7_t::Zero();
+    //     q_ret << base_pos, q.coeffs();
+    //
+    //     // Return
+    //     return q_ret;
 
-        vectorx_t q = GetNeutralConfig();
-        q.head<3>() = base_position;
-        q.segment<4>(3) = quat_guess.coeffs();
-
-        matrix6x_t J = matrix6x_t::Zero(6, GetVelDim());
-        matrix6x_t Jtemp = matrix6x_t::Zero(6, GetVelDim());
-        matrix3x_t J_lin_terms = matrix3x_t::Zero(3, GetVelDim());
-        vectorx_t v = vectorx_t::Zero(GetVelDim());
-
-        v.setZero();
-
-        for (int i = 0; i < IT_MAX; i++) {
-            pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
-            vector3_t error = vector3_t::Zero();
-
-            // Compute cost
-            for (int ee = 0; ee < frame_positions.size(); ee++) {
-                const int frame_idx = GetFrameIdx(frames[ee]);
-                error += -frame_positions[ee] + pin_data_->oMf[frame_idx].translation();
-            }
-
-            // Check for convergence
-            if (error.norm() <= THRESHOLD) {
-                break;
-            } else if (i == IT_MAX - 1) {
-                std::cout << "[IK] Pose fit failed! Error: " << error.norm() << std::endl;
-                std::cout << "q: " << q.transpose() << std::endl;
-                std::cout << ", iteration: " << i << ", error: " << error.transpose() << ", error norm: " << error.norm() << std::endl;
-                std::cout << "Resulting quat: " << q.segment<4>(3).transpose() << std::endl;
-                std::cout << std::endl;
-            }
-
-            J.setZero();
-            Jtemp.setZero();
-            // Compute jacobian of the cost
-            for (int ee = 0; ee < frame_positions.size(); ee++) {
-                const int frame_idx = GetFrameIdx(frames[ee]);
-                pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, frame_idx, pinocchio::LOCAL_WORLD_ALIGNED, Jtemp); // TODO: DO I need to change the frame?
-                J += Jtemp;
-            }
-
-            J_lin_terms = J.topRows<3>();
-            // TOOD: Maybe I should let the position be adjusted
-            // J_lin_terms.leftCols<3>().setZero();    // Don't want to the position to be adjusted
-
-            matrix3x_t JJt;
-            JJt.noalias() = J_lin_terms * J_lin_terms.transpose();
-            JJt.diagonal().array() += DAMP;
-
-            v.noalias() = -J_lin_terms.transpose() * JJt.ldlt().solve(error);
-            double alpha = 1;
-            while (alpha >= DT) {
-                q = pinocchio::integrate(pin_model_, q, v*alpha);
-                pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
-                q = pinocchio::integrate(pin_model_, q, -v*alpha);
-
-                vector3_t error_ls = vector3_t::Zero();
-                for (int ee = 0; ee < frame_positions.size(); ee++) {
-                    const int frame_idx = GetFrameIdx(frames[ee]);
-                    error_ls += -frame_positions[ee] + pin_data_->oMf[frame_idx].translation();
-                }
-
-                if (error_ls.norm() < error.norm()) {
-                    break;
-                }
-
-                alpha *= 0.5;
-            }
-        }
-        std::cout << "des position: " << base_position.transpose() << std::endl;
-        std::cout << "Resulting floating base: " << q.head<7>().transpose() << std::endl;
-        // std::cout << "Resulting quat: " << q.segment<4>(3).transpose() << std::endl;
-        return static_cast<quat_t>(q.segment<4>(3));
-    }
+    //     Eigen::Vector<double, 7> FullOrderRigidBody::PoseFit(const Eigen::Vector<double, 7>& floating_base_guess,
+    // const std::vector<vector3_t> &frame_positions, const std::vector<std::string> &frames) {
+        // // IK But for only the base
+        // // Define constants for the optimization
+        // constexpr double THRESHOLD = 1e-6; //1e-4; //3
+        // constexpr int IT_MAX = 40; //100; //500; //150; //5e2;
+        // constexpr double DT = 1e-2; //1e-3; //1e-2;
+        // constexpr double DAMP = 1e-6;
+        // constexpr double STEP_TERMINATION = 1e-3;
+        //
+        // vectorx_t q = GetNeutralConfig();
+        // q.head<7>() = floating_base_guess;
+        //
+        // matrixx_t J = matrix6x_t::Zero(frames.size(), GetVelDim());
+        // matrix6x_t Jtemp = matrix6x_t::Zero(6, GetVelDim());
+        // matrix3x_t J_lin_terms = matrix3x_t::Zero(3, GetVelDim());
+        // vectorx_t v = vectorx_t::Zero(GetVelDim());
+        //
+        // v.setZero();
+        //
+        // std::vector<int> frame_idxs;
+        // for (int ee = 0; ee < frame_positions.size(); ee++) {
+        //     frame_idxs.push_back(GetFrameIdx(frames[ee]));
+        // }
+        //
+        // for (int i = 0; i < IT_MAX; i++) {
+        //     pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+        //     double cost = 0;
+        //     vectorx_t cost_vec = vectorx_t::Zero(frames.size());
+        //
+        //     // Compute cost
+        //     for (int ee = 0; ee < frame_positions.size(); ee++) {
+        //         cost_vec[ee] = (frame_positions[ee] - pin_data_->oMf[frame_idxs[ee]].translation()).norm();
+        //     }
+        //     cost = cost_vec.squaredNorm();
+        //
+        //     // Check for convergence
+        //     if (cost <= THRESHOLD) {
+        //         break;
+        //     } else if (i == IT_MAX - 1) {
+        //         std::cout << "[IK] Pose fit failed! Cost: " << cost << std::endl;
+        //         std::cout << "guess: " << floating_base_guess.transpose() << std::endl;
+        //         for (int ee = 0; ee < frame_positions.size(); ee++) {
+        //             std::cout << "[" << frames[ee] << "] des pos: " << frame_positions[ee].transpose() <<
+        //                 " computed: " <<  pin_data_->oMf[GetFrameIdx(frames[ee])].translation().transpose() << std::endl;
+        //         }
+        //         std::cout << "Iteration: " << i << std::endl;
+        //         std::cout << "Resulting floating base: " << q.head<7>().transpose() << std::endl;
+        //         std::cout << std::endl;
+        //     }
+        //
+        //     J.setZero();
+        //     // Compute jacobian of the cost
+        //     for (int ee = 0; ee < frame_positions.size(); ee++) {
+        //         Jtemp.setZero();
+        //         pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, frame_idxs[ee], pinocchio::LOCAL_WORLD_ALIGNED, Jtemp); // TODO: Do I need to change the frame?
+        //
+        //         // Compute the gradient of this term of the cost (which is a 2-norm)
+        //         vector3_t g = frame_positions[ee] - pin_data_->oMf[frame_idxs[ee]].translation();
+        //         vectorx_t gradr = vectorx_t::Zero(GetVelDim());
+        //         if (g.norm() > 1e-7) {
+        //             gradr = Jtemp.topRows<3>().transpose()*(g)/g.norm();
+        //         }
+        //
+        //         J.row(ee) = gradr;
+        //     }
+        //
+        //     matrixx_t JtJ;
+        //     JtJ.noalias() = J.transpose() * J;
+        //     // JtJ.diagonal().array() += DAMP;
+        //
+        //     v.noalias() = JtJ.ldlt().solve(J.transpose() * cost_vec);
+        //
+        //     if (v.norm() < STEP_TERMINATION) {
+        //         std::cout << "[PoseFit] step size termination." << std::endl << std::endl;
+        //         return q.head<7>();
+        //     }
+        //
+        //     std::cout << "[" << i << "] v: " << v.transpose() << std::endl;
+        //     for (int k = 0; k < v.size(); k++) {
+        //         if (std::isnan(v(k))) {
+        //             std::cerr << "v(k): " << v(k) << std::endl;
+        //             throw std::runtime_error("v(k) is nan");
+        //         }
+        //     }
+        //     double alpha = 1;
+        //     while (alpha >= DT) {
+        //         q = pinocchio::integrate(pin_model_, q, v*alpha);
+        //         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+        //         // std::cout << "q head: " << q.head<7>().transpose() << std::endl;
+        //         q = pinocchio::integrate(pin_model_, q, -v*alpha);
+        //
+        //         double cost_ls = 0;
+        //         for (int ee = 0; ee < frame_positions.size(); ee++) {
+        //             cost_ls += (frame_positions[ee] - pin_data_->oMf[frame_idxs[ee]].translation()).squaredNorm();
+        //         }
+        //
+        //         // std::cout << "alpha: " << alpha << ", cost_ls: " << cost_ls << " cost: " << cost << std::endl;
+        //
+        //         if (cost_ls < cost) {
+        //             break;
+        //         }
+        //
+        //         alpha *= 0.5;
+        //     }
+        //
+        //     // TODO: Whats the deal with this?
+        //     // if (alpha < DT) {
+        //     //     return q.head<7>();
+        //     // }
+        //
+        //     q = pinocchio::integrate(pin_model_, q, v*alpha);
+        // }
+        // // std::cout << "guess floating base: " << floating_base_guess.transpose() << std::endl;
+        // // std::cout << "Resulting floating base: " << q.head<7>().transpose() << std::endl;
+        // return q.head<7>();
+    // }
 
     // DEBUG ------
     pinocchio::Model FullOrderRigidBody::GetModel() const {

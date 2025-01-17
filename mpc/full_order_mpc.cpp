@@ -757,10 +757,10 @@ namespace torc::mpc {
 
         // TODO: Why does the quad MPC not just pass out the target when there are no other constraints?
         // TODO: Remove
-        // for (int node = 0; node < q_target_.GetNumNodes(); ++node) {
-        //     traj_out.SetConfiguration(node, q_target_[node]);
-        //     traj_out.SetVelocity(node, v_target_[node]);
-        // }
+        for (int node = 0; node < q_target_.GetNumNodes(); ++node) {
+            traj_out.SetConfiguration(node, q_target_[node]);
+            traj_out.SetVelocity(node, v_target_[node]);
+        }
 
         traj_ = traj_out;
 

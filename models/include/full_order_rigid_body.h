@@ -13,9 +13,13 @@
 
 namespace torc::models {
     using vectorx_t = Eigen::VectorXd;
+    using vector2_t = Eigen::Vector2d;
+    using vector4_t = Eigen::Vector4d;
+    using vector7_t = Eigen::Vector<double, 7>;
     using matrixx_t = Eigen::MatrixXd;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using matrix3x_t = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+    using matrix3_t = Eigen::Matrix3d;
 
     template <typename ScalarT>
     struct ExternalForce {
@@ -155,7 +159,9 @@ namespace torc::models {
         vectorx_t InverseKinematics(const vectorx_t& base_config, const std::vector<vector3_t>& positions, const std::vector<std::string>& frames,
             const vectorx_t& q_guess, bool use_floating_base=false);
 
-        quat_t PoseFit(const vector3_t& base_position, const quat_t& quat_guess, const std::vector<vector3_t>& frame_positions, const std::vector<std::string>& frames);
+        Eigen::Vector<double, 7> PoseFit(vector3_t heading, vector3_t base_pos,
+            const std::vector<vector3_t>& frame_positions,
+            const std::vector<std::string>& frames);
 
         // DEBUG ------
         pinocchio::Model GetModel() const;

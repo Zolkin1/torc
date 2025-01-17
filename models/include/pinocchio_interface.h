@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 #include <pinocchio/math/quaternion.hpp>
 #include <pinocchio/spatial/explog-quaternion.hpp>
+#include "pinocchio/algorithm/frames.hpp"
 
 namespace torc::models {
 

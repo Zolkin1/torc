@@ -4,6 +4,9 @@
 
 #include "reference_generator.h"
 
+#include <eigen_utils.h>
+#include <torc_timer.h>
+
 namespace torc::mpc {
     ReferenceGenerator::ReferenceGenerator(int nodes, int config_size, int vel_size, std::vector<std::string> contact_frames,
                                            std::vector<double> dt, std::shared_ptr<models::FullOrderRigidBody> model, double polytope_delta)
@@ -335,6 +338,7 @@ namespace torc::mpc {
         std::vector<vector3_t> end_effectors_pos(contact_frames_.size());
         for (int i = 1; i < nodes_; i++) {
             vectorx_t q_command = GetCommandedConfig(i, q_target);
+            double avg_height = 0;
             for (int j = 0; j < contact_frames_.size(); j++) {
                 const auto& frame = contact_frames_[j];
                 end_effectors_pos[j] << des_foot_pos[frame][i].head<2>(), swing_traj.at(frame)[i];
@@ -346,23 +350,32 @@ namespace torc::mpc {
                 hip_offsets_2vec << hip_offsets[2*j], hip_offsets[2*j+1];
                 // TODO: Consider a better way to get the height
                 const double height = contact_schedule.GetInterpolatedHeight(frame, GetTime(i));
-                std::cout << "height: " << height << std::endl;
+                avg_height += height;
+                // std::cout << "height: " << height << std::endl;
                 hip_positions[j] << R.topLeftCorner<2,2>()*hip_offsets_2vec + q_command.head<2>(), q_command[2] + height;
             }
 
-            // TODO: Issues:
-            //  - Can't rotate
-            //  - Stepping up is causing weird things to happen - prob an issue with the height
-            //  - I think I need the position terms to move in the pose fit
+            avg_height /= static_cast<double>(contact_frames_.size());
 
-            // TODO: Put back
-            // base_config << GetBasePositionInterp(GetTime(i), times_and_bases, q_target, q).head<7>();
             base_config << q_command.head<7>();
-            base_config.segment<4>(3) = model_->PoseFit(base_config.head<3>(), static_cast<quat_t>(q_ref[i-1].segment<4>(3)),
-                hip_positions, hip_frame_names).coeffs();
+            base_config(2) += avg_height;   // Add the average height to help with the projection in the pose fit function
 
-            q_ref[i] = model_->InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
-            // std::cout << "i: " << i << ", qref: " << q_ref[i].transpose() << std::endl;
+            // Compute the heading point
+            const quat_t quat(q_command.segment<4>(3));
+            const matrix3_t R = quat.toRotationMatrix();
+            vector3_t heading_point = base_config.head<3>();
+            heading_point.head<2>() += R.topLeftCorner<2,2>()*vector2_t({1, 0});
+
+            torc::utils::TORCTimer timer;
+            timer.Tic();
+            base_config.head<7>() = PoseFit(heading_point, base_config.head<3>(), hip_positions, hip_frame_names); //base_config.head<7>(), hip_positions, hip_frame_names);
+            timer.Toc();
+            // std::cout << "Pose fit took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << " ms" << std::endl;
+
+            timer.Tic();
+            q_ref[i] << model_->InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
+            timer.Toc();
+            // std::cout << "IK took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << " ms" << std::endl;
         }
 
         // -------------------------------------------------- //
@@ -588,6 +601,70 @@ namespace torc::mpc {
             // TODO: Rotate the vel command
             return (1-lambda)*past_it->second + lambda*(past_it->second + end_vel_command*(end_time_ - last_base_pos_time));
         }
+    }
+
+    vector7_t ReferenceGenerator::PoseFit(vector3_t heading_point, vector3_t base_pos,
+        const std::vector<vector3_t> &frame_positions, const std::vector<std::string> &frames) {
+        // TODO: Need to consider how this will work with the biped when we only have 2 hips
+        // (1) Fit plane to hip data
+        matrixx_t A = matrixx_t::Zero(frame_positions.size(), 3);
+        vectorx_t b = vectorx_t::Zero(frame_positions.size());
+
+        for (int ee = 0; ee < frame_positions.size(); ee++) {
+            A.row(ee) << frame_positions[ee](0), frame_positions[ee](1), 1;
+            b(ee) = frame_positions[ee](2);
+        }
+
+        // Compute pseudo inverse
+        matrixx_t AtA;
+        AtA.noalias() = A.transpose()*A;
+
+        // Solve for the plane variables
+        vector3_t plane_vars = AtA.ldlt().solve(A.transpose()*b);
+        std::cout << "plane vars: " << plane_vars.transpose() << std::endl;
+
+        // Normal
+        vector3_t plane_normal;
+        plane_normal << -plane_vars.head<2>(), 1;
+        plane_normal.normalize();
+        std::cout << "plane_normal: " << plane_normal.transpose() << std::endl;
+
+        // (2) Project the base position onto the plane
+        // Point on the plane:
+        vector3_t point_on_plane = vector3_t::Zero();
+        point_on_plane(2) = plane_vars(2);
+
+        vector3_t v = base_pos - point_on_plane;
+        vector3_t temp = point_on_plane + v - v.dot(plane_normal)*plane_normal;
+
+        // Trying to just project the z value
+        base_pos(2) = temp(2);  // Otherwise the position drifts and robot moves undesirably
+
+        // (3) Project heading point onto the fit plane
+        v = heading_point - point_on_plane;
+        heading_point = point_on_plane + v - v.dot(plane_normal)*plane_normal;
+
+        // (4) x-axis is the difference in these points
+        vector3_t x_axis = heading_point - base_pos;
+        x_axis.normalize();
+
+        // (5) compute y-axis
+        vector3_t y_axis = plane_normal.cross(x_axis);
+        y_axis.normalize();
+
+        // (6) compute quaternion
+        matrix3_t R;
+        R.col(0) = x_axis;
+        R.col(1) = y_axis;
+        R.col(2) = plane_normal;
+
+        quat_t q(R);
+
+        vector7_t q_ret = vector7_t::Zero();
+        q_ret << base_pos, q.coeffs();
+
+        // Return
+        return q_ret;
     }
 
 }

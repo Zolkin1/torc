@@ -19,6 +19,7 @@ namespace torc::mpc {
     using vector2_t = Eigen::Vector2d;
     using vector3_t = Eigen::Vector3d;
     using vector4_t = Eigen::Vector4d;
+    using vector7_t = Eigen::Vector<double, 7>;
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3_t = Eigen::Matrix3d;
@@ -76,6 +77,9 @@ namespace torc::mpc {
 
         vector2_t InterpolateBasePositions(int node, const std::map<double, vector2_t>& base_pos,
             const vector2_t &current_pos, const vector2_t& end_vel_command);
+
+        vector7_t PoseFit(vector3_t heading_point, vector3_t base_pos,
+            const std::vector<vector3_t> &frame_positions, const std::vector<std::string> &frames);
 
         int nodes_;
         int config_size_;

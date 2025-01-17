@@ -7,6 +7,7 @@
 #include "pinocchio/algorithm/aba.hpp"
 
 #include "full_order_rigid_body.h"
+#include "pinocchio_interface.h"
 
 // #include "full_order_test_fcns.h"
 
@@ -391,4 +392,63 @@ TEST_CASE("Quadruped IK", "[model][ik]") {
     BENCHMARK("IK timing quad") {
         vectorx_t q_res = a1_model.InverseKinematics(q_rand.head<7>(), frame_positions, contact_names, q_rand + a1_model.GetRandomConfig()*0.2);
     };
+}
+
+TEST_CASE("New Frames") {
+    using namespace torc::models;
+    const std::string pin_model_name = "test_pin_model";
+
+    constexpr double MARGIN = 1e-6;
+
+    std::filesystem::path a1_urdf = std::filesystem::current_path();
+    a1_urdf += "/test_data/test_a1.urdf";
+
+    std::vector<std::string> joint_skip_names = {};
+    std::vector<double> joint_skip_values = {};
+
+    std::vector<std::string> new_frames_names = {"new_frame1"};
+    std::vector<vector3_t> new_frame_transforms = {{0.2, 0.5, 0}};
+
+    FullOrderRigidBody a1_model(pin_model_name, a1_urdf, joint_skip_names, joint_skip_values,
+        new_frames_names, new_frame_transforms);
+
+    // Check the position
+    vectorx_t q = a1_model.GetNeutralConfig();
+    a1_model.FirstOrderFK(q);
+
+    vector3_t frame_pos = a1_model.GetFrameState(new_frames_names[0]).placement.translation();
+    std::cout << "frame_pos: " << frame_pos.transpose() << std::endl;
+    std::cout << "expected: " << (q.head<3>() + new_frame_transforms[0]).transpose() << std::endl;
+    CHECK(frame_pos.isApprox(q.head<3>() + new_frame_transforms[0]));
+
+    // Move the base
+    vector3_t q_move = {0.1, -0.2, 0.1};
+    q.head<3>() += q_move;
+    a1_model.FirstOrderFK(q);
+    frame_pos = a1_model.GetFrameState(new_frames_names[0]).placement.translation();
+    std::cout << "frame_pos: " << frame_pos.transpose() << std::endl;
+    std::cout << "expected: " << (q.head<3>() + new_frame_transforms[0]).transpose() << std::endl;
+    CHECK(frame_pos.isApprox(q.head<3>() + new_frame_transforms[0]));
+
+    //Check the jacobian
+    matrix6x_t J = matrix6x_t::Zero(6, a1_model.GetVelDim());
+    a1_model.GetFrameJacobian(new_frames_names[0], q, J);
+    std::cout << "Jacobian:\n" << J << std::endl;
+
+    // Reorient the base
+    vectorx_t v = vectorx_t::Zero(a1_model.GetVelDim());
+    vector3_t v_move_orient = {0.1, 0.1, 0.1};
+    v.segment<3>(3) += v_move_orient;
+    q = torc::models::ConvertdqToq(v, q);
+    a1_model.FirstOrderFK(q);
+    frame_pos = a1_model.GetFrameState(new_frames_names[0]).placement.translation();
+    std::cout << "frame_pos: " << frame_pos.transpose() << std::endl;
+    vector3_t expected = q.head<3>() + static_cast<quat_t>(q.segment<4>(3))*new_frame_transforms[0];
+    std::cout << "expected: " << (expected).transpose() << std::endl;
+    CHECK(frame_pos.isApprox(expected));
+
+    //Check the jacobian
+    J.setZero();
+    a1_model.GetFrameJacobian(new_frames_names[0], q, J);
+    std::cout << "Jacobian:\n" << J << std::endl;
 }

@@ -149,7 +149,7 @@ namespace torc::models {
         new_frame.placement.translation() = translation;
         new_frame.inertia = pinocchio::Inertia();
         new_frame.inertia.setZero();
-        new_frame.parentFrame = 2;
+        // new_frame.parentFrame = 2;
         new_frame.parentJoint = 1;
         new_frame.type = pinocchio::OP_FRAME;
 

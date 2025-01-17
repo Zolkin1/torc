@@ -152,12 +152,15 @@ namespace torc::mpc {
             if (InSwing(frame, time)) {
                 for (const auto& [start, end] : frame_schedule_map.at(frame)) {
                     if (time >= start && time <= end) {
+                        // TODO: Need to fix this! I am getting weird heights when stepping on the stairs
                         const int next_contact_idx = GetContactIndex(frame, end + 0.001);
                         const double end_height = contact_polytopes.at(frame).at(next_contact_idx).height_ + height_offset;
-                        const double apex_height_adjusted = apex_height + end_height;
 
+                        //TODO: I think I am seeing something weird here when stepping down stairs
                         const int prev_contact_idx = GetContactIndex(frame, start - 0.001);
                         const double start_height = contact_polytopes.at(frame).at(prev_contact_idx).height_ + height_offset;
+
+                        const double apex_height_adjusted = apex_height + std::max(end_height, start_height);
 
                         swing_traj[node] = GetSwingHeight(apex_height_adjusted, end_height, start_height, apex_time, time, start, end);
                         break;
