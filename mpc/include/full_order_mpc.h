@@ -17,6 +17,8 @@
 #include "cpp_ad_interface.h"
 #include "simple_trajectory.h"
 
+#include "hpipm-cpp/hpipm-cpp.hpp"
+
 // TODO: Need to consider thread safety and how to return data better. I think I can return more references
 
 namespace torc::mpc {
@@ -386,6 +388,9 @@ namespace torc::mpc {
         osqp::OsqpInstance osqp_instance_;
         osqp::OsqpSolver osqp_solver_;
         osqp::OsqpSettings osqp_settings_;
+
+        // HPIPM
+        std::vector<hpipm::OcpQp> hpipm_qp;
 
         sp_matrixx_t A_;
 //        constraints::SparseBoxConstraints constraints_;

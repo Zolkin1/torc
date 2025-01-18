@@ -64,6 +64,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(osqp-cpp)
 target_link_libraries(Mpc PUBLIC osqp-cpp)
 
+# ------- HPIPM ------ #
+find_package(hpipm-cpp REQUIRED)
+target_link_libraries(Mpc PRIVATE hpipm-cpp::hpipm-cpp) # Might also need the include directories
+
 # ------- Utils ------ #
 target_link_libraries(Mpc PUBLIC Utils)
 
@@ -74,13 +78,14 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
         GIT_TAG 0.8.0 # note all other versions are of the form yaml-cpp-x.y.z
 )
-FetchContent_GetProperties(yaml-cpp)
+FetchContent_MakeAvailable(yaml-cpp)
+#FetchContent_GetProperties(yaml-cpp)
+#
+#if(NOT yaml-cpp_POPULATED)
+#    message(STATUS "Fetching yaml-cpp...")
+#    FetchContent_Populate(yaml-cpp)
+#    add_subdirectory(${yaml-cpp_SOURCE_DIR} ${yaml-cpp_BINARY_DIR})
+#endif()
 
-if(NOT yaml-cpp_POPULATED)
-    message(STATUS "Fetching yaml-cpp...")
-    FetchContent_Populate(yaml-cpp)
-    add_subdirectory(${yaml-cpp_SOURCE_DIR} ${yaml-cpp_BINARY_DIR})
-endif()
-
-target_link_libraries(Mpc PRIVATE yaml-cpp::yaml-cpp)
+target_link_libraries(Mpc PUBLIC yaml-cpp::yaml-cpp)
 

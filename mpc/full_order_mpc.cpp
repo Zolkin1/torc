@@ -441,6 +441,9 @@ namespace torc::mpc {
         osqp_instance_.lower_bounds.setConstant(-1);
         osqp_instance_.upper_bounds.setConstant(1);
 
+        // HPIPM
+        hpipm_qp.resize(nodes_+1);
+
         // Create A sparsity pattern to configure OSQP with
         CreateConstraintSparsityPattern();
 
@@ -869,6 +872,17 @@ namespace torc::mpc {
         osqp_instance_.upper_bounds.setZero();
 
         for (int node = 0; node < nodes_; node++) {
+            // HPIPM
+            // TODO: Resize all of these!
+            hpipm_qp[node].A.setZero();
+            hpipm_qp[node].B.setZero();
+            hpipm_qp[node].b.setZero();
+            hpipm_qp[node].Q.setZero();
+            hpipm_qp[node].R.setZero();
+            hpipm_qp[node].S.setZero();
+            hpipm_qp[node].q.setZero();
+            hpipm_qp[node].r.setZero();
+
             // Dynamics related constraints don't happen in the last node
             if (node < nodes_ - 1) {
                 AddIntegrationConstraint(node);
@@ -1074,6 +1088,10 @@ namespace torc::mpc {
 
         matrixx_t jac;
         integration_constraint_->GetJacobian(x_zero, p, jac);
+
+        // HPIPM
+        // TODO: Do the constraints need to be re-formulated for HPIPM?
+        hpipm_qp[node].A.topRows(2*vel_dim_) = jac;
 
         // dqk
         if (node != 0) {
