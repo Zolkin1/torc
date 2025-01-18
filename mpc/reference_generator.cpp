@@ -621,13 +621,13 @@ namespace torc::mpc {
 
         // Solve for the plane variables
         vector3_t plane_vars = AtA.ldlt().solve(A.transpose()*b);
-        std::cout << "plane vars: " << plane_vars.transpose() << std::endl;
+        // std::cout << "plane vars: " << plane_vars.transpose() << std::endl;
 
         // Normal
         vector3_t plane_normal;
         plane_normal << -plane_vars.head<2>(), 1;
         plane_normal.normalize();
-        std::cout << "plane_normal: " << plane_normal.transpose() << std::endl;
+        // std::cout << "plane_normal: " << plane_normal.transpose() << std::endl;
 
         // (2) Project the base position onto the plane
         // Point on the plane:
@@ -642,7 +642,10 @@ namespace torc::mpc {
 
         // (3) Project heading point onto the fit plane
         v = heading_point - point_on_plane;
-        heading_point = point_on_plane + v - v.dot(plane_normal)*plane_normal;
+        temp = point_on_plane + v - v.dot(plane_normal)*plane_normal;
+
+        // Trying to just project the z value
+        heading_point(2) = temp(2);  // Otherwise the position drifts and robot moves undesirably
 
         // (4) x-axis is the difference in these points
         vector3_t x_axis = heading_point - base_pos;

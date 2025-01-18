@@ -148,6 +148,10 @@ namespace torc::mpc {
         for (int node = 0; node < nodes; node++) {
             double time = GetTime(dt_vec, node);
 
+            // TODO: Issues:
+            //  - When moving at any speed but an absolute creep, we get artifacts where the heights are not correct
+            //  - Feet intersect the stairs during swing. Need a way to shape the trajectory to avoid collisions
+
             // Check if we are in swing
             if (InSwing(frame, time)) {
                 for (const auto& [start, end] : frame_schedule_map.at(frame)) {
@@ -155,10 +159,23 @@ namespace torc::mpc {
                         // TODO: Need to fix this! I am getting weird heights when stepping on the stairs
                         const int next_contact_idx = GetContactIndex(frame, end + 0.001);
                         const double end_height = contact_polytopes.at(frame).at(next_contact_idx).height_ + height_offset;
+                        // FOR DEBUGGING
+                        // double end_height = 0;
+                        // if (!contact_polytopes.at(frame)[next_contact_idx].b_.isApprox(vector4_t({1.250000, 1.000000, -0.750000, -1.000000}))) {
+                        //     end_height = 0.1;
+                        // }
 
-                        //TODO: I think I am seeing something weird here when stepping down stairs
+                        // // std::cout << "b: " << contact_polytopes.at(frame).at(next_contact_idx).b_.transpose() << std::endl;
+                        //
+                        // //TODO: I think I am seeing something weird here when stepping down stairs
                         const int prev_contact_idx = GetContactIndex(frame, start - 0.001);
+                        // FOR DEBUGGING
+                        // double start_height = 0;
+                        // if (!contact_polytopes.at(frame)[prev_contact_idx].b_.isApprox(vector4_t({1.250000, 1.000000, -0.750000, -1.000000}))) {
+                        //     start_height = 0.1;
+                        // }
                         const double start_height = contact_polytopes.at(frame).at(prev_contact_idx).height_ + height_offset;
+
 
                         const double apex_height_adjusted = apex_height + std::max(end_height, start_height);
 
@@ -170,7 +187,12 @@ namespace torc::mpc {
             if (!InSwing(frame, time)) {
                 const int contact_idx = GetContactIndex(frame, time);
                 const double end_height = contact_polytopes.at(frame)[contact_idx].height_ + height_offset;
-                swing_traj[node] = end_height;
+                // FOR DEBUGGING
+                // double end_height = 0;
+                // if (!contact_polytopes.at(frame)[contact_idx].b_.isApprox(vector4_t({1.250000, 1.000000, -0.750000, -1.000000}))) {
+                //     end_height = 0.1;
+                // }
+                swing_traj[node] = end_height;   // TODO: This should be fine
             }
         }
     }
