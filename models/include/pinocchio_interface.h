@@ -6,8 +6,12 @@
 #define PINOCCHIOINTERFACE_H
 
 #include <Eigen/Core>
+#include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/math/quaternion.hpp>
 #include <pinocchio/spatial/explog-quaternion.hpp>
+#include "pinocchio/algorithm/frames.hpp"
+#include "cppad/example/atomic_two/eigen_cholesky.hpp"
+#include "cppad/example/atomic_two/eigen_mat_inv.hpp"
 
 namespace torc::models {
 
@@ -40,11 +44,23 @@ namespace torc::models {
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& q,
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& v,
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& a,
-        const std::vector<ExternalForce<ad::adcg_t>>& f_ext) {
+        const std::vector<ExternalForce<ScalarT>>& f_ext) {
 
         const auto forces = ConvertExternalForcesToPin(pin_model, data, q, f_ext);
 
         return pinocchio::rnea(pin_model, data, q, v, a, forces);
+    }
+
+    template<typename ScalarT>
+    Eigen::Vector<ScalarT, Eigen::Dynamic> ForwardDynamics(const pinocchio::ModelTpl<ScalarT>& pin_model, pinocchio::DataTpl<ScalarT>& data,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& q,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& v,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& tau,
+    const std::vector<ExternalForce<ScalarT>>& f_ext) {
+
+        const auto forces = ConvertExternalForcesToPin(pin_model, data, q, f_ext);
+
+        return pinocchio::aba(pin_model, data, q, v, tau, forces);
     }
 
     template<typename ScalarT>
@@ -80,6 +96,25 @@ namespace torc::models {
         }
 
         return forces;
+    }
+
+    template<typename ScalarT>
+    Eigen::Vector<ScalarT, Eigen::Dynamic> ForwardWithCrba(const pinocchio::ModelTpl<ScalarT>& pin_model, pinocchio::DataTpl<ScalarT>& data,
+        const Eigen::Vector<ScalarT, Eigen::Dynamic>& q,
+        const Eigen::Vector<ScalarT, Eigen::Dynamic>& v,
+        const Eigen::Vector<ScalarT, Eigen::Dynamic>& tau,
+        const std::vector<ExternalForce<ScalarT>>& f_ext) {
+
+        // Compute bias term that includes external forces
+        const Eigen::Vector<ScalarT, Eigen::Dynamic> a = Eigen::Vector<ScalarT, Eigen::Dynamic>::Zero(v.size());
+        const Eigen::Vector<ScalarT, Eigen::Dynamic> b = InverseDynamics(pin_model, data, q, v, a, f_ext);
+
+        // Compute M
+        pinocchio::crba(pin_model, data, q);
+        data.M.template triangularView<Eigen::StrictlyLower>() = data.M.transpose().template triangularView<Eigen::StrictlyLower>();  // Make full
+
+        // Compute a
+        return data.M.llt().solve(tau - b);
     }
 
     template<typename ScalarT>

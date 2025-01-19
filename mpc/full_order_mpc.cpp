@@ -873,7 +873,26 @@ namespace torc::mpc {
 
         for (int node = 0; node < nodes_; node++) {
             // HPIPM
-            // TODO: Resize all of these!
+            // TODO: Need to deal with the different models
+            long nu;
+            long nx;
+            if (node < nodes_full_dynamics_) {
+                nu = robot_model_->GetVelDim() - FLOATING_VEL;
+                nx = 2*robot_model_->GetVelDim();
+            } else {
+                nu = robot_model_->GetVelDim() - FLOATING_VEL;
+                nx = robot_model_->GetVelDim() + FLOATING_VEL;
+            }
+
+            hpipm_qp[node].A.resize(nx, nx);
+            hpipm_qp[node].B.resize(nx, nx);
+            hpipm_qp[node].b.resize(nx);
+            hpipm_qp[node].Q.resize(nx, nx);
+            hpipm_qp[node].R.resize(nu, nu);
+            hpipm_qp[node].S.resize(nu, nx);
+            hpipm_qp[node].q.resize(nx);
+            hpipm_qp[node].r.resize(nu);
+
             hpipm_qp[node].A.setZero();
             hpipm_qp[node].B.setZero();
             hpipm_qp[node].b.setZero();
@@ -1091,7 +1110,7 @@ namespace torc::mpc {
 
         // HPIPM
         // TODO: Do the constraints need to be re-formulated for HPIPM?
-        hpipm_qp[node].A.topRows(2*vel_dim_) = jac;
+        hpipm_qp[node].A.topRows(vel_dim_) = jac;
 
         // dqk
         if (node != 0) {

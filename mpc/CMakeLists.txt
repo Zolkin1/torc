@@ -8,7 +8,13 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/cost_function.h"
     "${MPC_INC}/contact_schedule.h"
     "${MPC_INC}/configuration_tracking_cost.h"
-    "${MPC_INC}/simple_trajectory.h")
+    "${MPC_INC}/simple_trajectory.h"
+    "${MPC_INC}/hpipm_mpc.h"
+    "${MPC_INC}/constraint.h"
+    "${MPC_INC}/DynamicsConstraint.h"
+    "${MPC_INC}/StateConstraint.h"
+    "${MPC_INC}/InputConstraint.h"
+    "${MPC_INC}/MpcSettings.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -19,7 +25,13 @@ set(MPC_SOURCE_LIST
         cost_function.cpp
         contact_schedule.cpp
         configuration_tracking_cost.cpp
-        simple_trajectory.cpp)
+        simple_trajectory.cpp
+        hpipm_mpc.cpp
+        constraint.cpp
+        DynamicsConstraint.cpp
+        StateConstraint.cpp
+        InputConstraint.cpp
+        MpcSettings.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}
@@ -63,6 +75,10 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(osqp-cpp)
 target_link_libraries(Mpc PUBLIC osqp-cpp)
+
+# ------- Eigen ------ #
+find_package(Eigen3 REQUIRED)
+
 
 # ------- HPIPM ------ #
 find_package(hpipm-cpp REQUIRED)
