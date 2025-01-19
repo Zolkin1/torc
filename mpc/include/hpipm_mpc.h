@@ -16,10 +16,11 @@
 #include "trajectory.h"
 #include "constraint.h"
 #include "DynamicsConstraint.h"
-#include "InputConstraint.h"
+#include "FrictionConeConstraint.h"
+#include "HolonomicConstraint.h"
 
 #include "MpcSettings.h"
-#include "StateConstraint.h"
+#include "SwingConstraint.h"
 #include "StateInputConstraint.h"
 
 namespace torc::mpc {
@@ -35,11 +36,20 @@ namespace torc::mpc {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using sp_matrixx_t = Eigen::SparseMatrix<double, Eigen::ColMajor, long long>;
 
+    constexpr int FLOATING_BASE = 7;
+    constexpr int FLOATING_VEL = 6;
+
     class HpipmMpc {
     public:
-        HpipmMpc(MpcSettings settings);
+        HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model);
 
         void SetDynamicsConstraints(std::vector<DynamicsConstraint> constraints);
+        void SetConfigBox(const BoxConstraint& constraints);
+        void SetVelBox(const BoxConstraint& constraints);
+        void SetTauBox(const BoxConstraint& constraints);
+        void SetFrictionCone(FrictionConeConstraint constraints);
+        void SetSwingConstraint(SwingConstraint constraints);
+        void SetHolonomicConstraint(HolonomicConstraint constraints);
 
         void Compute();
 
@@ -47,7 +57,16 @@ namespace torc::mpc {
     protected:
         void CreateConstraints();
 
+        /**
+         * @brief
+         * @param node
+         * @return (row, col) pair
+         */
+        std::pair<int, int> GetFrictionIndex(int node);
+
     private:
+        void SetSizes();
+
         std::vector<Constraint> constraints;
         MpcSettings settings_;
 
@@ -56,22 +75,34 @@ namespace torc::mpc {
         std::unique_ptr<BoxConstraint> vel_box_;
         std::unique_ptr<BoxConstraint> tau_box_;
 
-        std::unique_ptr<InputConstraint> friction_cone_;
+        std::unique_ptr<FrictionConeConstraint> friction_cone_;
 
-        std::unique_ptr<StateConstraint> swing_height_;
+        std::unique_ptr<SwingConstraint> swing_constraint_;
 
-        std::unique_ptr<StateConstraint> holonomic_;
-        std::unique_ptr<StateInputConstraint> holonomic_cent_;
+        std::unique_ptr<HolonomicConstraint> holonomic_;
 
-        std::unique_ptr<StateConstraint> polytope_;
+        std::unique_ptr<SwingConstraint> polytope_;
 
-        std::unique_ptr<StateConstraint> collision_;
+        std::unique_ptr<SwingConstraint> collision_;
 
         // Solver
         std::vector<hpipm::OcpQp> qp;
 
         // Trajectories
         Trajectory traj_;
+
+        // Sizes (per node)
+        int ntau_;
+        int nforces_;
+        int nq_;
+        int nv_;
+
+        // Robot Model
+        models::FullOrderRigidBody model_;
+
+        // Swing
+        std::vector<double> swing_traj_;
+        std::vector<int> in_contact_;
     };
 }
 

@@ -14,19 +14,18 @@ namespace torc::mpc {
         const std::vector<std::string>& contact_frames, const std::string& name, const fs::path& deriv_lib_path,
         bool compile_derivs, bool full_order,
         int first_node, int last_node)
-        : Constraint(first_node, last_node), full_order_(full_order) {
-        model_ = std::make_unique<models::FullOrderRigidBody>(model);
+        : Constraint(first_node, last_node, name), full_order_(full_order), model_(model) {
 
-        vel_dim_ = model_->GetVelDim();
-        config_dim_ = model_->GetConfigDim();
-        tau_dim_ = model_->GetVelDim() - FLOATING_VEL;
+        vel_dim_ = model_.GetVelDim();
+        config_dim_ = model_.GetConfigDim();
+        tau_dim_ = model_.GetVelDim() - FLOATING_VEL;
         num_contacts_ = contact_frames.size();
 
         // Make the auto diff function
         dynamics_function_ = std::make_unique<ad::CppADInterface>(
             std::bind(&DynamicsConstraint::InverseDynamics, this, contact_frames, std::placeholders::_1,
                 std::placeholders::_2, std::placeholders::_3),
-            name + "_dynamics_constraint",
+            name_ + "_dynamics_constraint",
             deriv_lib_path,
             ad::DerivativeOrder::FirstOrder, 3*vel_dim_ + tau_dim_ + CONTACT_3DOF*num_contacts_,
             1 + config_dim_ + 2*vel_dim_ + tau_dim_ + CONTACT_3DOF*num_contacts_,
@@ -35,7 +34,7 @@ namespace torc::mpc {
 
         integration_function_ = std::make_unique<ad::CppADInterface>(
             std::bind(&DynamicsConstraint::IntegrationConstraint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
-            name + "_integration_constraint",
+            name_ + "_integration_constraint",
             deriv_lib_path,
             ad::DerivativeOrder::FirstOrder, 3*vel_dim_, 1 + 2*config_dim_ + vel_dim_,
             compile_derivs
@@ -134,7 +133,7 @@ namespace torc::mpc {
         }
 
         // Compute error
-        const ad::ad_vector_t tau_id = models::InverseDynamics(model_->GetADPinModel(), *model_->GetADPinData(),
+        const ad::ad_vector_t tau_id = models::InverseDynamics(model_.GetADPinModel(), *model_.GetADPinData(),
             qk_curr, vk_curr, a, f_ext);
 
         if (full_order_) {
@@ -145,7 +144,7 @@ namespace torc::mpc {
     }
 
      void DynamicsConstraint::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk,
-         const ad::ad_vector_t& dt_qkbar_qkp1bar_vk, ad::ad_vector_t& violation) const {
+         const ad::ad_vector_t& dt_qkbar_qkp1bar_vk, ad::ad_vector_t& violation) {
         // From the reference trajectory
         const ad::adcg_t& dt = dt_qkbar_qkp1bar_vk(0);
         const ad::ad_vector_t& qkbar = dt_qkbar_qkp1bar_vk.segment(1, config_dim_);
@@ -166,7 +165,7 @@ namespace torc::mpc {
 
         const ad::ad_vector_t v = dt*vk;
 
-        const ad::ad_vector_t qkp1_new = pinocchio::integrate(model_->GetADPinModel(), qk, v);
+        const ad::ad_vector_t qkp1_new = pinocchio::integrate(model_.GetADPinModel(), qk, v);
 
         // Floating base position differences
         violation.resize(vel_dim_);

@@ -33,7 +33,7 @@ namespace torc::mpc {
             ad::ad_vector_t &violation);
 
         void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk_dvkp1,
-            const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation) const;
+            const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation);
 
         int nx_;
         int nu_;
@@ -44,7 +44,7 @@ namespace torc::mpc {
 
         bool full_order_;
 
-        std::unique_ptr<models::FullOrderRigidBody> model_;
+        models::FullOrderRigidBody model_;
         std::unique_ptr<ad::CppADInterface> dynamics_function_;
         std::unique_ptr<ad::CppADInterface> integration_function_;
 

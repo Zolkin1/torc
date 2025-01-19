@@ -26,16 +26,17 @@ namespace torc::mpc {
 
     class Constraint {
     public:
-        Constraint(int first_node, int last_node);
+        Constraint(int first_node, int last_node, const std::string& name);
 
         int GetFirstNode() const;
         int GetLastNode() const;
 
         bool IsInNodeRange(int node) const;
     protected:
-    private:
         int first_node_;
         int last_node_;
+        std::string name_;
+    private:
     };
 }
 

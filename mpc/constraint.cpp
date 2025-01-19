@@ -5,9 +5,8 @@
 #include "constraint.h"
 
 namespace torc::mpc {
-    Constraint::Constraint(int first_node, int last_node) {
-        first_node_ = first_node;
-        last_node_ = last_node;
+    Constraint::Constraint(int first_node, int last_node, const std::string& name)
+        : first_node_(first_node), last_node_(last_node), name_(name) {
     }
 
     int Constraint::GetFirstNode() const {

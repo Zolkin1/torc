@@ -12,11 +12,12 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/hpipm_mpc.h"
     "${MPC_INC}/constraint.h"
     "${MPC_INC}/DynamicsConstraint.h"
-    "${MPC_INC}/StateConstraint.h"
-    "${MPC_INC}/InputConstraint.h"
+    "${MPC_INC}/SwingConstraint.h"
+    "${MPC_INC}/FrictionConeConstraint.h"
     "${MPC_INC}/MpcSettings.h"
     "${MPC_INC}/BoxConstraint.h"
-    "${MPC_INC}/StateInputConstraint.h")
+    "${MPC_INC}/StateInputConstraint.h"
+    "${MPC_INC}/HolonomicConstraint.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -31,11 +32,12 @@ set(MPC_SOURCE_LIST
         hpipm_mpc.cpp
         constraint.cpp
         DynamicsConstraint.cpp
-        StateConstraint.cpp
-        InputConstraint.cpp
+        SwingConstraint.cpp
+        FrictionConeConstraint.cpp
         MpcSettings.cpp
         BoxConstraint.cpp
-        StateInputConstraint.cpp)
+        StateInputConstraint.cpp
+        HolonomicConstraint.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}

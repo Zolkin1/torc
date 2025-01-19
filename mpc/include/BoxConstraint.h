@@ -10,7 +10,8 @@
 namespace torc::mpc {
     class BoxConstraint : public Constraint{
     public:
-        BoxConstraint(int first_node, int last_node);
+        BoxConstraint(int first_node, int last_node, const std::string& name, const vectorx_t& lb, const vectorx_t& ub,
+            const std::vector<int>& idxs);
 
         void SetLowerBound(const vectorx_t& lb);
         void SetUpperBound(const vectorx_t& ub);

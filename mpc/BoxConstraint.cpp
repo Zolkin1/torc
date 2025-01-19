@@ -5,8 +5,9 @@
 #include "BoxConstraint.h"
 
 namespace torc::mpc {
-    BoxConstraint::BoxConstraint(int first_node, int last_node)
-        : Constraint(first_node, last_node) {}
+    BoxConstraint::BoxConstraint(int first_node, int last_node, const std::string& name, const vectorx_t& lb, const vectorx_t& ub,
+            const std::vector<int>& idxs)
+        : Constraint(first_node, last_node, name), lb_(lb), ub_(ub), idxs_(idxs) {}
 
     void BoxConstraint::SetLowerBound(const vectorx_t &lb) {
         lb_ = lb;

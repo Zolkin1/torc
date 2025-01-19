@@ -4,10 +4,18 @@
 
 #include "hpipm_mpc.h"
 
+// TODO: Can I have changing sizes every solve without causing slow downs? Then I may be able to remove some constraints (swing related)
 namespace torc::mpc {
-    HpipmMpc::HpipmMpc(MpcSettings settings)
-        : settings_(std::move(settings)){
+    HpipmMpc::HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model)
+        : settings_(std::move(settings)), model_(model){
         qp.resize(settings_.nodes + 1);
+
+        nq_ = model_.GetConfigDim();
+        nv_ = model_.GetVelDim();
+        ntau_ = model_.GetVelDim() - FLOATING_VEL;
+        nforces_ = settings_.num_contact_locations * 3;
+
+        SetSizes();
     }
 
     void HpipmMpc::SetDynamicsConstraints(std::vector<DynamicsConstraint> constraints) {
@@ -15,6 +23,30 @@ namespace torc::mpc {
         if (dynamics_constraints_.size() !=2) {
             throw std::runtime_error("For now we only accept exactly 2 dynamics constraints!");
         }
+    }
+
+    void HpipmMpc::SetConfigBox(const BoxConstraint& constraint) {
+        config_box_ = std::make_unique<BoxConstraint>(constraint);
+    }
+
+    void HpipmMpc::SetVelBox(const BoxConstraint &constraints) {
+        vel_box_ = std::make_unique<BoxConstraint>(constraints);
+    }
+
+    void HpipmMpc::SetTauBox(const BoxConstraint &constraints) {
+        tau_box_ = std::make_unique<BoxConstraint>(constraints);
+    }
+
+    void HpipmMpc::SetFrictionCone(FrictionConeConstraint constraints) {
+        friction_cone_ = std::make_unique<FrictionConeConstraint>(std::move(constraints));
+    }
+
+    void HpipmMpc::SetSwingConstraint(SwingConstraint constraints) {
+        swing_constraint_ = std::make_unique<SwingConstraint>(std::move(constraints));
+    }
+
+    void HpipmMpc::SetHolonomicConstraint(HolonomicConstraint constraints) {
+        holonomic_ = std::make_unique<HolonomicConstraint>(std::move(constraints));
     }
 
     void HpipmMpc::UpdateSetttings(MpcSettings settings) {
@@ -34,6 +66,7 @@ namespace torc::mpc {
 
             int box_x_idx = 0;
             int box_u_idx = 0;
+            int ineq_row_idx = 0;
 
             // Dynamics Constraints
             if (dynamics_constraints_[0].IsInNodeRange(node)) {
@@ -111,31 +144,70 @@ namespace torc::mpc {
             }
 
             // Friction cone constraints
-            if (node >= friction_cone_->GetFirstNode() && node < friction_cone_->GetLastNode()) {
-
+            if (friction_cone_->IsInNodeRange(node)) {
+                int col = ntau_;
+                for (int contact = 0; contact < settings_.num_contact_locations; contact++) {
+                    const auto [d_block, lg_segment]
+                        = friction_cone_->GetLinearization(force.segment<3>(3*contact));
+                    qp[node].D.block(contact, col, 1, 3) = d_block;
+                    qp[node].lg.segment<1>(contact) = lg_segment;
+                    qp[node].ug_mask(contact) = 0;  // TODO: Verify this
+                    col +=3;
+                    ineq_row_idx++;
+                }
             }
 
             // Swing height
-            if (node >= swing_height_->GetFirstNode() && node < swing_height_->GetLastNode()) {
-
+            if (swing_constraint_->IsInNodeRange(node)) {
+                for (const auto& frame : settings_.contact_frames) {
+                    const auto [c_block, y_segment] =
+                        swing_constraint_->GetLinearization(traj_.GetConfiguration(node), swing_traj_[node], frame);
+                    // y_segment.size should = 3
+                    qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nq_) = in_contact_[node]*c_block;
+                    qp[node].lg.segment<3>(ineq_row_idx) = -in_contact_[node]*y_segment;
+                    qp[node].ug.segment<3>(ineq_row_idx) = -in_contact_[node]*y_segment;
+                    ineq_row_idx += y_segment.size();
+                }
             }
 
             // Holonomic
-            if (node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode()) {
+            if (holonomic_->IsInNodeRange(node)) {
+                for (const auto& frame : settings_.contact_frames) {
+                    const auto [jac, y_segment] =
+                        holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
+                    if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[node]*jac;
+                    } else {
+                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
+                            in_contact_[node]*jac.leftCols(nq_ + FLOATING_VEL);
+                        qp[node].D.block(ineq_row_idx, 0, y_segment.size(), FLOATING_VEL) =
+                            in_contact_[node]*jac.rightCols(FLOATING_VEL);
+                    }
+                    qp[node].lg.segment<2>(ineq_row_idx) = -in_contact_[node]*y_segment;
+                    qp[node].ug.segment<2>(ineq_row_idx) = -in_contact_[node]*y_segment;
 
+                    ineq_row_idx += y_segment.size();
+                }
             }
 
             // Collision
-            if (node >= collision_->GetFirstNode() && node < collision_->GetLastNode()) {
+            if (collision_->IsInNodeRange(node)) {
 
             }
 
             // Polytope
-            if (node >= polytope_->GetFirstNode() && node < polytope_->GetLastNode()) {
+            if (polytope_->IsInNodeRange(node)) {
 
             }
         }
     }
 
+    void HpipmMpc::SetSizes() {
+        // Resize all the QP mats and set them to zero.
+        throw std::runtime_error("TODO: Impelement SetSizes!");
+    }
+
+
 
 }
+
