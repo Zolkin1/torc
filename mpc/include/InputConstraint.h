@@ -4,13 +4,16 @@
 
 #ifndef INPUTCONSTRAINTS_H
 #define INPUTCONSTRAINTS_H
+#include "constraint.h"
 
 
-
-class InputConstraints {
-
-};
-
+namespace torc::mpc {
+    class InputConstraint : public Constraint {
+    public:
+    protected:
+    private:
+    };
+}
 
 
 #endif //INPUTCONSTRAINTS_H

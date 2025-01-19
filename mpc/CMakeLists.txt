@@ -14,7 +14,9 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/DynamicsConstraint.h"
     "${MPC_INC}/StateConstraint.h"
     "${MPC_INC}/InputConstraint.h"
-    "${MPC_INC}/MpcSettings.h")
+    "${MPC_INC}/MpcSettings.h"
+    "${MPC_INC}/BoxConstraint.h"
+    "${MPC_INC}/StateInputConstraint.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -31,7 +33,9 @@ set(MPC_SOURCE_LIST
         DynamicsConstraint.cpp
         StateConstraint.cpp
         InputConstraint.cpp
-        MpcSettings.cpp)
+        MpcSettings.cpp
+        BoxConstraint.cpp
+        StateInputConstraint.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}

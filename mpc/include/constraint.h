@@ -30,6 +30,8 @@ namespace torc::mpc {
 
         int GetFirstNode() const;
         int GetLastNode() const;
+
+        bool IsInNodeRange(int node) const;
     protected:
     private:
         int first_node_;

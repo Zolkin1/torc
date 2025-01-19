@@ -9,13 +9,18 @@
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
 #include <filesystem>
+
+#include "BoxConstraint.h"
 #include "hpipm-cpp/hpipm-cpp.hpp"
 #include "full_order_rigid_body.h"
 #include "trajectory.h"
 #include "constraint.h"
 #include "DynamicsConstraint.h"
+#include "InputConstraint.h"
 
 #include "MpcSettings.h"
+#include "StateConstraint.h"
+#include "StateInputConstraint.h"
 
 namespace torc::mpc {
     namespace fs = std::filesystem;
@@ -47,9 +52,22 @@ namespace torc::mpc {
         MpcSettings settings_;
 
         std::vector<DynamicsConstraint> dynamics_constraints_;
-        // TODO: Add vectors for other constraints
+        std::unique_ptr<BoxConstraint> config_box_;
+        std::unique_ptr<BoxConstraint> vel_box_;
+        std::unique_ptr<BoxConstraint> tau_box_;
 
-        // Sovler
+        std::unique_ptr<InputConstraint> friction_cone_;
+
+        std::unique_ptr<StateConstraint> swing_height_;
+
+        std::unique_ptr<StateConstraint> holonomic_;
+        std::unique_ptr<StateInputConstraint> holonomic_cent_;
+
+        std::unique_ptr<StateConstraint> polytope_;
+
+        std::unique_ptr<StateConstraint> collision_;
+
+        // Solver
         std::vector<hpipm::OcpQp> qp;
 
         // Trajectories
