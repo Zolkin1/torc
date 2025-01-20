@@ -45,6 +45,7 @@ namespace torc::mpc {
         int config_dim_;
         int tau_dim_;
         int num_contacts_;
+        std::vector<std::string> contact_frames_;
 
         bool full_order_;
 

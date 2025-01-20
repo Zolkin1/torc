@@ -65,6 +65,9 @@ namespace torc::mpc {
 
         void Compute(const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
 
+        void SetConfigTarget(const vectorx_t& q_target);
+        void SetVelTarget(const vectorx_t& v_target);
+
         void UpdateSetttings(MpcSettings settings);
     protected:
 

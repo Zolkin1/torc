@@ -20,6 +20,7 @@ namespace torc::mpc {
         config_dim_ = model_.GetConfigDim();
         tau_dim_ = model_.GetVelDim() - FLOATING_VEL;
         num_contacts_ = contact_frames.size();
+        contact_frames_ = contact_frames;
 
         // Make the auto diff function
         dynamics_function_ = std::make_unique<ad::CppADInterface>(
@@ -46,61 +47,191 @@ namespace torc::mpc {
         // TODO: To get the "forward dynamics" I will need to invert the jacobian term relating to v2
     }
 
+    // std::pair<matrixx_t, matrixx_t> DynamicsConstraint::GetLinDynamics(const vectorx_t &q1_lin, const vectorx_t &q2_lin, const vectorx_t &v1_lin,
+    //     const vectorx_t& v2_lin, const vectorx_t &tau_lin, const vectorx_t &force_lin, double dt) {
+    //     // --------- Dynamics --------- //
+    //     vectorx_t x_zero = vectorx_t::Zero(dynamics_function_->GetDomainSize());
+    //     vectorx_t p(dynamics_function_->GetParameterSize());
+    //     p << q1_lin, v1_lin, v2_lin, tau_lin, force_lin, dt;
+    //
+    //     matrixx_t dyn_jac;
+    //     dynamics_function_->GetJacobian(x_zero, p, dyn_jac);
+    //
+    //     // --------- Integration --------- //
+    //     x_zero.resize(integration_function_->GetDomainSize());
+    //     x_zero.setZero();
+    //
+    //     p.resize(integration_function_->GetParameterSize());
+    //     p << dt, q1_lin, q2_lin, v1_lin;
+    //
+    //     matrixx_t int_jac;
+    //     integration_function_->GetJacobian(x_zero, p, int_jac);
+    //
+    //     matrixx_t A, B;
+    //     if (full_order_) {
+    //         A.resize(2*vel_dim_, 2*vel_dim_);
+    //         B.resize(2*vel_dim_, tau_dim_ + num_contacts_*CONTACT_3DOF);
+    //
+    //         matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, vel_dim_).inverse();
+    //
+    //         A.topRows(vel_dim_) << int_jac.leftCols(vel_dim_), int_jac.middleCols(2*vel_dim_, vel_dim_);
+    //         A.bottomRows(vel_dim_) = dv2_inv*-dyn_jac.leftCols(2*vel_dim_);
+    //
+    //         B.topRows(vel_dim_).setZero();
+    //         B.bottomRows(vel_dim_) << dyn_jac.middleCols(3*vel_dim_, tau_dim_), dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
+    //         B.bottomRows(vel_dim_) = dv2_inv*-B.bottomRows(vel_dim_);
+    //     } else {
+    //         A.resize(vel_dim_ + FLOATING_VEL, vel_dim_ + FLOATING_VEL);
+    //         A.setZero();
+    //         B.resize(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL + num_contacts_*CONTACT_3DOF);
+    //         B.setZero();
+    //
+    //         // TODO: Check to be sure this is grabbing the block I want
+    //         // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
+    //         matrixx_t dv2_inv = dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL).inverse();
+    //
+    //         A.topRightCorner<FLOATING_VEL, FLOATING_VEL>() =
+    //             int_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL);
+    //         A.bottomRows<FLOATING_VEL>() << dv2_inv*-dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
+    //
+    //         B.block(FLOATING_VEL, 0, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL) =
+    //             int_jac.block(FLOATING_VEL, 2*vel_dim_, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
+    //         B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL),
+    //             dyn_jac.rightCols(num_contacts_*CONTACT_3DOF);
+    //         B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
+    //     }
+    //
+    //     return {A, B};
+    // }
+
+    // DEBUG -- Finite Difference
     std::pair<matrixx_t, matrixx_t> DynamicsConstraint::GetLinDynamics(const vectorx_t &q1_lin, const vectorx_t &q2_lin, const vectorx_t &v1_lin,
         const vectorx_t& v2_lin, const vectorx_t &tau_lin, const vectorx_t &force_lin, double dt) {
-        // --------- Dynamics --------- //
-        vectorx_t x_zero = vectorx_t::Zero(dynamics_function_->GetDomainSize());
-        vectorx_t p(dynamics_function_->GetParameterSize());
-        p << q1_lin, v1_lin, v2_lin, tau_lin, force_lin, dt;
+        const double FD_DELTA = 1e-8;
+        pinocchio::Model model = model_.GetModel();
+        pinocchio::Data data(model);
 
-        matrixx_t dyn_jac;
-        dynamics_function_->GetJacobian(x_zero, p, dyn_jac);
-
-        // --------- Integration --------- //
-        x_zero.resize(integration_function_->GetDomainSize());
-        x_zero.setZero();
-
-        p.resize(integration_function_->GetParameterSize());
-        p << dt, q1_lin, q2_lin, v1_lin;
-
-        matrixx_t int_jac;
-        integration_function_->GetJacobian(x_zero, p, int_jac);
-
-        matrixx_t A, B;
-        if (full_order_) {
-            A.resize(2*vel_dim_, 2*vel_dim_);
-            B.resize(2*vel_dim_, tau_dim_ + num_contacts_*CONTACT_3DOF);
-
-            matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, vel_dim_).inverse();
-
-            A.topRows(vel_dim_) << int_jac.leftCols(vel_dim_), int_jac.middleCols(2*vel_dim_, vel_dim_);
-            A.bottomRows(vel_dim_) = dv2_inv*-dyn_jac.leftCols(2*vel_dim_);
-
-            B.topRows(vel_dim_).setZero();
-            B.bottomRows(vel_dim_) << dyn_jac.middleCols(3*vel_dim_, tau_dim_), dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
-            B.bottomRows(vel_dim_) = dv2_inv*-B.bottomRows(vel_dim_);
-        } else {
-            A.resize(vel_dim_ + FLOATING_VEL, vel_dim_ + FLOATING_VEL);
-            A.setZero();
-            B.resize(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL + num_contacts_*CONTACT_3DOF);
-            B.setZero();
-
-            // TODO: Check to be sure this is grabbing the block I want
-            // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
-            matrixx_t dv2_inv = dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL).inverse();
-
-            A.topRightCorner<FLOATING_VEL, FLOATING_VEL>() =
-                int_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL);
-            A.bottomRows<FLOATING_VEL>() << dv2_inv*-dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
-
-            B.block(FLOATING_VEL, 0, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL) =
-                int_jac.block(FLOATING_VEL, 2*vel_dim_, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
-            B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL),
-                dyn_jac.rightCols(num_contacts_*CONTACT_3DOF);
-            B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
+        std::vector<models::ExternalForce<double>> f_ext;
+        for (int i = 0; i < num_contacts_; i++) {
+            f_ext.emplace_back(contact_frames_[i], force_lin.segment<3>(3*i));
         }
 
-        return {A, B};
+        vectorx_t tau_for_pin(vel_dim_);
+        tau_for_pin << vectorx_t::Zero(FLOATING_VEL), tau_lin;
+
+        vectorx_t a_default = models::ForwardDynamics(model, data, q1_lin, v1_lin, tau_for_pin, f_ext);
+        vectorx_t v2_default = a_default*dt + v1_lin;
+
+        vectorx_t q2_default = pinocchio::integrate(model, q1_lin, dt*v1_lin);
+
+        // ----- Compute FD for q ----- //
+        matrixx_t Jq = matrixx_t::Zero(model_.GetVelDim(), model_.GetVelDim());
+        matrixx_t Jintq = matrixx_t::Zero(model_.GetVelDim(), model_.GetVelDim());
+
+        for (int col = 0; col < Jq.cols(); col++) {
+            vectorx_t dq = vectorx_t::Zero(vel_dim_);
+            dq(col) += FD_DELTA;
+
+            vectorx_t q = models::ConvertdqToq(dq, q1_lin);
+            vectorx_t a = models::ForwardDynamics(model, data, q, v1_lin, tau_for_pin, f_ext);
+            vectorx_t v2 = dt*a + v1_lin;
+
+            vectorx_t q2 = pinocchio::integrate(model, q, dt*v1_lin);
+
+            Jq.col(col) = (v2 - v2_default)/FD_DELTA;
+            Jintq.col(col) = (q2 - q2_default)/FD_DELTA;
+        }
+
+        // ----- Compute FD for v ----- //
+        matrixx_t Jv = matrixx_t::Zero(model_.GetVelDim(), model_.GetVelDim());
+        matrixx_t Jintv = matrixx_t::Zero(model_.GetVelDim(), model_.GetVelDim());
+
+        for (int col = 0; col < Jv.cols(); col++) {
+            vectorx_t dv = vectorx_t::Zero(vel_dim_);
+            dv(col) += FD_DELTA;
+
+            vectorx_t v = v1_lin + dv;
+            vectorx_t a = models::ForwardDynamics(model, data, q1_lin, v, tau_for_pin, f_ext);
+            vectorx_t v2 = dt*a + v;
+
+            vectorx_t q2 = pinocchio::integrate(model, q1_lin, dt*v);
+
+            Jv.col(col) = (v2 - v2_default)/FD_DELTA;
+            Jintv.col(col) = (q2 - q2_default)/FD_DELTA;
+        }
+
+        // ----- Compute FD for tau ----- //
+        matrixx_t Jtau = matrixx_t::Zero(model_.GetVelDim(), tau_dim_);
+
+        for (int col = 0; col < Jtau.cols(); col++) {
+            vectorx_t dtau = vectorx_t::Zero(tau_dim_);
+            dtau(col) += FD_DELTA;
+
+            vectorx_t tau = tau_lin + dtau;
+
+            vectorx_t tau_app(vel_dim_);
+            tau_app << vectorx_t::Zero(FLOATING_VEL), tau;
+
+            vectorx_t a = models::ForwardDynamics(model, data, q1_lin, v1_lin, tau_app, f_ext);
+            vectorx_t v2 = dt*a + v1_lin;
+
+            Jtau.col(col) = (v2 - v2_default)/FD_DELTA;
+        }
+
+        // ----- Compute FD for F ----- //
+        matrixx_t JF = matrixx_t::Zero(model_.GetVelDim(), CONTACT_3DOF*num_contacts_);
+
+        for (int col = 0; col < JF.cols(); col++) {
+            vectorx_t dF = vectorx_t::Zero(CONTACT_3DOF*num_contacts_);
+            dF(col) += FD_DELTA;
+
+
+            vectorx_t F = force_lin + dF;
+
+            std::vector<models::ExternalForce<double>> f_ext_2;
+            for (int i = 0; i < num_contacts_; i++) {
+                f_ext_2.emplace_back(contact_frames_[i], F.segment<3>(3*i));
+            }
+
+            vectorx_t a = models::ForwardDynamics(model, data, q1_lin, v1_lin, tau_for_pin, f_ext_2);
+            vectorx_t v2 = dt*a + v1_lin;
+
+            JF.col(col) = (v2 - v2_default)/FD_DELTA;
+        }
+
+        // ----- Construct mats ----- //
+        if (full_order_) {
+            matrixx_t A = matrixx_t::Zero(2*vel_dim_, 2*vel_dim_);
+            matrixx_t B = matrixx_t::Zero(2*vel_dim_, tau_dim_ + CONTACT_3DOF*num_contacts_);
+
+            A.topLeftCorner(vel_dim_, vel_dim_) = Jintq;
+            A.topRightCorner(vel_dim_, vel_dim_) = Jintv;
+
+            A.bottomLeftCorner(vel_dim_, vel_dim_) = Jq;
+            A.bottomRightCorner(vel_dim_, vel_dim_) = Jv;
+
+            B.bottomLeftCorner(vel_dim_, tau_dim_) = Jtau;
+            B.bottomRightCorner(vel_dim_, CONTACT_3DOF*num_contacts_) = JF;
+
+            return {A, B};
+        } else {
+            // TODO: Check this, I think there still might be an issue
+            matrixx_t A = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, vel_dim_ + FLOATING_VEL);
+            matrixx_t B = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, tau_dim_ + CONTACT_3DOF*num_contacts_);
+
+            A.topLeftCorner(vel_dim_, vel_dim_) = Jintq;
+            A.topRightCorner(vel_dim_, FLOATING_VEL) = Jintv.leftCols<FLOATING_VEL>();
+
+            A.bottomLeftCorner(FLOATING_VEL, vel_dim_) = Jq.topRows<FLOATING_VEL>();
+            A.bottomRightCorner(FLOATING_VEL, FLOATING_VEL) = Jv.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
+
+            B.topLeftCorner(vel_dim_, tau_dim_) = Jintv.rightCols(tau_dim_);
+
+            B.bottomLeftCorner(FLOATING_VEL, tau_dim_) = Jv.topRightCorner(FLOATING_VEL, tau_dim_);
+            B.bottomRightCorner(FLOATING_VEL, CONTACT_3DOF*num_contacts_) = JF.topRows<FLOATING_VEL>();
+
+            return {A, B};
+        }
     }
 
 
@@ -155,7 +286,8 @@ namespace torc::mpc {
     std::pair<matrixx_t, matrixx_t> DynamicsConstraint::GetBoundaryDynamics() {
         matrixx_t B = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, tau_dim_ + CONTACT_3DOF*num_contacts_);
         matrixx_t A = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, 2*vel_dim_);
-        A.topRightCorner(vel_dim_, vel_dim_) = matrixx_t::Identity(vel_dim_, vel_dim_);
+        A.topLeftCorner(vel_dim_, vel_dim_) = matrixx_t::Identity(vel_dim_, vel_dim_);
+
         A.block(vel_dim_, vel_dim_, FLOATING_VEL, FLOATING_VEL)
             = matrixx_t::Identity(FLOATING_VEL, FLOATING_VEL);
 

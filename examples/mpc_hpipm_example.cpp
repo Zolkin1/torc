@@ -2,6 +2,8 @@
 // Created by zolkin on 1/18/25.
 //
 
+#include <torc_timer.h>
+
 #include "DynamicsConstraint.h"
 #include "hpipm_mpc.h"
 
@@ -35,9 +37,9 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, 5);
+        deriv_lib_path, settings.compile_derivs, true, 0, 30);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-        settings.compile_derivs, false, 5, settings.nodes);
+        settings.compile_derivs, false, 30, settings.nodes);
 
     // ---------- Box Constraints ---------- //
     // Config
@@ -117,18 +119,30 @@ int main() {
     mpc.SetFrictionCone(std::move(friction_cone_constraint));
     mpc.SetSwingConstraint(std::move(swing_constraint));
     mpc.SetHolonomicConstraint(std::move(holonomic_constraint));
+    std::cout << "===== MPC Constraints Added =====" << std::endl;
 
     mpc.SetVelTrackingCost(std::move(vel_tracking));
     mpc.SetTauTrackingCost(std::move(tau_tracking));
     mpc.SetForceTrackingCost(std::move(force_tracking));
     mpc.SetConfigTrackingCost(std::move(config_tracking));
 
-    std::cout << "===== MPC Constraints Added =====" << std::endl;
-    mpc.CreateConstraints();
-    mpc.CreateCost();
+    std::cout << "===== MPC Costs Added =====" << std::endl;
+
     Trajectory traj;
     vectorx_t q = g1.GetNeutralConfig();
     q(2) = 0.8;
+
+    vectorx_t v = vectorx_t::Zero(g1.GetVelDim());
+    v(1) = 0.3;
+    mpc.SetVelTarget(v);
+
+    torc::utils::TORCTimer timer;
+    timer.Tic();
+    mpc.CreateConstraints();
+    mpc.CreateCost();
     mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    timer.Toc();
+    std::cout << "total time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+
 }
 
