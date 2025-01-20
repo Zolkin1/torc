@@ -6,6 +6,8 @@
 #include "pinocchio/math/quaternion.hpp"
 #include "trajectory.h"
 
+#include <fstream>
+
 namespace torc::mpc {
     Trajectory::Trajectory()
         : q_(0, 0), v_(0, 0), tau_(0, 0) {}
@@ -281,5 +283,33 @@ namespace torc::mpc {
         return std::nullopt;
     }
 
+    void Trajectory::ExportToCSV(const std::string &file_path) {
+        std::cout << "Writing trajectory to " << file_path << std::endl;
+        std::ofstream csv_file(file_path, std::ios_base::out);
+        for (int node = 0; node < nodes_; node++) {
+            vectorx_t q = q_[node];
+            for (int i = 0; i < q.size(); i++) {
+                csv_file << q[i] << ",";
+            }
+
+            vectorx_t v = v_[node];
+            for (int i = 0; i < v.size(); i++) {
+                csv_file << v[i] << ",";
+            }
+
+            vectorx_t tau = tau_[node];
+            for (int i = 0; i < tau.size(); i++) {
+                csv_file << tau[i] << ",";
+            }
+            for (int frame = 0; frame < num_frames_; frame++) {
+                for (int i = 0; i < 3; i++) {
+                    csv_file << forces_[node][frame][i] << ",";
+                }
+            }
+
+            csv_file << dt_[node] << std::endl;
+        }
+        csv_file.close();
+    }
 
 } //torc::mpc

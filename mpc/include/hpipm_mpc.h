@@ -11,6 +11,7 @@
 #include <filesystem>
 
 #include "BoxConstraint.h"
+#include "ConfigTrackingCost.h"
 #include "hpipm-cpp/hpipm-cpp.hpp"
 #include "full_order_rigid_body.h"
 #include "trajectory.h"
@@ -18,8 +19,10 @@
 #include "DynamicsConstraint.h"
 #include "FrictionConeConstraint.h"
 #include "HolonomicConstraint.h"
+#include "LinearLsCost.h"
 
 #include "MpcSettings.h"
+#include "NonlinearLsCost.h"
 #include "SwingConstraint.h"
 #include "StateInputConstraint.h"
 
@@ -28,6 +31,7 @@ namespace torc::mpc {
 
     using vectorx_t = Eigen::VectorXd;
     using vector2_t = Eigen::Vector2d;
+    using vector3_t = Eigen::Vector3d;
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3x_t = Eigen::Matrix3Xd;
@@ -51,10 +55,15 @@ namespace torc::mpc {
         void SetSwingConstraint(SwingConstraint constraints);
         void SetHolonomicConstraint(HolonomicConstraint constraints);
 
+        void SetVelTrackingCost(LinearLsCost cost);
+        void SetTauTrackingCost(LinearLsCost cost);
+        void SetForceTrackingCost(LinearLsCost cost);
+        void SetConfigTrackingCost(ConfigTrackingCost cost);
+
         void CreateConstraints();
         void CreateCost();
 
-        void Compute(const vectorx_t& q0, const vectorx_t& v0);
+        void Compute(const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
 
         void UpdateSetttings(MpcSettings settings);
     protected:
@@ -68,6 +77,12 @@ namespace torc::mpc {
 
         void ConvertQpSolToTraj();
 
+        // TODO: Make these const refs
+        vectorx_t GetVelocityTarget(int node) const;
+        vectorx_t GetTauTarget(int node) const;
+        vectorx_t GetForceTarget(int node, int force_idx) const;
+        vectorx_t GetConfigTarget(int node) const;
+
     private:
         void SetSizes();
 
@@ -76,6 +91,8 @@ namespace torc::mpc {
         std::vector<Constraint> constraints;
         MpcSettings settings_;
 
+
+        // --------- Constraints --------- //
         std::vector<DynamicsConstraint> dynamics_constraints_;
         std::unique_ptr<BoxConstraint> config_box_;
         std::unique_ptr<BoxConstraint> vel_box_;
@@ -90,6 +107,18 @@ namespace torc::mpc {
         std::unique_ptr<SwingConstraint> polytope_;
 
         std::unique_ptr<SwingConstraint> collision_;
+
+        // --------- Cost --------- //
+        std::unique_ptr<ConfigTrackingCost> config_tracking_;
+        std::unique_ptr<LinearLsCost> vel_tracking_;
+        std::unique_ptr<LinearLsCost> tau_tracking_;
+        std::unique_ptr<LinearLsCost> force_tracking_;
+
+        // TODO: Consider allowing this to vary by node
+        vectorx_t v_target_;
+        vectorx_t q_target_;
+        vectorx_t tau_target_;
+        std::vector<vector3_t> force_target_;
 
         // Solver
         std::vector<hpipm::OcpQp> qp;
@@ -116,7 +145,8 @@ namespace torc::mpc {
 
         static constexpr int CONTACT_3DOF = 3;
 
-        bool first_solve_;
+        bool first_constraint_gen_;
+        bool first_cost_gen_;
     };
 }
 

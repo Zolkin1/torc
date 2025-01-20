@@ -50,9 +50,7 @@ namespace torc::mpc {
 
         void SetDefault(const vectorx_t& q_default);
 
-//        void Reset();
-
-        // TODO: Add interpolation function
+        void ExportToCSV(const std::string& file_path);
 
     protected:
     private:

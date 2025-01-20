@@ -86,7 +86,7 @@ namespace torc::mpc {
             B.setZero();
 
             // TODO: Check to be sure this is grabbing the block I want
-            std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
+            // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
             matrixx_t dv2_inv = dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL).inverse();
 
             A.topRightCorner<FLOATING_VEL, FLOATING_VEL>() =

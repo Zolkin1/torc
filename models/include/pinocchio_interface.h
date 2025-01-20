@@ -22,8 +22,8 @@ namespace torc::models {
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& q) {
 
         if (dq.size() != q.size() - 1) {
-            std::cerr << "dq size: " << dq.size() << std::endl;
-            throw std::runtime_error("dq size is incorrect!");
+            std::cerr << "dq size: " << dq.size() << ", q size: " << q.size() << std::endl;
+            throw std::runtime_error("dq and q are incompatible!");
         }
 
         Eigen::Vector<ScalarT, Eigen::Dynamic> q_out(q.size());

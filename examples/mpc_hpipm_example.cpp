@@ -25,7 +25,9 @@ int main() {
     deriv_lib_path = deriv_lib_path / "deriv_libs";
 
     std::vector<std::string> contact_frames = {"left_toe", "left_heel", "right_toe", "right_heel"};
-
+    // --------------------------------- //
+    // ---------- Constraints ---------- //
+    // --------------------------------- //
     // ---------- Dynamics ---------- //
     std::vector<DynamicsConstraint> dynamics_constraints;
     // dynamics_constraints.emplace_back(DynamicsConstraint(g1, contact_frames, "g1_full_order",
@@ -73,7 +75,8 @@ int main() {
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Swing Constraints ---------- //
-    SwingConstraint swing_constraint(1, settings.nodes, "swing_constraint", g1, contact_frames,
+    // TODO: Move the first node back
+    SwingConstraint swing_constraint(10, settings.nodes, "swing_constraint", g1, contact_frames,
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
@@ -81,6 +84,28 @@ int main() {
         settings.deriv_lib_path, settings.compile_derivs);
 
     std::cout << "===== Constraints Created =====" << std::endl;
+
+    // --------------------------------- //
+    // ------------- Costs ------------- //
+    // --------------------------------- //
+    // ---------- Velocity Tracking ---------- //
+    // TODO: Confirm I am giving the correct weight!
+    std::cout << settings.cost_data.at(1).weight.transpose() << std::endl;
+    LinearLsCost vel_tracking(0, settings.nodes, "vel_tracking", settings.cost_data.at(1).weight,
+        settings.deriv_lib_path, settings.compile_derivs);
+
+    // ---------- Tau Tracking ---------- //
+    LinearLsCost tau_tracking(0, settings.nodes, "tau_tracking", settings.cost_data.at(2).weight,
+        settings.deriv_lib_path, settings.compile_derivs);
+
+    // ---------- Force Tracking ---------- //
+    LinearLsCost force_tracking(0, settings.nodes, "force_tracking", settings.cost_data.at(3).weight,
+        settings.deriv_lib_path, settings.compile_derivs);
+
+    // ---------- Config Tracking ---------- //
+    std::cerr << "weights size: " << settings.cost_data.at(0).weight.size() << std::endl;
+    ConfigTrackingCost config_tracking(0, settings.nodes, "config_tracking", settings.cost_data.at(0).weight,
+        settings.deriv_lib_path, settings.compile_derivs, g1);
 
     HpipmMpc mpc(settings, g1);
 
@@ -93,9 +118,17 @@ int main() {
     mpc.SetSwingConstraint(std::move(swing_constraint));
     mpc.SetHolonomicConstraint(std::move(holonomic_constraint));
 
+    mpc.SetVelTrackingCost(std::move(vel_tracking));
+    mpc.SetTauTrackingCost(std::move(tau_tracking));
+    mpc.SetForceTrackingCost(std::move(force_tracking));
+    mpc.SetConfigTrackingCost(std::move(config_tracking));
+
     std::cout << "===== MPC Constraints Added =====" << std::endl;
     mpc.CreateConstraints();
     mpc.CreateCost();
-    mpc.Compute(g1.GetNeutralConfig(), vectorx_t::Zero(g1.GetVelDim()));
+    Trajectory traj;
+    vectorx_t q = g1.GetNeutralConfig();
+    q(2) = 0.8;
+    mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
 }
 
