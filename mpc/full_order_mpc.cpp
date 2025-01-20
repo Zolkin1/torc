@@ -34,9 +34,9 @@ namespace torc::mpc {
         }
 
         if (joint_skip_names_.empty()) {
-            robot_model_ = std::make_unique<models::FullOrderRigidBody>("mpc_robot", model_path);
+            robot_model_ = std::make_shared<models::FullOrderRigidBody>("mpc_robot", model_path);
         } else {
-            robot_model_ = std::make_unique<models::FullOrderRigidBody>("mpc_robot", model_path, joint_skip_names_, joint_skip_values_);
+            robot_model_ = std::make_shared<models::FullOrderRigidBody>("mpc_robot", model_path, joint_skip_names_, joint_skip_values_);
         }
 
         vel_dim_ = robot_model_->GetVelDim();
@@ -53,6 +53,10 @@ namespace torc::mpc {
         traj_.UpdateSizes(robot_model_->GetConfigDim(), robot_model_->GetVelDim(),
                           robot_model_->GetNumInputs(), contact_frames_, nodes_);
         traj_.SetDtVector(dt_);
+
+        // Create the reference generator
+        reference_generator_ = std::make_unique<ReferenceGenerator>(nodes_, config_dim_, vel_dim_, contact_frames_,
+            dt_, robot_model_, polytope_delta_);
 
         // ---------- Create the ad functions ---------- //
         integration_constraint_ = std::make_unique<ad::CppADInterface>(
@@ -81,6 +85,15 @@ namespace torc::mpc {
                ad::DerivativeOrder::FirstOrder, vel_dim_,  config_dim_ + 1,
                compile_derivatves_
             ));
+
+            foot_polytope_constraint_.emplace(frame,
+            std::make_unique<ad::CppADInterface>(
+            std::bind(&FullOrderMpc::FootPolytopeConstraint, this, frame, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
+            name_ + "_" + frame + "_foot_polytope_constraint",
+            deriv_lib_path_,
+            ad::DerivativeOrder::FirstOrder, vel_dim_,  config_dim_ + POLYTOPE_SIZE + POLYTOPE_SIZE,
+            compile_derivatves_  //TODO: Put back
+            ));
         }
 
         inverse_dynamics_constraint_ = std::make_unique<ad::CppADInterface>(
@@ -100,8 +113,28 @@ namespace torc::mpc {
             compile_derivatves_
         );
 
+        // Init polytope
+        matrixx_t A_temp = matrixx_t::Identity(2, 2);
+        vector4_t b_temp = vector4_t::Zero();
+        b_temp << 10, 10, -10, -10;
+        std::vector<matrixx_t> A_vec(nodes_);
+        std::vector<vectorx_t> b_vec(nodes_);
+        for (int i = 0; i < nodes_; i++) {
+            A_vec[i] = A_temp;
+            b_vec[i] = b_temp;   // Default box size
+        }
+
+        for (const auto& frame : contact_frames_) {
+            foot_polytope_.insert(std::pair<std::string, std::vector<matrixx_t>>(frame, A_vec));
+            ub_lb_polytope.insert(std::pair<std::string, std::vector<vectorx_t>>(frame, b_vec));
+        }
+
         q_target_.SetSizes(robot_model_->GetConfigDim(), nodes_);
         v_target_.SetSizes(robot_model_->GetVelDim(), nodes_);
+
+        // TODO: Make not hard coded
+        mu_ = 1.3;
+        delta_ = 0.02;
     }
 
     FullOrderMpc::~FullOrderMpc() {
@@ -140,7 +173,7 @@ namespace torc::mpc {
 
             int node_type = 0;
             if (general_settings["node_dt_type"]) {
-                if (general_settings["node_dt_type"].as<std::string>() == "SmallFirst") {
+                if (general_settings["node_dt_type"].as<std::string>() == "two_groups") {
                     node_type = 1;
                 } else if (general_settings["node_dt_type"].as<std::string>() == "Adaptive") {
                     throw std::runtime_error("Adaptive node dt not implemented yet!");
@@ -161,19 +194,23 @@ namespace torc::mpc {
                     throw std::runtime_error("Node dt not specified!");
                 }
             } else if (node_type == 1) {
-                if (general_settings["node_dt"]) {
-                    const auto dt = general_settings["node_dt"].as<double>();
+                if (general_settings["node_group_1_n"] && general_settings["node_group_2_n"]
+                        && general_settings["node_dt_1"] && general_settings["node_dt_2"]) {
                     dt_.resize(nodes_);
-                    for (double & it : dt_) {
-                        it = dt;
+
+                    if (general_settings["node_group_1_n"].as<int>() + general_settings["node_group_2_n"].as<int>() != nodes_) {
+                        throw std::runtime_error("Node groups don't sum to the nodes!");
+                    }
+
+                    for (int i = 0; i < general_settings["node_group_1_n"].as<int>(); i++) {
+                        dt_[i] = general_settings["node_dt_1"].as<double>();
+                    }
+
+                    for (int i = general_settings["node_group_1_n"].as<int>(); i < general_settings["node_group_2_n"].as<int>() + general_settings["node_group_1_n"].as<int>(); i++) {
+                        dt_[i] = general_settings["node_dt_2"].as<double>();
                     }
                 } else {
-                    throw std::runtime_error("Node dt not specified!");
-                }
-                if (general_settings["first_node_dt"]) {
-                    dt_[0] = general_settings["first_node_dt"].as<double>();
-                } else {
-                    throw std::runtime_error("You selected node dt type as 'SmallFirst' but did not provide a first node dt!");
+                    throw std::runtime_error("Node group 1 or 2 n not specified or the dt's are not specified!");
                 }
             }
 
@@ -266,7 +303,8 @@ namespace torc::mpc {
         friction_coef_ = constraint_settings["friction_coef"].as<double>();
         max_grf_ = constraint_settings["max_grf"].as<double>();
         friction_margin_ = (constraint_settings["friction_margin"] ? constraint_settings["friction_margin"].as<double>() : 0.05);
-
+        polytope_delta_ = (constraint_settings["polytope_delta"] ? constraint_settings["polytope_delta"].as<double>() : 0.0);
+        polytope_shrinking_rad_ = (constraint_settings["polytope_shrinking_rad"] ? constraint_settings["polytope_shrinking_rad"].as<double>() : 0.4);
         ParseCollisionYaml(constraint_settings["collisions"]);
 
         // ---------- Cost Settings ---------- //
@@ -355,6 +393,8 @@ namespace torc::mpc {
             std::cout << "\tFriction coefficient: " << friction_coef_ << std::endl;
             std::cout << "\tFriction margin: " << friction_margin_ << std::endl;
             std::cout << "\tMaximum ground reaction force: " << max_grf_ << std::endl;
+            std::cout << "\tPolytope delta: " << polytope_delta_ << std::endl;
+            std::cout << "\tPolytope shrinking rad: " << polytope_shrinking_rad_ << std::endl;
 
             std::cout << "Costs:" << std::endl;
             for (const auto& data : cost_data_) {
@@ -446,6 +486,8 @@ namespace torc::mpc {
 
         // Create A sparsity pattern to configure OSQP with
         CreateConstraintSparsityPattern();
+        std::cout << "nnz(A): " << constraint_triplets_.size() << std::endl;
+        std::cout << "sparsity factor: " << static_cast<double>(constraint_triplets_.size()) / static_cast<double>(GetNumConstraints() * GetNumDecisionVars()) << std::endl;
 
         // Copy into constraints, which is what will be updated throughout the code
         // FromTriplets destroys the object, and osqp-cpp uses a reference to osqp_instance_, so we can't destroy it.
@@ -484,15 +526,42 @@ namespace torc::mpc {
 
     void FullOrderMpc::UpdateContactSchedule(const ContactSchedule& contact_schedule) {
         // Convert the contact schedule into the binary digits I need
-        for (auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
+        vector4_t polytope_delta;
+        polytope_delta << polytope_delta_, polytope_delta_, -polytope_delta_, -polytope_delta_;
+        // std::cerr << "POLYTOPE DELTA: " << polytope_delta.transpose() << std::endl;
+
+        vector4_t polytope_convergence_scalar;
+        polytope_convergence_scalar << 1, 1, -1, -1;
+
+        for (const auto& [frame, schedule] : contact_schedule.GetScheduleMap()) {
             if (in_contact_.contains(frame)) {
+
+                const auto& polytopes = contact_schedule.GetPolytopes(frame);
+
                 // Break the continuous time contact schedule into each node
                 double time = 0;
+                int contact_idx = 0;
                 for (int node = 0; node < nodes_; node++) {
                     if (contact_schedule.InContact(frame, time)) {
                         in_contact_[frame][node] = 1;
+
+                        contact_idx = contact_schedule.GetContactIndex(frame, time);
+                        // TODO: Put back - solve issue with feet dragging to another polytope!
+                        // foot_polytope_[frame][node] = polytopes[contact_idx].A_;
+                        // ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta;
+                        foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                        ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
                     } else {
                         in_contact_[frame][node] = 0;
+                        if (contact_idx + 1 < polytopes.size()) {
+                            foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                            ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+                            // foot_polytope_[frame][node] = polytopes[contact_idx].A_;
+                            // ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
+                        } else {
+                            foot_polytope_[frame][node] = contact_schedule.GetDefaultContactInfo().A_;
+                            ub_lb_polytope[frame][node] = contact_schedule.GetDefaultContactInfo().b_;
+                        }
                     }
                     time += dt_[node];
                 }
@@ -502,6 +571,17 @@ namespace torc::mpc {
         }
 
     }
+
+    double FullOrderMpc::GetPolytopeConvergence(const std::string &frame, double time, const ContactSchedule &cs) const {
+        // Compute time left until the next contact
+        double swing_dur = cs.GetSwingDuration(frame, time);
+        double start_time = cs.GetSwingStartTime(frame, time);
+        double lambda = 1 - ((time - start_time) / swing_dur);
+
+        // Multiply range by a positive number
+        return lambda*polytope_shrinking_rad_;
+    }
+
 
     void FullOrderMpc::UpdateContactScheduleAndSwingTraj(const ContactSchedule& contact_schedule, double apex_height,
             std::vector<double> end_height, double apex_time) {
@@ -518,7 +598,7 @@ namespace torc::mpc {
         }
     }
 
-    void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time) {
+    void FullOrderMpc::Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out) {
         utils::TORCTimer compute_timer;
         compute_timer.Tic();
 
@@ -577,27 +657,36 @@ namespace torc::mpc {
          // std::cout << "objective vec: " << osqp_instance_.objective_vector.transpose() << std::endl;
          // std::cout << "A: \n" << A_ << std::endl;
 
+        // Scaling seems to take a non-trivial amount of time here.
+
+        utils::TORCTimer update_mats_timer;
         // Set upper and lower bounds
+        // This was getting inconsistent with using numeric limit bounds that change with contacts
+        update_mats_timer.Tic();
         auto status = osqp_solver_.SetBounds(osqp_instance_.lower_bounds, osqp_instance_.upper_bounds);
         if (!status.ok()) {
             std::cerr << "status: " << status << std::endl;
             throw std::runtime_error("Could not update the constraint bounds.");
         }
 
-         // Set matrices
+        // This is the most time-consuming operation in the MPC solve.
+        // This is where the numeric matrix factorization takes place.
+        // Set matrices
         status = osqp_solver_.UpdateObjectiveAndConstraintMatrices(objective_mat_, A_);
          if (!status.ok()) {
              std::cerr << "status: " << status << std::endl;
              throw std::runtime_error("Could not update the objective and constraint matrix.");
          }
 
-         // Set objective vector
-         status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
-         if (!status.ok()) {
-             std::cerr << "status: " << status << std::endl;
-             throw std::runtime_error("Could not update the objective vector.");
-         }
+        // This update takes almost no time!
+        // Set objective vector
+        status = osqp_solver_.SetObjectiveVector(osqp_instance_.objective_vector);
+        if (!status.ok()) {
+            std::cerr << "status: " << status << std::endl;
+            throw std::runtime_error("Could not update the objective vector.");
+        }
 
+        // This update takes almost no time!
         // Set the warmstart to 0 -- appears to be very important
         status = osqp_solver_.SetWarmStart(vectorx_t::Zero(GetNumDecisionVars()),
             vectorx_t::Zero(GetNumConstraints()));
@@ -605,9 +694,13 @@ namespace torc::mpc {
             std::cerr << "status: " << status << std::endl;
             throw std::runtime_error("Could not update the warmstart.");
         }
+        update_mats_timer.Toc();
 
+        utils::TORCTimer solve_timer;
+        solve_timer.Tic();
         // Solve
         auto solve_status = osqp_solver_.Solve();
+        solve_timer.Toc();
 
         if (solve_status == osqp::OsqpExitCode::kPrimalInfeasible || solve_status == osqp::OsqpExitCode::kPrimalInfeasibleInaccurate) {
             std::cerr << "Bad solve!" << std::endl;
@@ -660,7 +753,18 @@ namespace torc::mpc {
              constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              cost_timer.Duration<std::chrono::microseconds>().count()/1000.0,
              ls_timer.Duration<std::chrono::microseconds>().count()/1000.0,
-             ls_condition_, constraint_ls);
+             ls_condition_, constraint_ls,
+             update_mats_timer.Duration<std::chrono::microseconds>().count()/1000.0,
+             solve_timer.Duration<std::chrono::microseconds>().count()/1000.0);
+
+        // std::cout << "Update timer: " << update_mats_timer.Duration<std::chrono::microseconds>().count()/1000.0 << std::endl;
+
+        // TODO: Why does the quad MPC not just pass out the target when there are no other constraints?
+        // TODO: Remove
+        // for (int node = 0; node < q_target_.GetNumNodes(); ++node) {
+        //     traj_out.SetConfiguration(node, q_target_[node]);
+        //     traj_out.SetVelocity(node, v_target_[node]);
+        // }
 
         traj_ = traj_out;
 
@@ -717,138 +821,18 @@ namespace torc::mpc {
     }
 
     // TODO: Consider moving this to a different class along with the swing trajectory generation
-    void FullOrderMpc::GenerateCostReference(const vectorx_t& q, const vectorx_t& v, const vector3_t& vel) {
-        if (hip_offsets_.empty()) {
-            throw std::runtime_error("No hip joint provided in the config file! Cannot generate the cost reference!");
-        }
+    void FullOrderMpc::GenerateCostReference(const vectorx_t& q_current, const vectorx_t& v_current, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target,
+        const ContactSchedule& contact_schedule) {
+        utils::TORCTimer timer;
+        timer.Tic();
+        // Note this is clocking in at about 0.55-0.6ms when walking around
+        auto [qt, vt] = reference_generator_->GenerateReference(q_current, v_current, q_target, v_target,
+            swing_traj_, hip_offsets_, contact_schedule, des_foot_pos_);
 
-        for (int node = 0; node < nodes_; node++) {
-            // Integrate the velocity forward to get the planar positions
-            q_target_[node](0) = node*dt_[node]*vel(0) + q(0);
-            q_target_[node](1) = node*dt_[node]*vel(1) + q(1);
-            q_target_[node](2) = q(2);
-            // TODO: Determine the quaternion targets from the commanded velocity, for now ignoring
-            q_target_[node].segment<3>(POS_VARS).setZero();
-            q_target_[node](6) = 1;
-
-            // Assign velocity targets
-            v_target_[node](0) = vel(0);
-            v_target_[node](1) = vel(1);
-            v_target_[node](2) = 0;
-            // TODO: Determine the quaternion velocity from the commanded velocity, for now setting to 0
-            v_target_[node].segment<3>(POS_VARS).setZero();
-            v_target_[node].tail(robot_model_->GetVelDim() - FLOATING_VEL).setZero();
-        }
-
-        // Compute foothold positions
-        std::map<std::string, std::vector<vector3_t>> positions;
-        int frame_idx = 0;
-        for (const auto& frame : contact_frames_) {
-            positions[frame] = std::vector<vector3_t>(nodes_);
-
-            vector2_t foothold = vector2_t::Zero();
-            bool first_contact = false;
-
-            for (int node = 0; node < nodes_; node++) {
-                if (in_contact_[frame][node]) {
-                    if (node == 0 && in_contact_[frame][node]) {
-                        // Foothold is where we currently are
-                        robot_model_->FirstOrderFK(q);
-                        foothold = robot_model_->GetFrameState(frame).placement.translation().head<2>();
-                        first_contact = true;
-                    } else if (node > 0 && (!in_contact_[frame][node-1] && in_contact_[frame][node])) {
-                        // Compute the middle node of the contact
-                        int contact_count = 0;
-                        while (contact_count < nodes_ && in_contact_[frame][node + contact_count]) {
-                            contact_count++;
-                        }
-
-                        // Flooring division, could be ceil
-                        int contact_middle = std::floor(contact_count / 2);
-                        int contact_node_middle = node + contact_middle;
-
-                        // Compute x,y reference given this node
-                        vector2_t hip_offset;
-                        hip_offset << hip_offsets_[2*frame_idx], hip_offsets_[2*frame_idx + 1];
-                        // std::cout << "frame: " << frame << ", hip offset: " << hip_offset << std::endl;
-
-                        foothold = hip_offset + q_target_[contact_node_middle].head<2>();
-
-                        if (!first_contact) {
-                            first_contact = true;
-                            vector2_t raibert_offset;
-                            raibert_offset << std::sqrt(q(2)/9.81)*(v(0) - vel(0)),
-                                              std::sqrt(q(2)/9.81)*(v(1) - vel(1));
-                            foothold = foothold + raibert_offset;
-                        }
-
-                        // std::cout << "frame: " << frame << ", foothold: " << foothold.transpose() << std::endl;
-                    }
-
-                    positions[frame][node] << foothold(0), foothold(1), swing_traj_[frame][node];
-                }
-            }
-            frame_idx++;
-        }
-
-        robot_model_->FirstOrderFK(q);
-        frame_idx = 0;
-        for (const auto& frame : contact_frames_) {
-            vector2_t prev_foothold = robot_model_->GetFrameState(frame).placement.translation().head<2>();
-            vector2_t next_foothold = robot_model_->GetFrameState(frame).placement.translation().head<2>();
-            // std::cout << "Frame: " << frame << std::endl;
-            int swing_start = 0;
-            int swing_end = 0;
-            for (int node = 0; node < nodes_; node++) {
-                // Linear interpolation between footholds
-                if ((node == 0 && !in_contact_[frame][node]) || (node > 0 && (!in_contact_[frame][node] && in_contact_[frame][node-1]))) {
-                    swing_start = node;
-                }
-
-                if (swing_start == node) {
-                    swing_end = swing_start;
-                    while (swing_end < nodes_ && !in_contact_[frame][swing_end]) {
-                        swing_end++;
-                    }
-
-                    if (swing_end == nodes_) {
-                        swing_end += 5; // TODO: Deal with this better, for now just extending it a bit
-                        // TODO: Consider changing how this next foothold is computed
-                        next_foothold = prev_foothold + dt_[1]*(swing_end - swing_start)*vel.head<2>();
-                    } else {
-                        next_foothold = positions[frame][swing_end].head<2>();
-                    }
-                }
-
-                if (!in_contact_[frame][node]) {
-                    vector2_t swing_location = prev_foothold + (next_foothold - prev_foothold)*(static_cast<double>(node - swing_start)/static_cast<double>(swing_end - swing_start));
-                    positions[frame][node] << swing_location(0), swing_location(1), swing_traj_[frame][node];
-                } else {
-                    prev_foothold = positions[frame][node].head<2>();
-                }
-            }
-            frame_idx++;
-        }
-
-        // TODO: Do I want this?
-        q_target_[0] = q;
-        for (int node = 1; node < nodes_; node++) {
-            std::vector<vector3_t> end_effectors(contact_frames_.size());
-            for (int i = 0; i < contact_frames_.size(); i++) {
-                end_effectors[i] = positions[contact_frames_[i]][node];
-                // std::cout << "node: " << node << ", target: " << positions[contact_frames_[i]][node].transpose() << std::endl;
-            }
-            // IK for joint targets
-            // q_target_.value()[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
-            //     robot_model_->InverseKinematics(q_target_.value()[node].head<FLOATING_BASE>(),
-            //         end_effectors, frames, traj_.GetConfiguration(node)).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
-
-
-            q_target_[node].tail(robot_model_->GetConfigDim() - FLOATING_BASE) =
-                robot_model_->InverseKinematics(q_target_[node].head<FLOATING_BASE>(),
-                    end_effectors, contact_frames_, q_target_[node-1]).tail(robot_model_->GetConfigDim() - FLOATING_BASE);
-        }
-
+        timer.Toc();
+        // std::cout << "Reference gen took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
+        q_target_ = qt;
+        v_target_ = vt;
     }
 
     SimpleTrajectory FullOrderMpc::GetConfigTargets() {
@@ -926,6 +910,8 @@ namespace torc::mpc {
                 AddSwingHeightConstraint(node);
 
                 AddCollisionConstraint(node);
+
+                AddFootPolytopeConstraint(node);
             }
         }
 
@@ -986,8 +972,8 @@ namespace torc::mpc {
         const ad::ad_vector_t& qkbar = qk_vk.head(config_dim_);
         const ad::ad_vector_t& vkbar = qk_vk.tail(vel_dim_);
 
-        ad::ad_vector_t q = torc::models::ConvertdqToq(dq, qkbar);
-        ad::ad_vector_t v = vkbar + dv;
+        const ad::ad_vector_t q = torc::models::ConvertdqToq(dq, qkbar);
+        const ad::ad_vector_t v = vkbar + dv;
 
         // forward kinematics
         pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q, v);
@@ -1094,6 +1080,43 @@ namespace torc::mpc {
         violation.resize(1);
         violation(0) = friction_coef_*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
     }
+
+    void FullOrderMpc::FootPolytopeConstraint(const std::string& frame, const ad::ad_vector_t& dqk,
+        const ad::ad_vector_t& qk_A_b, ad::ad_vector_t& violation) const {
+
+        const ad::ad_vector_t& qkbar = qk_A_b.head(config_dim_);
+        ad::ad_matrix_t A = ad::ad_matrix_t::Zero(POLYTOPE_SIZE, 2);
+        // ad::ad_matrix_t A = ad::ad_matrix_t::Identity(POLYTOPE_SIZE, 2);
+
+        for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+            A.row(i) = qk_A_b.segment<2>(config_dim_ + i*2).transpose();
+        }
+
+        A.bottomRows<POLYTOPE_SIZE/2>() = -A.topRows<POLYTOPE_SIZE/2>();
+
+        ad::ad_vector_t b = qk_A_b.tail<POLYTOPE_SIZE>();        // ub then lb
+        b.tail<POLYTOPE_SIZE/2>() = -b.tail<POLYTOPE_SIZE/2>();
+
+        const ad::ad_vector_t q = torc::models::ConvertdqToq(dqk, qkbar);
+
+        // Forward kinematics
+        pinocchio::forwardKinematics(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), q);
+        const long frame_idx = robot_model_->GetFrameIdx(frame);
+        pinocchio::updateFramePlacement(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx);
+
+        // Get frame position in world frame (data oMf)
+        ad::ad_vector_t frame_pos = robot_model_->GetADPinData()->oMf.at(frame_idx).translation();
+
+        violation.resize(POLYTOPE_SIZE);
+        violation = A*frame_pos.head<2>() - b;
+        // violation << frame_pos.head<2>(), -frame_pos.head<2>();
+        // violation = violation - b;
+
+        // vector2_t x_temp;
+        // x_temp << 1, 1;
+        // violation = A*x_temp - b;
+    }
+
 
     void FullOrderMpc::AddIntegrationConstraint(int node) {
         assert(node != nodes_ - 1);
@@ -1243,12 +1266,12 @@ namespace torc::mpc {
             vectorx_t y;
             friction_cone_constraint_->GetFunctionValue(x_zero, p, y);
             osqp_instance_.lower_bounds(row_start) = -in_contact_[frame][node]*y(0);
-            osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*std::numeric_limits<double>::max();
+            // osqp_instance_.upper_bounds(row_start) = in_contact_[frame][node]*std::numeric_limits<double>::max();
+            osqp_instance_.upper_bounds(row_start) = std::numeric_limits<double>::max();
 
             row_start += friction_cone_constraint_->GetRangeSize();
             col_start += CONTACT_3DOF;
 
-            // TODO: I think I can remove this
             // ----- Z Force Bounds ----- //
             // DiagonalScalarMatrixToTriplet(in_contact_[frame][node]*1, row_start, col_start - 1, 1,
             //     constraint_triplets_, constraint_triplet_idx_);
@@ -1413,6 +1436,81 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::AddFootPolytopeConstraint(int node) {
+        int row_start = GetConstraintRow(node, FootPolytope);
+        int col_start = GetDecisionIdx(node, Configuration);
+
+        // TODO: Double check all of this
+        // TODO: Might be able to get away with only enforcing this on one contact per foot (only if needed)
+        for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+            matrixx_t jac;
+            vectorx_t x_zero = vectorx_t::Zero(constraint->GetDomainSize());
+            vectorx_t p(constraint->GetParameterSize());
+            // std::cout << "A row 0: " << foot_polytope_[frame][node].row(0) << std::endl;
+            // std::cout << "A row 1: " << foot_polytope_[frame][node].row(1) << std::endl;
+            // std::cout << "b: " << ub_lb_polytope[frame][node].transpose() << std::endl;
+            p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
+
+            const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
+            torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                sparsity_head[i] = sparsity[i];
+            }
+
+            // TODO: For now the way it is programmed the polytope must be in the x-y plane. Expand to support the polytope on different planes.
+            constraint->GetJacobian(x_zero, p, jac);
+            // Only need to put the top POLYTOPE_SIZE/2 rows into the matrix because the bottom rows are covered by the double-sided constraints
+            MatrixToTripletWithSparsitySet(jac.topRows<POLYTOPE_SIZE/2>(), row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity_head);
+
+            // Bounds
+            vectorx_t y;
+            constraint->GetFunctionValue(x_zero, p, y);
+            // std::cout << "y: " << y.transpose() << std::endl;
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                // osqp_instance_.upper_bounds(row_start + i) = std::max(y(i), -y(i + POLYTOPE_SIZE/2));
+                // osqp_instance_.lower_bounds(row_start + i) = std::min(y(i), -y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.upper_bounds(row_start + i) = std::max(-y(i), y(i + POLYTOPE_SIZE/2));
+                osqp_instance_.lower_bounds(row_start + i) = std::min(-y(i), y(i + POLYTOPE_SIZE/2));
+            }
+
+            // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+            // std::cout << frame << " position: " << robot_model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
+            // std::cout << "y: " << y.transpose() << std::endl;
+
+            row_start += POLYTOPE_SIZE/2;
+        }
+
+        // for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+        //     matrixx_t jac;
+        //     vectorx_t x_zero = vectorx_t::Zero(constraint->GetDomainSize());
+        //     vectorx_t p(constraint->GetParameterSize());
+        //     // std::cout << "A row 0: " << foot_polytope_[frame][node].row(0) << std::endl;
+        //     // std::cout << "A row 1: " << foot_polytope_[frame][node].row(1) << std::endl;
+        //     // std::cout << "b: " << ub_lb_polytope[frame][node].transpose() << std::endl;
+        //     p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(), foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
+        //
+        //     const auto& sparsity = constraint->GetJacobianSparsityPatternSet();
+        //
+        //     // TODO: For now the way it is programmed the polytope must be in the x-y plane. Expand to support the polytope on different planes.
+        //     constraint->GetJacobian(x_zero, p, jac);
+        //     // Only need to put the top POLYTOPE_SIZE/2 rows into the matrix because the bottom rows are covered by the double-sided constraints
+        //     MatrixToTripletWithSparsitySet(jac, row_start, col_start, constraint_triplets_, constraint_triplet_idx_, sparsity);
+        //
+        //     // Bounds
+        //     vectorx_t y;
+        //     constraint->GetFunctionValue(x_zero, p, y);
+        //     for (int i = 0; i < POLYTOPE_SIZE; i++) {
+        //         osqp_instance_.upper_bounds(row_start + i) = -y(i);
+        //         osqp_instance_.lower_bounds(row_start + i) = -10000;
+        //     }
+        //
+        //     // robot_model_->FirstOrderFK(traj_.GetConfiguration(node));
+        //     // std::cout << frame << " position: " << robot_model_->GetFrameState(frame).placement.translation().transpose() << std::endl;
+        //     // std::cout << "y: " << y.transpose() << std::endl;
+        //
+        //     row_start += POLYTOPE_SIZE;
+        // }
+    }
 
     // -------------------------------------- //
     // -------- Constraint Violation -------- //
@@ -1445,12 +1543,22 @@ namespace torc::mpc {
                 // Velocity is fixed for the initial condition, do not constrain it
                 // std::cout << "Holonomic violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetHolonomicViolation(qp_res, node);
+                // std::cout << "Holonomic constraint violation: " << GetHolonomicViolation(qp_res, node) << std::endl;
                 violation += GetVelocityBoxViolation(qp_res, node);
 
                 violation += GetConfigurationBoxViolation(qp_res, node);
                 violation += GetSwingHeightViolation(qp_res, node);
 
                 violation += GetCollisionViolation(qp_res, node);
+
+                violation += GetFootPolytopeViolation(qp_res, node);
+                // double fvio = GetFootPolytopeViolation(qp_res, node);
+                // if (fvio > 0.001) {
+                //     std::cout << "Foot polytope constraint violation: " << fvio << std::endl;
+                // }
+                // if (fvio > 100) {
+                //     throw std::runtime_error("Foot polytope violation exceeded max bounds!");
+                // }
             }
         }
 
@@ -1650,7 +1758,6 @@ namespace torc::mpc {
         return violation;
     }
 
-
     double FullOrderMpc::GetSwingHeightViolation(const vectorx_t &qp_res, int node) {
         double violation = 0;
         for (const auto& frame : contact_frames_) {
@@ -1670,6 +1777,34 @@ namespace torc::mpc {
         return violation;
     }
 
+    double FullOrderMpc::GetFootPolytopeViolation(const vectorx_t& qp_res, int node) {
+        double violation = 0;
+
+        for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+            vectorx_t x(constraint->GetDomainSize());
+            vectorx_t p(constraint->GetParameterSize());
+            vectorx_t y;
+
+            const vectorx_t& dqk = qp_res.segment(GetDecisionIdx(node, Configuration), vel_dim_);
+            x << dqk;
+
+            // std::cout << "A row 0: " << foot_polytope_[frame].at(node).row(0) << std::endl;
+            // std::cout << "A row 1: " << foot_polytope_[frame].at(node).row(1) << std::endl;
+            p << traj_.GetConfiguration(node), foot_polytope_[frame][node].row(0).transpose(),
+                foot_polytope_[frame][node].row(1).transpose(), ub_lb_polytope[frame][node];
+
+            constraint->GetFunctionValue(x, p, y);
+            for (double yi : y) {
+                violation += yi*std::max(yi, 0.0);
+            }
+        }
+
+        if (std::isinf(violation)) {
+            std::cout << "FootPolytope violation is inf.\n node:" << node << std::endl;
+        }
+
+        return violation;
+    }
 
     // -------------------------------------- //
     // -------- Linearization Helpers ------- //
@@ -1729,6 +1864,10 @@ namespace torc::mpc {
                     int decision_idx = GetDecisionIdx(i, Configuration);
                     data.sp_pattern = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
                     AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
+                } else if (data.type == CostTypes::FootPolytope && i > 0) {
+                    int decision_idx = GetDecisionIdx(i, Configuration);
+                    data.sp_pattern = cost_.GetGaussNewtonSparsityPattern(data.constraint_name);
+                    AddSparsitySet(data.sp_pattern, decision_idx, decision_idx, objective_triplets_);
                 }
             }
         }
@@ -1776,7 +1915,7 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetConfiguration(node), GetConfigTarget(node),
                                            ws_->obj_config_vector, ws_->obj_config_mat, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
                             scaling * ws_->obj_config_vector;
 
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_config_mat, decision_idx, decision_idx, objective_triplets_,
@@ -1787,7 +1926,7 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetVelocity(node), GetVelTarget(node),
                                            ws_->obj_vel_vector, ws_->obj_vel_mat, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
                             scaling * ws_->obj_vel_vector;
 
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_vel_mat, decision_idx, decision_idx, objective_triplets_,
@@ -1800,7 +1939,7 @@ namespace torc::mpc {
                         cost_.GetApproximation(traj_.GetForce(node, frame), force_target,
                                                ws_->obj_force_vector, ws_->obj_force_mat, data.constraint_name);
 
-                        osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) =
+                        osqp_instance_.objective_vector.segment(force_idx, CONTACT_3DOF) +=
                                 scaling * ws_->obj_force_vector;
 
                         MatrixToTripletWithSparsitySet(scaling * ws_->obj_force_mat, force_idx, force_idx, objective_triplets_,
@@ -1815,7 +1954,7 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetTau(node), tau_target,
                                            ws_->obj_tau_vector, ws_->obj_tau_mat, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetNumInputs()) +=
                             scaling * ws_->obj_tau_vector;
 
                     MatrixToTripletWithSparsitySet(scaling * ws_->obj_tau_mat, decision_idx, decision_idx, objective_triplets_,
@@ -1832,7 +1971,27 @@ namespace torc::mpc {
                     cost_.GetApproximation(traj_.GetConfiguration(node), GetDesiredFramePos(node, data.frame_name),
                                            linear_term, hess_term, data.constraint_name);
 
-                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) =
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
+                            scaling * linear_term;
+
+                    MatrixToTripletWithSparsitySet(scaling * hess_term, decision_idx, decision_idx, objective_triplets_,
+                                                   objective_triplet_idx_, data.sp_pattern);
+                } else if (data.type == CostTypes::FootPolytope && node > 0) {
+                    int decision_idx = GetDecisionIdx(node, Configuration);
+                    // std::string frame = contact_frames_[0];
+                    vectorx_t linear_term;
+                    matrixx_t hess_term;
+
+                    // Target = A, b, mu, delta
+                    vectorx_t target(2*POLYTOPE_SIZE + 2);
+                    target << foot_polytope_[data.frame_name][node].row(0).transpose(),
+                                        foot_polytope_[data.frame_name][node].row(1).transpose(),
+                                        ub_lb_polytope[data.frame_name][node], data.delta, data.mu;
+
+                    cost_.GetApproximation(traj_.GetConfiguration(node), target,
+                                           linear_term, hess_term, data.constraint_name);
+
+                    osqp_instance_.objective_vector.segment(decision_idx, robot_model_->GetVelDim()) +=
                             scaling * linear_term;
 
                     MatrixToTripletWithSparsitySet(scaling * hess_term, decision_idx, decision_idx, objective_triplets_,
@@ -1902,6 +2061,15 @@ namespace torc::mpc {
                     vectorx_t pos_target = GetDesiredFramePos(node, data.frame_name);
                     cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
                                                            traj_.GetConfiguration(node), pos_target, data.constraint_name);
+                } else if (data.type == CostTypes::FootPolytope && node > 0) {
+                    vectorx_t target(2*POLYTOPE_SIZE + 2);
+                    target << foot_polytope_[data.frame_name][node].row(0).transpose(),
+                                        foot_polytope_[data.frame_name][node].row(1).transpose(),
+                                        ub_lb_polytope[data.frame_name][node], data.delta, data.mu;
+                    cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                                                           traj_.GetConfiguration(node), target, data.constraint_name);
+                    // std::cout << "Polytope cost: " << cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                    //                                         traj_.GetConfiguration(node), target, data.constraint_name) << std::endl;
                 }
             }
 
@@ -1954,6 +2122,14 @@ namespace torc::mpc {
                     cost_node += scale * cost_.GetTermCost(
                             q_zero,
                             traj.GetConfiguration(node), targets.fk_targets.at(data.constraint_name)[node], data.constraint_name);
+                } else if (data.type == CostTypes::FootPolytope) {
+                    throw std::runtime_error("Trajectory cost for FootPolytope not implemented!");
+                    // vectorx_t target(2*POLYTOPE_SIZE + 2);
+                    // target << foot_polytope_[data.frame_name][node].row(0).transpose(),
+                    //                     foot_polytope_[data.frame_name][node].row(1).transpose(),
+                    //                     ub_lb_polytope[data.frame_name][node], mu_, delta_;
+                    // cost_node += scale * cost_.GetTermCost(qp_res.segment(GetDecisionIdx(node, Configuration), robot_model_->GetVelDim()),
+                    //                                        traj_.GetConfiguration(node), target, data.constraint_name);
                 }
             }
 
@@ -1990,14 +2166,18 @@ namespace torc::mpc {
         return force_target;
     }
 
-    // TODO: Consider removing or at least moving this function
     vector3_t FullOrderMpc::GetDesiredFramePos(int node, std::string frame) {
-        vector3_t frame_pos;
-
-        // TODO: Implement raibert heuristic
-        frame_pos.setZero();
-
-        return frame_pos;
+        if (!des_foot_pos_.contains(frame)) {
+            std::cerr << "Desired frame " << frame << std::endl;
+            std::cerr << "Possible frames:" << std::endl;
+            for (const auto& [frame, positions] : des_foot_pos_) {
+                std::cerr << frame << std::endl;
+            }
+            throw std::runtime_error("[GetDesiredFramePos] frame not in the map!");
+        }
+        vector3_t desired_pos;
+        desired_pos << des_foot_pos_.at(frame)[node], swing_traj_.at(frame)[node];
+        return desired_pos;
     }
 
     vectorx_t FullOrderMpc::GetConfigTarget(int node) {
@@ -2036,6 +2216,8 @@ namespace torc::mpc {
                     cost_data_[idx].type = CostTypes::ForceReg;
                 } else if (type == "ForwardKinematics") {
                     cost_data_[idx].type = CostTypes::ForwardKinematics;
+                } else if (type == "FootPolytope") {
+                    cost_data_[idx].type = CostTypes::FootPolytope;
                 } else {
                     throw std::runtime_error("Provided cost type does not exist!");
                 }
@@ -2056,8 +2238,16 @@ namespace torc::mpc {
                 throw std::runtime_error("Cost term must include a weight!");
             }
 
-            if (cost_term["frame"] && cost_data_[idx].type == ForwardKinematics) {
+            if (cost_term["frame"]) { // && (cost_data_[idx].type == ForwardKinematics || cost_data_[idx].type == FootPolytope)) {
                 cost_data_[idx].frame_name = cost_term["frame"].as<std::string>();
+            }
+
+            if (cost_term["mu"]) {
+                cost_data_[idx].mu = cost_term["mu"].as<double>();
+            }
+
+            if (cost_term["delta"]) {
+                cost_data_[idx].delta = cost_term["delta"].as<double>();
             }
 
             idx++;
@@ -2175,6 +2365,8 @@ namespace torc::mpc {
                 AddSwingHeightPattern(node);
 
                 AddCollisionPattern(node);
+
+                AddFootPolytopePattern(node);
             }
         }
 
@@ -2400,6 +2592,26 @@ namespace torc::mpc {
         }
     }
 
+    void FullOrderMpc::AddFootPolytopePattern(int node) {
+        int row_start = GetConstraintRow(node, FootPolytope);
+        int col_start = GetDecisionIdx(node, Configuration);
+
+        for (const auto& [frame, constraint] : foot_polytope_constraint_) {
+            const auto sparsity = constraint->GetJacobianSparsityPatternSet();
+            // TODO: Remove
+            // AddSparsitySet(sparsity, row_start, col_start, constraint_triplets_);
+            // row_start += POLYTOPE_SIZE;
+
+            // TODO: Put back
+            torc::ad::sparsity_pattern_t sparsity_head(POLYTOPE_SIZE/2);
+            for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
+                sparsity_head[i] = sparsity[i];
+            }
+            AddSparsitySet(sparsity_head, row_start, col_start, constraint_triplets_);
+            row_start += POLYTOPE_SIZE/2;
+        }
+    }
+
 
     // ------------------------------------------------- //
     // ---------------- Helper Functions --------------- //
@@ -2525,6 +2737,8 @@ namespace torc::mpc {
                 row += NumSwingHeightConstraintsNode();
 
                 row += NumCollisionConstraintsNode();
+
+                row += NumFootPolytopeConstraintsNode();
             }
         }
 
@@ -2535,6 +2749,10 @@ namespace torc::mpc {
     int FullOrderMpc::GetConstraintRow(int node, const ConstraintType& constraint) const {
         int row = GetConstraintRowStartNode(node);
         switch (constraint) {
+            case FootPolytope:
+                if (node > 0) {
+                    row += NumCollisionConstraintsNode();
+                }
             case Collision:
                 if (node > 0) {
                     row += NumHolonomicConstraintsNode();
@@ -2699,8 +2917,8 @@ namespace torc::mpc {
 
 
     int FullOrderMpc::NumFrictionConeConstraintsNode() const {
-        return num_contact_locations_ * (1 + CONTACT_3DOF);
-        // return num_contact_locations_ * (1 + CONTACT_3DOF + 1);
+        // return num_contact_locations_ * (1 + CONTACT_3DOF);
+        return num_contact_locations_ * (1 + CONTACT_3DOF + 1);
     }
 
     int FullOrderMpc::NumConfigBoxConstraintsNode() const {
@@ -2727,6 +2945,10 @@ namespace torc::mpc {
         return collision_constraints_.size();
     }
 
+    int FullOrderMpc::NumFootPolytopeConstraintsNode() const {
+        return (POLYTOPE_SIZE/2)*num_contact_locations_;
+        // return (POLYTOPE_SIZE)*num_contact_locations_;
+    }
 
     // Other functions
     void FullOrderMpc::SetVerbosity(bool verbose) {
@@ -2965,6 +3187,8 @@ namespace torc::mpc {
         const auto constraint_times = GetConstraintTimeStats();
         const auto cost_times = GetCostTimeStats();
         const auto ls_times = GetLineSearchTimeStats();
+        const auto solve_times = GetSolveTimeStats();
+        const auto update_times = GetUpdateTimeStats();
 
         std::cout << std::fixed << std::setprecision(6);
         std::cout << std::left << setw(col_width) << "Compute time (ms): " << std::right << compute_times.first <<
@@ -2975,6 +3199,10 @@ namespace torc::mpc {
             setw(col_width) << cost_times.second << std::endl;
         std::cout << std::left << setw(col_width) << "Line search time (ms): " << std::right << ls_times.first <<
             setw(col_width) << ls_times.second << std::endl;
+        std::cout << std::left << setw(col_width) << "Update time (ms): " << std::right << update_times.first <<
+            setw(col_width) << update_times.second << std::endl;
+        std::cout << std::left << setw(col_width) << "QP solve time (ms): " << std::right << solve_times.first <<
+            setw(col_width) << solve_times.second << std::endl;
 
         const auto constr_vio_stats = GetConstraintViolationStats();
         std::cout << std::left << setw(col_width) << "Constraint violation: " << std::right << constr_vio_stats.first <<
@@ -3068,6 +3296,42 @@ namespace torc::mpc {
         double st_dev = 0;
         for (const auto& stat : stats_) {
             st_dev += std::pow((stat.constraint_violation - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetUpdateTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.update_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.update_time - avg), 2);
+        }
+
+        st_dev = sqrt(st_dev/stats_.size());
+
+        return std::make_pair(avg, st_dev);
+    }
+
+    std::pair<double, double> FullOrderMpc::GetSolveTimeStats() const {
+        double avg = 0;
+        for (const auto& stat : stats_) {
+            avg += stat.solve_time;
+        }
+
+        avg = avg/stats_.size();
+
+        double st_dev = 0;
+        for (const auto& stat : stats_) {
+            st_dev += std::pow((stat.solve_time - avg), 2);
         }
 
         st_dev = sqrt(st_dev/stats_.size());

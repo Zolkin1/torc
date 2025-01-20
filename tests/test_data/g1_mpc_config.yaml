@@ -11,17 +11,17 @@ general_settings:
   initial_constraint_tol: 5e-4
   nodes_full_dynamics: 3 #4   # Also determines how many nodes have torque constraints
   delay_prediction_dt: 0
-  terminal_cost_weight: 10
+  terminal_cost_weight: 2
 solver_settings:
   rel_tol: 1e-3
   abs_tol: 1e-3
-  verbose: False
+  verbose: True
   polish: False
   rho: 0.01
   alpha: 1.6 # 1.6, 1.1
   sigma: 1e-6
   adaptive_rho: False
-  max_iter: 20 #20
+  max_iter: 200 #20
   scaling: 10
 constraints:
   friction_coef: 0.7  # TODO: Tune this
@@ -30,67 +30,113 @@ constraints:
   collisions:
     - frame1: "left_toe"
       frame2: "right_toe"
-      radius1: 0.06
-      radius2: 0.06
+      radius1: 0.1 #0.13
+      radius2: 0.1 #0.13
     - frame1: "left_heel"
       frame2: "right_heel"
-      radius1: 0.06
-      radius2: 0.06
+      radius1: 0.1 #0.13
+      radius2: 0.1 #0.13
+    - frame1: "left_toe"
+      frame2: "right_heel"
+      radius1: 0.1
+      radius2: 0.1
+    - frame1: "left_heel"
+      frame2: "right_toe"
+      radius1: 0.1
+      radius2: 0.1
     - frame1: "left_wrist_yaw_link"
       frame2: "waist_support_link"
-      radius1: 0.1
-      radius2: 0.1
+      radius1: 0.06
+      radius2: 0.06
     - frame1: "right_wrist_yaw_link"
       frame2: "waist_support_link"
-      radius1: 0.1
-      radius2: 0.1
+      radius1: 0.06
+      radius2: 0.06
+  polytope_delta: 0.02
 costs:
   - type: ConfigurationTracking
     name: "ConfigTracking"
-    weight:  [1, 1, 20,
-              10, 10, 10,
-              1, 1, 1, 1, 1, 1,         # Left Leg
-              1, 1, 1, 1, 1, 1,         # Right Leg
-              1, 1, 1,                  # Waist
-              1, 1, 1, 1,               # Left Arm
-              1, 1, 1, 1,]              # Right Arm
+    weight: [ 2, 2, 5,  #15,
+              2, 2, 2,
+              0.005, 3, 4, 0.0005, 1, #1,         # Left Leg
+              0.005, 3, 4, 0.0005, 1, #1,         # Right Leg
+              0.5, 0.5, 0.5, 0.5,      # Left Arm
+              0.5, 0.5, 0.5, 0.5 ]      # Right Arm
   - type: VelocityTracking
     name: "VelocityTracking"
-    weight: [1, 1, 20,
-             10, 10, 10,
-             1, 1, 1, 1, 1, 1,         # Left Leg
-             1, 1, 1, 1, 1, 1,         # Right Leg
-             1, 1, 1,                  # Waist
-             1, 1, 1, 1,               # Left Arm
-             1, 1, 1, 1]               # Right Arm
+    weight: [ 2, 2, 2,
+              2, 1, 2,
+              0.005, 1, 2, 0.001, 0.1, #0.001,         # Left Leg
+              0.005, 1, 2, 0.001, 0.1, #0.001,         # Right Leg
+              0.3, 0.3, 0.3, 0.3,      # Left Arm
+              0.3, 0.3, 0.3, 0.3 ]      # Right Arm
   - type: TorqueRegularization
     name: "TorqueReg"
-    weight: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001,              # Left Leg
-             0.001, 0.001, 0.001, 0.001, 0.001, 0.001,              # Right Leg
-             0.001, 0.001, 0.001,                                   # Waist
-             0.001, 0.001, 0.001, 0.001,                            # Left Arm
-             0.001, 0.001, 0.001, 0.001]                            # Right Arm
+    weight: [ 0.0001, 0.001, 0.001, 0.0001, 0.001, #0.001,            # Left Leg
+              0.0001, 0.001, 0.001, 0.0001, 0.001, #0.001,             # Right Leg
+              0.01, 0.01, 0.01, 0.01,                           # Left Arm
+              0.01, 0.01, 0.01, 0.01, ]                          # Right Arm
   - type: ForceRegularization
     name: "ForceReg"
-    weight: [0.001, 0.001, 0.01]
+    weight: [ 0.01, 0.01, 0.0001 ]
+  - type: ForwardKinematics
+    name: left_toe_fk
+    frame: "left_toe"
+    weight: [1, 1, 1]
+#  - type: ConfigurationTracking
+#    name: "ConfigTracking"
+#    weight:  [1, 1, 20,
+#              10, 10, 10,
+#              1, 1, 1, 1, 1, 1,         # Left Leg
+#              1, 1, 1, 1, 1, 1,         # Right Leg
+#              1, 1, 1,                  # Waist
+#              1, 1, 1, 1,               # Left Arm
+#              1, 1, 1, 1,]              # Right Arm
+#  - type: VelocityTracking
+#    name: "VelocityTracking"
+#    weight: [1, 1, 20,
+#             10, 10, 10,
+#             1, 1, 1, 1, 1, 1,         # Left Leg
+#             1, 1, 1, 1, 1, 1,         # Right Leg
+#             1, 1, 1,                  # Waist
+#             1, 1, 1, 1,               # Left Arm
+#             1, 1, 1, 1]               # Right Arm
+#  - type: TorqueRegularization
+#    name: "TorqueReg"
+#    weight: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001,              # Left Leg
+#             0.001, 0.001, 0.001, 0.001, 0.001, 0.001,              # Right Leg
+#             0.001, 0.001, 0.001,                                   # Waist
+#             0.001, 0.001, 0.001, 0.001,                            # Left Arm
+#             0.001, 0.001, 0.001, 0.001]                            # Right Arm
+#  - type: ForceRegularization
+#    name: "ForceReg"
+#    weight: [0.001, 0.001, 0.01]
+#  - type: FootPolytope
+#    name: "left_toe_polytope"
+#    weight: [1, 1, 1, 1]
+#    frame: "left_toe"
 contacts:
   contact_frames: ["left_toe", "left_heel", "right_toe", "right_heel"]
-  hip_offsets: [0.145, 0.1164, -0.025, 0.1164, 0.145, 0.1164, -0.025, 0.1164,]
+  hip_offsets: [0.145, 0.1164, -0.025, 0.1164, 0.145, -0.1164, -0.025, -0.1164]
 joint_defaults:
-  joints: ["left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
-           "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
+  joints: ["left_ankle_roll_joint", "right_ankle_roll_joint",
+           "waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint",
+           "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
            "left_hand_thumb_0_joint", "left_hand_thumb_1_joint", "left_hand_thumb_2_joint",
            "left_hand_middle_0_joint", "left_hand_middle_1_joint",
            "left_hand_index_0_joint", "left_hand_index_1_joint",
+           "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
            "right_hand_thumb_0_joint", "right_hand_thumb_1_joint", "right_hand_thumb_2_joint",
            "right_hand_middle_0_joint", "right_hand_middle_1_joint",
            "right_hand_index_0_joint", "right_hand_index_1_joint",]
-  values: [0, 0, 0,
+  values: [0, 0,
+           0, 0, 0.03,
            0, 0, 0,
-           0, 0, 0,
+           0, 1, 1,
            0, 0,
            0, 0,
            0, 0, 0,
+           0, -1, -1,
            0, 0,
            0, 0,]
 line_search:

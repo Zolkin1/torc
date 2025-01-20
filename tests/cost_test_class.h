@@ -14,7 +14,7 @@ namespace torc::mpc {
     public:
         explicit CostTestClass(const std::string& name, const std::filesystem::path& urdf_path)
             : CostFunction("test_cost") {
-            robot_model_ = std::make_unique<models::FullOrderRigidBody>(name, urdf_path);
+            robot_model_ = std::make_shared<models::FullOrderRigidBody>(name, urdf_path);
         }
 
         void CheckConfigure() {
@@ -282,7 +282,7 @@ namespace torc::mpc {
 //
 //        }
     protected:
-        std::unique_ptr<models::FullOrderRigidBody> robot_model_;
+        std::shared_ptr<models::FullOrderRigidBody> robot_model_;
 
         std::vector<CostData> data_;
 

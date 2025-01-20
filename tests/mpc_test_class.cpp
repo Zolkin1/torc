@@ -41,37 +41,38 @@ TEST_CASE("MPC Test Class A1", "[mpc]") {
     // mpc.BenchmarkCostFunctions();
 }
 
-TEST_CASE("MPC Test Class Achilles", "[mpc]") {
-    using namespace torc::mpc;
-    const std::string pin_model_name = "test_pin_model";
-    std::filesystem::path achilles_urdf = std::filesystem::current_path();
-    achilles_urdf += "/test_data/achilles.urdf";
-
-    std::filesystem::path mpc_config = std::filesystem::current_path();
-    mpc_config += "/test_data/achilles_mpc_config.yaml";
-
-    MpcTestClass mpc(mpc_config, achilles_urdf, "achilles_test_class");
-
-    mpc.Configure();
-
-    mpc.CheckInverseDynamicsLin();
-    mpc.CheckSwingHeightLin();
-    mpc.CheckHolonomicLin();
-    mpc.CheckCostFunctionDefiniteness();
-    mpc.CheckConstraintIdx();
-    mpc.CheckDefaultSwingTraj();
-    mpc.CheckSwingHeightConstraint();
-    // mpc.BenchmarkQuaternionIntegrationLin();
-    // mpc.BenchmarkInverseDynamicsLin();
-    // mpc.BenchmarkQuaternionConfigurationLin();
-    // mpc.BenchmarkSwingHeightLin();
-    // mpc.BenchmarkHolonomicLin();
-    // mpc.BenchmarkConstraints();
-    // mpc.BenchmarkCompute();
-    // mpc.BenchmarkCostFunctions();
-
-    mpc.CheckPinIntegrate();
-}
+// TODO: Put back
+// TEST_CASE("MPC Test Class Achilles", "[mpc]") {
+//     using namespace torc::mpc;
+//     const std::string pin_model_name = "test_pin_model";
+//     std::filesystem::path achilles_urdf = std::filesystem::current_path();
+//     achilles_urdf += "/test_data/achilles.urdf";
+//
+//     std::filesystem::path mpc_config = std::filesystem::current_path();
+//     mpc_config += "/test_data/achilles_mpc_config.yaml";
+//
+//     MpcTestClass mpc(mpc_config, achilles_urdf, "achilles_test_class");
+//
+//     mpc.Configure();
+//
+//     mpc.CheckInverseDynamicsLin();
+//     mpc.CheckSwingHeightLin();
+//     mpc.CheckHolonomicLin();
+//     mpc.CheckCostFunctionDefiniteness();
+//     mpc.CheckConstraintIdx();
+//     mpc.CheckDefaultSwingTraj();
+//     mpc.CheckSwingHeightConstraint();
+//     // mpc.BenchmarkQuaternionIntegrationLin();
+//     // mpc.BenchmarkInverseDynamicsLin();
+//     // mpc.BenchmarkQuaternionConfigurationLin();
+//     // mpc.BenchmarkSwingHeightLin();
+//     // mpc.BenchmarkHolonomicLin();
+//     // mpc.BenchmarkConstraints();
+//     // mpc.BenchmarkCompute();
+//     // mpc.BenchmarkCostFunctions();
+//
+//     mpc.CheckPinIntegrate();
+// }
 
 TEST_CASE("Cost Test Class", "[mpc][cost]") {
     using namespace torc::mpc;

@@ -17,7 +17,9 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/MpcSettings.h"
     "${MPC_INC}/BoxConstraint.h"
     "${MPC_INC}/StateInputConstraint.h"
-    "${MPC_INC}/HolonomicConstraint.h")
+    "${MPC_INC}/HolonomicConstraint.h"
+    "${MPC_INC}/simple_trajectory.h"
+    "${MPC_INC}/reference_generator.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -37,7 +39,9 @@ set(MPC_SOURCE_LIST
         MpcSettings.cpp
         BoxConstraint.cpp
         StateInputConstraint.cpp
-        HolonomicConstraint.cpp)
+        HolonomicConstraint.cpp
+        simple_trajectory.cpp
+        reference_generator.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}
@@ -57,16 +61,16 @@ target_link_libraries(Mpc PUBLIC Autodiff)
 
 # ------- Solver ------ #
 #target_link_libraries(Mpc PUBLIC SolverInterfaces)
-find_package(osqp)
-if (NOT TARGET osqpstatic)  # This is what osqp-cpp looks for
-    message(STATUS "osqpstatic target not found, checking osqp::osqpstatic...")
-    if (NOT TARGET osqp::osqpstatic)
-        message(STATUS "Could not find osqp::osqpstatic, osqp-cpp will try to fetch it...")
-    else ()
-        message(STATUS "Found osqp::osqpstatic. Using it in osqp-cpp.")
-        add_library(osqpstatic ALIAS osqp::osqpstatic)
-    endif ()
-endif ()
+#find_package(osqp)
+#if (NOT TARGET osqpstatic)  # This is what osqp-cpp looks for
+#    message(STATUS "osqpstatic target not found, checking osqp::osqpstatic...")
+#    if (NOT TARGET osqp::osqpstatic)
+#        message(STATUS "Could not find osqp::osqpstatic, osqp-cpp will try to fetch it...")
+#    else ()
+#        message(STATUS "Found osqp::osqpstatic. Using it in osqp-cpp.")
+#        add_library(osqpstatic ALIAS osqp::osqpstatic)
+#    endif ()
+#endif ()
 
 include(FetchContent)
 

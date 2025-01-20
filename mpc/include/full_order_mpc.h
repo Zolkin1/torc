@@ -16,6 +16,7 @@
 #include "contact_schedule.h"
 #include "cpp_ad_interface.h"
 #include "simple_trajectory.h"
+#include "reference_generator.h"
 
 #include "hpipm-cpp/hpipm-cpp.hpp"
 
@@ -53,6 +54,8 @@ namespace torc::mpc {
         double ls_time;                     // Time to line search
         LineSearchCondition ls_condition;   // Condition for line search termination
         double constraint_violation;        // Constraint violation
+        double update_time;                 // Time to update the mats and vecs
+        double solve_time;                  // QP solve time
     };
 
     // TODO: Clean up these data structures
@@ -94,7 +97,7 @@ namespace torc::mpc {
          *
          * @return
          */
-        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out, double delay_start_time = 0);
+        void Compute(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
 
         void ComputeNLP(const vectorx_t& q, const vectorx_t& v, Trajectory& traj_out);
 
@@ -105,13 +108,6 @@ namespace torc::mpc {
          * @return
          */
         [[nodiscard]] double GetTrajCost(const Trajectory& traj, const CostTargets& targets) const;
-
-        /**
-         * @brief return the current parameters that define the cost.
-         * Thread safe.
-         * @return
-         */
-        [[nodiscard]] CostTargets GetCostSnapShot();
 
         void SetVerbosity(bool verbose);
 
@@ -130,6 +126,8 @@ namespace torc::mpc {
         [[nodiscard]] std::pair<double, double> GetConstraintTimeStats() const;
         [[nodiscard]] std::pair<double, double> GetCostTimeStats() const;
         [[nodiscard]] std::pair<double, double> GetLineSearchTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetSolveTimeStats() const;
+        [[nodiscard]] std::pair<double, double> GetUpdateTimeStats() const;
 
         [[nodiscard]] std::pair<double, double> GetConstraintViolationStats() const;
         [[nodiscard]] std::pair<double, double> GetCostStats() const;
@@ -158,7 +156,8 @@ namespace torc::mpc {
         * @param pos is a 3-vector giving the the x,y,z positions of the base link
         * @param vel is a 3-vector in the form [xdot, ydot, yawdot] where yaw dot is the rotation about the z axis
         */
-        void GenerateCostReference(const vectorx_t& q, const vectorx_t& v, const vector3_t& vel);
+        void GenerateCostReference(const vectorx_t& q_current, const vectorx_t& v_current, const SimpleTrajectory& q_target, const SimpleTrajectory& v_target,
+                const ContactSchedule& contact_schedule);
 
         SimpleTrajectory GetConfigTargets();
 
@@ -184,7 +183,8 @@ namespace torc::mpc {
         TorqueBox,
         SwingHeight,
         Holonomic,
-        Collision
+        Collision,
+        FootPolytope
         };
 
         enum DecisionType {
@@ -245,6 +245,8 @@ namespace torc::mpc {
 
         void FrictionConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk, ad::ad_vector_t& violation) const;
 
+        void FootPolytopeConstraint(const std::string& frame, const ad::ad_vector_t& dqk, const ad::ad_vector_t& qk_A_b, ad::ad_vector_t& violation) const;
+
     // -------- Constraint Creation -------- //
         void CreateConstraints();
         // void AddICConstraint();
@@ -257,6 +259,7 @@ namespace torc::mpc {
         void AddSwingHeightConstraint(int node);
         void AddHolonomicConstraint(int node);
         void AddCollisionConstraint(int node);
+        void AddFootPolytopeConstraint(int node);
 
     // -------- Constraint Violation -------- //
         double GetConstraintViolation(const vectorx_t& qp_res);
@@ -270,6 +273,7 @@ namespace torc::mpc {
         double GetSwingHeightViolation(const vectorx_t& qp_res, int node);
         double GetHolonomicViolation(const vectorx_t& qp_res, int node);
         double GetCollisionViolation(const vectorx_t& qp_res, int node);
+        double GetFootPolytopeViolation(const vectorx_t& qp_res, int node);
 
     // -------- Linearization Helpers ------- //
         // matrix3_t QuatIntegrationLinearizationXi(int node);
@@ -321,6 +325,7 @@ namespace torc::mpc {
         void AddSwingHeightPattern(int node);
         void AddHolonomicPattern(int node);
         void AddCollisionPattern(int node);
+        void AddFootPolytopePattern(int node);
 
     // ----- Helper Functions ----- //
         void ConvertSolutionToTraj(const vectorx_t& qp_sol, Trajectory& traj);
@@ -331,7 +336,6 @@ namespace torc::mpc {
         [[nodiscard]] int GetDecisionIdxStart(int node) const;
 
         [[nodiscard]] int GetNumConstraints() const;
-        [[nodiscard]] int GetConstraintsPerNode() const;
         [[nodiscard]] int GetConstraintRow(int node, const ConstraintType& constraint) const;
         [[nodiscard]] int GetConstraintRowStartNode(int node) const;
 
@@ -356,6 +360,10 @@ namespace torc::mpc {
         void ConvertdqToq(const vectorx_t& dq, const vectorx_t& q_ref, vectorx_t& q) const;
 
         double GetTime(int node) const;
+
+    // ----- Polytope functions ----- //
+        double GetPolytopeConvergence(const std::string& frame, double time, const ContactSchedule& cs) const;
+
     // ----- Getters for Sizes of Individual nodes ----- //
         [[nodiscard]] int NumIntegratorConstraintsNode() const;
         [[nodiscard]] int NumIDConstraintsNode() const;
@@ -367,6 +375,7 @@ namespace torc::mpc {
         [[nodiscard]] int NumSwingHeightConstraintsNode() const;
         [[nodiscard]] int NumHolonomicConstraintsNode() const;
         [[nodiscard]] int NumCollisionConstraintsNode() const;
+        [[nodiscard]] int NumFootPolytopeConstraintsNode() const;
 
         void UpdateSettings();
 
@@ -379,6 +388,8 @@ namespace torc::mpc {
         static constexpr int POS_VARS = 3;
         static constexpr int QUAT_VARS = 4;
         static constexpr double FD_DELTA = 1e-8;
+
+        static constexpr int POLYTOPE_SIZE = 4;
 
     //---------- Member Variables ---------- //
         std::string name_;
@@ -423,6 +434,14 @@ namespace torc::mpc {
 
         std::vector<vectorx_t> cost_weights_;
 
+        // Reference Generator
+        std::unique_ptr<ReferenceGenerator> reference_generator_;
+        std::map<std::string, std::vector<vector2_t>> des_foot_pos_;
+
+        // Cost Barrier Relaxations
+        double mu_;
+        double delta_;
+
         // Line search
         double alpha_;
         LineSearchCondition ls_condition_;
@@ -436,7 +455,7 @@ namespace torc::mpc {
         double ls_alpha_min_;
 
         // Model
-        std::unique_ptr<models::FullOrderRigidBody> robot_model_;
+        std::shared_ptr<models::FullOrderRigidBody> robot_model_;
         int vel_dim_;
         int config_dim_;
         int input_dim_;
@@ -446,7 +465,12 @@ namespace torc::mpc {
 
         // Contact schedule
         std::map<std::string, std::vector<int>> in_contact_;
-        ContactSchedule cs_;
+        // Hold the polytope giving the foot constraint
+        std::map<std::string, std::vector<matrixx_t>> foot_polytope_;
+        std::map<std::string, std::vector<vectorx_t>> ub_lb_polytope;
+        double polytope_delta_;     // Polytope backoff for robustness
+        double polytope_shrinking_rad_;     // Size of the shrinking radius at its biggest point
+        // ContactSchedule cs_;
 
         // dt's
         std::vector<double> dt_;
@@ -480,6 +504,7 @@ namespace torc::mpc {
         std::unique_ptr<ad::CppADInterface> inverse_dynamics_constraint_;
         std::vector<std::unique_ptr<ad::CppADInterface>> collision_constraints_;
         std::unique_ptr<ad::CppADInterface> friction_cone_constraint_;
+        std::map<std::string, std::unique_ptr<ad::CppADInterface>> foot_polytope_constraint_;
         std::vector<std::pair<double, double>> radii_;
 
         // Contact settings

@@ -30,6 +30,9 @@ namespace torc::mpc {
 
 
 	Eigen::VectorBlock<vectorx_t> SimpleTrajectory::GetNodeData(int node) {
+		if (node >= nodes_) {
+			throw std::runtime_error("[Simple Trajectory] Node too large!");
+		}
 		return data_.segment(GetStartIdx(node), size_);
 	}
 
