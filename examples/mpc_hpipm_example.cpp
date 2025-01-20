@@ -77,7 +77,7 @@ int main() {
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
-    HolonomicConstraint holonomic_constraint(0, settings.nodes, "holonomic_constraint", g1, contact_frames,
+    HolonomicConstraint holonomic_constraint(1, settings.nodes, "holonomic_constraint", g1, contact_frames,
         settings.deriv_lib_path, settings.compile_derivs);
 
     std::cout << "===== Constraints Created =====" << std::endl;

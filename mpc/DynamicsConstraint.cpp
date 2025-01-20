@@ -86,15 +86,17 @@ namespace torc::mpc {
             B.setZero();
 
             // TODO: Check to be sure this is grabbing the block I want
-            // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
+            std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
             matrixx_t dv2_inv = dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL).inverse();
 
-            A.topRows(vel_dim_) << int_jac.leftCols(vel_dim_), int_jac.middleCols(2*vel_dim_, FLOATING_VEL);
+            A.topRightCorner<FLOATING_VEL, FLOATING_VEL>() =
+                int_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL);
             A.bottomRows<FLOATING_VEL>() << dv2_inv*-dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
 
-            B.topRows(vel_dim_) << int_jac.rightCols(vel_dim_ - FLOATING_VEL);
+            B.block(FLOATING_VEL, 0, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL) =
+                int_jac.block(FLOATING_VEL, 2*vel_dim_, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
             B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL),
-                dyn_jac.rightCols(tau_dim_ + num_contacts_*CONTACT_3DOF);
+                dyn_jac.rightCols(num_contacts_*CONTACT_3DOF);
             B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
         }
 

@@ -10,6 +10,7 @@
 #include "contact_schedule.h"
 #include "pinocchio_interface.h"
 #include "simple_trajectory.h"
+#include "MpcSettings.h"
 
 #define ENABLE_BENCHMARKS false
 
@@ -73,3 +74,39 @@ TEST_CASE("Forward Dynamics") {
         CHECK(a.isApprox(a_crba));
     }
 }
+
+// TODO: Come back to this
+TEST_CASE("Dynamics Constraint") {
+    using namespace torc::mpc;
+    std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand.urdf";
+
+    std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_mpc_config.yaml";
+
+    MpcSettings settings(mpc_config);
+    settings.Print();
+
+    torc::models::FullOrderRigidBody g1("g1", g1_urdf, settings.joint_skip_names, settings.joint_skip_values);
+
+    std::vector<std::string> contact_frames = {"left_toe", "left_heel", "right_toe", "right_heel"};
+
+    auto curr_path = fs::current_path();
+    curr_path = curr_path / "dynamics_constraint_deriv_libs";
+
+    DynamicsConstraint c1(g1, contact_frames, "g1_c1", curr_path, true, true,
+        0, 5);
+
+    // TODO: Pick different configs
+    vectorx_t q1 = g1.GetNeutralConfig();
+    vectorx_t q2 = g1.GetNeutralConfig();
+
+    vectorx_t v1 = g1.GetRandomVel();
+    vectorx_t v2 = v1;
+
+    vectorx_t tau = vectorx_t::Random(g1.GetVelDim() - 6);
+
+    vectorx_t force = vectorx_t::Random(3*contact_frames.size());
+
+    const auto [A, B] = c1.GetLinDynamics(q1, q2, v1, v2, tau, force, 0.01);
+
+}
+

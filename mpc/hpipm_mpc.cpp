@@ -4,6 +4,8 @@
 
 #include "hpipm_mpc.h"
 
+#include <torc_timer.h>
+
 // TODO: Can I have changing sizes every solve without causing slow downs? Then I may be able to remove some constraints (swing related)
 namespace torc::mpc {
     HpipmMpc::HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model)
@@ -107,17 +109,28 @@ namespace torc::mpc {
             if (node < settings_.nodes) {
                 // TODO: verify all of these mats
                 if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                    std::cerr << "Adding FO dynamics..." << std::endl;
                     std::tie(qp[node].A, qp[node].B) = dynamics_constraints_[0].GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
                         traj_.GetVelocity(node + 1), traj_.GetTau(node), force, settings_.dt[node]);
+                    // TODO: Remove
+                    // qp[node].A.setIdentity();
+                    // qp[node].B.setIdentity();
                 } else if (node == boundary_node_) {
+                    std::cerr << "Adding boundary dynamics..." << std::endl;
                     std::tie(qp[node].A, qp[node].B) = dynamics_constraints_[0].GetBoundaryDynamics();
                 } else {
+                    std::cerr << "Adding ROM dynamics..." << std::endl;
                     // TODO: Error here
                     std::tie(qp[node].A, qp[node].B) = dynamics_constraints_[1].GetLinDynamics(
                                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
                                         traj_.GetVelocity(node + 1), traj_.GetTau(node), force, settings_.dt[node]);
-                    // TODO: Check these - check against finite differencing the actual Forward Dynamics
+
+                    // TODO: Remove
+                    // qp[node].A.setIdentity();
+                    // qp[node].B.setIdentity();
+
+                    // TODO: Check these
                     // std::cerr << "A:\n" << qp[node].A << std::endl;
                     // std::cerr << "B:\n" << qp[node].B << std::endl;
                 }
@@ -127,6 +140,7 @@ namespace torc::mpc {
 
             // Config box constraints
             if ((node >= config_box_->GetFirstNode() && node < config_box_->GetLastNode() + 1) && node != boundary_node_) {
+                std::cerr << "Adding config box..." << std::endl;
                 // Set box indexes
                 const auto& idxs = config_box_->GetIdxs();
 
@@ -142,6 +156,7 @@ namespace torc::mpc {
 
             // Vel box constraints
             if ((node >= vel_box_->GetFirstNode() && node < vel_box_->GetLastNode() + 1) && node != boundary_node_) {
+                std::cerr << "Adding vel box..." << std::endl;
                 // Full order model this is in the state
                 if (dynamics_constraints_[0].IsInNodeRange(node)) {
                     // Set box indexes
@@ -170,6 +185,7 @@ namespace torc::mpc {
 
             // Torque box constraints
             if ((node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
+                std::cerr << "Adding tau box..." << std::endl;
                 if (dynamics_constraints_[0].IsInNodeRange(node)) {
                     // Set box indexes
                     const auto& idxs = tau_box_->GetIdxs();
@@ -185,6 +201,7 @@ namespace torc::mpc {
 
             // Friction cone constraints
             if ((node >= friction_cone_->GetFirstNode() && node < friction_cone_->GetLastNode() + 1) && node != boundary_node_) {
+                std::cerr << "Adding friction cone..." << std::endl;
                 int col = ntau_;
                 for (int contact = 0; contact < settings_.num_contact_locations; contact++) {
                     const auto [d_block, lg_segment]
@@ -197,21 +214,24 @@ namespace torc::mpc {
                 }
             }
 
-            // Swing height
-            if ((node >= swing_constraint_->GetFirstNode() && node < swing_constraint_->GetLastNode() + 1) && node != boundary_node_) {
-                for (const auto& frame : settings_.contact_frames) {
-                    const auto [c_block, y_segment] =
-                        swing_constraint_->GetLinearization(traj_.GetConfiguration(node), swing_traj_[node], frame);
-                    // y_segment.size should = 1
-                    qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nq_) = in_contact_[node]*c_block;
-                    qp[node].lg(ineq_row_idx) = -in_contact_[node]*y_segment(0);
-                    qp[node].ug(ineq_row_idx) = -in_contact_[node]*y_segment(0);
-                    ineq_row_idx += y_segment.size();
-                }
-            }
+            // TODO: Investigate, this seems to be throwing off the solver
+            // // Swing height
+            // if ((node >= swing_constraint_->GetFirstNode() && node < swing_constraint_->GetLastNode() + 1) && node != boundary_node_) {
+            //     std::cerr << "Adding swing..." << std::endl;
+            //     for (const auto& frame : settings_.contact_frames) {
+            //         const auto [c_block, y_segment] =
+            //             swing_constraint_->GetLinearization(traj_.GetConfiguration(node), swing_traj_[node], frame);
+            //         // y_segment.size should = 1
+            //         qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nq_) = in_contact_[node]*c_block;
+            //         qp[node].lg(ineq_row_idx) = -in_contact_[node]*y_segment(0);
+            //         qp[node].ug(ineq_row_idx) = -in_contact_[node]*y_segment(0);
+            //         ineq_row_idx += y_segment.size();
+            //     }
+            // }
 
             // Holonomic
             if ((node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
+                std::cerr << "Adding holonomic..." << std::endl;
                 for (const auto& frame : settings_.contact_frames) {
                     const auto [jac, y_segment] =
                         holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
@@ -305,12 +325,12 @@ namespace torc::mpc {
 
             // Box Constraints
             qp[node].idxbx.resize(nx_box);
-            qp[node].lbx.resize(nx_box);
-            qp[node].ubx.resize(nx_box);
+            qp[node].lbx = vectorx_t::Zero(nx_box);
+            qp[node].ubx = vectorx_t::Zero(nx_box);
 
             qp[node].idxbu.resize(nu_box);
-            qp[node].lbu.resize(nu_box);
-            qp[node].ubu.resize(nu_box);
+            qp[node].lbu = vectorx_t::Zero(nu_box);
+            qp[node].ubu = vectorx_t::Zero(nu_box);
 
             // Other Constraints
             qp[node].C = matrixx_t::Zero(n_other_constraints, nx1);
@@ -381,10 +401,18 @@ namespace torc::mpc {
     void HpipmMpc::Compute(const vectorx_t &q0, const vectorx_t &v0) {
         NanCheck(); // TODO: Can remove
 
+        torc::utils::TORCTimer timer;
+
+        timer.Tic();
         const auto res = solver_->solve(vectorx_t::Zero(model_.GetConfigDim() + model_.GetVelDim()),
             qp, solution); // TODO: Might need to remove this x0 input
+        timer.Toc();
+
+        const auto stats = solver_->getSolverStatistics();
 
         std::cout << "Res: " << res << std::endl;
+        std::cout << stats << std::endl;
+        std::cout << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
     }
 }
