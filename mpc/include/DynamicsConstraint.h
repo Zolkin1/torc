@@ -29,9 +29,6 @@ namespace torc::mpc {
         bool IsInNodeRange(int node) const override;
 
     protected:
-    private:
-
-
         // Forward dynamics constraint
         // void ForwardDynamics(const std::vector<std::string>& frames,
         // const ad::ad_vector_t& dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t& qk_vk_vkp1_tauk_fk_dt, ad::ad_vector_t& violation);
@@ -60,6 +57,8 @@ namespace torc::mpc {
         static constexpr int QUAT_VARS = 4;
         static constexpr int FLOATING_BASE = 7;
         static constexpr int FLOATING_VEL = 6;
+
+    private:
     };
 }
 

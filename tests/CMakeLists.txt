@@ -45,7 +45,7 @@ target_link_libraries(ad_tests PUBLIC Autodiff)
 catch_discover_tests(ad_tests)
 
 # --------- HPIPM Tests --------- #
-add_executable(mpc_hpipm_tests hpipm_mpc_test.cpp)
+add_executable(mpc_hpipm_tests hpipm_mpc_test.cpp constraints/DynamicsConstraintsTest.cpp constraints/DynamicsConstraintsTest.h)
 target_link_libraries(mpc_hpipm_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(mpc_hpipm_tests PUBLIC Mpc)
 catch_discover_tests(mpc_hpipm_tests)

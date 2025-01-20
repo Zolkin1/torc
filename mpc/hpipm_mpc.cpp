@@ -11,7 +11,7 @@ namespace torc::mpc {
     HpipmMpc::HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model)
         : settings_(std::move(settings)), model_(model) {
         qp.resize(settings_.nodes + 1); // Need the extra node for the model boundary
-        solution.resize(settings_.nodes + 1);
+        solution_.resize(settings_.nodes + 1);
 
         nq_ = model_.GetConfigDim();
         nv_ = model_.GetVelDim();
@@ -31,6 +31,8 @@ namespace torc::mpc {
             swing_traj_[i] = 0;
             traj_.SetConfiguration(i, model_.GetNeutralConfig());
         }
+
+        traj_.SetDtVector(settings_.dt);
     }
 
     void HpipmMpc::SetDynamicsConstraints(std::vector<DynamicsConstraint> constraints) {
@@ -405,7 +407,7 @@ namespace torc::mpc {
 
         timer.Tic();
         const auto res = solver_->solve(vectorx_t::Zero(model_.GetConfigDim() + model_.GetVelDim()),
-            qp, solution); // TODO: Might need to remove this x0 input
+            qp, solution_); // TODO: Might need to remove this x0 input
         timer.Toc();
 
         const auto stats = solver_->getSolverStatistics();
@@ -414,6 +416,39 @@ namespace torc::mpc {
         std::cout << stats << std::endl;
         std::cout << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
+        ConvertQpSolToTraj();
+        //TODO: Visualize trajectory!
     }
+
+    void HpipmMpc::ConvertQpSolToTraj() {
+        vectorx_t q(nq_);
+        for (int node = 0; node < settings_.nodes + 1; node++) {
+
+
+            if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                models::ConvertdqToq<double>(solution_[node].x.head(nv_), q);
+                traj_.SetConfiguration(node, q);
+
+                traj_.SetVelocity(node, traj_.GetVelocity(node) + solution_[node].x.tail(nv_));
+                traj_.SetTau(node, traj_.GetTau(node) + solution_[node].u.head(ntau_));
+            } else if (node != boundary_node_ && node < settings_.nodes) {
+                models::ConvertdqToq<double>(solution_[node].x.head(nv_), q);
+                traj_.SetConfiguration(node, q);
+
+                vectorx_t v(nv_);
+                v << solution_[node].x.tail<FLOATING_VEL>(), solution_[node].u.head(ntau_);
+                traj_.SetVelocity(node, traj_.GetVelocity(node) + v);
+            }
+
+            if (node != boundary_node_ && node < settings_.nodes) {
+                for (int i = 0; i < settings_.contact_frames.size(); i++) {
+                    traj_.SetForce(node, settings_.contact_frames[i],
+                        traj_.GetForce(node, settings_.contact_frames[i]) + solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3));
+                }
+            }
+        }
+    }
+
+
 }
 

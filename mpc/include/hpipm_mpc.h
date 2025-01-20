@@ -66,6 +66,8 @@ namespace torc::mpc {
          */
         std::pair<int, int> GetFrictionIndex(int node);
 
+        void ConvertQpSolToTraj();
+
     private:
         void SetSizes();
 
@@ -92,7 +94,7 @@ namespace torc::mpc {
         // Solver
         std::vector<hpipm::OcpQp> qp;
         hpipm::OcpQpIpmSolverSettings qp_settings;
-        std::vector<hpipm::OcpQpSolution> solution;
+        std::vector<hpipm::OcpQpSolution> solution_;
         std::unique_ptr<hpipm::OcpQpIpmSolver> solver_;
 
         // Trajectories

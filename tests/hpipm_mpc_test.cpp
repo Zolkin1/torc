@@ -6,7 +6,7 @@
 #include <torc_timer.h>
 #include <catch2/catch_test_macros.hpp>
 
-#include "DynamicsConstraint.h"
+#include "constraints/DynamicsConstraintsTest.h"
 #include "contact_schedule.h"
 #include "pinocchio_interface.h"
 #include "simple_trajectory.h"
@@ -92,7 +92,7 @@ TEST_CASE("Dynamics Constraint") {
     auto curr_path = fs::current_path();
     curr_path = curr_path / "dynamics_constraint_deriv_libs";
 
-    DynamicsConstraint c1(g1, contact_frames, "g1_c1", curr_path, true, true,
+    DynamicsConstraintsTest c1(g1, contact_frames, "g1_c1", curr_path, true, true,
         0, 5);
 
     // TODO: Pick different configs

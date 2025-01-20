@@ -10,8 +10,10 @@
 #include <pinocchio/math/quaternion.hpp>
 #include <pinocchio/spatial/explog-quaternion.hpp>
 #include "pinocchio/algorithm/frames.hpp"
-#include "cppad/example/atomic_two/eigen_cholesky.hpp"
-#include "cppad/example/atomic_two/eigen_mat_inv.hpp"
+#include "pinocchio/algorithm/rnea.hpp"
+#include "pinocchio/algorithm/crba.hpp"
+
+#include "ExternalForce.h"
 
 namespace torc::models {
 
