@@ -7,7 +7,7 @@
 
 #include <vector>
 #include <filesystem>
-
+#include "hpipm-cpp/hpipm-cpp.hpp"
 #include "cost_function.h"
 
 namespace torc::mpc {
@@ -57,6 +57,8 @@ namespace torc::mpc {
         std::vector<std::string> contact_frames;
         int num_contact_locations;
         std::vector<double> hip_offsets;
+
+        hpipm::OcpQpIpmSolverSettings qp_settings;
 
         double ls_eta;
         double ls_alpha_min;

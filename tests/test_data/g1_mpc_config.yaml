@@ -15,16 +15,30 @@ general_settings:
   delay_prediction_dt: 0
   terminal_cost_weight: 2
 solver_settings:
-  rel_tol: 1e-3
-  abs_tol: 1e-3
-  verbose: True
-  polish: False
-  rho: 0.01
-  alpha: 1.6 # 1.6, 1.1
-  sigma: 1e-6
-  adaptive_rho: False
-  max_iter: 200 #20
-  scaling: 10
+# HPIPM:
+  mode: Speed
+  alpha_min: 1e-8
+  max_iter: 10
+  mu0: 100
+  tol_stat: 1e-8
+  tol_eq: 1e-8
+  tol_comp: 1e-8
+  reg_prim: 1e-12
+  warm_start: 0
+  pred_corr: 1
+  ric_alg: 1
+  split_step: 0
+# OSQP:
+#  rel_tol: 1e-3
+#  abs_tol: 1e-3
+#  verbose: True
+#  polish: False
+#  rho: 0.01
+#  alpha: 1.6 # 1.6, 1.1
+#  sigma: 1e-6
+#  adaptive_rho: False
+#  max_iter: 200 #20
+#  scaling: 10
 constraints:
   friction_coef: 0.7  # TODO: Tune this
   friction_margin: 2

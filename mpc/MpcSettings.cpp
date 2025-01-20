@@ -177,7 +177,67 @@ namespace torc::mpc {
             }
         } else {
             YAML::Node solver_settings = config["solver_settings"];
-            // TODO: Fill in
+            if (solver_settings["alpha_min"]) {
+                qp_settings.alpha_min = solver_settings["alpha_min"].as<double>();
+            }
+            if (solver_settings["max_iter"]) {
+                qp_settings.iter_max = solver_settings["max_iter"].as<int>();
+            }
+            if (solver_settings["mu0"]) {
+                qp_settings.mu0 = solver_settings["mu0"].as<double>();
+            }
+            if (solver_settings["tol_stat"]) {
+                qp_settings.tol_stat = solver_settings["tol_stat"].as<double>();
+            }
+            if (solver_settings["tol_eq"]) {
+                qp_settings.tol_eq = solver_settings["tol_eq"].as<double>();
+            }
+            if (solver_settings["tol_ineq"]) {
+                qp_settings.tol_ineq = solver_settings["tol_ineq"].as<double>();
+            }
+            if (solver_settings["tol_comp"]) {
+                qp_settings.tol_comp = solver_settings["tol_comp"].as<double>();
+            }
+            if (solver_settings["reg_prim"]) {
+                qp_settings.reg_prim = solver_settings["reg_prim"].as<double>();
+            }
+            if (solver_settings["warm_start"]) {
+                qp_settings.warm_start = solver_settings["warm_start"].as<int>();
+                if (qp_settings.warm_start != 0 && qp_settings.warm_start != 1) {
+                    throw std::invalid_argument("[MpcSettings] The warm_start parameter must be 0 or 1!");
+                }
+            }
+            if (solver_settings["pred_corr"]) {
+                qp_settings.pred_corr = solver_settings["pred_corr"].as<int>();
+                if (qp_settings.pred_corr != 0 && qp_settings.pred_corr != 1) {
+                    throw std::invalid_argument("[MpcSettings] The pred_corr parameter must be 0 or 1!");
+                }
+            }
+            if (solver_settings["ric_alg"]) {
+                qp_settings.ric_alg = solver_settings["ric_alg"].as<int>();
+                if (qp_settings.ric_alg != 0 && qp_settings.ric_alg != 1) {
+                    throw std::invalid_argument("[MpcSettings] The ric_alg parameter must be 0 or 1!");
+                }
+            }
+            if (solver_settings["split_step"]) {
+                qp_settings.split_step = solver_settings["split_step"].as<int>();
+                if (qp_settings.split_step != 0 && qp_settings.split_step != 1) {
+                    throw std::invalid_argument("[MpcSettings] The split_step parameter must be 0 or 1!");
+                }
+            }
+            if (solver_settings["mode"]) {
+                if (solver_settings["mode"].as<std::string>() == "Balance") {
+                    qp_settings.mode = hpipm::HpipmMode::Balance;
+                } else if (solver_settings["mode"].as<std::string>() == "SpeedAbs") {
+                    qp_settings.mode = hpipm::HpipmMode::SpeedAbs;
+                } else if (solver_settings["mode"].as<std::string>() == "Speed") {
+                    qp_settings.mode = hpipm::HpipmMode::Speed;
+                } else if (solver_settings["mode"].as<std::string>() == "Robust") {
+                    qp_settings.mode = hpipm::HpipmMode::Robust;
+                } else {
+                    throw std::runtime_error("[MpcSettings] HPIPM mode must be one of: {Balance, SpeedAbs, Speed, Robust}");
+                }
+            }
         }
     }
 

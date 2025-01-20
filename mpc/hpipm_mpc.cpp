@@ -20,8 +20,7 @@ namespace torc::mpc {
 
         first_constraint_gen_ = true;
 
-        // TODO: Set solver settings
-        qp_settings.mode = hpipm::HpipmMode::Balance;
+        qp_settings = settings_.qp_settings;
 
         // TODO: Adjust size to NOT account for the boundary (I think)
         traj_.UpdateSizes(nq_, nv_, ntau_, settings_.contact_frames, settings.nodes);
