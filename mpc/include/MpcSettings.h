@@ -47,6 +47,8 @@ namespace torc::mpc {
         double friction_coef;
         double max_grf;
         double friction_margin;
+        double polytope_delta;
+        double polytope_shrinking_rad;
         std::vector<std::pair<std::string, std::string>> collision_frames;
         std::vector<std::pair<double, double>> collision_radii;
 

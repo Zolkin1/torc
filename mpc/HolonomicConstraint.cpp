@@ -55,8 +55,8 @@ namespace torc::mpc {
         const ad::ad_vector_t& qkbar = qk_vk.head(model_.GetConfigDim());
         const ad::ad_vector_t& vkbar = qk_vk.tail(model_.GetVelDim());
 
-        ad::ad_vector_t q = torc::models::ConvertdqToq(dq, qkbar);
-        ad::ad_vector_t v = vkbar + dv;
+        const ad::ad_vector_t q = torc::models::ConvertdqToq(dq, qkbar);
+        const ad::ad_vector_t v = vkbar + dv;
 
         // forward kinematics
         pinocchio::forwardKinematics(model_.GetADPinModel(), *model_.GetADPinData(), q, v);

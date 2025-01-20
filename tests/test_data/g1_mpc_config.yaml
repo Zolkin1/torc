@@ -1,9 +1,11 @@
 general_settings:
   nodes: 32
   verbose: True #True
-  node_dt_type: SmallFirst # Even, SmallFirst, Adaptive
-  node_dt: 0.025
-  first_node_dt: 0.01
+  node_dt_type: two_groups # Even, two_groups, Adaptive
+  node_group_1_n: 5
+  node_group_2_n: 27
+  node_dt_1: 0.015
+  node_dt_2: 0.025
   compile_derivatives: False #True
   base_frame: "pelvis"
   scale_cost: False

@@ -74,7 +74,7 @@ namespace torc::mpc {
 
             int node_type = 0;
             if (general_settings["node_dt_type"]) {
-                if (general_settings["node_dt_type"].as<std::string>() == "SmallFirst") {
+                if (general_settings["node_dt_type"].as<std::string>() == "two_groups") {
                     node_type = 1;
                 } else if (general_settings["node_dt_type"].as<std::string>() == "Adaptive") {
                     throw std::runtime_error("Adaptive node dt not implemented yet!");
@@ -95,19 +95,23 @@ namespace torc::mpc {
                     throw std::runtime_error("Node dt not specified!");
                 }
             } else if (node_type == 1) {
-                if (general_settings["node_dt"]) {
-                    const auto dt_in = general_settings["node_dt"].as<double>();
+                if (general_settings["node_group_1_n"] && general_settings["node_group_2_n"]
+                        && general_settings["node_dt_1"] && general_settings["node_dt_2"]) {
                     dt.resize(nodes);
-                    for (double & it : dt) {
-                        it = dt_in;
+
+                    if (general_settings["node_group_1_n"].as<int>() + general_settings["node_group_2_n"].as<int>() != nodes) {
+                        throw std::runtime_error("Node groups don't sum to the nodes!");
+                    }
+
+                    for (int i = 0; i < general_settings["node_group_1_n"].as<int>(); i++) {
+                        dt[i] = general_settings["node_dt_1"].as<double>();
+                    }
+
+                    for (int i = general_settings["node_group_1_n"].as<int>(); i < general_settings["node_group_2_n"].as<int>() + general_settings["node_group_1_n"].as<int>(); i++) {
+                        dt[i] = general_settings["node_dt_2"].as<double>();
                     }
                 } else {
-                    throw std::runtime_error("Node dt not specified!");
-                }
-                if (general_settings["first_node_dt"]) {
-                    dt[0] = general_settings["first_node_dt"].as<double>();
-                } else {
-                    throw std::runtime_error("You selected node dt type as 'SmallFirst' but did not provide a first node dt!");
+                    throw std::runtime_error("Node group 1 or 2 n not specified or the dt's are not specified!");
                 }
             }
 
@@ -192,6 +196,9 @@ namespace torc::mpc {
         friction_coef = constraint_settings["friction_coef"].as<double>();
         max_grf = constraint_settings["max_grf"].as<double>();
         friction_margin = (constraint_settings["friction_margin"] ? constraint_settings["friction_margin"].as<double>() : 0.05);
+        polytope_delta = (constraint_settings["polytope_delta"] ? constraint_settings["polytope_delta"].as<double>() : 0.0);
+        polytope_shrinking_rad = (constraint_settings["polytope_shrinking_rad"]
+            ? constraint_settings["polytope_shrinking_rad"].as<double>() : 0.4);
 
         YAML::Node collision_settings = constraint_settings["collisions"];
         if (!collision_settings.IsSequence()) {
@@ -261,8 +268,15 @@ namespace torc::mpc {
                 throw std::runtime_error("Cost term must include a weight!");
             }
 
-            if (cost_term["frame"] && cost_data[idx].type == ForwardKinematics) {
+            if (cost_term["frame"]) {
                 cost_data[idx].frame_name = cost_term["frame"].as<std::string>();
+            }
+
+            if (cost_term["mu"]) {
+                cost_data[idx].mu = cost_term["mu"].as<double>();
+            }
+            if (cost_term["delta"]) {
+                cost_data[idx].delta = cost_term["delta"].as<double>();
             }
 
             idx++;
@@ -358,6 +372,8 @@ namespace torc::mpc {
             std::cout << "\tFriction coefficient: " << friction_coef << std::endl;
             std::cout << "\tFriction margin: " << friction_margin << std::endl;
             std::cout << "\tMaximum ground reaction force: " << max_grf << std::endl;
+            std::cout << "\tPolytope delta: " << polytope_delta << std::endl;
+            std::cout << "\tPolytope shrinking rad: " << polytope_shrinking_rad << std::endl;
 
             std::cout << "Costs:" << std::endl;
             for (const auto& data : cost_data) {
