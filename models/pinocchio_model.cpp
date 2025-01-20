@@ -29,9 +29,11 @@ namespace torc::models {
         : BaseModel(other.name_, other.system_type_) {
         model_path_ = other.model_path_;
         pin_model_ = other.pin_model_;
-        pin_data_ = std::make_unique<pinocchio::Data>(*other.pin_data_); // TODO: Check that this works as expected
+        pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
         mass_ = other.mass_;
         n_input_ = other.n_input_;
+        pin_ad_model_ = other.pin_ad_model_;
+        pin_ad_data_ = std::make_shared<ad_pin_data_t>(pin_ad_model_);
     }
 
     PinocchioModel::PinocchioModel(const std::string& name, const std::filesystem::path& model_path,

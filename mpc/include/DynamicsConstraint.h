@@ -21,6 +21,13 @@ namespace torc::mpc {
             const vectorx_t& v1_lin, const vectorx_t& v2_lin, const vectorx_t& tau_lin, const vectorx_t& force_lin,
             double dt);
 
+        int GetNumConstraints() const override;
+
+        // These dynamics convert the full order model to the centroidal ones.
+        std::pair<matrixx_t, matrixx_t> GetBoundaryDynamics();
+
+        bool IsInNodeRange(int node) const override;
+
     protected:
     private:
 

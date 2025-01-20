@@ -21,6 +21,7 @@ namespace torc::mpc {
         ParseConstraintSettings();
         ParseCostSettings();
         ParseLineSearchSettings();
+        ParseContactSettings();
     }
 
     void MpcSettings::ParseJointDefaults() {

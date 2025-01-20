@@ -51,11 +51,13 @@ namespace torc::mpc {
         void SetSwingConstraint(SwingConstraint constraints);
         void SetHolonomicConstraint(HolonomicConstraint constraints);
 
-        void Compute();
+        void CreateConstraints();
+        void CreateCost();
+
+        void Compute(const vectorx_t& q0, const vectorx_t& v0);
 
         void UpdateSetttings(MpcSettings settings);
     protected:
-        void CreateConstraints();
 
         /**
          * @brief
@@ -66,6 +68,8 @@ namespace torc::mpc {
 
     private:
         void SetSizes();
+
+        void NanCheck();
 
         std::vector<Constraint> constraints;
         MpcSettings settings_;
@@ -87,6 +91,9 @@ namespace torc::mpc {
 
         // Solver
         std::vector<hpipm::OcpQp> qp;
+        hpipm::OcpQpIpmSolverSettings qp_settings;
+        std::vector<hpipm::OcpQpSolution> solution;
+        std::unique_ptr<hpipm::OcpQpIpmSolver> solver_;
 
         // Trajectories
         Trajectory traj_;
@@ -99,10 +106,15 @@ namespace torc::mpc {
 
         // Robot Model
         models::FullOrderRigidBody model_;
+        int boundary_node_;
 
         // Swing
         std::vector<double> swing_traj_;
         std::vector<int> in_contact_;
+
+        static constexpr int CONTACT_3DOF = 3;
+
+        bool first_solve_;
     };
 }
 

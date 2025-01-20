@@ -42,6 +42,10 @@ namespace torc::mpc {
         return {jac, y};
     }
 
+    int HolonomicConstraint::GetNumConstraints() const {
+        return constraint_functions_.size()*constraint_functions_.begin()->second->GetRangeSize();
+    }
+
 
     void HolonomicConstraint::HoloConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk,
         const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation) {

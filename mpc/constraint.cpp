@@ -18,7 +18,7 @@ namespace torc::mpc {
     }
 
     bool Constraint::IsInNodeRange(int node) const {
-        return node >= first_node_ && node < last_node_;
+        return node >= first_node_ && node < last_node_ + 1;    // The + 1 accounts for the boundary node
     }
 
 

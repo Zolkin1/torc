@@ -17,7 +17,9 @@ int main() {
 
     const std::string pin_model_name = "test_pin_model";
 
-    torc::models::FullOrderRigidBody g1("g1", g1_urdf);
+    torc::models::FullOrderRigidBody g1("g1", g1_urdf, settings.joint_skip_names, settings.joint_skip_values);
+    std::cout << "g1 config dim: " << g1.GetConfigDim() << std::endl;
+    std::cout << "g1 vel dim: " << g1.GetVelDim() << std::endl;
 
     fs::path deriv_lib_path = fs::current_path();
     deriv_lib_path = deriv_lib_path / "deriv_libs";
@@ -26,8 +28,12 @@ int main() {
 
     // ---------- Dynamics ---------- //
     std::vector<DynamicsConstraint> dynamics_constraints;
-    dynamics_constraints.emplace_back(DynamicsConstraint(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, 5));
+    // dynamics_constraints.emplace_back(DynamicsConstraint(g1, contact_frames, "g1_full_order",
+    //     deriv_lib_path, false, true, 0, 5));
+    // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
+    //     false, false, 5, settings.nodes);
+    dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
+        deriv_lib_path, settings.compile_derivs, true, 0, 5);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
         settings.compile_derivs, false, 5, settings.nodes);
 
@@ -55,7 +61,7 @@ int main() {
     // Torque
     std::vector<int> tau_lims_idxs;
     for (int i = 0; i < g1.GetVelDim() - torc::mpc::FLOATING_VEL; ++i) {
-        tau_lims_idxs.push_back(i + FLOATING_BASE);
+        tau_lims_idxs.push_back(i);
     }
     BoxConstraint tau_box(1, settings.nodes, "tau_box",
         -g1.GetTorqueJointLimits().tail(g1.GetVelDim() - torc::mpc::FLOATING_VEL),
@@ -71,15 +77,25 @@ int main() {
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
-
+    HolonomicConstraint holonomic_constraint(0, settings.nodes, "holonomic_constraint", g1, contact_frames,
+        settings.deriv_lib_path, settings.compile_derivs);
 
     std::cout << "===== Constraints Created =====" << std::endl;
 
     HpipmMpc mpc(settings, g1);
+
+    std::cout << "===== MPC Created =====" << std::endl;
     mpc.SetDynamicsConstraints(std::move(dynamics_constraints));
     mpc.SetConfigBox(config_box);
     mpc.SetVelBox(vel_box);
     mpc.SetTauBox(tau_box);
     mpc.SetFrictionCone(std::move(friction_cone_constraint));
+    mpc.SetSwingConstraint(std::move(swing_constraint));
+    mpc.SetHolonomicConstraint(std::move(holonomic_constraint));
+
+    std::cout << "===== MPC Constraints Added =====" << std::endl;
+    mpc.CreateConstraints();
+    mpc.CreateCost();
+    mpc.Compute(g1.GetNeutralConfig(), vectorx_t::Zero(g1.GetVelDim()));
 }
 

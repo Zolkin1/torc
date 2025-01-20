@@ -25,7 +25,7 @@ namespace torc::ad {
         }
 
         if (force_compile || !fs::exists(lib_path_)) {
-            std::cout << "[CppADInterface] Compiling model..." << std::endl;
+            std::cout << "[CppADInterface] Compiling model [" << name_ << "]..." << std::endl;
             CreateModel();
         } else {
             std::cout << "[CppADInterface] Loading model from " << lib_path_ << std::endl;

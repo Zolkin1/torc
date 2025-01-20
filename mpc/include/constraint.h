@@ -31,7 +31,9 @@ namespace torc::mpc {
         int GetFirstNode() const;
         int GetLastNode() const;
 
-        bool IsInNodeRange(int node) const;
+        virtual bool IsInNodeRange(int node) const;
+
+        virtual int GetNumConstraints() const = 0;
     protected:
         int first_node_;
         int last_node_;

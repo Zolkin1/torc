@@ -16,6 +16,8 @@ namespace torc::mpc {
         FrictionConeConstraint(int first_node, int last_node, const std::string& name, double friction_coef,
             double friction_margin, const fs::path& deriv_lib_path, bool compile_derivs);
 
+        int GetNumConstraints() const override;
+
         std::pair<matrixx_t, vectorx_t> GetLinearization(const vectorx_t& f_lin) const;
 
     protected:

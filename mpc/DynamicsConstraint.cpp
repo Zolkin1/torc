@@ -40,6 +40,9 @@ namespace torc::mpc {
             compile_derivs
         );
 
+        std::cout << "g1 config dim: " << model_.GetConfigDim() << std::endl;
+        std::cout << "g1 vel dim: " << model_.GetVelDim() << std::endl;
+
         // TODO: To get the "forward dynamics" I will need to invert the jacobian term relating to v2
     }
 
@@ -58,17 +61,17 @@ namespace torc::mpc {
         x_zero.setZero();
 
         p.resize(integration_function_->GetParameterSize());
-        p << dt, q1_lin, q2_lin, v1_lin, v2_lin;
+        p << dt, q1_lin, q2_lin, v1_lin;
 
         matrixx_t int_jac;
         integration_function_->GetJacobian(x_zero, p, int_jac);
-
-        matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, vel_dim_).inverse();
 
         matrixx_t A, B;
         if (full_order_) {
             A.resize(2*vel_dim_, 2*vel_dim_);
             B.resize(2*vel_dim_, tau_dim_ + num_contacts_*CONTACT_3DOF);
+
+            matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, vel_dim_).inverse();
 
             A.topRows(vel_dim_) << int_jac.leftCols(vel_dim_), int_jac.middleCols(2*vel_dim_, vel_dim_);
             A.bottomRows(vel_dim_) = dv2_inv*-dyn_jac.leftCols(2*vel_dim_);
@@ -81,6 +84,10 @@ namespace torc::mpc {
             A.setZero();
             B.resize(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL + num_contacts_*CONTACT_3DOF);
             B.setZero();
+
+            // TODO: Check to be sure this is grabbing the block I want
+            // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
+            matrixx_t dv2_inv = dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL).inverse();
 
             A.topRows(vel_dim_) << int_jac.leftCols(vel_dim_), int_jac.middleCols(2*vel_dim_, FLOATING_VEL);
             A.bottomRows<FLOATING_VEL>() << dv2_inv*-dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
@@ -136,12 +143,32 @@ namespace torc::mpc {
         const ad::ad_vector_t tau_id = models::InverseDynamics(model_.GetADPinModel(), *model_.GetADPinData(),
             qk_curr, vk_curr, a, f_ext);
 
-        if (full_order_) {
-            violation = tau_id - tauk_curr;
-        } else {
-            violation = (tau_id - tauk_curr).head<FLOATING_VEL>();
+        violation = tau_id - tauk_curr;
+
+        if (!full_order_) {
+            violation.conservativeResize(FLOATING_VEL, Eigen::NoChange);
         }
     }
+
+    std::pair<matrixx_t, matrixx_t> DynamicsConstraint::GetBoundaryDynamics() {
+        matrixx_t B = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, tau_dim_ + CONTACT_3DOF*num_contacts_);
+        matrixx_t A = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, 2*vel_dim_);
+        A.topRightCorner(vel_dim_, vel_dim_) = matrixx_t::Identity(vel_dim_, vel_dim_);
+        A.block(vel_dim_, vel_dim_, FLOATING_VEL, FLOATING_VEL)
+            = matrixx_t::Identity(FLOATING_VEL, FLOATING_VEL);
+
+        return {A, B};
+    }
+
+
+    int DynamicsConstraint::GetNumConstraints() const {
+        return dynamics_function_->GetRangeSize() + integration_function_->GetRangeSize();
+    }
+
+    bool DynamicsConstraint::IsInNodeRange(int node) const {
+        return node >= first_node_ && node < last_node_;
+    }
+
 
      void DynamicsConstraint::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk,
          const ad::ad_vector_t& dt_qkbar_qkp1bar_vk, ad::ad_vector_t& violation) {

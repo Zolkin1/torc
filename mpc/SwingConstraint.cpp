@@ -19,7 +19,7 @@ namespace torc::mpc {
                    std::bind(&SwingConstraint::SwingHeightConstraint, this, frame, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
                   name_ + "_" + frame + "_swing_height_constraint",
                   deriv_lib_path,
-                  ad::DerivativeOrder::FirstOrder, model.GetVelDim(),  model.GetConfigDim() + 1,
+                  ad::DerivativeOrder::FirstOrder, model_.GetVelDim(),  model_.GetConfigDim() + 1,
                   compile_derivs
                ));
         }
@@ -38,6 +38,10 @@ namespace torc::mpc {
         swing_function_[frame]->GetFunctionValue(x_zero, p, y);
 
         return {jac, y};
+    }
+
+    int SwingConstraint::GetNumConstraints() const {
+        return swing_function_.size()*swing_function_.begin()->second->GetRangeSize();
     }
 
 

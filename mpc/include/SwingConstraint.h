@@ -16,6 +16,7 @@ namespace torc::mpc {
 
         std::pair<matrixx_t, vectorx_t> GetLinearization(const vectorx_t& q_lin, double des_height, const std::string& frame);
 
+        int GetNumConstraints() const override;
     protected:
     private:
         void SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk,

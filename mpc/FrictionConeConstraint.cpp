@@ -17,6 +17,11 @@ namespace torc::mpc {
             compile_derivs) {
     }
 
+    int FrictionConeConstraint::GetNumConstraints() const {
+        return constraint_function_.GetRangeSize();
+    }
+
+
     std::pair<matrixx_t, vectorx_t> FrictionConeConstraint::GetLinearization(const vectorx_t &f_lin) const {
         matrixx_t jac;
 

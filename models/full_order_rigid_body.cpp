@@ -47,7 +47,7 @@ namespace torc::models {
     }
 
     FullOrderRigidBody::FullOrderRigidBody(const torc::models::FullOrderRigidBody& other)
-        : PinocchioModel(other.name_, other.model_path_, HybridSystemImpulse) {
+        : PinocchioModel(other) {
         n_input_ = other.n_input_;
 
         act_mat_ = other.act_mat_;

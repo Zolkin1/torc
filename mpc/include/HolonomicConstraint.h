@@ -17,6 +17,8 @@ namespace torc::mpc {
 
         std::pair<matrixx_t, vectorx_t> GetLinearization(const vectorx_t& q_lin, const vectorx_t& v_lin,
             const std::string& frame);
+
+        int GetNumConstraints() const override;
     protected:
     private:
         void HoloConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation);
