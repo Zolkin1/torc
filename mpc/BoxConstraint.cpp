@@ -31,19 +31,11 @@ namespace torc::mpc {
     }
 
     vectorx_t BoxConstraint::GetLowerBound(const vectorx_t& x_lin) const {
-        vectorx_t lb_out = lb_;
-        for (int i = 0; i < idxs_.size(); i++) {
-            lb_out[idxs_[i]] -= x_lin[idxs_[i]];
-        }
-        return lb_out;
+        return lb_ - x_lin;
     }
 
     vectorx_t BoxConstraint::GetUpperBound(const vectorx_t& x_lin) const {
-        vectorx_t ub_out = ub_;
-        for (int i = 0; i < idxs_.size(); i++) {
-            ub_out[idxs_[i]] -= x_lin[idxs_[i]];
-        }
-        return ub_out;
+        return ub_ - x_lin;
     }
 
     const std::vector<int>& BoxConstraint::GetIdxs() const {

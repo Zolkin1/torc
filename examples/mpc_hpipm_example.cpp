@@ -37,15 +37,15 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, 30);
+        deriv_lib_path, settings.compile_derivs, true, 0, 5);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-        settings.compile_derivs, false, 30, settings.nodes);
+        settings.compile_derivs, false, 5, settings.nodes);
 
     // ---------- Box Constraints ---------- //
     // Config
     std::vector<int> config_lims_idxs;
     for (int i = 0; i < g1.GetConfigDim() - torc::mpc::FLOATING_BASE; ++i) {
-        config_lims_idxs.push_back(i + FLOATING_BASE);
+        config_lims_idxs.push_back(i + FLOATING_VEL);
     }
     BoxConstraint config_box(1, settings.nodes, "config_box",
         g1.GetLowerConfigLimits().tail(g1.GetConfigDim() - torc::mpc::FLOATING_BASE),
@@ -55,7 +55,7 @@ int main() {
     // Vel
     std::vector<int> vel_lims_idxs;
     for (int i = 0; i < g1.GetVelDim() - torc::mpc::FLOATING_VEL; ++i) {
-        vel_lims_idxs.push_back(i + FLOATING_BASE);
+        vel_lims_idxs.push_back(i + FLOATING_VEL);
     }
     BoxConstraint vel_box(1, settings.nodes, "vel_box",
         -g1.GetVelocityJointLimits().tail(g1.GetVelDim() - torc::mpc::FLOATING_VEL),
@@ -67,18 +67,19 @@ int main() {
     for (int i = 0; i < g1.GetVelDim() - torc::mpc::FLOATING_VEL; ++i) {
         tau_lims_idxs.push_back(i);
     }
-    BoxConstraint tau_box(1, settings.nodes, "tau_box",
+    BoxConstraint tau_box(0, settings.nodes, "tau_box",
         -g1.GetTorqueJointLimits().tail(g1.GetVelDim() - torc::mpc::FLOATING_VEL),
         g1.GetTorqueJointLimits().tail(g1.GetVelDim() - torc::mpc::FLOATING_VEL),
         tau_lims_idxs);
 
     // ---------- Friction Cone Constraints ---------- //
-    FrictionConeConstraint friction_cone_constraint(0, settings.nodes, "friction_cone_cone",
+    std::cout << "friction coef: " << settings.friction_coef << std::endl;
+    std::cout << "friction margin: " << settings.friction_margin << std::endl;
+    FrictionConeConstraint friction_cone_constraint(0,settings.nodes, "friction_cone_cone",
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Swing Constraints ---------- //
-    // TODO: Move the first node back
-    SwingConstraint swing_constraint(10, settings.nodes, "swing_constraint", g1, contact_frames,
+    SwingConstraint swing_constraint(1, settings.nodes, "swing_constraint", g1, contact_frames,
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
@@ -109,6 +110,19 @@ int main() {
     ConfigTrackingCost config_tracking(0, settings.nodes, "config_tracking", settings.cost_data.at(0).weight,
         settings.deriv_lib_path, settings.compile_derivs, g1);
 
+    // --------------------------------- //
+    // ------- Contact Schedule -------- //
+    // --------------------------------- //
+    torc::mpc::ContactSchedule cs(settings.contact_frames);
+
+    cs.InsertSwing("right_toe", 0.3, 0.6);
+    cs.InsertSwing("right_heel", 0.3, 0.6);
+    cs.InsertSwing("left_toe", 0.6, 0.9);
+    cs.InsertSwing("left_heel", 0.6, 0.9);
+
+    // --------------------------------- //
+    // -------------- MPC -------------- //
+    // --------------------------------- //
     HpipmMpc mpc(settings, g1);
 
     std::cout << "===== MPC Created =====" << std::endl;
@@ -131,18 +145,37 @@ int main() {
     Trajectory traj;
     vectorx_t q = g1.GetNeutralConfig();
     q(2) = 0.8;
+    // q(0) = 1.0;
+    SimpleTrajectory q_target(g1.GetConfigDim(), settings.nodes);
+    q_target.SetAllData(q);
+    mpc.SetConfigTarget(q_target);
+    // q(0) = 0.0;
+    // TODO: Fix bug with initial condition!
 
+    SimpleTrajectory v_target(g1.GetVelDim(), settings.nodes);
     vectorx_t v = vectorx_t::Zero(g1.GetVelDim());
-    v(1) = 0.3;
-    mpc.SetVelTarget(v);
+    // v(0) = 0.3;
+    v_target.SetAllData(v);
+    mpc.SetVelTarget(v_target);
+
+    // mpc.UpdateContactSchedule(cs);
 
     torc::utils::TORCTimer timer;
     timer.Tic();
     mpc.CreateConstraints();
     mpc.CreateCost();
+    q(2) = 0.8;
     mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
     timer.Toc();
     std::cout << "total time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+
+    // mpc.CreateConstraints();
+    // mpc.CreateCost();
+    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    //
+    // mpc.CreateConstraints();
+    // mpc.CreateCost();
+    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
 
 }
 

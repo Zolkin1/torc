@@ -368,6 +368,17 @@ namespace torc::mpc {
                 throw std::runtime_error("Invalid number of hip offsets provided! Must match the number of contacts x 2!");
             }
         }
+
+        apex_height = contact_settings["apex_height"].as<double>();
+        apex_time = contact_settings["apex_time"].as<double>();
+        default_ground_height = contact_settings["default_ground_height"].as<double>();
+
+        if (apex_height < 0) {
+            throw std::runtime_error("Invalid apex height provided!");
+        }
+        if (apex_time < 0 || apex_time > 1) {
+            throw std::runtime_error("Invalid apex time provided!");
+        }
     }
 
     void MpcSettings::ParseLineSearchSettings() {
@@ -446,6 +457,9 @@ namespace torc::mpc {
             std::cout << "\tTerminal cost weight: " << terminal_weight << std::endl;
 
             std::cout << "Contacts:" << std::endl;
+            std::cout << "\tApex height: " << apex_height << std::endl;
+            std::cout << "\tApex time: " << apex_time << std::endl;
+            std::cout << "\tDefault ground height: " << default_ground_height << std::endl;
             std::cout << "\tNumber of contact locations: " << num_contact_locations << std::endl;
             std::cout << "\tContact frames: [ ";
             for (const auto& frame : contact_frames) {

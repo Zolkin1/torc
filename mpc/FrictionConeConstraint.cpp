@@ -8,33 +8,48 @@ namespace torc::mpc {
     FrictionConeConstraint::FrictionConeConstraint(int first_node, int last_node, const std::string& name,
         double friction_coef, double friction_margin, const fs::path& deriv_lib_path,
         bool compile_derivs)
-        : Constraint(first_node, last_node, name), friction_coef_(friction_coef), friction_margin_(friction_margin),
-            constraint_function_(
+        : Constraint(first_node, last_node, name), friction_coef_(friction_coef), friction_margin_(friction_margin) {
+        constraint_function_ = std::make_unique<ad::CppADInterface>(
             std::bind(&FrictionConeConstraint::ConeConstraint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
             name_ + "_friction_cone_constraint",
             deriv_lib_path,
             ad::DerivativeOrder::FirstOrder, 3, 4,
-            compile_derivs) {
+            compile_derivs);
+
+        if (constraint_function_->GetRangeSize() != 1) {
+            throw std::runtime_error("Friction cone should have a range size of 1");
+        }
+
     }
 
     int FrictionConeConstraint::GetNumConstraints() const {
-        return constraint_function_.GetRangeSize();
+        return constraint_function_->GetRangeSize() + CONTACT_3DOF; // Cone and 0 in the air
     }
 
 
     std::pair<matrixx_t, vectorx_t> FrictionConeConstraint::GetLinearization(const vectorx_t &f_lin) const {
         matrixx_t jac;
 
-        vectorx_t x_zero = vectorx_t::Zero(constraint_function_.GetDomainSize());
-        vectorx_t p(constraint_function_.GetParameterSize());
+        vectorx_t x_zero = vectorx_t::Zero(constraint_function_->GetDomainSize());
+        vectorx_t p(constraint_function_->GetParameterSize());
         p << f_lin, friction_margin_;
 
-        constraint_function_.GetJacobian(x_zero, p, jac);
+        constraint_function_->GetJacobian(x_zero, p, jac);
 
         vectorx_t y;
-        constraint_function_.GetFunctionValue(x_zero, p, y);
+        constraint_function_->GetFunctionValue(x_zero, p, y);
 
-        return {jac, y};
+        matrixx_t A = matrixx_t::Zero(constraint_function_->GetRangeSize() + 3, constraint_function_->GetDomainSize());
+        A.row(0) = jac;
+        A(1, 0) = 1;
+        A(2, 1) = 1;
+        A(3, 2) = 1;
+
+        vectorx_t lin = vectorx_t::Zero(constraint_function_->GetRangeSize() + 3);
+        lin(0) = y(0);
+        lin.tail<3>() = f_lin;
+
+        return {A, lin};
     }
 
 

@@ -20,11 +20,9 @@
 #include "FrictionConeConstraint.h"
 #include "HolonomicConstraint.h"
 #include "LinearLsCost.h"
-
+#include "contact_schedule.h"
 #include "MpcSettings.h"
-#include "NonlinearLsCost.h"
 #include "SwingConstraint.h"
-#include "StateInputConstraint.h"
 
 namespace torc::mpc {
     namespace fs = std::filesystem;
@@ -55,6 +53,7 @@ namespace torc::mpc {
         void SetSwingConstraint(SwingConstraint constraints);
         void SetHolonomicConstraint(HolonomicConstraint constraints);
 
+        // TODO: Write a version that takes in a SimpleTraj object
         void SetVelTrackingCost(LinearLsCost cost);
         void SetTauTrackingCost(LinearLsCost cost);
         void SetForceTrackingCost(LinearLsCost cost);
@@ -65,8 +64,10 @@ namespace torc::mpc {
 
         void Compute(const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
 
-        void SetConfigTarget(const vectorx_t& q_target);
-        void SetVelTarget(const vectorx_t& v_target);
+        void SetConfigTarget(const SimpleTrajectory& q_target);
+        void SetVelTarget(const SimpleTrajectory& v_target);
+
+        void UpdateContactSchedule(const ContactSchedule& sched);
 
         void UpdateSetttings(MpcSettings settings);
     protected:
@@ -83,7 +84,7 @@ namespace torc::mpc {
         // TODO: Make these const refs
         vectorx_t GetVelocityTarget(int node) const;
         vectorx_t GetTauTarget(int node) const;
-        vectorx_t GetForceTarget(int node, int force_idx) const;
+        vector3_t GetForceTarget(int node, const std::string& frame) const;
         vectorx_t GetConfigTarget(int node) const;
 
     private:
@@ -118,10 +119,9 @@ namespace torc::mpc {
         std::unique_ptr<LinearLsCost> force_tracking_;
 
         // TODO: Consider allowing this to vary by node
-        vectorx_t v_target_;
-        vectorx_t q_target_;
-        vectorx_t tau_target_;
-        std::vector<vector3_t> force_target_;
+        SimpleTrajectory v_target_;
+        SimpleTrajectory q_target_;
+        SimpleTrajectory tau_target_;
 
         // Solver
         std::vector<hpipm::OcpQp> qp;
@@ -142,14 +142,16 @@ namespace torc::mpc {
         models::FullOrderRigidBody model_;
         int boundary_node_;
 
-        // Swing
-        std::vector<double> swing_traj_;
-        std::vector<int> in_contact_;
+        // Contacts & Swing
+        std::map<std::string, std::vector<double>> swing_traj_;
+        std::map<std::string, std::vector<int>> in_contact_;
+        std::map<std::string, std::vector<ContactInfo>> contact_info_;
 
         static constexpr int CONTACT_3DOF = 3;
 
         bool first_constraint_gen_;
         bool first_cost_gen_;
+
     };
 }
 

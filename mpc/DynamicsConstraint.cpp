@@ -64,6 +64,7 @@ namespace torc::mpc {
     //     p.resize(integration_function_->GetParameterSize());
     //     p << dt, q1_lin, q2_lin, v1_lin;
     //
+    //     // TODO: Think about if the violation that is returned is really the delta that we want
     //     matrixx_t int_jac;
     //     integration_function_->GetJacobian(x_zero, p, int_jac);
     //
@@ -95,7 +96,7 @@ namespace torc::mpc {
     //         A.bottomRows<FLOATING_VEL>() << dv2_inv*-dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
     //
     //         B.block(FLOATING_VEL, 0, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL) =
-    //             int_jac.block(FLOATING_VEL, 2*vel_dim_, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
+    //             int_jac.block(FLOATING_VEL, 2*vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
     //         B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL),
     //             dyn_jac.rightCols(num_contacts_*CONTACT_3DOF);
     //         B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
@@ -105,8 +106,9 @@ namespace torc::mpc {
     // }
 
     // DEBUG -- Finite Difference
-    std::pair<matrixx_t, matrixx_t> DynamicsConstraint::GetLinDynamics(const vectorx_t &q1_lin, const vectorx_t &q2_lin, const vectorx_t &v1_lin,
-        const vectorx_t& v2_lin, const vectorx_t &tau_lin, const vectorx_t &force_lin, double dt) {
+    void DynamicsConstraint::GetLinDynamics(const vectorx_t &q1_lin, const vectorx_t &q2_lin, const vectorx_t &v1_lin,
+        const vectorx_t& v2_lin, const vectorx_t &tau_lin, const vectorx_t &force_lin, double dt,
+         matrixx_t& A, matrixx_t& B, vectorx_t& b) {
         const double FD_DELTA = 1e-8;
         pinocchio::Model model = model_.GetModel();
         pinocchio::Data data(model);
@@ -121,8 +123,13 @@ namespace torc::mpc {
 
         vectorx_t a_default = models::ForwardDynamics(model, data, q1_lin, v1_lin, tau_for_pin, f_ext);
         vectorx_t v2_default = a_default*dt + v1_lin;
+        vectorx_t dv2 = v2_default - v2_lin;
 
         vectorx_t q2_default = pinocchio::integrate(model, q1_lin, dt*v1_lin);
+        std::cout << "q2_default: " << q2_default.transpose() << std::endl;
+        std::cout << "q2_lin: " << q2_lin.transpose() << std::endl;
+        vectorx_t dq2 = models::qDifference(q2_default, q2_lin);
+        std::cout << "dq2: " << dq2.transpose() << std::endl;
 
         // ----- Compute FD for q ----- //
         matrixx_t Jq = matrixx_t::Zero(model_.GetVelDim(), model_.GetVelDim());
@@ -135,11 +142,13 @@ namespace torc::mpc {
             vectorx_t q = models::ConvertdqToq(dq, q1_lin);
             vectorx_t a = models::ForwardDynamics(model, data, q, v1_lin, tau_for_pin, f_ext);
             vectorx_t v2 = dt*a + v1_lin;
+            vectorx_t dv2_new = v2 - v2_lin;
 
             vectorx_t q2 = pinocchio::integrate(model, q, dt*v1_lin);
+            vectorx_t dq2_new = models::qDifference(q2, q2_lin);
 
-            Jq.col(col) = (v2 - v2_default)/FD_DELTA;
-            Jintq.col(col) = (q2 - q2_default)/FD_DELTA;
+            Jq.col(col) = (dv2_new - dv2)/FD_DELTA;
+            Jintq.col(col) = (dq2_new - dq2)/FD_DELTA;
         }
 
         // ----- Compute FD for v ----- //
@@ -153,11 +162,13 @@ namespace torc::mpc {
             vectorx_t v = v1_lin + dv;
             vectorx_t a = models::ForwardDynamics(model, data, q1_lin, v, tau_for_pin, f_ext);
             vectorx_t v2 = dt*a + v;
+            vectorx_t dv2_new = v2 - v2_lin;
 
             vectorx_t q2 = pinocchio::integrate(model, q1_lin, dt*v);
+            vectorx_t dq2_new = models::qDifference(q2, q2_lin);
 
-            Jv.col(col) = (v2 - v2_default)/FD_DELTA;
-            Jintv.col(col) = (q2 - q2_default)/FD_DELTA;
+            Jv.col(col) = (dv2_new - dv2)/FD_DELTA;
+            Jintv.col(col) = (dq2_new - dq2)/FD_DELTA;
         }
 
         // ----- Compute FD for tau ----- //
@@ -174,8 +185,9 @@ namespace torc::mpc {
 
             vectorx_t a = models::ForwardDynamics(model, data, q1_lin, v1_lin, tau_app, f_ext);
             vectorx_t v2 = dt*a + v1_lin;
+            vectorx_t dv2_new = v2 - v2_lin;
 
-            Jtau.col(col) = (v2 - v2_default)/FD_DELTA;
+            Jtau.col(col) = (dv2_new - dv2)/FD_DELTA;
         }
 
         // ----- Compute FD for F ----- //
@@ -195,14 +207,16 @@ namespace torc::mpc {
 
             vectorx_t a = models::ForwardDynamics(model, data, q1_lin, v1_lin, tau_for_pin, f_ext_2);
             vectorx_t v2 = dt*a + v1_lin;
+            vectorx_t dv2_new = v2 - v2_lin;
 
-            JF.col(col) = (v2 - v2_default)/FD_DELTA;
+            JF.col(col) = (dv2_new - dv2)/FD_DELTA;
         }
 
         // ----- Construct mats ----- //
         if (full_order_) {
-            matrixx_t A = matrixx_t::Zero(2*vel_dim_, 2*vel_dim_);
-            matrixx_t B = matrixx_t::Zero(2*vel_dim_, tau_dim_ + CONTACT_3DOF*num_contacts_);
+            A.setZero();
+            B.setZero();
+            b.setZero();
 
             A.topLeftCorner(vel_dim_, vel_dim_) = Jintq;
             A.topRightCorner(vel_dim_, vel_dim_) = Jintv;
@@ -210,14 +224,16 @@ namespace torc::mpc {
             A.bottomLeftCorner(vel_dim_, vel_dim_) = Jq;
             A.bottomRightCorner(vel_dim_, vel_dim_) = Jv;
 
-            B.bottomLeftCorner(vel_dim_, tau_dim_) = Jtau;
+            // TODO: Put back
+            // B.bottomLeftCorner(vel_dim_, tau_dim_) = Jtau;
             B.bottomRightCorner(vel_dim_, CONTACT_3DOF*num_contacts_) = JF;
 
-            return {A, B};
+            b.head(vel_dim_) = dq2;
+            b.tail(vel_dim_) = dv2;
         } else {
-            // TODO: Check this, I think there still might be an issue
-            matrixx_t A = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, vel_dim_ + FLOATING_VEL);
-            matrixx_t B = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, tau_dim_ + CONTACT_3DOF*num_contacts_);
+            A.setZero();
+            B.setZero();
+            b.setZero();
 
             A.topLeftCorner(vel_dim_, vel_dim_) = Jintq;
             A.topRightCorner(vel_dim_, FLOATING_VEL) = Jintv.leftCols<FLOATING_VEL>();
@@ -230,7 +246,8 @@ namespace torc::mpc {
             B.bottomLeftCorner(FLOATING_VEL, tau_dim_) = Jv.topRightCorner(FLOATING_VEL, tau_dim_);
             B.bottomRightCorner(FLOATING_VEL, CONTACT_3DOF*num_contacts_) = JF.topRows<FLOATING_VEL>();
 
-            return {A, B};
+            b.head(vel_dim_) = dq2;
+            b.tail<FLOATING_VEL>() = dv2.head<FLOATING_VEL>();
         }
     }
 

@@ -17,9 +17,9 @@ namespace torc::mpc {
             bool compile_derivs, bool full_order,
             int first_node, int last_node);
 
-        std::pair<matrixx_t, matrixx_t> GetLinDynamics(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
+        void GetLinDynamics(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
             const vectorx_t& v1_lin, const vectorx_t& v2_lin, const vectorx_t& tau_lin, const vectorx_t& force_lin,
-            double dt);
+            double dt, matrixx_t& A, matrixx_t& B, vectorx_t& b);
 
         int GetNumConstraints() const override;
 

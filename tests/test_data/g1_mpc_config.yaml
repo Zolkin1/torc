@@ -134,6 +134,9 @@ costs:
 contacts:
   contact_frames: ["left_toe", "left_heel", "right_toe", "right_heel"]
   hip_offsets: [0.145, 0.1164, -0.025, 0.1164, 0.145, -0.1164, -0.025, -0.1164]
+  apex_height: 0.08
+  apex_time: 0.75
+  default_ground_height: 0
 joint_defaults:
   joints: ["left_ankle_roll_joint", "right_ankle_roll_joint",
            "waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint",

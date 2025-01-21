@@ -122,7 +122,7 @@ namespace torc::mpc {
 
         int GetNumContacts(const std::string& frame) const;
 
-        ContactInfo GetDefaultContactInfo() const;
+        static ContactInfo GetDefaultContactInfo();
 
         int GetContactIndex(const std::string& frame, double time) const;
 

@@ -27,7 +27,7 @@ namespace torc::mpc {
                             const torc::ad::ad_vector_t& xref_xtarget_weight,
                             torc::ad::ad_vector_t& x_diff) const;
 
-        ad::CppADInterface cost_function_;
+        std::unique_ptr<ad::CppADInterface> cost_function_;
         int var_size_;
     private:
     };

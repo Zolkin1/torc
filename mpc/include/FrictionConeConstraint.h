@@ -24,7 +24,7 @@ namespace torc::mpc {
     private:
         void ConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk_margin, ad::ad_vector_t& violation) const;
 
-        ad::CppADInterface constraint_function_;
+        std::unique_ptr<ad::CppADInterface> constraint_function_;
         double friction_coef_;
         double friction_margin_;
 

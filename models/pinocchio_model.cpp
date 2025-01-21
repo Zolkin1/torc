@@ -42,6 +42,7 @@ namespace torc::models {
             : BaseModel(name, system_type), model_path_(model_path) {
         // Create the pin model with some fixed joints
         CreatePinModel(true, joint_skip_names, joint_skip_values);
+        mass_ = pinocchio::computeTotalMass(pin_model_);
     }
 
 

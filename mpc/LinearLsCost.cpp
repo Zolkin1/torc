@@ -7,13 +7,14 @@
 namespace torc::mpc {
     LinearLsCost::LinearLsCost(int first_node, int last_node, const std::string &name, const vectorx_t &weights,
         const std::filesystem::path& deriv_lib_path, bool compile_derivs)
-    : Cost(first_node, last_node, name, weights), cost_function_(
+    : Cost(first_node, last_node, name, weights), var_size_(weights.size()) {
+        cost_function_ = std::make_unique<ad::CppADInterface> (
                         std::bind(&LinearLsCost::CostFunction, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
                         name_ + "_linear_ls_cost",
                         deriv_lib_path,
                         torc::ad::DerivativeOrder::SecondOrder, weights.size(), 3*weights.size(),
-                        compile_derivs), var_size_(weights.size()) {
-        std::cout << "weights size: " << weights.size() << ", weights:\n" << weights_.transpose() << std::endl;
+                        compile_derivs);
+        std::cout << "weights size: " << weights_.size() << ", weights:\n" << weights_.transpose() << std::endl;
     }
 
     std::pair<matrixx_t, vectorx_t> LinearLsCost::GetQuadraticApprox(const vectorx_t &x_lin, const vectorx_t& p) {
@@ -23,22 +24,22 @@ namespace torc::mpc {
             throw std::runtime_error("[LinearLSCost] x_lin or p has the wrong size!");
         }
 
-        vectorx_t x_zero = vectorx_t::Zero(cost_function_.GetDomainSize());
+        vectorx_t x_zero = vectorx_t::Zero(cost_function_->GetDomainSize());
 
         matrixx_t hessian;
         vectorx_t linear_term;
 
-        vectorx_t p_ad(cost_function_.GetParameterSize());
-        p_ad << x_lin, p, weights_;
+        vectorx_t p_ad(cost_function_->GetParameterSize());
+        p_ad << x_lin, p, weights_; // TODO: Check to make sure this is filled in by here
 
         matrixx_t jac;
-        cost_function_.GetJacobian(x_zero, p_ad, jac);
+        cost_function_->GetJacobian(x_zero, p_ad, jac);
 
         vectorx_t y;
-        cost_function_.GetFunctionValue(x_zero, p_ad, y);
+        cost_function_->GetFunctionValue(x_zero, p_ad, y);
         linear_term = 2*jac.transpose()*y;
 
-        cost_function_.GetHessian(x_zero, p_ad, 2*y, hessian);
+        cost_function_->GetHessian(x_zero, p_ad, 2*y, hessian);
         hessian += 2*jac.transpose() * jac;
 
         return {hessian, linear_term};

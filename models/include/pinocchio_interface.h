@@ -41,6 +41,37 @@ namespace torc::models {
         return q_out;
     }
 
+    /**
+     * @brief computes q1 - q2
+     * @tparam ScalarT
+     * @param q1
+     * @param q
+     * @return
+     */
+    template<typename ScalarT>
+    Eigen::Vector<ScalarT, Eigen::Dynamic> qDifference(const Eigen::Vector<ScalarT, Eigen::Dynamic>& q1,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& q2) {
+
+        if (q1.size() != q2.size()) {
+            throw std::runtime_error("q1 and q2 do not have the same size!");
+        }
+
+        Eigen::Vector<ScalarT, Eigen::Dynamic> q_out(q1.size() - 1);
+
+        // Position variables
+        q_out.template head<3>() = q1.template head<3>() - q2.template head<3>();
+
+        // Quaternion
+        Eigen::Quaternion<ScalarT> quat1(q1.template segment<4>(3));
+        Eigen::Quaternion<ScalarT> quat2(q2.template segment<4>(3));
+        q_out.template segment<3>(3) = pinocchio::quaternion::log3(quat2.inverse()*quat1);
+
+        // Joints
+        q_out.tail(q_out.size() - 6) = q1.tail(q1.size() - 7) - q2.tail(q2.size() - 7);
+
+        return q_out;
+    }
+
     template<typename ScalarT>
     Eigen::Vector<ScalarT, Eigen::Dynamic> InverseDynamics(const pinocchio::ModelTpl<ScalarT>& pin_model, pinocchio::DataTpl<ScalarT>& data,
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& q,

@@ -358,7 +358,7 @@ namespace torc::mpc {
         return frame_schedule_map.at(frame).size() + 1;
     }
 
-    ContactInfo ContactSchedule::GetDefaultContactInfo() const {
+    ContactInfo ContactSchedule::GetDefaultContactInfo() {
         ContactInfo contact_info;
 
         // TODO: Come back to these defaults

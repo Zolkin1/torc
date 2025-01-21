@@ -29,9 +29,11 @@ namespace torc::mpc {
 
         void Print();
 
+        // Model
         std::vector<std::string> joint_skip_names;
         std::vector<double> joint_skip_values;
 
+        // General
         int nodes;
         bool verbose;
         std::vector<double> dt;
@@ -44,6 +46,7 @@ namespace torc::mpc {
         int nodes_full_dynamics;
         double terminal_weight;
 
+        // Constraints
         double friction_coef;
         double max_grf;
         double friction_margin;
@@ -54,12 +57,20 @@ namespace torc::mpc {
 
         std::vector<CostData> cost_data;
 
+        // Contact Info
         std::vector<std::string> contact_frames;
         int num_contact_locations;
         std::vector<double> hip_offsets;
 
+        // Swing Info
+        double apex_height;
+        double apex_time;   // 0-1
+        double default_ground_height;
+
+        // QP Settings
         hpipm::OcpQpIpmSolverSettings qp_settings;
 
+        // Line Search
         double ls_eta;
         double ls_alpha_min;
         double ls_theta_max;
