@@ -37,9 +37,9 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, 4);
+        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-        settings.compile_derivs, false, 4, settings.nodes);
+        settings.compile_derivs, false, settings.nodes_full_dynamics, settings.nodes);
 
     // ---------- Box Constraints ---------- //
     // Config
