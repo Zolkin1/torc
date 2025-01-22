@@ -169,8 +169,7 @@ int main() {
 
     // // mpc.CreateConstraints();
     // // mpc.CreateCost();
-    // TODO: Why does calling this again make it worse?
-    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
     //
     // // mpc.CreateConstraints();
     // // mpc.CreateCost();
