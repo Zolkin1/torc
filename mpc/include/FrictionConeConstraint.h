@@ -20,6 +20,7 @@ namespace torc::mpc {
 
         std::pair<matrixx_t, vectorx_t> GetLinearization(const vectorx_t& f_lin) const;
 
+        vectorx_t GetViolation(const vectorx_t& F, double margin);
     protected:
     private:
         void ConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk_margin, ad::ad_vector_t& violation) const;

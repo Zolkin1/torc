@@ -13,10 +13,10 @@ general_settings:
   initial_constraint_tol: 5e-4
   nodes_full_dynamics: 3 #4   # Also determines how many nodes have torque constraints
   delay_prediction_dt: 0
-  terminal_cost_weight: 2
+  terminal_cost_weight: 200 #2
 solver_settings:
 # HPIPM:
-  mode: Balance
+  mode: Robust #Balance
   alpha_min: 1e-8
   max_iter: 30 #5 #10
   mu0: 100
@@ -95,11 +95,11 @@ costs:
               0.01, 0.01, 0.01, 0.01, ]                          # Right Arm
   - type: ForceRegularization
     name: "ForceReg"
-    weight: [ 0.01, 0.01, 0.0001 ]
-  - type: ForwardKinematics
-    name: left_toe_fk
-    frame: "left_toe"
-    weight: [1, 1, 1]
+    weight: [ 0.01, 0.01, 0.001 ]
+#  - type: ForwardKinematics
+#    name: left_toe_fk
+#    frame: "left_toe"
+#    weight: [1, 1, 1]
 #  - type: ConfigurationTracking
 #    name: "ConfigTracking"
 #    weight:  [1, 1, 20,

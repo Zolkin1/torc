@@ -79,11 +79,11 @@ int main() {
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Swing Constraints ---------- //
-    SwingConstraint swing_constraint(1, settings.nodes, "swing_constraint", g1, contact_frames,
+    SwingConstraint swing_constraint(2, settings.nodes, "swing_constraint", g1, contact_frames,
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
-    HolonomicConstraint holonomic_constraint(1, settings.nodes, "holonomic_constraint", g1, contact_frames,
+    HolonomicConstraint holonomic_constraint(2, settings.nodes, "holonomic_constraint", g1, contact_frames,
         settings.deriv_lib_path, settings.compile_derivs);
 
     std::cout << "===== Constraints Created =====" << std::endl;
@@ -92,7 +92,6 @@ int main() {
     // ------------- Costs ------------- //
     // --------------------------------- //
     // ---------- Velocity Tracking ---------- //
-    // TODO: Confirm I am giving the correct weight!
     std::cout << settings.cost_data.at(1).weight.transpose() << std::endl;
     LinearLsCost vel_tracking(0, settings.nodes, "vel_tracking", settings.cost_data.at(1).weight,
         settings.deriv_lib_path, settings.compile_derivs);
@@ -170,6 +169,7 @@ int main() {
 
     // // mpc.CreateConstraints();
     // // mpc.CreateCost();
+    // TODO: Why does calling this again make it worse?
     // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
     //
     // // mpc.CreateConstraints();

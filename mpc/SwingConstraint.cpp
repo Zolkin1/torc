@@ -44,7 +44,6 @@ namespace torc::mpc {
         return swing_function_.size()*swing_function_.begin()->second->GetRangeSize();
     }
 
-
     void SwingConstraint::SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk,
         const ad::ad_vector_t& qk_desheight, ad::ad_vector_t& violation) {
         const ad::ad_vector_t& qkbar = qk_desheight.head(model_.GetConfigDim());
@@ -63,4 +62,15 @@ namespace torc::mpc {
         violation.resize(1);
         violation(0) = frame_pos(2) - des_height;
     }
+
+    vectorx_t SwingConstraint::GetViolation(const vectorx_t &q, double des_height, const std::string& frame) {
+        const vectorx_t x_zero = vectorx_t::Zero(swing_function_[frame]->GetDomainSize());
+        vectorx_t p(swing_function_[frame]->GetParameterSize());
+        p << q, des_height;
+
+        vectorx_t violation;
+        swing_function_[frame]->GetFunctionValue(x_zero, p, violation);
+        return violation;
+    }
+
 }

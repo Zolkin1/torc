@@ -52,6 +52,20 @@ namespace torc::mpc {
         return {A, lin};
     }
 
+    vectorx_t FrictionConeConstraint::GetViolation(const vectorx_t &F, double margin) {
+        vectorx_t x_zero = vectorx_t::Zero(constraint_function_->GetDomainSize());
+        vectorx_t p(constraint_function_->GetParameterSize());
+        p << F, margin;
+
+        vectorx_t fcn_vio;
+        constraint_function_->GetFunctionValue(x_zero, p, fcn_vio);
+
+        vectorx_t violation(4);
+        violation(0) = fcn_vio(0);
+        violation.tail<3>() = F;
+
+        return violation;
+    }
 
     void FrictionConeConstraint::ConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk_margin, ad::ad_vector_t& violation) const {
         const ad::ad_vector_t f = df + fk_margin.head<CONTACT_3DOF>();
