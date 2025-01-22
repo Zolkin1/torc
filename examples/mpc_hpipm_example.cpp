@@ -20,8 +20,6 @@ int main() {
     const std::string pin_model_name = "test_pin_model";
 
     torc::models::FullOrderRigidBody g1("g1", g1_urdf, settings.joint_skip_names, settings.joint_skip_values);
-    std::cout << "g1 config dim: " << g1.GetConfigDim() << std::endl;
-    std::cout << "g1 vel dim: " << g1.GetVelDim() << std::endl;
 
     fs::path deriv_lib_path = fs::current_path();
     deriv_lib_path = deriv_lib_path / "deriv_libs";
@@ -73,8 +71,6 @@ int main() {
         tau_lims_idxs);
 
     // ---------- Friction Cone Constraints ---------- //
-    std::cout << "friction coef: " << settings.friction_coef << std::endl;
-    std::cout << "friction margin: " << settings.friction_margin << std::endl;
     FrictionConeConstraint friction_cone_constraint(0,settings.nodes, "friction_cone_cone",
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
 
@@ -83,7 +79,7 @@ int main() {
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
-    HolonomicConstraint holonomic_constraint(2, settings.nodes, "holonomic_constraint", g1, contact_frames,
+    HolonomicConstraint holonomic_constraint(1, settings.nodes, "holonomic_constraint", g1, contact_frames,
         settings.deriv_lib_path, settings.compile_derivs);
 
     std::cout << "===== Constraints Created =====" << std::endl;
@@ -105,7 +101,6 @@ int main() {
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Config Tracking ---------- //
-    std::cerr << "weights size: " << settings.cost_data.at(0).weight.size() << std::endl;
     ConfigTrackingCost config_tracking(0, settings.nodes, "config_tracking", settings.cost_data.at(0).weight,
         settings.deriv_lib_path, settings.compile_derivs, g1);
 
@@ -158,25 +153,27 @@ int main() {
     // Create an IC
     vectorx_t q = settings.q_target;
     // q(2) = 0.8;
-    // q(0) = 1;
+    q(0) = 1;
 
     torc::utils::TORCTimer timer;
     timer.Tic();
     mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
     timer.Toc();
-    std::cout << "total time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+    std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
+
     mpc.GetConstraintViolation();
 
-    // // mpc.CreateConstraints();
-    // // mpc.CreateCost();
+    timer.Tic();
     mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
-    //
-    // // mpc.CreateConstraints();
-    // // mpc.CreateCost();
-    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
-    //
-    // mpc.GetConstraintViolation();
+    timer.Toc();
+    std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
 
+    timer.Tic();
+    mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    timer.Toc();
+    std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
+
+    traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output.csv");
 
 }
 

@@ -62,7 +62,7 @@ namespace torc::mpc {
         void CreateConstraints();
         void CreateCost();
 
-        void Compute(const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
+        hpipm::HpipmStatus Compute(const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
 
         void SetConfigTarget(const SimpleTrajectory& q_target);
         void SetVelTarget(const SimpleTrajectory& v_target);
