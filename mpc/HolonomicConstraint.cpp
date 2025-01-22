@@ -71,6 +71,18 @@ namespace torc::mpc {
 
         // Violation is the velocity as we want to drive it to 0
         // TODO: Consider going back to 3
-        violation = vel.head<2>();
+        violation = vel.head<3>();
     }
+
+    vectorx_t HolonomicConstraint::GetViolation(const vectorx_t &q, const vectorx_t &v, const std::string &frame) {
+        vectorx_t x_zero = vectorx_t::Zero(constraint_functions_[frame]->GetDomainSize());
+        vectorx_t p(constraint_functions_[frame]->GetParameterSize());
+        p << q, v;
+        vectorx_t violation = vectorx_t::Zero(constraint_functions_[frame]->GetRangeSize());
+
+        constraint_functions_[frame]->GetFunctionValue(x_zero, p, violation);
+
+        return violation;
+    }
+
 }

@@ -150,19 +150,22 @@ namespace torc::mpc {
                 if (dynamics_constraints_[0].IsInNodeRange(node)) {
                     std::cerr << "Adding FO dynamics..." << std::endl;
                     dynamics_constraints_[0].GetLinDynamics(
-                        traj_.GetConfiguration(traj_idx), traj_.GetConfiguration(traj_idx + 1), traj_.GetVelocity(traj_idx),
-                        traj_.GetVelocity(traj_idx + 1), traj_.GetTau(traj_idx), force, settings_.dt[traj_idx],
+                        traj_.GetConfiguration(traj_idx), traj_.GetConfiguration(traj_idx + 1),
+                        traj_.GetVelocity(traj_idx), traj_.GetVelocity(traj_idx + 1),
+                        traj_.GetTau(traj_idx), force, settings_.dt[traj_idx],
                         qp[node].A, qp[node].B, qp[node].b);
                 } else if (node == boundary_node_) {
                     std::cerr << "Adding boundary dynamics..." << std::endl;
                     std::tie(qp[node].A, qp[node].B) = dynamics_constraints_[0].GetBoundaryDynamics();
+                    qp[node].b.setZero();
                 } else {
                     std::cerr << "Adding ROM dynamics..." << std::endl;
                     // TODO: Error here
                     dynamics_constraints_[1].GetLinDynamics(
-                                        traj_.GetConfiguration(traj_idx), traj_.GetConfiguration(traj_idx + 1), traj_.GetVelocity(traj_idx),
-                                        traj_.GetVelocity(traj_idx + 1), traj_.GetTau(traj_idx), force, settings_.dt[node],
-                                        qp[node].A, qp[node].B, qp[node].b);
+                        traj_.GetConfiguration(traj_idx), traj_.GetConfiguration(traj_idx + 1),
+                        traj_.GetVelocity(traj_idx), traj_.GetVelocity(traj_idx + 1),
+                        traj_.GetTau(traj_idx), force, settings_.dt[node],
+                        qp[node].A, qp[node].B, qp[node].b);
 
                     // TODO: Check these
                     // std::cerr << "A:\n" << qp[node].A << std::endl;
@@ -263,44 +266,44 @@ namespace torc::mpc {
                 }
             }
 
-            // // Swing height
-            // if ((node >= swing_constraint_->GetFirstNode() && node < swing_constraint_->GetLastNode() + 1) && node != boundary_node_) {
-            //     std::cerr << "Adding swing..." << std::endl;
-            //     for (const auto& frame : settings_.contact_frames) {
-            //         // std::cout << "[" << frame << "] swing height: " << swing_traj_[frame][node] << std::endl;
-            //
-            //         const auto [c_block, y_segment] =
-            //             swing_constraint_->GetLinearization(traj_.GetConfiguration(traj_idx), swing_traj_[frame][traj_idx], frame);
-            //         // std::cout << "c block:\n" << c_block << std::endl;
-            //         // std::cout << "y_segment: " << y_segment.transpose() << std::endl;
-            //         // y_segment.size should = 1
-            //         qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nv_) = c_block;
-            //         qp[node].lg(ineq_row_idx) = -y_segment(0);
-            //         qp[node].ug(ineq_row_idx) = -y_segment(0);
-            //         ineq_row_idx += y_segment.size();
-            //     }
-            // }
+            // Swing height
+            if ((node >= swing_constraint_->GetFirstNode() && node < swing_constraint_->GetLastNode() + 1) && node != boundary_node_) {
+                std::cerr << "Adding swing..." << std::endl;
+                for (const auto& frame : settings_.contact_frames) {
+                    // std::cout << "[" << frame << "] swing height: " << swing_traj_[frame][node] << std::endl;
 
-            // // Holonomic
-            // if ((node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
-            //     // std::cerr << "Adding holonomic..." << std::endl;
-            //     for (const auto& frame : settings_.contact_frames) {
-            //         const auto [jac, y_segment] =
-            //             holonomic_->GetLinearization(traj_.GetConfiguration(traj_idx), traj_.GetVelocity(traj_idx), frame);
-            //         if (dynamics_constraints_[0].IsInNodeRange(traj_idx)) {
-            //             qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][traj_idx]*jac;
-            //         } else {
-            //             qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
-            //                 in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
-            //             qp[node].D.block(ineq_row_idx, 0, y_segment.size(), FLOATING_VEL) =
-            //                 in_contact_[frame][node]*jac.rightCols(FLOATING_VEL);
-            //         }
-            //         qp[node].lg.segment<2>(ineq_row_idx) = -in_contact_[frame][traj_idx]*y_segment;
-            //         qp[node].ug.segment<2>(ineq_row_idx) = -in_contact_[frame][traj_idx]*y_segment;
-            //
-            //         ineq_row_idx += y_segment.size();
-            //     }
-            // }
+                    const auto [c_block, y_segment] =
+                        swing_constraint_->GetLinearization(traj_.GetConfiguration(traj_idx), swing_traj_[frame][traj_idx], frame);
+                    // std::cout << "c block:\n" << c_block << std::endl;
+                    // std::cout << "y_segment: " << y_segment.transpose() << std::endl;
+                    // y_segment.size should = 1
+                    qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nv_) = c_block;
+                    qp[node].lg(ineq_row_idx) = -y_segment(0);
+                    qp[node].ug(ineq_row_idx) = -y_segment(0);
+                    ineq_row_idx += y_segment.size();
+                }
+            }
+
+            // Holonomic
+            if ((node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
+                // std::cerr << "Adding holonomic..." << std::endl;
+                for (const auto& frame : settings_.contact_frames) {
+                    const auto [jac, y_segment] =
+                        holonomic_->GetLinearization(traj_.GetConfiguration(traj_idx), traj_.GetVelocity(traj_idx), frame);
+                    if (dynamics_constraints_[0].IsInNodeRange(traj_idx)) {
+                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][traj_idx]*jac;
+                    } else {
+                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
+                            in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
+                        qp[node].D.block(ineq_row_idx, 0, y_segment.size(), nv_ - FLOATING_VEL) =
+                            in_contact_[frame][node]*jac.rightCols(nv_ - FLOATING_VEL);
+                    }
+                    qp[node].lg.segment<3>(ineq_row_idx) = -in_contact_[frame][traj_idx]*y_segment;
+                    qp[node].ug.segment<3>(ineq_row_idx) = -in_contact_[frame][traj_idx]*y_segment;
+
+                    ineq_row_idx += y_segment.size();
+                }
+            }
 
             // // Collision
             // if (collision_->IsInNodeRange(node)) {
@@ -333,8 +336,8 @@ namespace torc::mpc {
             std::cout << "lbu: " << qp[node].lbu.transpose() << std::endl;
             std::cout << "ubu: " << qp[node].ubu.transpose() << std::endl;
 
-            std::cout << "D:\n" << qp[node].D << std::endl;
-            std::cout << "C:\n" << qp[node].C << std::endl;
+            // std::cout << "D:\n" << qp[node].D << std::endl;
+            // std::cout << "C:\n" << qp[node].C << std::endl;
             std::cout << "lg: " << qp[node].lg.transpose() << std::endl;
             std::cout << "ug: " << qp[node].ug.transpose() << std::endl;
             std::cout << "ugmask: " << qp[node].ug_mask.transpose() << std::endl;
@@ -450,6 +453,7 @@ namespace torc::mpc {
                 nx2 = nv_ + FLOATING_VEL;
                 nx_box = 0;
                 nu_box = 0;
+                // TODO: Might be able to make the input dimension here 0
             } else {
                 nx1 = nv_ + FLOATING_VEL;
                 nx2 = nx1;
@@ -558,9 +562,13 @@ namespace torc::mpc {
         traj_.SetConfiguration(0, q0);
         traj_.SetVelocity(0, v0);
 
+        // TODO: If I don't create the constraints right now then I need to re-create the constraints that involve the IC!
+        CreateConstraints();
+        CreateCost();
+
         torc::utils::TORCTimer timer;
         timer.Tic();
-        const auto res = solver_->solve(vectorx_t::Zero(model_.GetConfigDim() + model_.GetVelDim()),
+        const auto res = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
             qp, solution_); // TODO: Might need to remove this x0 input
         timer.Toc();
 
@@ -569,6 +577,9 @@ namespace torc::mpc {
         std::cout << "Res: " << res << std::endl;
         std::cout << stats << std::endl;
         std::cout << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+        for (int i = 0; i < stats.obj.size(); i++) {
+            std::cout << "Objective value: [" << i << "] " << stats.obj[i] << std::endl;
+        }
 
         ConvertQpSolToTraj();
         traj_out = traj_;
@@ -578,31 +589,44 @@ namespace torc::mpc {
     void HpipmMpc::ConvertQpSolToTraj() {
         int traj_idx = 0;
         for (int node = 0; node < settings_.nodes + 1; node++) {
-            // TODO: Make it start at node 1!
-
             std::cout << "node: " << node << std::endl;
+            std::cout << "traj idx: " << traj_idx << std::endl;
+            std::cout << "x: " << solution_[node].x.transpose() << std::endl;
+            std::cout << "u: " << solution_[node].u.transpose() << std::endl;
 
             if (dynamics_constraints_[0].IsInNodeRange(node)) {
-                // std::cout << "q before: " << traj_.GetConfiguration(node).transpose() << std::endl;
-                traj_.SetConfiguration(traj_idx, models::ConvertdqToq<double>(solution_[node].x.head(nv_), traj_.GetConfiguration(traj_idx)));
-                // std::cout << "dq: " << solution_[node].x.head(nv_).transpose() << std::endl;
+                if (node != 0) {
+                    // std::cout << "q before: " << traj_.GetConfiguration(node).transpose() << std::endl;
+                    traj_.SetConfiguration(traj_idx, models::ConvertdqToq<double>(solution_[node].x.head(nv_), traj_.GetConfiguration(traj_idx)));
+                    // std::cout << "dq: " << solution_[node].x.head(nv_).transpose() << std::endl;
 
-                traj_.SetVelocity(traj_idx, traj_.GetVelocity(traj_idx) + solution_[node].x.tail(nv_));
+                    traj_.SetVelocity(traj_idx, traj_.GetVelocity(traj_idx) + solution_[node].x.tail(nv_));
+
+                    std::cout << "q: " << traj_.GetConfiguration(traj_idx).transpose() << std::endl;
+                    std::cout << "v: " << traj_.GetVelocity(traj_idx).transpose() << std::endl;
+                }
+
                 traj_.SetTau(traj_idx, traj_.GetTau(traj_idx) + solution_[node].u.head(ntau_));
-            } else if (node != boundary_node_ && node < settings_.nodes) {
+            } else if (node != boundary_node_) {
                 traj_.SetConfiguration(traj_idx, models::ConvertdqToq<double>(solution_[node].x.head(nv_), traj_.GetConfiguration(traj_idx)));
 
-                vectorx_t v(nv_);
-                v << solution_[node].x.tail<FLOATING_VEL>(), solution_[node].u.head(ntau_);
-                traj_.SetVelocity(traj_idx, traj_.GetVelocity(traj_idx) + v);
+                if (node < settings_.nodes - 1) {
+                    vectorx_t v(nv_);
+                    v << solution_[node].x.tail<FLOATING_VEL>(), solution_[node].u.head(ntau_);
+
+                    traj_.SetVelocity(traj_idx, traj_.GetVelocity(traj_idx) + v);
+                }
             }
 
-            if (node != boundary_node_ && node < settings_.nodes) {
+            if (node != boundary_node_ && node < settings_.nodes - 1) {
                 for (int i = 0; i < settings_.contact_frames.size(); i++) {
                     traj_.SetForce(traj_idx, settings_.contact_frames[i],
                         traj_.GetForce(traj_idx, settings_.contact_frames[i]) + solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3));
                 }
             }
+
+            // std::cerr << "traj size (nodes): " << traj_.GetNumNodes() << std::endl;
+            // std::cerr << "traj config: " << traj_.GetConfiguration(traj_idx).transpose() << std::endl;
 
             if (node != boundary_node_) {
                 traj_idx++;
@@ -647,6 +671,28 @@ namespace torc::mpc {
     void HpipmMpc::SetConfigTarget(const SimpleTrajectory &q_target) {
         q_target_ = q_target;
     }
+
+    void HpipmMpc::SetLinTrajConfig(const SimpleTrajectory &config_traj) {
+        if (config_traj.GetNumNodes() != traj_.GetNumNodes()) {
+            throw std::runtime_error("[SetLinTrajConfig] Invalid config trajectory size!");
+        }
+
+        for (int i = 0; i < traj_.GetNumNodes(); i++) {
+            traj_.SetConfiguration(i, config_traj.GetNodeData(i));
+        }
+    }
+
+    void HpipmMpc::SetLinTrajVel(const SimpleTrajectory &vel_traj) {
+        if (vel_traj.GetNumNodes() != traj_.GetNumNodes()) {
+            throw std::runtime_error("[SetLinTrajConfig] Invalid config trajectory size!");
+        }
+
+        for (int i = 0; i < traj_.GetNumNodes(); i++) {
+            traj_.SetVelocity(i, vel_traj.GetNodeData(i));
+        }
+    }
+
+
 
     void HpipmMpc::UpdateContactSchedule(const ContactSchedule &sched) {
         vector4_t polytope_delta;
@@ -700,6 +746,82 @@ namespace torc::mpc {
                 settings_.apex_time, settings_.dt, traj);
             frame_idx++;
         }
+    }
+
+    double HpipmMpc::GetConstraintViolation() {
+        double violation = 0;
+        int traj_idx = 0;
+        for (int node = 0; node < settings_.nodes + 1; node++) {
+            vectorx_t force(CONTACT_3DOF*settings_.num_contact_locations);
+            int force_idx = 0;
+            for (const auto& frame : settings_.contact_frames) {
+                force.segment<CONTACT_3DOF>(force_idx) = traj_.GetForce(traj_idx, frame);
+                force_idx += CONTACT_3DOF;
+            }
+
+            // TODO: There appears to always be a large spike at the boundary between dynamics,
+            //  Specifically the node before the change seems to have a high cost
+
+            std::cout << "traj idx: " << traj_idx << std::endl;
+
+            if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                vectorx_t vio_vec = dynamics_constraints_[0].GetViolation(traj_.GetConfiguration(traj_idx),
+                    traj_.GetConfiguration(traj_idx + 1), traj_.GetVelocity(traj_idx),
+                    traj_.GetVelocity(traj_idx + 1), traj_.GetTau(traj_idx), force, settings_.dt[traj_idx]);
+                std::cout << "Dynamics vio: " << vio_vec.transpose() << std::endl;
+                std::cout << "velocity: " << traj_.GetVelocity(traj_idx).transpose() << std::endl;
+                violation += vio_vec.squaredNorm();
+            } else if (node != boundary_node_ && node < traj_.GetNumNodes() - 1) {
+                vectorx_t vio_vec = dynamics_constraints_[1].GetViolation(traj_.GetConfiguration(traj_idx),
+                    traj_.GetConfiguration(traj_idx + 1), traj_.GetVelocity(traj_idx),
+                    traj_.GetVelocity(traj_idx + 1), traj_.GetTau(traj_idx), force, settings_.dt[traj_idx]);
+                std::cout << "Dynamics vio: " << vio_vec.transpose() << std::endl;
+                violation += vio_vec.squaredNorm();
+            }
+
+            if (config_box_->IsInNodeRange(node) && node != boundary_node_) {
+                vectorx_t vio_vec = config_box_->GetViolation(traj_.GetConfiguration(traj_idx).tail(nv_ - FLOATING_VEL));
+                std::cout << "Config box vio: " << vio_vec.transpose() << std::endl;
+                violation += vio_vec.squaredNorm();
+            }
+
+            if (vel_box_->IsInNodeRange(node) && node != boundary_node_) {
+                vectorx_t vio_vec = vel_box_->GetViolation(traj_.GetVelocity(traj_idx).tail(nv_ - FLOATING_VEL));
+                std::cout << "Vel box vio: " << vio_vec.transpose() << std::endl;
+                violation += vio_vec.squaredNorm();
+            }
+
+            if (tau_box_->IsInNodeRange(node) && node != boundary_node_) {
+                vectorx_t vio_vec = tau_box_->GetViolation(traj_.GetTau(traj_idx));
+                std::cout << "Tau box vio: " << vio_vec.transpose() << std::endl;
+                violation += vio_vec.squaredNorm();
+            }
+
+            if (friction_cone_->IsInNodeRange(node) && node != boundary_node_) {
+                // TODO: Fill in
+            }
+
+            // TODO: Add in swing
+
+            if (holonomic_->IsInNodeRange(node) && node != boundary_node_) {
+                for (const auto& frame : settings_.contact_frames) {
+                    vectorx_t vio_vec = holonomic_->GetViolation(traj_.GetConfiguration(traj_idx),
+                        traj_.GetVelocity(traj_idx), frame);
+                    std::cout << "[" << frame << "] holonomic vio: " << vio_vec.transpose() << std::endl;
+                    violation += vio_vec.squaredNorm();
+                }
+            }
+
+            if (node != boundary_node_) {
+                traj_idx++;
+            }
+
+            std::cout << "Running violation: " << std::sqrt(violation) << std::endl;
+        }
+
+        std::cout << "Total violation: " << std::sqrt(violation) << std::endl;
+
+        return std::sqrt(violation);
     }
 
 

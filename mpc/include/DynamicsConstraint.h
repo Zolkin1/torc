@@ -28,6 +28,10 @@ namespace torc::mpc {
 
         bool IsInNodeRange(int node) const override;
 
+        vectorx_t GetViolation(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
+            const vectorx_t& v1_lin, const vectorx_t& v2_lin, const vectorx_t& tau_lin, const vectorx_t& force_lin,
+            double dt);
+
     protected:
         // Forward dynamics constraint
         // void ForwardDynamics(const std::vector<std::string>& frames,

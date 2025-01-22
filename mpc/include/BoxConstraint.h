@@ -22,6 +22,8 @@ namespace torc::mpc {
         vectorx_t GetLowerBound(const vectorx_t& x_lin) const;
         vectorx_t GetUpperBound(const vectorx_t& x_lin) const;
         const std::vector<int>& GetIdxs() const;
+
+        vectorx_t GetViolation(const vectorx_t& x) const;
     protected:
     private:
         vectorx_t lb_;

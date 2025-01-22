@@ -26,6 +26,7 @@ namespace torc::mpc {
         void ParseCostSettings();
         void ParseContactSettings();
         void ParseLineSearchSettings();
+        void ParseTargetSettings();
 
         void Print();
 
@@ -78,6 +79,10 @@ namespace torc::mpc {
         double ls_gamma_theta;
         double ls_gamma_alpha;
         double ls_gamma_phi;
+
+        // Targets
+        vectorx_t q_target;
+        vectorx_t v_target;
 
     protected:
     private:

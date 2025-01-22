@@ -26,7 +26,7 @@ int main() {
     fs::path deriv_lib_path = fs::current_path();
     deriv_lib_path = deriv_lib_path / "deriv_libs";
 
-    std::vector<std::string> contact_frames = {"left_toe", "left_heel", "right_toe", "right_heel"};
+    std::vector<std::string> contact_frames = settings.contact_frames;
     // --------------------------------- //
     // ---------- Constraints ---------- //
     // --------------------------------- //
@@ -37,9 +37,9 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, 5);
+        deriv_lib_path, settings.compile_derivs, true, 0, 4);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-        settings.compile_derivs, false, 5, settings.nodes);
+        settings.compile_derivs, false, 4, settings.nodes);
 
     // ---------- Box Constraints ---------- //
     // Config
@@ -115,10 +115,10 @@ int main() {
     // --------------------------------- //
     torc::mpc::ContactSchedule cs(settings.contact_frames);
 
-    cs.InsertSwing("right_toe", 0.3, 0.6);
-    cs.InsertSwing("right_heel", 0.3, 0.6);
-    cs.InsertSwing("left_toe", 0.6, 0.9);
-    cs.InsertSwing("left_heel", 0.6, 0.9);
+    cs.InsertSwing("right_toe", 0.1, 0.4);
+    cs.InsertSwing("right_heel", 0.1, 0.4);
+    cs.InsertSwing("left_toe", 0.4, 0.7);
+    cs.InsertSwing("left_heel", 0.4, 0.7);
 
     // --------------------------------- //
     // -------------- MPC -------------- //
@@ -143,39 +143,41 @@ int main() {
     std::cout << "===== MPC Costs Added =====" << std::endl;
 
     Trajectory traj;
-    vectorx_t q = g1.GetNeutralConfig();
-    q(2) = 0.8;
-    // q(0) = 1.0;
     SimpleTrajectory q_target(g1.GetConfigDim(), settings.nodes);
-    q_target.SetAllData(q);
+    q_target.SetAllData(settings.q_target);
     mpc.SetConfigTarget(q_target);
-    // q(0) = 0.0;
-    // TODO: Fix bug with initial condition!
 
     SimpleTrajectory v_target(g1.GetVelDim(), settings.nodes);
-    vectorx_t v = vectorx_t::Zero(g1.GetVelDim());
-    // v(0) = 0.3;
-    v_target.SetAllData(v);
+    v_target.SetAllData(settings.v_target);
     mpc.SetVelTarget(v_target);
 
-    // mpc.UpdateContactSchedule(cs);
+    mpc.SetLinTrajConfig(q_target);
+    mpc.SetLinTrajVel(v_target);
+
+    mpc.UpdateContactSchedule(cs);
+
+    // Create an IC
+    vectorx_t q = settings.q_target;
+    // q(2) = 0.8;
+    // q(0) = 1;
 
     torc::utils::TORCTimer timer;
     timer.Tic();
-    mpc.CreateConstraints();
-    mpc.CreateCost();
-    q(2) = 0.8;
     mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
     timer.Toc();
     std::cout << "total time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+    mpc.GetConstraintViolation();
 
-    // mpc.CreateConstraints();
-    // mpc.CreateCost();
+    // // mpc.CreateConstraints();
+    // // mpc.CreateCost();
     // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
     //
-    // mpc.CreateConstraints();
-    // mpc.CreateCost();
+    // // mpc.CreateConstraints();
+    // // mpc.CreateCost();
     // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    //
+    // mpc.GetConstraintViolation();
+
 
 }
 

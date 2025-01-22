@@ -224,8 +224,7 @@ namespace torc::mpc {
             A.bottomLeftCorner(vel_dim_, vel_dim_) = Jq;
             A.bottomRightCorner(vel_dim_, vel_dim_) = Jv;
 
-            // TODO: Put back
-            // B.bottomLeftCorner(vel_dim_, tau_dim_) = Jtau;
+            B.bottomLeftCorner(vel_dim_, tau_dim_) = Jtau;
             B.bottomRightCorner(vel_dim_, CONTACT_3DOF*num_contacts_) = JF;
 
             b.head(vel_dim_) = dq2;
@@ -427,4 +426,33 @@ namespace torc::mpc {
         // dxdt.resize(dqk_out.size() + dvk_out.size());
         // dxdt << dvk_out, dqk_out;
     // }
+
+    vectorx_t DynamicsConstraint::GetViolation(const vectorx_t &q1_lin, const vectorx_t &q2_lin,
+        const vectorx_t &v1_lin, const vectorx_t &v2_lin, const vectorx_t &tau_lin,
+        const vectorx_t &force_lin, double dt) {
+        vectorx_t x_zero = vectorx_t::Zero(dynamics_function_->GetDomainSize());
+        vectorx_t p(dynamics_function_->GetParameterSize());
+
+        vectorx_t dyn_violation(dynamics_function_->GetRangeSize());
+
+        p << q1_lin, v1_lin, v2_lin, tau_lin, force_lin, dt;
+        dynamics_function_->GetFunctionValue(x_zero, p, dyn_violation);
+
+        vectorx_t int_violation(integration_function_->GetRangeSize());
+        x_zero = vectorx_t::Zero(integration_function_->GetDomainSize());
+        p.resize(integration_function_->GetParameterSize());
+        p << dt, q1_lin, q2_lin, v1_lin;
+        integration_function_->GetFunctionValue(x_zero, p, int_violation);
+
+        vectorx_t violation;
+        if (full_order_) {
+            violation.resize(2*vel_dim_);
+        } else {
+            violation.resize(vel_dim_ + FLOATING_VEL);
+        }
+        violation << int_violation, dyn_violation;
+
+        return violation;
+    }
+
 }

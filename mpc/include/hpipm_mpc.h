@@ -67,8 +67,13 @@ namespace torc::mpc {
         void SetConfigTarget(const SimpleTrajectory& q_target);
         void SetVelTarget(const SimpleTrajectory& v_target);
 
-        void UpdateContactSchedule(const ContactSchedule& sched);
+        void SetLinTrajConfig(const SimpleTrajectory& config_traj);
+        void SetLinTrajVel(const SimpleTrajectory& vel_traj);
 
+        // Computes constraint violation for traj_
+        double GetConstraintViolation();
+
+        void UpdateContactSchedule(const ContactSchedule& sched);
         void UpdateSetttings(MpcSettings settings);
     protected:
 

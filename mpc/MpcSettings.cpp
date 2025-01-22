@@ -22,6 +22,7 @@ namespace torc::mpc {
         ParseCostSettings();
         ParseLineSearchSettings();
         ParseContactSettings();
+        ParseTargetSettings();
     }
 
     void MpcSettings::ParseJointDefaults() {
@@ -400,6 +401,27 @@ namespace torc::mpc {
             ls_gamma_theta = (ls_settings["constraint_reduction_mult"] ? ls_settings["constraint_reduction_mult"].as<double>() : 1e-6);
             ls_gamma_alpha = (ls_settings["alpha_step"] ? ls_settings["alpha_step"].as<double>() : 0.5);
             ls_gamma_phi = (ls_settings["cost_reduction_mult"] ? ls_settings["cost_reduction_mult"].as<double>() : 1e-6);
+        }
+    }
+
+
+    void MpcSettings::ParseTargetSettings() {
+        YAML::Node config;
+        try {
+            config = YAML::LoadFile(config_file_);
+        } catch (...) {
+            throw std::runtime_error("Could not load the configuration file!");
+        }
+
+        if (!config["targets"]) {
+            throw std::runtime_error("No targets setting provided!");
+        } else {
+            YAML::Node target_settings = config["targets"];
+            std::vector<double> q_targ_std = target_settings["q_target"].as<std::vector<double>>();
+            q_target = utils::StdToEigenVector(q_targ_std);
+
+            std::vector<double> v_targ_std = target_settings["v_target"].as<std::vector<double>>();
+            v_target = utils::StdToEigenVector(v_targ_std);
         }
     }
 
