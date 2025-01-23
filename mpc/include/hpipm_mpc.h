@@ -72,9 +72,12 @@ namespace torc::mpc {
 
         // Computes constraint violation for traj_
         double GetConstraintViolation();
+        int GetSolveCounter() const;
 
         void UpdateContactSchedule(const ContactSchedule& sched);
         void UpdateSetttings(MpcSettings settings);
+
+        Trajectory GetTrajectory() const;
     protected:
 
         /**
@@ -156,6 +159,9 @@ namespace torc::mpc {
 
         bool first_constraint_gen_;
         bool first_cost_gen_;
+
+        // Stats
+        int solve_counter_;
 
     };
 }

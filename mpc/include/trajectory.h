@@ -52,6 +52,9 @@ namespace torc::mpc {
 
         void ExportToCSV(const std::string& file_path);
 
+        SimpleTrajectory GetConfigTrajectory() const;
+        SimpleTrajectory GetVelocityTrajectory() const;
+
     protected:
     private:
         void StandardVectorInterp(double time, vectorx_t& vec_out, const SimpleTrajectory& vecs);

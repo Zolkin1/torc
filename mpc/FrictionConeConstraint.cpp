@@ -13,7 +13,7 @@ namespace torc::mpc {
             std::bind(&FrictionConeConstraint::ConeConstraint, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
             name_ + "_friction_cone_constraint",
             deriv_lib_path,
-            ad::DerivativeOrder::FirstOrder, 3, 4,
+            ad::DerivativeOrder::FirstOrder, 3, 5,
             compile_derivs);
 
         if (constraint_function_->GetRangeSize() != 1) {
@@ -32,7 +32,7 @@ namespace torc::mpc {
 
         vectorx_t x_zero = vectorx_t::Zero(constraint_function_->GetDomainSize());
         vectorx_t p(constraint_function_->GetParameterSize());
-        p << f_lin, friction_margin_;
+        p << f_lin, friction_margin_, friction_coef_;
 
         constraint_function_->GetJacobian(x_zero, p, jac);
 
@@ -55,7 +55,7 @@ namespace torc::mpc {
     vectorx_t FrictionConeConstraint::GetViolation(const vectorx_t &F, double margin) {
         vectorx_t x_zero = vectorx_t::Zero(constraint_function_->GetDomainSize());
         vectorx_t p(constraint_function_->GetParameterSize());
-        p << F, margin;
+        p << F, margin, friction_coef_;
 
         vectorx_t fcn_vio;
         constraint_function_->GetFunctionValue(x_zero, p, fcn_vio);
@@ -67,12 +67,13 @@ namespace torc::mpc {
         return violation;
     }
 
-    void FrictionConeConstraint::ConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk_margin, ad::ad_vector_t& violation) const {
-        const ad::ad_vector_t f = df + fk_margin.head<CONTACT_3DOF>();
-        const ad::adcg_t& margin = fk_margin(3);
+    void FrictionConeConstraint::ConeConstraint(const ad::ad_vector_t& df, const ad::ad_vector_t& fk_margin_coef, ad::ad_vector_t& violation) const {
+        const ad::ad_vector_t f = df + fk_margin_coef.head<CONTACT_3DOF>();
+        const ad::adcg_t& margin = fk_margin_coef(3);
+        const ad::adcg_t& friction_coef = fk_margin_coef(4);
 
         violation.resize(1);
-        violation(0) = friction_coef_*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
+        violation(0) = friction_coef*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
     }
 
 }

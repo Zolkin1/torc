@@ -13,7 +13,8 @@ namespace torc::mpc {
         : settings_(std::move(settings)), model_(model),
         v_target_(model.GetVelDim(), settings.nodes),
         q_target_(model.GetConfigDim(), settings.nodes),
-        tau_target_(model.GetVelDim() - FLOATING_VEL, settings.nodes) {
+        tau_target_(model.GetVelDim() - FLOATING_VEL, settings.nodes),
+        solve_counter_(0) {
         qp.resize(settings_.nodes + 1); // Need the extra node for the model boundary
         solution_.resize(settings_.nodes + 1);
 
@@ -272,6 +273,7 @@ namespace torc::mpc {
             }
 
             // Holonomic
+            // TODO: I think I could enforce this for node 1 if I only consider the velocity part of the jacobian for that node
             if ((node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
                 // std::cerr << "Adding holonomic..." << std::endl;
                 for (const auto& frame : settings_.contact_frames) {
@@ -314,7 +316,7 @@ namespace torc::mpc {
             // std::cout << std::endl;
             // std::cout << "lbx: " << qp[node].lbx.transpose() << std::endl;
             // std::cout << "ubx: " << qp[node].ubx.transpose() << std::endl;
-
+            //
             // std::cout << "idxbu: ";
             // for (const auto& idx : qp[node].idxbu) {
             //     std::cout << idx << ", ";
@@ -322,14 +324,14 @@ namespace torc::mpc {
             // std::cout << std::endl;
             // std::cout << "lbu: " << qp[node].lbu.transpose() << std::endl;
             // std::cout << "ubu: " << qp[node].ubu.transpose() << std::endl;
-
+            //
             // std::cout << "D:\n" << qp[node].D << std::endl;
             // std::cout << "C:\n" << qp[node].C << std::endl;
             // std::cout << "lg: " << qp[node].lg.transpose() << std::endl;
             // std::cout << "ug: " << qp[node].ug.transpose() << std::endl;
             // std::cout << "ugmask: " << qp[node].ug_mask.transpose() << std::endl;
-
-            // TODO: Inspect later
+            //
+            // // TODO: Inspect later
             // std::cout << "A:\n" << qp[node].A << std::endl;
             // std::cout << "B:\n" << qp[node].B << std::endl;
             // std::cout << "b: " << qp[node].b.transpose() << std::endl;
@@ -378,7 +380,6 @@ namespace torc::mpc {
                     const auto [hess, lin]
                         = force_tracking_->GetQuadraticApprox(
                             traj_.GetForce(traj_idx, frame), GetForceTarget(traj_idx, frame));
-
                     qp[node].R.block<CONTACT_3DOF, CONTACT_3DOF>(block_idx, block_idx) = hess;
                     qp[node].r.segment<CONTACT_3DOF>(block_idx) = lin;
                     block_idx += CONTACT_3DOF;
@@ -597,6 +598,8 @@ namespace torc::mpc {
         ConvertQpSolToTraj();
         traj_out = traj_;
 
+        solve_counter_++;
+
         return res;
     }
 
@@ -759,6 +762,18 @@ namespace torc::mpc {
                 settings_.apex_time, settings_.dt, traj);
             frame_idx++;
         }
+
+        // for (const auto& frame : settings_.contact_frames) {
+        //     std::cout << "Frame " << frame << std::endl;
+        //     for (int i = 0; i < in_contact_[frame].size(); i++) {
+        //         std::cout << in_contact_[frame][i] << ", ";
+        //     }
+        //     std::cout << std::endl;
+        //     for (int i = 0; i < in_contact_[frame].size(); i++) {
+        //         std::cout << swing_traj_[frame][i] << ", ";
+        //     }
+        //     std::cout << std::endl << std::endl;
+        // }
     }
 
     double HpipmMpc::GetConstraintViolation() {
@@ -853,6 +868,13 @@ namespace torc::mpc {
         return std::sqrt(violation);
     }
 
+    Trajectory HpipmMpc::GetTrajectory() const {
+        return traj_;
+    }
+
+    int HpipmMpc::GetSolveCounter() const {
+        return solve_counter_;
+    }
 
 }
 

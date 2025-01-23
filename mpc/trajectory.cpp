@@ -312,4 +312,11 @@ namespace torc::mpc {
         csv_file.close();
     }
 
+    SimpleTrajectory Trajectory::GetConfigTrajectory() const {
+        return q_;
+    }
+
+    SimpleTrajectory Trajectory::GetVelocityTrajectory() const {
+        return v_;
+    }
 } //torc::mpc

@@ -55,6 +55,7 @@ int main() {
     for (int i = 0; i < g1.GetVelDim() - torc::mpc::FLOATING_VEL; ++i) {
         vel_lims_idxs.push_back(i + FLOATING_VEL);
     }
+    std::cout << g1.GetVelocityJointLimits().transpose() << std::endl;
     BoxConstraint vel_box(1, settings.nodes, "vel_box",
         -g1.GetVelocityJointLimits().tail(g1.GetVelDim() - torc::mpc::FLOATING_VEL),
         g1.GetVelocityJointLimits().tail(g1.GetVelDim() - torc::mpc::FLOATING_VEL),
@@ -71,7 +72,7 @@ int main() {
         tau_lims_idxs);
 
     // ---------- Friction Cone Constraints ---------- //
-    FrictionConeConstraint friction_cone_constraint(0,settings.nodes, "friction_cone_cone",
+    FrictionConeConstraint friction_cone_constraint(0,settings.nodes-1, "friction_cone_cone",
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Swing Constraints ---------- //
@@ -79,7 +80,7 @@ int main() {
         settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
-    HolonomicConstraint holonomic_constraint(1, settings.nodes, "holonomic_constraint", g1, contact_frames,
+    HolonomicConstraint holonomic_constraint(2, settings.nodes, "holonomic_constraint", g1, contact_frames,
         settings.deriv_lib_path, settings.compile_derivs);
 
     std::cout << "===== Constraints Created =====" << std::endl;
@@ -109,10 +110,11 @@ int main() {
     // --------------------------------- //
     torc::mpc::ContactSchedule cs(settings.contact_frames);
 
+    // TODO: When the swing time goes past the time horizon weird stuff happens
     cs.InsertSwing("right_toe", 0.1, 0.4);
     cs.InsertSwing("right_heel", 0.1, 0.4);
-    cs.InsertSwing("left_toe", 0.4, 0.7);
-    cs.InsertSwing("left_heel", 0.4, 0.7);
+    cs.InsertSwing("left_toe", 0.4, 0.8);
+    cs.InsertSwing("left_heel", 0.4, 0.8);
 
     // --------------------------------- //
     // -------------- MPC -------------- //
@@ -153,7 +155,7 @@ int main() {
     // Create an IC
     vectorx_t q = settings.q_target;
     // q(2) = 0.8;
-    q(0) = 1;
+    // q(0) = 1;
 
     torc::utils::TORCTimer timer;
     timer.Tic();
@@ -161,17 +163,17 @@ int main() {
     timer.Toc();
     std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
 
-    mpc.GetConstraintViolation();
-
-    timer.Tic();
-    mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
-    timer.Toc();
-    std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
-
-    timer.Tic();
-    mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
-    timer.Toc();
-    std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
+    // mpc.GetConstraintViolation();
+    //
+    // timer.Tic();
+    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    // timer.Toc();
+    // std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
+    //
+    // timer.Tic();
+    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    // timer.Toc();
+    // std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
 
     traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output.csv");
 

@@ -1,7 +1,6 @@
 message(STATUS "Configuring examples")
 
-add_executable(mpc_app_test mpc_app_tests.cpp
-        mpc_hpipm_example.cpp)
+add_executable(mpc_app_test mpc_app_tests.cpp)
 target_link_libraries(mpc_app_test Mpc)
 
 add_executable(mpc_quad_test mpc_quad_test.cpp)
