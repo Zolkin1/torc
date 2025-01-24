@@ -95,15 +95,26 @@ namespace torc::mpc {
 
             matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, vel_dim_).inverse();
             matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
+            // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
 
             A.topRows(vel_dim_) << -dq2_inv*int_jac.leftCols(vel_dim_), -dq2_inv*int_jac.middleCols(2*vel_dim_, vel_dim_);
-            A.bottomRows(vel_dim_) = dv2_inv*-dyn_jac.leftCols(2*vel_dim_);
+            A.bottomRows(vel_dim_) = -dv2_inv*dyn_jac.leftCols(2*vel_dim_);
 
             B.topRows(vel_dim_).setZero();
-            B.bottomRows(vel_dim_) << dyn_jac.middleCols(3*vel_dim_, tau_dim_), dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
-            B.bottomRows(vel_dim_) = dv2_inv*-B.bottomRows(vel_dim_);
+            // TODO: Put torque part back
+            B.bottomRows(vel_dim_) << dyn_jac.middleCols(3*vel_dim_, tau_dim_),
+                dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
+            // B.block(vel_dim_, tau_dim_, vel_dim_, CONTACT_3DOF*num_contacts_)
+            //     = -dv2_inv*dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
+            B.bottomRows(vel_dim_) = -dv2_inv*B.bottomRows(vel_dim_);
+            // B.middleRows(vel_dim_, FLOATING_VEL).setZero();  // TODO: Remove
 
-            b << int_fbar, -dv2_inv*fbar;
+            // std::cout << "dv2_inv:\n" << dv2_inv << std::endl;
+            // std::cout << "Jtau:\n" << dyn_jac.middleCols(3*vel_dim_, tau_dim_) << std::endl;
+            // std::cout << "dv2inv*Jtau:\n" << dv2_inv * dyn_jac.middleCols(3*vel_dim_, tau_dim_) << std::endl;
+
+            // b << int_fbar, -dv2_inv*fbar;
+            b << -dq2_inv*int_fbar, -dv2_inv*fbar;
         } else {
             A.setZero();
             B.setZero();
@@ -111,21 +122,28 @@ namespace torc::mpc {
 
             // TODO: Check to be sure this is grabbing the block I want
             // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
-            matrixx_t dv2_inv = dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL).inverse();
+            if (dyn_jac.rows() != FLOATING_VEL) {
+                throw std::runtime_error("dyn jac wrong number of rows!");
+            }
+            matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, FLOATING_VEL).inverse();
             matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
+            // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
 
             A.topRows(vel_dim_) << -dq2_inv*int_jac.leftCols(vel_dim_), -dq2_inv*int_jac.middleCols(2*vel_dim_, FLOATING_VEL);
             // A.topRightCorner<FLOATING_VEL, FLOATING_VEL>() =
             //     int_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL);
-            A.bottomRows<FLOATING_VEL>() << dv2_inv*-dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
+            A.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
 
-            B.block(FLOATING_VEL, 0, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL) =
-                int_jac.block(FLOATING_VEL, 2*vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
+            B.topLeftCorner(vel_dim_, vel_dim_ - FLOATING_VEL) = -dq2_inv*int_jac.rightCols(vel_dim_ - FLOATING_VEL);
+            // B.block(FLOATING_VEL, 0, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL) =
+            //     int_jac.block(FLOATING_VEL, 2*vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
+
             B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL),
                 dyn_jac.rightCols(num_contacts_*CONTACT_3DOF);
             B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
 
-            b << int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
+            // b << int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
+            b << -dq2_inv*int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
         }
     }
 
@@ -150,10 +168,10 @@ namespace torc::mpc {
     //     vectorx_t dv2 = v2_default - v2_lin;
     //
     //     vectorx_t q2_default = pinocchio::integrate(model, q1_lin, dt*v1_lin);
-    //     std::cout << "q2_default: " << q2_default.transpose() << std::endl;
-    //     std::cout << "q2_lin: " << q2_lin.transpose() << std::endl;
+    //     // std::cout << "q2_default: " << q2_default.transpose() << std::endl;
+    //     // std::cout << "q2_lin: " << q2_lin.transpose() << std::endl;
     //     vectorx_t dq2 = models::qDifference(q2_default, q2_lin);
-    //     std::cout << "dq2: " << dq2.transpose() << std::endl;
+    //     // std::cout << "dq2: " << dq2.transpose() << std::endl;
     //
     //     // ----- Compute FD for q ----- //
     //     matrixx_t Jq = matrixx_t::Zero(model_.GetVelDim(), model_.GetVelDim());
@@ -339,9 +357,9 @@ namespace torc::mpc {
         return dynamics_function_->GetRangeSize() + integration_function_->GetRangeSize();
     }
 
-    bool DynamicsConstraint::IsInNodeRange(int node) const {
-        return node >= first_node_ && node < last_node_;
-    }
+    // bool DynamicsConstraint::IsInNodeRange(int node) const {
+    //     return node >= first_node_ && node < last_node_;
+    // }
 
 
      void DynamicsConstraint::IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk,
@@ -451,32 +469,28 @@ namespace torc::mpc {
         // dxdt << dvk_out, dqk_out;
     // }
 
-    vectorx_t DynamicsConstraint::GetViolation(const vectorx_t &q1_lin, const vectorx_t &q2_lin,
+    std::pair<vectorx_t, vectorx_t> DynamicsConstraint::GetViolation(const vectorx_t &q1_lin, const vectorx_t &q2_lin,
         const vectorx_t &v1_lin, const vectorx_t &v2_lin, const vectorx_t &tau_lin,
-        const vectorx_t &force_lin, double dt) {
-        vectorx_t x_zero = vectorx_t::Zero(dynamics_function_->GetDomainSize());
+        const vectorx_t &force_lin, double dt, const vectorx_t& dq1, const vectorx_t& dq2,
+        const vectorx_t& dv1, const vectorx_t& dv2, const vectorx_t& dtau, const vectorx_t& dforce) {
+        vectorx_t x(dynamics_function_->GetDomainSize());
+        x << dq1, dv1, dv2, dtau, dforce;
+
         vectorx_t p(dynamics_function_->GetParameterSize());
 
         vectorx_t dyn_violation(dynamics_function_->GetRangeSize());
 
         p << q1_lin, v1_lin, v2_lin, tau_lin, force_lin, dt;
-        dynamics_function_->GetFunctionValue(x_zero, p, dyn_violation);
+        dynamics_function_->GetFunctionValue(x, p, dyn_violation);
 
         vectorx_t int_violation(integration_function_->GetRangeSize());
-        x_zero = vectorx_t::Zero(integration_function_->GetDomainSize());
+        x.resize(integration_function_->GetDomainSize());
+        x << dq1, dq2, dv1;
         p.resize(integration_function_->GetParameterSize());
         p << dt, q1_lin, q2_lin, v1_lin;
-        integration_function_->GetFunctionValue(x_zero, p, int_violation);
+        integration_function_->GetFunctionValue(x, p, int_violation);
 
-        vectorx_t violation;
-        if (full_order_) {
-            violation.resize(2*vel_dim_);
-        } else {
-            violation.resize(vel_dim_ + FLOATING_VEL);
-        }
-        violation << int_violation, dyn_violation;
-
-        return violation;
+        return {int_violation, dyn_violation};
     }
 
 }

@@ -71,13 +71,15 @@ namespace torc::mpc {
         void SetLinTrajVel(const SimpleTrajectory& vel_traj);
 
         // Computes constraint violation for traj_
-        double GetConstraintViolation();
+        double GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol);
         int GetSolveCounter() const;
 
         void UpdateContactSchedule(const ContactSchedule& sched);
         void UpdateSetttings(MpcSettings settings);
 
         Trajectory GetTrajectory() const;
+
+        void PrintNodeInfo() const;
     protected:
 
         /**

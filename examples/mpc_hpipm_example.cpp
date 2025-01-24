@@ -76,12 +76,12 @@ int main() {
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Swing Constraints ---------- //
-    SwingConstraint swing_constraint(2, settings.nodes, "swing_constraint", g1, contact_frames,
-        settings.deriv_lib_path, settings.compile_derivs);
+    SwingConstraint swing_constraint(settings.swing_start_node, settings.swing_end_node,
+        "swing_constraint", g1, contact_frames, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
-    HolonomicConstraint holonomic_constraint(2, settings.nodes, "holonomic_constraint", g1, contact_frames,
-        settings.deriv_lib_path, settings.compile_derivs);
+    HolonomicConstraint holonomic_constraint(settings.holonomic_start_node, settings.holonomic_end_node,
+        "holonomic_constraint", g1, contact_frames, settings.deriv_lib_path, settings.compile_derivs);
 
     std::cout << "===== Constraints Created =====" << std::endl;
 
@@ -115,7 +115,10 @@ int main() {
     cs.InsertSwing("right_heel", 0.1, 0.4);
     cs.InsertSwing("left_toe", 0.4, 0.8);
     cs.InsertSwing("left_heel", 0.4, 0.8);
-
+    cs.InsertSwing("right_toe", 0.8, 1.2);
+    cs.InsertSwing("right_heel", 0.8, 1.2);
+    cs.InsertSwing("left_toe", 1.2, 1.6);
+    cs.InsertSwing("left_heel", 1.2, 1.6);
     // --------------------------------- //
     // -------------- MPC -------------- //
     // --------------------------------- //
@@ -138,44 +141,65 @@ int main() {
 
     std::cout << "===== MPC Costs Added =====" << std::endl;
 
-    Trajectory traj;
-    SimpleTrajectory q_target(g1.GetConfigDim(), settings.nodes);
-    q_target.SetAllData(settings.q_target);
-    mpc.SetConfigTarget(q_target);
-
-    SimpleTrajectory v_target(g1.GetVelDim(), settings.nodes);
-    v_target.SetAllData(settings.v_target);
-    mpc.SetVelTarget(v_target);
-
-    mpc.SetLinTrajConfig(q_target);
-    mpc.SetLinTrajVel(v_target);
-
-    mpc.UpdateContactSchedule(cs);
-
     // Create an IC
     vectorx_t q = settings.q_target;
     // q(2) = 0.8;
-    // q(0) = 1;
+    // q(0) = 0;
+
+    vectorx_t v = vectorx_t::Zero(g1.GetVelDim());
+    // v(0) = 1;
+    // v(1) = 2;
+    // v(3) = 2;
+    // v(4) = -1.5;
+    // v(5) = 1;
+
+    // Initial linearization
+    Trajectory traj;
+    SimpleTrajectory q_target(g1.GetConfigDim(), settings.nodes);
+    SimpleTrajectory v_target(g1.GetVelDim(), settings.nodes);
+
+    for (int i = 0; i < settings.nodes; i++) {
+        auto lam = static_cast<double>(i)/static_cast<double>(settings.nodes);
+        // std::cout << "lambda: " << lam << std::endl;
+        q_target.InsertData(i, (1-lam)*q + lam*settings.q_target);
+        v_target.InsertData(i, (1-lam)*v + lam*settings.v_target);
+    }
+    mpc.SetLinTrajConfig(q_target);
+    mpc.SetLinTrajVel(v_target);
+
+    q_target.SetAllData(settings.q_target);
+    mpc.SetConfigTarget(q_target);
+    v_target.SetAllData(settings.v_target);
+    mpc.SetVelTarget(v_target);
+
+    mpc.UpdateContactSchedule(cs);
 
     torc::utils::TORCTimer timer;
     timer.Tic();
-    mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    mpc.Compute(q, v, traj);
     timer.Toc();
     std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
+    traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output_1.csv");
 
-    // mpc.GetConstraintViolation();
-    //
     // timer.Tic();
-    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    // mpc.Compute(q, v, traj);
     // timer.Toc();
     // std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
     //
     // timer.Tic();
-    // mpc.Compute(q, vectorx_t::Zero(g1.GetVelDim()), traj);
+    // mpc.Compute(q, v, traj);
     // timer.Toc();
     // std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
 
-    traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output.csv");
+    // for (int i = 0; i < 10; i++) {
+    //     mpc.Compute(q, v, traj);
+    // }
+
+    mpc.Compute(q, v, traj);
+    // mpc.Compute(q, v, traj);
+    mpc.PrintNodeInfo();
+
+    traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output_2.csv");
 
 }
 

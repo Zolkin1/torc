@@ -26,11 +26,12 @@ namespace torc::mpc {
         // These dynamics convert the full order model to the centroidal ones.
         std::pair<matrixx_t, matrixx_t> GetBoundaryDynamics();
 
-        bool IsInNodeRange(int node) const override;
+        // bool IsInNodeRange(int node) const override;
 
-        vectorx_t GetViolation(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
+        std::pair<vectorx_t, vectorx_t> GetViolation(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
             const vectorx_t& v1_lin, const vectorx_t& v2_lin, const vectorx_t& tau_lin, const vectorx_t& force_lin,
-            double dt);
+            double dt, const vectorx_t& dq1, const vectorx_t& dq2,
+            const vectorx_t& dv1, const vectorx_t& dv2, const vectorx_t& dtau, const vectorx_t& dforce);
 
     protected:
         // Forward dynamics constraint
@@ -40,7 +41,7 @@ namespace torc::mpc {
             const ad::ad_vector_t &dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t &qk_vk_vkp1_tauk_fk_dt,
             ad::ad_vector_t &violation);
 
-        void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk_dvkp1,
+        void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk,
             const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation);
 
         int nx_;

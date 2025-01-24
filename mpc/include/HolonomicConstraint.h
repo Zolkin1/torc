@@ -20,7 +20,8 @@ namespace torc::mpc {
 
         int GetNumConstraints() const override;
 
-        vectorx_t GetViolation(const vectorx_t& q, const vectorx_t& v, const std::string &frame);
+        vectorx_t GetViolation(const vectorx_t& q, const vectorx_t& v, const vectorx_t& dq, const vectorx_t& dv,
+            const std::string &frame);
     protected:
     private:
         void HoloConstraint(const std::string& frame, const ad::ad_vector_t& dqk_dvk, const ad::ad_vector_t& qk_vk, ad::ad_vector_t& violation);

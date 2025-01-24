@@ -15,11 +15,6 @@ namespace torc::mpc {
             deriv_lib_path,
             ad::DerivativeOrder::FirstOrder, 3, 5,
             compile_derivs);
-
-        if (constraint_function_->GetRangeSize() != 1) {
-            throw std::runtime_error("Friction cone should have a range size of 1");
-        }
-
     }
 
     int FrictionConeConstraint::GetNumConstraints() const {
@@ -40,29 +35,30 @@ namespace torc::mpc {
         constraint_function_->GetFunctionValue(x_zero, p, y);
 
         matrixx_t A = matrixx_t::Zero(constraint_function_->GetRangeSize() + 3, constraint_function_->GetDomainSize());
-        A.row(0) = jac;
-        A(1, 0) = 1;
-        A(2, 1) = 1;
-        A(3, 2) = 1;
+        A.topRows(constraint_function_->GetRangeSize()) = jac;
+        A(constraint_function_->GetRangeSize(), 0) = 1;
+        A(constraint_function_->GetRangeSize() + 1, 1) = 1;
+        A(constraint_function_->GetRangeSize() + 2, 2) = 1;
 
         vectorx_t lin = vectorx_t::Zero(constraint_function_->GetRangeSize() + 3);
-        lin(0) = y(0);
+        lin.head(constraint_function_->GetRangeSize()) = y;
         lin.tail<3>() = f_lin;
 
         return {A, lin};
     }
 
-    vectorx_t FrictionConeConstraint::GetViolation(const vectorx_t &F, double margin) {
-        vectorx_t x_zero = vectorx_t::Zero(constraint_function_->GetDomainSize());
+    vectorx_t FrictionConeConstraint::GetViolation(const vectorx_t &F, const vectorx_t& dF) {
+        vectorx_t x(constraint_function_->GetDomainSize());
+        x << dF;
         vectorx_t p(constraint_function_->GetParameterSize());
-        p << F, margin, friction_coef_;
+        p << F, friction_margin_, friction_coef_;
 
         vectorx_t fcn_vio;
-        constraint_function_->GetFunctionValue(x_zero, p, fcn_vio);
+        constraint_function_->GetFunctionValue(x, p, fcn_vio);
 
-        vectorx_t violation(4);
-        violation(0) = fcn_vio(0);
-        violation.tail<3>() = F;
+        vectorx_t violation(constraint_function_->GetRangeSize() + 3);
+        violation.head(constraint_function_->GetRangeSize()) = fcn_vio;
+        violation.tail<3>() = dF + F;
 
         return violation;
     }
@@ -72,8 +68,17 @@ namespace torc::mpc {
         const ad::adcg_t& margin = fk_margin_coef(3);
         const ad::adcg_t& friction_coef = fk_margin_coef(4);
 
-        violation.resize(1);
-        violation(0) = friction_coef*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
+        // Linear cone, >= 0
+        violation.resize(5);
+        violation(0) = friction_coef * f(2) - f(0);
+        violation(1) = friction_coef * f(2) - f(1);
+        violation(2) = friction_coef * f(2) + f(0);
+        violation(3) = friction_coef * f(2) + f(1);
+        violation(4) = f(2);
+
+        // Nonlinear
+        // violation.resize(1);
+        // violation(0) = friction_coef*f(2) - CppAD::sqrt(f(0)*f(0) + f(1)*f(1) + margin*margin);
     }
 
 }

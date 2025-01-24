@@ -260,6 +260,10 @@ namespace torc::mpc {
         polytope_delta = (constraint_settings["polytope_delta"] ? constraint_settings["polytope_delta"].as<double>() : 0.0);
         polytope_shrinking_rad = (constraint_settings["polytope_shrinking_rad"]
             ? constraint_settings["polytope_shrinking_rad"].as<double>() : 0.4);
+        swing_start_node = constraint_settings["swing_start_node"].as<int>();
+        swing_end_node = constraint_settings["swing_end_node"].as<int>();
+        holonomic_start_node = constraint_settings["holonomic_start_node"].as<int>();
+        holonomic_end_node = constraint_settings["holonomic_end_node"].as<int>();
 
         YAML::Node collision_settings = constraint_settings["collisions"];
         if (!collision_settings.IsSequence()) {

@@ -55,6 +55,10 @@ namespace torc::mpc {
         double polytope_shrinking_rad;
         std::vector<std::pair<std::string, std::string>> collision_frames;
         std::vector<std::pair<double, double>> collision_radii;
+        int swing_start_node;
+        int swing_end_node;
+        int holonomic_start_node;
+        int holonomic_end_node;
 
         std::vector<CostData> cost_data;
 

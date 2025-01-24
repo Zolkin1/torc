@@ -18,7 +18,7 @@ namespace torc::mpc {
 
         int GetNumConstraints() const override;
 
-        vectorx_t GetViolation(const vectorx_t& q, double des_height, const std::string& frame);
+        vectorx_t GetViolation(const vectorx_t& q, const vectorx_t& dq, double des_height, const std::string& frame);
     protected:
     private:
         void SwingHeightConstraint(const std::string& frame, const ad::ad_vector_t& dqk,

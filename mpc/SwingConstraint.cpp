@@ -63,13 +63,15 @@ namespace torc::mpc {
         violation(0) = frame_pos(2) - des_height;
     }
 
-    vectorx_t SwingConstraint::GetViolation(const vectorx_t &q, double des_height, const std::string& frame) {
-        const vectorx_t x_zero = vectorx_t::Zero(swing_function_[frame]->GetDomainSize());
+    vectorx_t SwingConstraint::GetViolation(const vectorx_t &q, const vectorx_t& dq, double des_height, const std::string& frame) {
+        vectorx_t x(swing_function_[frame]->GetDomainSize());
+        x << dq;
+
         vectorx_t p(swing_function_[frame]->GetParameterSize());
         p << q, des_height;
 
         vectorx_t violation;
-        swing_function_[frame]->GetFunctionValue(x_zero, p, violation);
+        swing_function_[frame]->GetFunctionValue(x, p, violation);
         return violation;
     }
 

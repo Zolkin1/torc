@@ -74,13 +74,15 @@ namespace torc::mpc {
         violation = vel.head<2>();
     }
 
-    vectorx_t HolonomicConstraint::GetViolation(const vectorx_t &q, const vectorx_t &v, const std::string &frame) {
-        vectorx_t x_zero = vectorx_t::Zero(constraint_functions_[frame]->GetDomainSize());
+    vectorx_t HolonomicConstraint::GetViolation(const vectorx_t &q, const vectorx_t &v, const vectorx_t& dq,
+        const vectorx_t& dv, const std::string &frame) {
+        vectorx_t x(constraint_functions_[frame]->GetDomainSize());
+        x << dq, dv;
         vectorx_t p(constraint_functions_[frame]->GetParameterSize());
         p << q, v;
         vectorx_t violation = vectorx_t::Zero(constraint_functions_[frame]->GetRangeSize());
 
-        constraint_functions_[frame]->GetFunctionValue(x_zero, p, violation);
+        constraint_functions_[frame]->GetFunctionValue(x, p, violation);
 
         return violation;
     }

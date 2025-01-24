@@ -42,14 +42,15 @@ namespace torc::mpc {
         return idxs_;
     }
 
-    vectorx_t BoxConstraint::GetViolation(const vectorx_t &x) const {
+    vectorx_t BoxConstraint::GetViolation(const vectorx_t &x, const vectorx_t& dx) const {
         vectorx_t vio =vectorx_t::Zero(lb_.size());
+        vectorx_t x_curr = x + dx;
         for (int i = 0; i < lb_.size(); ++i) {
-            if (x[i] < lb_[i]) {
-                vio[i] = lb_[i] - x[i];
+            if (x_curr[i] < lb_[i]) {
+                vio[i] = lb_[i] - x_curr[i];
             }
-            if (x[i] > ub_[i]) {
-                vio[i] = x[i] - ub_[i];
+            if (x_curr[i] > ub_[i]) {
+                vio[i] = x_curr[i] - ub_[i];
             }
         }
 
