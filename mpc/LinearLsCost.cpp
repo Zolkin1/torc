@@ -45,6 +45,20 @@ namespace torc::mpc {
         return {hessian, linear_term};
     }
 
+    double LinearLsCost::GetCost(const vectorx_t &x, const vectorx_t &dx, const vectorx_t &p) {
+        vectorx_t x_ad(cost_function_->GetDomainSize());
+        x_ad << dx;
+
+        vectorx_t y;
+
+        vectorx_t p_ad(cost_function_->GetParameterSize());
+        p_ad << x, p, weights_;
+
+        cost_function_->GetFunctionValue(x_ad, p_ad, y);
+        return y.norm();
+    }
+
+
     void LinearLsCost::CostFunction(const torc::ad::ad_vector_t& dx,
                             const torc::ad::ad_vector_t& xref_xtarget_weight,
                             torc::ad::ad_vector_t& x_diff) const {

@@ -41,6 +41,13 @@ namespace torc::mpc {
     constexpr int FLOATING_BASE = 7;
     constexpr int FLOATING_VEL = 6;
 
+    enum LineSearchCondition {
+        ConstraintViolation,
+        CostReduction,
+        Both,
+        MinAlpha
+    };
+
     class HpipmMpc {
     public:
         HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model);
@@ -71,7 +78,8 @@ namespace torc::mpc {
         void SetLinTrajVel(const SimpleTrajectory& vel_traj);
 
         // Computes constraint violation for traj_
-        double GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol);
+        double GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol, double alpha);
+        double GetCost(const std::vector<hpipm::OcpQpSolution>& sol, double alpha);
         int GetSolveCounter() const;
 
         void UpdateContactSchedule(const ContactSchedule& sched);
@@ -96,6 +104,8 @@ namespace torc::mpc {
         vectorx_t GetTauTarget(int node) const;
         vector3_t GetForceTarget(int node, const std::string& frame) const;
         vectorx_t GetConfigTarget(int node) const;
+
+        std::pair<double, double> LineSearch(const std::vector<hpipm::OcpQpSolution>& sol);
 
     private:
         void SetSizes();
@@ -164,6 +174,9 @@ namespace torc::mpc {
 
         // Stats
         int solve_counter_;
+
+        // Line search
+        LineSearchCondition ls_condition_;
 
     };
 }

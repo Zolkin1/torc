@@ -151,24 +151,30 @@ namespace torc::mpc {
                     dynamics_constraints_[0].GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
                         traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
-                        traj_.GetTau(node), force, settings_.dt[node],
+                        traj_.GetTau(node), force, settings_.dt[node], false,
                         qp[node].A, qp[node].B, qp[node].b);
                 } else if (node == dynamics_constraints_[0].GetLastNode() - 1) {
                     // std::cerr << "Adding boundary dynamics..." << std::endl;
-                    matrixx_t Atemp, Btemp;
-                    Atemp.resize(2*nv_, 2*nv_);
-                    Btemp.resize(2*nv_, ntau_ + CONTACT_3DOF*settings_.num_contact_locations);
-                    vectorx_t btemp;
-                    btemp.resize(2*nv_);
-                    dynamics_constraints_[0].GetLinDynamics(
+                    // matrixx_t Atemp, Btemp;
+                    // Atemp.resize(2*nv_, 2*nv_);
+                    // Btemp.resize(2*nv_, ntau_ + CONTACT_3DOF*settings_.num_contact_locations);
+                    // vectorx_t btemp;
+                    // btemp.resize(2*nv_);
+                    // dynamics_constraints_[0].GetLinDynamics(
+                    //     traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
+                    //     traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
+                    //     traj_.GetTau(node), force, settings_.dt[node], true,
+                    //     Atemp, Btemp, btemp);
+                    //
+                    // qp[node].A = Atemp.topRows(nv_ + FLOATING_VEL);
+                    // qp[node].B = Btemp.topRows(nv_ + FLOATING_VEL);
+                    // qp[node].b = btemp.head(nv_ + FLOATING_VEL);
+
+                    dynamics_constraints_[1].GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
                         traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
-                        traj_.GetTau(node), force, settings_.dt[node],
-                        Atemp, Btemp, btemp);
-
-                    qp[node].A = Atemp.topRows(nv_ + FLOATING_VEL);
-                    qp[node].B = Btemp.topRows(nv_ + FLOATING_VEL);
-                    qp[node].b = btemp.head(nv_ + FLOATING_VEL);
+                        traj_.GetTau(node), force, settings_.dt[node], true,
+                        qp[node].A, qp[node].B, qp[node].b);
 
                     // std::cout << "A:\n" << qp[node].A << std::endl;
                     // std::cout << "B:\n" << qp[node].B << std::endl;
@@ -178,7 +184,7 @@ namespace torc::mpc {
                     dynamics_constraints_[1].GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
                         traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
-                        traj_.GetTau(node), force, settings_.dt[node],
+                        traj_.GetTau(node), force, settings_.dt[node], false,
                         qp[node].A, qp[node].B, qp[node].b);
                 }
             }
@@ -614,10 +620,15 @@ namespace torc::mpc {
             std::cout << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
         }
 
-        // TODO: Line search
-        std::cout << "Constraint violation: " << GetConstraintViolation(solution_) << std::endl;
+        std::cout << "Constraint violation: " << GetConstraintViolation(solution_, 1) << std::endl;
+        std::cout << "Cost: " << GetCost(solution_, 1) << std::endl;
 
-        ConvertQpSolToTraj();
+        // Line Search
+        // const auto [constraint_vio, cost] = LineSearch(solution_);
+        // std::cout << "Post LS constraint violation: " << constraint_vio << std::endl;
+        // std::cout << "Post LS cost: " << cost << std::endl;
+
+        ConvertQpSolToTraj();   // TODO: add alpha term here
         traj_out = traj_;
 
         solve_counter_++;
@@ -806,7 +817,7 @@ namespace torc::mpc {
         // }
     }
 
-    double HpipmMpc::GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol) {
+    double HpipmMpc::GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol, double alpha) {
         double violation = 0;
         for (int node = 0; node < settings_.nodes; node++) {
             vectorx_t force(CONTACT_3DOF*settings_.num_contact_locations);
@@ -816,8 +827,8 @@ namespace torc::mpc {
                 force_idx += CONTACT_3DOF;
             }
 
-            const vectorx_t& dq = sol[node].x.head(nv_);
-            vectorx_t dv(nv_);
+            vectorx_t dq = sol[node].x.head(nv_);
+            vectorx_t dv = vectorx_t::Zero(nv_);
             vectorx_t dtau = vectorx_t::Zero(ntau_);
             dv.head<FLOATING_VEL>() = sol[node].x.segment<FLOATING_VEL>(nv_);
             if (dynamics_constraints_[0].IsInNodeRange(node)) {
@@ -831,12 +842,20 @@ namespace torc::mpc {
                 df = sol[node].u.tail(CONTACT_3DOF*settings_.num_contact_locations);
             }
 
+            dq *= alpha;
+            dv *= alpha;
+            dtau *= alpha;
+            df *= alpha;
+
             std::cout << "node: " << node << std::endl;
+            std::cout << "x: " << sol[node].x.transpose() << std::endl;
 
             if (node < dynamics_constraints_[0].GetLastNode() - 1) {
 
-                const vectorx_t& dq2 = sol[node+1].x.head(nv_);
-                const vectorx_t& dv2 = sol[node+1].x.tail(nv_);
+                vectorx_t dq2 = sol[node+1].x.head(nv_);
+                vectorx_t dv2 = sol[node+1].x.tail(nv_);
+                dq2 *= alpha;
+                dv2 *= alpha;
 
                 const auto[int_vio, dyn_vio] = dynamics_constraints_[0].GetViolation(traj_.GetConfiguration(node),
                     traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
@@ -851,12 +870,17 @@ namespace torc::mpc {
                 violation += int_vio.squaredNorm();
 
             } else if (node < traj_.GetNumNodes() - 1) {
-                const auto& dq2 = sol[node+1].x.head(nv_);
+                vectorx_t dq2 = sol[node+1].x.head(nv_);
                 vectorx_t dv2 = vectorx_t::Zero(nv_);
                 dv2.head<FLOATING_VEL>() = sol[node+1].x.segment<FLOATING_VEL>(nv_);
                 if (node < traj_.GetNumNodes() - 2) {
                     dv2.tail(ntau_) = sol[node+1].u.head(ntau_);
                 }
+
+                dq2 *= alpha;
+                dv2 *= alpha;
+
+                dtau.setZero();
 
                 const auto[int_vio, dyn_vio] = dynamics_constraints_[1].GetViolation(traj_.GetConfiguration(node),
                     traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
@@ -865,6 +889,10 @@ namespace torc::mpc {
 
                 std::cout << "Dynamics vio: |" << dyn_vio.squaredNorm() << "| " << dyn_vio.transpose() << std::endl;
                 std::cout << "Integration vio: |" << int_vio.squaredNorm() << "| " << int_vio.transpose() << std::endl;
+                std::cout << "v1: " << (traj_.GetVelocity(node) + dv).transpose() << std::endl;
+                std::cout << "v2: " << (traj_.GetVelocity(node + 1) + dv2).transpose() << std::endl;
+                std::cout << "tau: " << (traj_.GetTau(node) + dtau).transpose() << std::endl;
+                std::cout << "force: " << (force + df).transpose() << std::endl;
 
                 violation += dyn_vio.squaredNorm();
                 violation += int_vio.squaredNorm();
@@ -884,7 +912,7 @@ namespace torc::mpc {
                 violation += vio_vec.squaredNorm();
             }
 
-            if (tau_box_->IsInNodeRange(node)) {
+            if (tau_box_->IsInNodeRange(node) && dynamics_constraints_[0].IsInNodeRange(node)) {
                 vectorx_t vio_vec = tau_box_->GetViolation(traj_.GetTau(node), dtau);
                 std::cout << "Tau box vio: |" << vio_vec.squaredNorm() << "| " << vio_vec.transpose() << std::endl;
                 violation += vio_vec.squaredNorm();
@@ -938,6 +966,104 @@ namespace torc::mpc {
 
         return std::sqrt(violation);
     }
+
+    double HpipmMpc::GetCost(const std::vector<hpipm::OcpQpSolution> &sol, double alpha) {
+        double cost = 0;
+        for (int node = 0; node < settings_.nodes; node++) {
+            vectorx_t dq = sol[node].x.head(nv_);
+            vectorx_t dv(nv_);
+            vectorx_t dtau = vectorx_t::Zero(ntau_);
+            dv.head<FLOATING_VEL>() = sol[node].x.segment<FLOATING_VEL>(nv_);
+            if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                dv.tail(ntau_) = sol[node].x.segment(FLOATING_VEL + nv_, ntau_);
+                dtau = sol[node].u.head(ntau_);
+            } else if (node  < settings_.nodes - 1) {
+                dv.tail(ntau_) = sol[node].u.head(ntau_);
+            }
+            vectorx_t df = vectorx_t::Zero(CONTACT_3DOF*settings_.num_contact_locations);
+            if (node < settings_.nodes - 1) {
+                df = sol[node].u.tail(CONTACT_3DOF*settings_.num_contact_locations);
+            }
+
+            dq *= alpha;
+            dv *= alpha;
+            dtau *= alpha;
+            df *= alpha;
+
+            if (node < settings_.nodes - 1) {
+                if (vel_tracking_->IsInNodeRange(node)) {
+                    cost += vel_tracking_->GetCost(traj_.GetVelocity(node), dv, GetVelocityTarget(node));
+                }
+
+                if (tau_tracking_->IsInNodeRange(node) && dynamics_constraints_[0].IsInNodeRange(node)) {
+                    cost += tau_tracking_->GetCost(traj_.GetTau(node), dtau, GetTauTarget(node));
+                }
+
+                if (force_tracking_->IsInNodeRange(node)) {
+                    int f_idx = 0;
+                    for (const auto& frame : settings_.contact_frames) {
+                        cost += force_tracking_->GetCost(traj_.GetForce(node, frame),
+                            df.segment<CONTACT_3DOF>(f_idx), GetForceTarget(node, frame));
+                        f_idx += CONTACT_3DOF;
+                    }
+                }
+
+                if (config_tracking_->IsInNodeRange(node)) {
+                    cost += config_tracking_->GetCost(traj_.GetConfiguration(node), dq, GetConfigTarget(node));
+                }
+            } else {
+                cost += settings_.terminal_weight*vel_tracking_->GetCost(traj_.GetVelocity(node), dv, GetVelocityTarget(node));
+                cost += settings_.terminal_weight*config_tracking_->GetCost(traj_.GetConfiguration(node), dq, GetConfigTarget(node));
+            }
+        }
+
+        return std::sqrt(cost);
+    }
+
+
+    std::pair<double, double> HpipmMpc::LineSearch(const std::vector<hpipm::OcpQpSolution> &sol) {
+        double alpha = 1;
+
+        double theta_k = GetConstraintViolation(sol, 0);
+        double phi_k = GetCost(sol, 0);
+
+        while (alpha > settings_.ls_alpha_min) {
+            double theta_kp1 = GetConstraintViolation(sol, alpha);
+
+            if (theta_kp1 >= settings_.ls_theta_max) {
+                if (theta_kp1 < (1 - settings_.ls_gamma_theta)*theta_k) {
+                    ls_condition_ = ConstraintViolation;
+                    std::cout << "CONSTRAINT REDUCTION" << std::endl;
+                    std::cout << "alpha = " << alpha << std::endl;
+                    double phi_kp1 = GetCost(sol, alpha);
+                    return std::make_pair(theta_kp1, phi_kp1);
+                }
+                // TODO: Fix for the new solver
+            } else if (std::max(theta_k, theta_kp1) < settings_.ls_theta_min) { // && osqp_instance_.objective_vector.dot(qp_res) < 0) {   // TODO: Fix/put back
+                double phi_kp1 = GetCost(sol, alpha);
+                if (phi_kp1 < (phi_k)) { // + settings_.ls_eta*alpha*osqp_instance_.objective_vector.dot(qp_res))) {    // TODO: Fix/put back
+                    ls_condition_ = CostReduction;
+                    std::cout << "COST REDUCTION" << std::endl;
+                    std::cout << "alpha = " << alpha << std::endl;
+                    return std::make_pair(theta_kp1, phi_kp1);
+                }
+            } else {
+                double phi_kp1 = GetCost(sol, alpha);
+                if (phi_kp1 < (1 - settings_.ls_gamma_phi)*phi_k || theta_kp1 < (1 - settings_.ls_gamma_theta)*theta_k) {
+                    ls_condition_ = Both;
+                    std::cout << "CONSTRAINT & COST REDUCTION" << std::endl;
+                    std::cout << "alpha = " << alpha << std::endl;
+                    return std::make_pair(theta_kp1, phi_kp1);
+                }
+            }
+            alpha = settings_.ls_gamma_alpha*alpha;
+        }
+        ls_condition_ = MinAlpha;
+        alpha = 0;
+
+        return std::make_pair(theta_k, phi_k);
+    }
+
 
     Trajectory HpipmMpc::GetTrajectory() const {
         return traj_;
@@ -1019,7 +1145,6 @@ namespace torc::mpc {
             }
         }
         std::cout << std::endl;
-
     }
 
 

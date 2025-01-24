@@ -49,7 +49,7 @@ namespace torc::mpc {
 
     void DynamicsConstraint::GetLinDynamics(const vectorx_t &q1_lin, const vectorx_t &q2_lin,
         const vectorx_t &v1_lin, const vectorx_t& v2_lin, const vectorx_t &tau_lin, const vectorx_t &force_lin,
-        double dt, matrixx_t& A, matrixx_t& B, vectorx_t& b) {
+        double dt, bool boundary, matrixx_t& A, matrixx_t& B, vectorx_t& b) {
         // --------- Dynamics --------- //
         vectorx_t x_zero = vectorx_t::Zero(dynamics_function_->GetDomainSize());
         vectorx_t p(dynamics_function_->GetParameterSize());
@@ -88,12 +88,37 @@ namespace torc::mpc {
         // vectorx_t q2_default = pinocchio::integrate(model_.GetModel(), q1_lin, dt*v1_lin);
         // vectorx_t dq2 = models::qDifference(q2_default, q2_lin);
 
-        if (full_order_) {
+        if (boundary) {
+            // Try #1: Just use the centroidal dynamics -- must be called from the non-full order node
+            A.setZero();
+            B.setZero();
+            b.setZero();
+
+            // TODO: Check to be sure this is grabbing the block I want
+            // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
+            if (dyn_jac.rows() != FLOATING_VEL) {
+                throw std::runtime_error("dyn jac wrong number of rows!");
+            }
+            matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, FLOATING_VEL).inverse();
+            matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
+            // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
+
+            A.topRows(vel_dim_) << -dq2_inv*int_jac.leftCols(vel_dim_), -dq2_inv*int_jac.middleCols(2*vel_dim_, vel_dim_);
+            A.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.leftCols(2*vel_dim_);
+
+            B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(3*vel_dim_, tau_dim_),
+                dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
+            B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
+
+            // b << int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
+            b << -dq2_inv*int_fbar, -dv2_inv*fbar;
+        } else if (full_order_) {
             A.setZero();
             B.setZero();
             b.setZero();
 
             matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, vel_dim_).inverse();
+            std::cout << "dv2_inv:\n" << dv2_inv << std::endl;
             matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
             // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
 

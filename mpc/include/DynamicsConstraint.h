@@ -19,7 +19,7 @@ namespace torc::mpc {
 
         void GetLinDynamics(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
             const vectorx_t& v1_lin, const vectorx_t& v2_lin, const vectorx_t& tau_lin, const vectorx_t& force_lin,
-            double dt, matrixx_t& A, matrixx_t& B, vectorx_t& b);
+            double dt, bool boundary, matrixx_t& A, matrixx_t& B, vectorx_t& b);
 
         int GetNumConstraints() const override;
 

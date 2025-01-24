@@ -22,6 +22,8 @@ namespace torc::mpc {
          */
         std::pair<matrixx_t, vectorx_t> GetQuadraticApprox(const vectorx_t& x_lin, const vectorx_t& p);
 
+        double GetCost(const vectorx_t& x, const vectorx_t& dx, const vectorx_t& p);
+
     protected:
         void CostFunction(const torc::ad::ad_vector_t& dx,
                             const torc::ad::ad_vector_t& xref_xtarget_weight,

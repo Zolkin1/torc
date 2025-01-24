@@ -11,7 +11,7 @@ general_settings:
   scale_cost: False
   max_initial_solves: 20
   initial_constraint_tol: 5e-4
-  nodes_full_dynamics: 30 #14 #5 #3 #3 #3 #4   # Also determines how many nodes have torque constraints
+  nodes_full_dynamics: 4 #20 #14 #5 #3 #3 #3 #4   # Also determines how many nodes have torque constraints
   delay_prediction_dt: 0
   terminal_cost_weight: 20 #200 #2
 solver_settings:
@@ -192,7 +192,7 @@ line_search:
   alpha_step: 0.5 # Since the line search is high variance, lowering this helps
   armijo_constant: 1e-4
 targets:
-  q_target: [1, 0, 0.77,
+  q_target: [0, 0, 0.77,
               0, 0, 0, 1,
              -0.2, 0, 0, 0.4, -0.216,
              -0.2, 0, 0, 0.4, -0.216,
@@ -204,7 +204,7 @@ targets:
 #            -0.2, 0, 0, 0.4, -0.216,
 #            0, 0, 0, 0.2,
 #            0, 0, 0, 0.2 ]
-  v_target: [0.5, 0, 0,
+  v_target: [0, 0, 0,
              0, 0, 0,
              0, 0, 0, 0, 0,
              0, 0, 0, 0, 0,

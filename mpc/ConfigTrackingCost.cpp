@@ -40,6 +40,20 @@ namespace torc::mpc {
         return {hessian_term, linear_term};
     }
 
+    double ConfigTrackingCost::GetCost(const vectorx_t &x, const vectorx_t &dx, const vectorx_t &p) const {
+        vectorx_t x_ad(cost_function_->GetDomainSize());
+        x_ad << dx;
+
+        vectorx_t y;
+
+        vectorx_t p_ad(cost_function_->GetParameterSize());
+        p_ad << x, p, weights_;
+
+        cost_function_->GetFunctionValue(x_ad, p_ad, y);
+        return y.squaredNorm();
+    }
+
+
     void ConfigTrackingCost::CostFunction(const torc::ad::ad_vector_t &dx,
         const torc::ad::ad_vector_t &xref_xtarget_weight, torc::ad::ad_vector_t &x_diff) const {
         // I'd like to just call pinocchio's integrate here, but that will require a templated model, which I currently don't have

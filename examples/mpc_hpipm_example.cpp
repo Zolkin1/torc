@@ -158,12 +158,14 @@ int main() {
     SimpleTrajectory q_target(g1.GetConfigDim(), settings.nodes);
     SimpleTrajectory v_target(g1.GetVelDim(), settings.nodes);
 
-    for (int i = 0; i < settings.nodes; i++) {
-        auto lam = static_cast<double>(i)/static_cast<double>(settings.nodes);
-        // std::cout << "lambda: " << lam << std::endl;
-        q_target.InsertData(i, (1-lam)*q + lam*settings.q_target);
-        v_target.InsertData(i, (1-lam)*v + lam*settings.v_target);
-    }
+    // for (int i = 0; i < settings.nodes; i++) {
+    //     auto lam = static_cast<double>(i)/static_cast<double>(settings.nodes);
+    //     // std::cout << "lambda: " << lam << std::endl;
+    //     q_target.InsertData(i, (1-lam)*q + lam*settings.q_target);
+    //     v_target.InsertData(i, (1-lam)*v + lam*settings.v_target);
+    // }
+    q_target.SetAllData(settings.q_target);
+    v_target.SetAllData(settings.v_target);
     mpc.SetLinTrajConfig(q_target);
     mpc.SetLinTrajVel(v_target);
 
@@ -196,7 +198,7 @@ int main() {
     // }
 
     mpc.Compute(q, v, traj);
-    // mpc.Compute(q, v, traj);
+    mpc.Compute(q, v, traj);
     mpc.PrintNodeInfo();
 
     traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output_2.csv");
