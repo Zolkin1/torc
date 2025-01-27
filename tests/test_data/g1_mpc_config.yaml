@@ -11,7 +11,7 @@ general_settings:
   scale_cost: False
   max_initial_solves: 20
   initial_constraint_tol: 5e-4
-  nodes_full_dynamics: 4 #20 #14 #5 #3 #3 #3 #4   # Also determines how many nodes have torque constraints
+  nodes_full_dynamics: 20 #14 #5 #3 #3 #3 #4   # Also determines how many nodes have torque constraints
   delay_prediction_dt: 0
   terminal_cost_weight: 20 #200 #2
 solver_settings:
@@ -26,9 +26,9 @@ solver_settings:
   tol_ineq: 1e-8
   reg_prim: 1e-12
   warm_start: 0
-  pred_corr: 1
+  pred_corr: 0 #1 -- Setting this one seems to hurt the constraint violation across solves
   ric_alg: 1
-  split_step: 0
+  split_step: 1 #0
 # OSQP:
 #  rel_tol: 1e-3
 #  abs_tol: 1e-3
@@ -110,14 +110,14 @@ costs:
 #              0.3, 0.3, 0.3, 0.3 ]      # Right Arm
   - type: TorqueRegularization
     name: "TorqueReg"
+#    weight: [ 0.1, 0.1, 0.1, 0.1, 0.1, #0.001,            # Left Leg
+#              0.1, 0.1, 0.1, 0.1, 0.1, #0.001,             # Right Leg
+#              0.1, 0.1, 0.1, 0.1,                           # Left Arm
+#              0.1, 0.1, 0.1, 0.1, ]                          # Right Arm
     weight: [0.001, 0.001, 0.001, 0.0001, 0.001, #0.001,            # Left Leg
              0.001, 0.001, 0.001, 0.0001, 0.001, #0.001,             # Right Leg
              0.01, 0.01, 0.01, 0.01,                           # Left Arm
              0.01, 0.01, 0.01, 0.01,]                          # Right Arm
-#    weight: [ 0.0001, 0.001, 0.001, 0.0001, 0.001, #0.001,            # Left Leg
-#              0.0001, 0.001, 0.001, 0.0001, 0.001, #0.001,             # Right Leg
-#              0.01, 0.01, 0.01, 0.01,                           # Left Arm
-#              0.01, 0.01, 0.01, 0.01, ]                          # Right Arm
   - type: ForceRegularization
     name: "ForceReg"
     weight: [ 0.01, 0.01, 0.0001 ]
@@ -192,7 +192,7 @@ line_search:
   alpha_step: 0.5 # Since the line search is high variance, lowering this helps
   armijo_constant: 1e-4
 targets:
-  q_target: [0, 0, 0.77,
+  q_target: [1, 0, 0.77,
               0, 0, 0, 1,
              -0.2, 0, 0, 0.4, -0.216,
              -0.2, 0, 0, 0.4, -0.216,

@@ -8,6 +8,9 @@
 #include "full_order_rigid_body.h"
 #include <filesystem>
 
+#include <casadi/casadi.hpp>
+// #include "/home/zolkin/AmberLab/Project-TORC/casadi_dynamics/aba_dynamics_dynamics_functions.h"
+
 namespace torc::mpc {
     namespace fs = std::filesystem;
     class DynamicsConstraint : public Constraint {
@@ -44,6 +47,11 @@ namespace torc::mpc {
         void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk,
             const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation);
 
+        void ComputeDynamicsJacobians(const vectorx_t& q1_lin,
+            const vectorx_t& v1_lin, const vectorx_t& v2_lin, const vectorx_t& tau_lin, const vectorx_t& force_lin,
+            double dt, const vectorx_t& dq1, const vectorx_t& dv1, const vectorx_t& dtau,
+            const vectorx_t& dforce, matrixx_t& Jdq, matrixx_t& Jdv, matrixx_t& Jdtau, matrixx_t& JdF, vectorx_t& b);
+
         int nx_;
         int nu_;
         int vel_dim_;
@@ -63,6 +71,12 @@ namespace torc::mpc {
         static constexpr int QUAT_VARS = 4;
         static constexpr int FLOATING_BASE = 7;
         static constexpr int FLOATING_VEL = 6;
+
+        std::unique_ptr<casadi::Function> casadi_dynamics_function_;
+        std::unique_ptr<casadi::Function> casadi_dq_jac_function_;
+        std::unique_ptr<casadi::Function> casadi_dv_jac_function_;
+        std::unique_ptr<casadi::Function> casadi_dtau_jac_function_;
+        std::unique_ptr<casadi::Function> casadi_dF_jac_function_;
 
     private:
     };

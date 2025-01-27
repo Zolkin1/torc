@@ -41,11 +41,11 @@ namespace torc::mpc {
     constexpr int FLOATING_BASE = 7;
     constexpr int FLOATING_VEL = 6;
 
-    enum LineSearchCondition {
-        ConstraintViolation,
-        CostReduction,
-        Both,
-        MinAlpha
+    enum HpipmLineSearchCondition {
+        HConstraintViolation,
+        HCostReduction,
+        HBoth,
+        HMinAlpha
     };
 
     class HpipmMpc {
@@ -74,6 +74,7 @@ namespace torc::mpc {
         void SetConfigTarget(const SimpleTrajectory& q_target);
         void SetVelTarget(const SimpleTrajectory& v_target);
 
+        void SetLinTraj(const Trajectory& traj_in);
         void SetLinTrajConfig(const SimpleTrajectory& config_traj);
         void SetLinTrajVel(const SimpleTrajectory& vel_traj);
 
@@ -176,7 +177,7 @@ namespace torc::mpc {
         int solve_counter_;
 
         // Line search
-        LineSearchCondition ls_condition_;
+        HpipmLineSearchCondition ls_condition_;
 
     };
 }

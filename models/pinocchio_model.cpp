@@ -65,6 +65,9 @@ namespace torc::models {
 
                 // AD Model
                 pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
+
+                // // Casadi Model
+                // casadi_ad_model_ = pin_model_.cast<ADScalar>();
             } else {
                 // Verify that we are given a .xml
                 if (model_path_.extension() != ".xml") {
@@ -98,6 +101,9 @@ namespace torc::models {
 
             // AD Model
             pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
+
+            // // Casadi Model
+            // casadi_ad_model_ = pin_model_.cast<ADScalar>();
         }
 
         // Normal data
@@ -105,6 +111,9 @@ namespace torc::models {
 
         // AD data
         pin_ad_data_ = std::make_shared<ad_pin_data_t>(pin_ad_model_);
+
+        // // Casadi data
+        // ADData casadi_ad_data_(casadi_ad_model_);
     }
 
     long PinocchioModel::GetNumInputs() const {
@@ -347,6 +356,14 @@ namespace torc::models {
     std::shared_ptr<ad_pin_data_t> PinocchioModel::GetADPinData() {
         return pin_ad_data_;
     }
+
+    // const ADModel& PinocchioModel::GetCasadiPinModel() const {
+    //     return casadi_ad_model_;
+    // }
+    //
+    // std::shared_ptr<ADData> PinocchioModel::GetCasadiPinData() {
+    //     return casadi_ad_data_;
+    // }
 
 
 } // torc::models

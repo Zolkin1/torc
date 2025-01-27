@@ -35,9 +35,9 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics);
+        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes + 1); //
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-        settings.compile_derivs, false, settings.nodes_full_dynamics, settings.nodes);
+        settings.compile_derivs, false, settings.nodes_full_dynamics + 100, settings.nodes + 100);
 
     // ---------- Box Constraints ---------- //
     // Config
@@ -111,12 +111,12 @@ int main() {
     torc::mpc::ContactSchedule cs(settings.contact_frames);
 
     // TODO: When the swing time goes past the time horizon weird stuff happens
-    cs.InsertSwing("right_toe", 0.1, 0.4);
-    cs.InsertSwing("right_heel", 0.1, 0.4);
-    cs.InsertSwing("left_toe", 0.4, 0.8);
-    cs.InsertSwing("left_heel", 0.4, 0.8);
-    cs.InsertSwing("right_toe", 0.8, 1.2);
-    cs.InsertSwing("right_heel", 0.8, 1.2);
+    cs.InsertSwing("right_toe", 0.1, 0.5);
+    cs.InsertSwing("right_heel", 0.1, 0.5);
+    cs.InsertSwing("left_toe", 0.5, 0.9);
+    cs.InsertSwing("left_heel", 0.5, 0.9);
+    cs.InsertSwing("right_toe", 0.9, 1.2);
+    cs.InsertSwing("right_heel", 0.9, 1.2);
     cs.InsertSwing("left_toe", 1.2, 1.6);
     cs.InsertSwing("left_heel", 1.2, 1.6);
     // --------------------------------- //
@@ -144,7 +144,7 @@ int main() {
     // Create an IC
     vectorx_t q = settings.q_target;
     // q(2) = 0.8;
-    // q(0) = 0;
+    q(0) = 0;
 
     vectorx_t v = vectorx_t::Zero(g1.GetVelDim());
     // v(0) = 1;
@@ -197,8 +197,12 @@ int main() {
     //     mpc.Compute(q, v, traj);
     // }
 
-    mpc.Compute(q, v, traj);
-    mpc.Compute(q, v, traj);
+    // mpc.Compute(q, v, traj);
+    // mpc.Compute(q, v, traj);
+    // mpc.Compute(q, v, traj);
+    for (int i = 0; i < 20; i++) {
+        mpc.Compute(q, v, traj);
+    }
     mpc.PrintNodeInfo();
 
     traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output_2.csv");

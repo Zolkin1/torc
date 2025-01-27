@@ -80,6 +80,10 @@ target_link_libraries(Mpc PUBLIC Autodiff)
 #    endif ()
 #endif ()
 
+# ------- Eigen ------ #
+find_package(Eigen3 REQUIRED)
+
+# ------- OSQP ------ #
 include(FetchContent)
 
 set(OSQP-CPP_BUILD_TESTS OFF CACHE BOOL "Build OSQP-CPP without tests")
@@ -93,10 +97,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(osqp-cpp)
 target_link_libraries(Mpc PUBLIC osqp-cpp)
-
-# ------- Eigen ------ #
-find_package(Eigen3 REQUIRED)
-
 
 # ------- HPIPM ------ #
 find_package(hpipm-cpp REQUIRED)
@@ -122,4 +122,8 @@ FetchContent_MakeAvailable(yaml-cpp)
 #endif()
 
 target_link_libraries(Mpc PUBLIC yaml-cpp::yaml-cpp)
+
+# Casadi
+find_package(casadi)
+target_link_libraries(Mpc PRIVATE casadi)
 

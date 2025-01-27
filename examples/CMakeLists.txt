@@ -11,3 +11,6 @@ target_link_libraries(mpc_g1_test Mpc)
 
 add_executable(mpc_hpipm mpc_hpipm_example.cpp)
 target_link_libraries(mpc_hpipm Mpc)
+
+#add_executable(casadi_test casadi_test.cpp)
+#target_link_libraries(casadi_test Mpc)
