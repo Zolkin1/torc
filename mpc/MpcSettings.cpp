@@ -260,10 +260,13 @@ namespace torc::mpc {
         polytope_delta = (constraint_settings["polytope_delta"] ? constraint_settings["polytope_delta"].as<double>() : 0.0);
         polytope_shrinking_rad = (constraint_settings["polytope_shrinking_rad"]
             ? constraint_settings["polytope_shrinking_rad"].as<double>() : 0.4);
+
         swing_start_node = constraint_settings["swing_start_node"].as<int>();
         swing_end_node = constraint_settings["swing_end_node"].as<int>();
         holonomic_start_node = constraint_settings["holonomic_start_node"].as<int>();
         holonomic_end_node = constraint_settings["holonomic_end_node"].as<int>();
+        collision_start_node = constraint_settings["collision_start_node"].as<int>();
+        collision_end_node = constraint_settings["collision_end_node"].as<int>();
 
         YAML::Node collision_settings = constraint_settings["collisions"];
         if (!collision_settings.IsSequence()) {
@@ -273,11 +276,10 @@ namespace torc::mpc {
         for (const auto& collision : collision_settings) {
             const auto frame1 = collision["frame1"].as<std::string>();
             const auto frame2 = collision["frame2"].as<std::string>();
-            collision_frames.emplace_back(frame1, frame2);
 
             const auto r1 = collision["radius1"].as<double>();
             const auto r2 = collision["radius2"].as<double>();
-            collision_radii.emplace_back(r1, r2);
+            collision_data.emplace_back(frame1, frame2, r1, r2);
         }
     }
 

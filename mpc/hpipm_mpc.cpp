@@ -99,6 +99,10 @@ namespace torc::mpc {
         holonomic_ = std::make_unique<HolonomicConstraint>(std::move(constraints));
     }
 
+    void HpipmMpc::SetCollisionConstraint(CollisionConstraint constraints) {
+        collision_ = std::make_unique<CollisionConstraint>(std::move(constraints));
+    }
+
     void HpipmMpc::SetVelTrackingCost(LinearLsCost cost) {
         vel_tracking_ = std::make_unique<LinearLsCost>(std::move(cost));
     }
@@ -271,9 +275,9 @@ namespace torc::mpc {
                     qp[node].lg.segment(ineq_row_idx, lin_seg.size()) = -lin_seg;
                     qp[node].ug.segment(ineq_row_idx, lin_seg.size()) = -lin_seg;
 
+                    qp[node].ug(ineq_row_idx + 4) += settings_.max_grf;  // Upper bounding just the z part
                     qp[node].lg.segment<5>(ineq_row_idx) *= in_contact_[settings_.contact_frames[contact]][node];
                     qp[node].ug.segment<5>(ineq_row_idx) *= in_contact_[settings_.contact_frames[contact]][node];
-                    qp[node].ug(ineq_row_idx + 4) += settings_.max_grf;  // Upper bounding just the z part
 
                     qp[node].lg.segment<CONTACT_3DOF>(ineq_row_idx + 5) *= 1 - in_contact_[settings_.contact_frames[contact]][node];
                     qp[node].ug.segment<CONTACT_3DOF>(ineq_row_idx + 5) *= 1 - in_contact_[settings_.contact_frames[contact]][node];
@@ -323,11 +327,18 @@ namespace torc::mpc {
                 }
             }
 
-            // // Collision
-            // if (collision_->IsInNodeRange(node)) {
-            //
-            // }
-            //
+            // Collision
+            if (collision_->IsInNodeRange(node)) {
+                for (int i = 0; i < collision_->GetNumCollisions(); i++) {
+                    const auto [c_block, y_segment] =
+                        collision_->GetLinearization(traj_.GetConfiguration(node), i);
+                    qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nv_) = c_block;
+                    qp[node].lg.segment(ineq_row_idx, 1) = -y_segment;
+                    qp[node].ug_mask(ineq_row_idx) = 0;
+                    ineq_row_idx++;
+                }
+            }
+
             // // Polytope
             // if (polytope_->IsInNodeRange(node)) {
             //
@@ -335,8 +346,8 @@ namespace torc::mpc {
 
             // std::cout << "node: " << node << std::endl;
             // for (const auto& frame : settings_.contact_frames) {
-            //     std::cout << "[" << frame << "] in contact: " << in_contact_[frame][node]
-            //         << ", swing height: " << swing_traj_[frame][node] << std::endl;
+                // std::cout << "[" << frame << "] in contact: " << in_contact_[frame][node]
+                    // << ", swing height: " << swing_traj_[frame][node] << std::endl;
             // }
             // std::cout << "idxbx: ";
             // for (const auto& idx : qp[node].idxbx) {
@@ -460,6 +471,9 @@ namespace torc::mpc {
             if (holonomic_->IsInNodeRange(node)) {
                 n_other_constraints += holonomic_->GetNumConstraints();
             }
+            if (collision_->IsInNodeRange(node)) {
+                n_other_constraints += collision_->GetNumConstraints();
+            }
             // TODO: Add other constraints
 
             if (node < dynamics_constraints_[0].GetLastNode() - 1) {
@@ -529,8 +543,8 @@ namespace torc::mpc {
             qp[node].ug = vectorx_t::Zero(n_other_constraints);
             qp[node].ug_mask = vectorx_t::Ones(n_other_constraints);
 
-            // solution_[node].x = vectorx_t::Zero(nx1);
-            // solution_[node].u = vectorx_t::Zero(nu);
+            solution_[node].x = vectorx_t::Zero(nx1);
+            solution_[node].u = vectorx_t::Zero(nu);
         }
 
         solver_ = std::make_unique<hpipm::OcpQpIpmSolver>(qp, qp_settings);
@@ -592,9 +606,6 @@ namespace torc::mpc {
 
 
     hpipm::HpipmStatus HpipmMpc::Compute(const vectorx_t &q0, const vectorx_t &v0, Trajectory& traj_out) {
-        std::cout << "IN COMPUTE" << std::endl;
-        // NanCheck();  // TODO: Remove line
-
         traj_.SetConfiguration(0, q0);
         traj_.SetVelocity(0, v0);
 
@@ -638,6 +649,10 @@ namespace torc::mpc {
         ConvertQpSolToTraj();   // TODO: add alpha term here
         traj_out = traj_;
 
+        if (settings_.verbose) {
+            PrintNodeInfo();
+        }
+
         solve_counter_++;
 
         return res;
@@ -678,12 +693,12 @@ namespace torc::mpc {
 
             if (node < settings_.nodes - 1) {
                 for (int i = 0; i < settings_.contact_frames.size(); i++) {
-                    // std::cout << "[" << settings_.contact_frames[i] << "] " << in_contact_[settings_.contact_frames[i]][traj_idx] << std::endl;
+                    // std::cout << "[" << settings_.contact_frames[i] << "] " << in_contact_[settings_.contact_frames[i]][node] << std::endl;
                     // std::cout << "dforce: " << solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3).transpose() << std::endl;
-                    // std::cout << "current force: " << traj_.GetForce(traj_idx, settings_.contact_frames[i]).transpose() << std::endl;
+                    // std::cout << "current force: " << traj_.GetForce(node, settings_.contact_frames[i]).transpose() << std::endl;
                     traj_.SetForce(node, settings_.contact_frames[i],
                         traj_.GetForce(node, settings_.contact_frames[i]) + solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3));
-                    // std::cout << "new force: " << traj_.GetForce(traj_idx, settings_.contact_frames[i]).transpose() << std::endl;
+                    // std::cout << "new force: " << traj_.GetForce(node, settings_.contact_frames[i]).transpose() << std::endl;
                 }
             }
         }
@@ -820,7 +835,15 @@ namespace torc::mpc {
             frame_idx++;
         }
 
-        PrintNodeInfo();
+        // TODO: Why do I need this?????
+        // TODO: Remove
+        // for (int i = 0; i < settings_.nodes; i++) {
+        //     for (const auto& frame : settings_.contact_frames) {
+        //         traj_.SetForce(i, frame, GetForceTarget(i, frame));
+        //     }
+        // }
+
+        // PrintNodeInfo();
 
         // for (const auto& frame : settings_.contact_frames) {
         //     std::cout << "Frame " << frame << std::endl;
@@ -961,6 +984,7 @@ namespace torc::mpc {
                 for (const auto& frame : settings_.contact_frames) {
                     vectorx_t vio_vec = friction_cone_->GetViolation(traj_.GetForce(node, frame),
                         df.segment<CONTACT_3DOF>(df_idx));
+                    // std::cout << "raw vio vec: " << vio_vec.transpose() << std::endl;
                     df_idx += CONTACT_3DOF;
                     vio_vec.head<5>() *= in_contact_[frame][node];
                     for (int i = 0; i < 4; i++) {
@@ -997,12 +1021,20 @@ namespace torc::mpc {
                 }
             }
 
+            if (collision_->IsInNodeRange(node)) {
+                for (int i = 0; i < collision_->GetNumCollisions(); i++) {
+                    vectorx_t vio_vec = collision_->GetViolation(traj_.GetConfiguration(node), dq, i);
+                    vio_vec(0) = std::min(0., vio_vec(0));
+                    violation += vio_vec.squaredNorm();
+                }
+            }
+
             // std::cout << "Running violation: (squared) " << violation << ", sqrt: " << std::sqrt(violation) << std::endl;
         }
 
-        std::cout << "Total violation: " << std::sqrt(violation) << std::endl;
+        std::cout << "Total violation: " << settings_.dt.back()*std::sqrt(violation) << std::endl;
 
-        return std::sqrt(violation);
+        return settings_.dt.back()*std::sqrt(violation);
     }
 
     double HpipmMpc::GetCost(const std::vector<hpipm::OcpQpSolution> &sol, double alpha) {
@@ -1114,10 +1146,68 @@ namespace torc::mpc {
     }
 
     void HpipmMpc::PrintNodeInfo() const {
+//     // Configurable column width
+//     constexpr int node_width = 6; // Width for each node column
+//     constexpr int label_width = 22; // Width for row labels
+//
+//     // Print node headers
+//     std::cout << std::setw(label_width) << " " << "Nodes:";
+//     for (int node = 0; node < settings_.nodes; ++node) {
+//         std::cout << std::setw(node_width) << node;
+//     }
+//     std::cout << std::endl;
+//
+//     // Print time headers
+//     std::cout << std::setw(label_width) << " " << "Time:";
+//     double time = 0.0;
+//     for (int node = 0; node < settings_.nodes; ++node) {
+//         std::cout << std::setw(node_width) << std::fixed << std::setprecision(2) << time;
+//         time += settings_.dt[node];
+//     }
+//     std::cout << std::endl;
+//
+//     // Print contact frames
+//     for (const auto& frame : settings_.contact_frames) {
+//         std::cout << std::setw(label_width) << frame;
+//         for (int node = 0; node < settings_.nodes; ++node) {
+//             std::cout << std::setw(node_width)
+//                       << (in_contact_.at(frame)[node] ? "____" : "xxxx");
+//         }
+//         std::cout << std::endl;
+//     }
+//
+//     // Print constraints
+//     auto PrintConstraintRow = [&](const std::string& label, auto& constraint) {
+//         std::cout << std::setw(label_width) << label;
+//         for (int node = 0; node < settings_.nodes; ++node) {
+//             std::cout << std::setw(node_width)
+//                       << (constraint.IsInNodeRange(node) ? "T" : "F");
+//         }
+//         std::cout << std::endl;
+//     };
+//
+//     PrintConstraintRow("Dynamics", dynamics_constraints_[0]);
+//     PrintConstraintRow("Friction", *friction_cone_);
+//     PrintConstraintRow("Swing", *swing_constraint_);
+//     PrintConstraintRow("Holonomic", *holonomic_);
+//
+//     // Print force data
+//     for (const auto& frame : settings_.contact_frames) {
+//         for (const std::string& axis : {"x", "y", "z"}) {
+//             std::cout << std::setw(label_width) << "Force [" + frame + "] " + axis;
+//             for (int node = 0; node < settings_.nodes; ++node) {
+//                 std::cout << std::setw(node_width) << std::fixed << std::setprecision(2)
+//                           << traj_.GetForce(node, frame)[axis == "x" ? 0 : axis == "y" ? 1 : 2];
+//             }
+//             std::cout << std::endl;
+//         }
+//     }
+// }
+
         std::cout << std::setfill(' ');
         std::cout << std::setw(22) << "";
         for (int node = 0; node < settings_.nodes; node++) {
-            std::cout << std::setw(1) << std::fixed << std::setprecision(2) << " " << node;
+            std::cout << std::setw(5) << std::fixed << std::setprecision(2) << node;
         }
         std::cout << std::endl;
         std::cout << std::setw(22) << "";
@@ -1185,8 +1275,29 @@ namespace torc::mpc {
             }
         }
         std::cout << std::endl;
+
+        for (const auto& frame : settings_.contact_frames) {
+            std::cout << std::setw(20) << " ";
+            for (int node = 0; node < settings_.nodes; node++) {
+                std::cout << std::setw(8) << std::fixed << std::setprecision(2) << node;
+            }
+            std::cout << std::endl;
+            std::cout << std::setw(20) << "Force [" + frame + "] x";
+            for (int node = 0; node < settings_.nodes; node++) {
+                std::cout << std::setw(8) << std::fixed << std::setprecision(2) << traj_.GetForce(node, frame)[0];
+            }
+            std::cout << std::endl;
+            std::cout << std::setw(20) << "Force [" + frame + "] y";
+            for (int node = 0; node < settings_.nodes; node++) {
+                std::cout << std::setw(8) << std::fixed << std::setprecision(2) << traj_.GetForce(node, frame)[1];
+            }
+            std::cout << std::endl;
+            std::cout << std::setw(20) << "Force [" + frame + "] z";
+            for (int node = 0; node < settings_.nodes; node++) {
+                std::cout << std::setw(8) << std::fixed << std::setprecision(2) << traj_.GetForce(node, frame)[2];
+            }
+            std::cout << std::endl;
+        }
     }
-
-
 }
 

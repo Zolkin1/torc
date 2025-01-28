@@ -11,6 +11,7 @@
 #include <filesystem>
 
 #include "BoxConstraint.h"
+#include "CollisionConstraint.h"
 #include "ConfigTrackingCost.h"
 #include "hpipm-cpp/hpipm-cpp.hpp"
 #include "full_order_rigid_body.h"
@@ -59,6 +60,7 @@ namespace torc::mpc {
         void SetFrictionCone(FrictionConeConstraint constraints);
         void SetSwingConstraint(SwingConstraint constraints);
         void SetHolonomicConstraint(HolonomicConstraint constraints);
+        void SetCollisionConstraint(CollisionConstraint constraints);
 
         // TODO: Write a version that takes in a SimpleTraj object
         void SetVelTrackingCost(LinearLsCost cost);
@@ -131,7 +133,7 @@ namespace torc::mpc {
 
         std::unique_ptr<SwingConstraint> polytope_;
 
-        std::unique_ptr<SwingConstraint> collision_;
+        std::unique_ptr<CollisionConstraint> collision_;
 
         // --------- Cost --------- //
         std::unique_ptr<ConfigTrackingCost> config_tracking_;

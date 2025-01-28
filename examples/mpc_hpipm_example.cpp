@@ -72,7 +72,7 @@ int main() {
         tau_lims_idxs);
 
     // ---------- Friction Cone Constraints ---------- //
-    FrictionConeConstraint friction_cone_constraint(0,settings.nodes-1, "friction_cone_cone",
+    FrictionConeConstraint friction_cone_constraint(0,settings.nodes - 1, "friction_cone_cone",
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Swing Constraints ---------- //
@@ -82,6 +82,10 @@ int main() {
     // ---------- Holonomic Constraints ---------- //
     HolonomicConstraint holonomic_constraint(settings.holonomic_start_node, settings.holonomic_end_node,
         "holonomic_constraint", g1, contact_frames, settings.deriv_lib_path, settings.compile_derivs);
+
+    // ---------- Collision Constraints ---------- //
+    CollisionConstraint collision_constraint(settings.collision_start_node, settings.collision_end_node,
+        "collision_constraint", g1, settings.deriv_lib_path, settings.compile_derivs, settings.collision_data);
 
     std::cout << "===== Constraints Created =====" << std::endl;
 
@@ -132,6 +136,7 @@ int main() {
     mpc.SetFrictionCone(std::move(friction_cone_constraint));
     mpc.SetSwingConstraint(std::move(swing_constraint));
     mpc.SetHolonomicConstraint(std::move(holonomic_constraint));
+    mpc.SetCollisionConstraint(std::move(collision_constraint));
     std::cout << "===== MPC Constraints Added =====" << std::endl;
 
     mpc.SetVelTrackingCost(std::move(vel_tracking));
@@ -145,6 +150,7 @@ int main() {
     vectorx_t q = settings.q_target;
     // q(2) = 0.8;
     q(0) = 0;
+    q(2) = 0.77;
 
     vectorx_t v = vectorx_t::Zero(g1.GetVelDim());
     // v(0) = 1;
@@ -158,23 +164,36 @@ int main() {
     SimpleTrajectory q_target(g1.GetConfigDim(), settings.nodes);
     SimpleTrajectory v_target(g1.GetVelDim(), settings.nodes);
 
-    // for (int i = 0; i < settings.nodes; i++) {
-    //     auto lam = static_cast<double>(i)/static_cast<double>(settings.nodes);
-    //     // std::cout << "lambda: " << lam << std::endl;
-    //     q_target.InsertData(i, (1-lam)*q + lam*settings.q_target);
-    //     v_target.InsertData(i, (1-lam)*v + lam*settings.v_target);
-    // }
     q_target.SetAllData(settings.q_target);
     v_target.SetAllData(settings.v_target);
     mpc.SetLinTrajConfig(q_target);
     mpc.SetLinTrajVel(v_target);
 
-    q_target.SetAllData(settings.q_target);
+    for (int i = 0; i < settings.nodes; i++) {
+        // auto lam = static_cast<double>(i)/static_cast<double>(settings.nodes);
+        // std::cout << "lambda: " << lam << std::endl;
+        // q_target.InsertData(i, (1-lam)*q + lam*settings.q_target);
+        // v_target.InsertData(i, (1-lam)*v + lam*settings.v_target);
+
+        // Sinusoidal z height
+        // vectorx_t q_temp = settings.q_target;
+        // q_temp(2) = 0.77 - 0.3*sin(0.1*i);
+        // q_target[i] = q_temp;
+        //
+        // vectorx_t v_temp = settings.v_target;
+        // v_temp(2) = -0.3*0.1*cos(0.1*i);
+        // v_target[i] = v_temp;
+        //
+        // std::cout << "[" << i << "] qz: " << q_temp(2) << ", vz: " << v_temp(2) << std::endl;
+    }
+
     mpc.SetConfigTarget(q_target);
-    v_target.SetAllData(settings.v_target);
     mpc.SetVelTarget(v_target);
 
     mpc.UpdateContactSchedule(cs);
+
+    std::cout << "q ic: " << q.transpose() << std::endl;
+    std::cout << "v ic: " << v.transpose() << std::endl;
 
     torc::utils::TORCTimer timer;
     timer.Tic();
@@ -197,11 +216,48 @@ int main() {
     //     mpc.Compute(q, v, traj);
     // }
 
+    // double dt = -0.01;
+    // cs.ShiftSwings(dt);
+    // vectorx_t q_traj, v_traj;
+    // q_traj = q;
+    // v_traj = v;
+    // // traj.GetConfigInterp(0.25, q_traj);
+    // // traj.GetVelocityInterp(0.25, v_traj);
+    // mpc.Compute(q_traj, v_traj, traj);
+    //
+    // cs.ShiftSwings(dt);
+    // // traj.GetConfigInterp(0.25, q_traj);
+    // // traj.GetVelocityInterp(0.25, v_traj);
+    // mpc.Compute(q_traj, v_traj, traj);
+    //
+    // cs.ShiftSwings(dt);
+    // mpc.Compute(q_traj, v_traj, traj);
+    //
+    // cs.ShiftSwings(dt);
+    // mpc.Compute(q_traj, v_traj, traj);
+    //
+    // cs.ShiftSwings(dt);
+    // mpc.Compute(q_traj, v_traj, traj);
+    //
+    // cs.ShiftSwings(dt);
+    // mpc.Compute(q_traj, v_traj, traj);
+    //
+    // cs.ShiftSwings(dt);
+    // mpc.Compute(q_traj, v_traj, traj);
+    //
+    // cs.ShiftSwings(dt);
+    // mpc.Compute(q_traj, v_traj, traj);
+
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
-    for (int i = 0; i < 20; i++) {
-        mpc.Compute(q, v, traj);
+    for (int i = 0; i < 50; i++) { // 50
+        cs.ShiftSwings(-0.01);
+        vectorx_t q_traj, v_traj;
+        traj.GetConfigInterp(0.01, q_traj);
+        traj.GetVelocityInterp(0.01, v_traj);
+        mpc.UpdateContactSchedule(cs);
+        mpc.Compute(q_traj, v_traj, traj);
     }
     mpc.PrintNodeInfo();
 
