@@ -6,6 +6,7 @@
 
 #include "DynamicsConstraint.h"
 #include "hpipm_mpc.h"
+#include "SRBConstraint.h"
 
 int main() {
     // Create all the constraints
@@ -35,9 +36,13 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes + 1); //
+        deriv_lib_path, settings.compile_derivs, true, 0 - 100, settings.nodes_full_dynamics - 100); //
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-        settings.compile_derivs, false, settings.nodes_full_dynamics + 100, settings.nodes + 100);
+        settings.compile_derivs, false, settings.nodes_full_dynamics - 100, settings.nodes - 100);
+
+    SRBConstraint srb_dynamics(0, settings.nodes, //settings.nodes_full_dynamics, settings.nodes,
+        "g1_srb",
+        settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1, settings.q_target);
 
     // ---------- Box Constraints ---------- //
     // Config
@@ -130,6 +135,7 @@ int main() {
 
     std::cout << "===== MPC Created =====" << std::endl;
     mpc.SetDynamicsConstraints(std::move(dynamics_constraints));
+    mpc.SetSrbConstraint(std::move(srb_dynamics));
     mpc.SetConfigBox(config_box);
     mpc.SetVelBox(vel_box);
     mpc.SetTauBox(tau_box);
@@ -183,7 +189,7 @@ int main() {
         // vectorx_t v_temp = settings.v_target;
         // v_temp(2) = -0.3*0.1*cos(0.1*i);
         // v_target[i] = v_temp;
-        //
+
         // std::cout << "[" << i << "] qz: " << q_temp(2) << ", vz: " << v_temp(2) << std::endl;
     }
 

@@ -16,6 +16,7 @@ namespace torc::mpc {
 
     using vectorx_t = Eigen::VectorXd;
     using vector2_t = Eigen::Vector2d;
+    using vector3_t = Eigen::Vector3d;
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3x_t = Eigen::Matrix3Xd;

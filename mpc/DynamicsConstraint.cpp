@@ -707,7 +707,7 @@ namespace torc::mpc {
         const ad::ad_vector_t fk_curr = dfk + fk;
 
         // Intermediate values
-        const ad::ad_vector_t a = (vkp1_curr - vk_curr)/dt;
+        const ad::ad_vector_t a = (vkp1_curr - vk_curr)/dt; // TODO: Do I need to account for the different local frames somehow?
         std::vector<models::ExternalForce<ad::adcg_t>> f_ext;
 
         int idx = 0;
@@ -954,6 +954,13 @@ namespace torc::mpc {
         dynamics_function_->GetFunctionValue(xid, pid, id_violation);
 
         vectorx_t dyn_vio = dv2 - cpp_dv2;
+
+        if (!full_order_) {
+            dyn_vio.conservativeResize(FLOATING_VEL, Eigen::NoChange);
+        }
+
+        std::cout << "FD vio: " << dyn_vio.transpose() << std::endl;
+        std::cout << "ID vio: " << id_violation.transpose() << std::endl;
 
         // std::cout << "v: " << v_eval.transpose() << std::endl;
         // std::cout << "F: " << force_eval.transpose() << std::endl;

@@ -5,6 +5,7 @@
 #ifndef PINOCCHIOINTERFACE_H
 #define PINOCCHIOINTERFACE_H
 
+#include <iostream>
 #include <Eigen/Core>
 #include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/math/quaternion.hpp>

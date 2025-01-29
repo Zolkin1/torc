@@ -57,13 +57,13 @@ namespace torc::mpc {
 
     void HpipmMpc::SetDynamicsConstraints(std::vector<DynamicsConstraint> constraints) {
         dynamics_constraints_ = std::move(constraints);
-        if (dynamics_constraints_.size() !=2) {
-            throw std::runtime_error("For now we only accept exactly 2 dynamics constraints!");
-        }
-
-        if (dynamics_constraints_[0].GetFirstNode() != 0) {
-            throw std::runtime_error("First dynamics constraint must start at node = 0!");
-        }
+        // if (dynamics_constraints_.size() !=2) {
+        //     throw std::runtime_error("For now we only accept exactly 2 dynamics constraints!");
+        // }
+        //
+        // if (dynamics_constraints_[0].GetFirstNode() != 0) {
+        //     throw std::runtime_error("First dynamics constraint must start at node = 0!");
+        // }
         // TODO: Put back
         // if (dynamics_constraints_[0].GetLastNode() != dynamics_constraints_[1].GetFirstNode()) {
         //     throw std::runtime_error("First and last nodes for the dynamics constraints must match!");
@@ -73,6 +73,11 @@ namespace torc::mpc {
         // }
 
         // boundary_node_ = dynamics_constraints_[0].GetLastNode();
+    }
+
+    void HpipmMpc::SetSrbConstraint(SRBConstraint constraint) {
+        srb_constraint_ = std::make_unique<torc::mpc::SRBConstraint>(std::move(constraint));
+        // TODO: Check nodes to make sure they are compatible
     }
 
     void HpipmMpc::SetConfigBox(const BoxConstraint& constraint) {
@@ -160,36 +165,21 @@ namespace torc::mpc {
                         qp[node].A, qp[node].B, qp[node].b);
                 } else if (node == dynamics_constraints_[0].GetLastNode() - 1) {
                     // std::cerr << "Adding boundary dynamics..." << std::endl;
-                    // matrixx_t Atemp, Btemp;
-                    // Atemp.resize(2*nv_, 2*nv_);
-                    // Btemp.resize(2*nv_, ntau_ + CONTACT_3DOF*settings_.num_contact_locations);
-                    // vectorx_t btemp;
-                    // btemp.resize(2*nv_);
-                    // dynamics_constraints_[0].GetLinDynamics(
-                    //     traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
-                    //     traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
-                    //     traj_.GetTau(node), force, settings_.dt[node], true,
-                    //     Atemp, Btemp, btemp);
-                    //
-                    // qp[node].A = Atemp.topRows(nv_ + FLOATING_VEL);
-                    // qp[node].B = Btemp.topRows(nv_ + FLOATING_VEL);
-                    // qp[node].b = btemp.head(nv_ + FLOATING_VEL);
-
                     dynamics_constraints_[1].GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
                         traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
                         traj_.GetTau(node), force, settings_.dt[node], true,
                         qp[node].A, qp[node].B, qp[node].b);
 
-                    // std::cout << "A:\n" << qp[node].A << std::endl;
-                    // std::cout << "B:\n" << qp[node].B << std::endl;
-                    // std::cout << "b: " << qp[node].b.transpose() << std::endl;
                 } else if (node < settings_.nodes - 1) {
                     // std::cerr << "Adding ROM dynamics..." << std::endl;
-                    dynamics_constraints_[1].GetLinDynamics(
-                        traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
-                        traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
-                        traj_.GetTau(node), force, settings_.dt[node], false,
+                    // dynamics_constraints_[1].GetLinDynamics(
+                    //     traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
+                    //     traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
+                    //     traj_.GetTau(node), force, settings_.dt[node], false,
+                    //     qp[node].A, qp[node].B, qp[node].b);
+                    srb_constraint_->GetLinDynamics(traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
+                        traj_.GetVelocity(node), traj_.GetVelocity(node + 1), force, settings_.dt[node],
                         qp[node].A, qp[node].B, qp[node].b);
                 }
             }
@@ -305,27 +295,27 @@ namespace torc::mpc {
                 }
             }
 
-            // Holonomic
-            // TODO: I think I could enforce this for node 1 if I only consider the velocity part of the jacobian for that node
-            if (holonomic_->IsInNodeRange(node)) { //(node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
-                // std::cerr << "Adding holonomic..." << std::endl;
-                for (const auto& frame : settings_.contact_frames) {
-                    const auto [jac, y_segment] =
-                        holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
-                    if (dynamics_constraints_[0].IsInNodeRange(node)) {
-                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][node]*jac;
-                    } else {
-                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
-                            in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
-                        qp[node].D.block(ineq_row_idx, 0, y_segment.size(), nv_ - FLOATING_VEL) =
-                            in_contact_[frame][node]*jac.rightCols(nv_ - FLOATING_VEL);
-                    }
-                    qp[node].lg.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
-                    qp[node].ug.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
-
-                    ineq_row_idx += y_segment.size();
-                }
-            }
+            // // Holonomic
+            // // TODO: I think I could enforce this for node 1 if I only consider the velocity part of the jacobian for that node
+            // if (holonomic_->IsInNodeRange(node)) { //(node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
+            //     // std::cerr << "Adding holonomic..." << std::endl;
+            //     for (const auto& frame : settings_.contact_frames) {
+            //         const auto [jac, y_segment] =
+            //             holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
+            //         if (dynamics_constraints_[0].IsInNodeRange(node)) {
+            //             qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][node]*jac;
+            //         } else {
+            //             qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
+            //                 in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
+            //             qp[node].D.block(ineq_row_idx, 0, y_segment.size(), nv_ - FLOATING_VEL) =
+            //                 in_contact_[frame][node]*jac.rightCols(nv_ - FLOATING_VEL);
+            //         }
+            //         qp[node].lg.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
+            //         qp[node].ug.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
+            //
+            //         ineq_row_idx += y_segment.size();
+            //     }
+            // }
 
             // Collision
             if (collision_->IsInNodeRange(node)) {
@@ -943,17 +933,29 @@ namespace torc::mpc {
 
                 dtau.setZero();
 
-                const auto[int_vio, dyn_vio] = dynamics_constraints_[1].GetViolation(traj_.GetConfiguration(node),
-                    traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
-                    traj_.GetVelocity(node + 1), traj_.GetTau(node), force, settings_.dt[node],
-                    dq, dq2, dv, dv2, dtau, df);
+                // const auto[int_vio, dyn_vio] = dynamics_constraints_[1].GetViolation(traj_.GetConfiguration(node),
+                //     traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
+                //     traj_.GetVelocity(node + 1), traj_.GetTau(node), force, settings_.dt[node],
+                //     dq, dq2, dv, dv2, dtau, df);
 
-                // std::cout << "Dynamics vio: |" << dyn_vio.squaredNorm() << "| " << dyn_vio.transpose() << std::endl;
-                // std::cout << "Integration vio: |" << int_vio.squaredNorm() << "| " << int_vio.transpose() << std::endl;
-                // std::cout << "v1: " << (traj_.GetVelocity(node) + dv).transpose() << std::endl;
-                // std::cout << "v2: " << (traj_.GetVelocity(node + 1) + dv2).transpose() << std::endl;
-                // std::cout << "tau: " << (traj_.GetTau(node) + dtau).transpose() << std::endl;
-                // std::cout << "force: " << (force + df).transpose() << std::endl;
+                const auto [int_vio, dyn_vio] = srb_constraint_->GetViolation(
+                    traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
+                    traj_.GetVelocity(node + 1), force, settings_.dt[node],
+                    dq, dq2, dv, dv2, df);
+
+                std::cout << "Dynamics vio: |" << dyn_vio.squaredNorm() << "| " << dyn_vio.transpose() << std::endl;
+                std::cout << "Integration vio: |" << int_vio.squaredNorm() << "| " << int_vio.transpose() << std::endl;
+                // std::cout << "v: " << traj_.GetVelocity(node).transpose() << std::endl;
+                // std::cout << "dv: " << dv.transpose() << std::endl;
+                // std::cout << "v2: " << traj_.GetVelocity(node+1).transpose() << std::endl;
+                // std::cout << "dv2: " << dv2.transpose() << std::endl;
+                // std::cout << "dtau: " << dtau.transpose() << std::endl;
+                // std::cout << "q: " << traj_.GetConfiguration(node).transpose() << std::endl;
+                // std::cout << "dq: " << dq.transpose() << std::endl;
+                // std::cout << "tau: " << traj_.GetTau(node).transpose() << std::endl;
+                // std::cout << "dtau: " << dtau.transpose() << std::endl;
+                // std::cout << "F: " << force.transpose() << std::endl;
+                // std::cout << "dF: " << df.transpose() << std::endl;
 
                 violation += dyn_vio.squaredNorm();
                 violation += int_vio.squaredNorm();

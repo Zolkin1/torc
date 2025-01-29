@@ -23,6 +23,7 @@
 #include "LinearLsCost.h"
 #include "contact_schedule.h"
 #include "MpcSettings.h"
+#include "SRBConstraint.h"
 #include "SwingConstraint.h"
 
 namespace torc::mpc {
@@ -54,6 +55,7 @@ namespace torc::mpc {
         HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model);
 
         void SetDynamicsConstraints(std::vector<DynamicsConstraint> constraints);
+        void SetSrbConstraint(SRBConstraint constraint);
         void SetConfigBox(const BoxConstraint& constraints);
         void SetVelBox(const BoxConstraint& constraints);
         void SetTauBox(const BoxConstraint& constraints);
@@ -121,6 +123,7 @@ namespace torc::mpc {
 
         // --------- Constraints --------- //
         std::vector<DynamicsConstraint> dynamics_constraints_;
+        std::unique_ptr<SRBConstraint> srb_constraint_;
         std::unique_ptr<BoxConstraint> config_box_;
         std::unique_ptr<BoxConstraint> vel_box_;
         std::unique_ptr<BoxConstraint> tau_box_;
