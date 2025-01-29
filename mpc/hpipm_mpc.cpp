@@ -232,19 +232,17 @@ namespace torc::mpc {
             }
 
             // Torque box constraints
-            if (tau_box_->IsInNodeRange(node)) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
+            if (dynamics_constraints_[0].IsInNodeRange(node) && tau_box_->IsInNodeRange(node)) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
                 // std::cerr << "Adding tau box..." << std::endl;
-                if (dynamics_constraints_[0].IsInNodeRange(node)) {
-                    // Set box indexes
-                    const auto& idxs = tau_box_->GetIdxs();
-                    for (int i = 0; i < idxs.size(); i++) {
-                        qp[node].idxbu[i] = idxs[i];
-                    }
-
-                    // Bounds
-                    qp[node].lbu.head(idxs.size()) = tau_box_->GetLowerBound(traj_.GetTau(node));
-                    qp[node].ubu.head(idxs.size()) = tau_box_->GetUpperBound(traj_.GetTau(node));
+                // Set box indexes
+                const auto& idxs = tau_box_->GetIdxs();
+                for (int i = 0; i < idxs.size(); i++) {
+                    qp[node].idxbu[i] = idxs[i];
                 }
+
+                // Bounds
+                qp[node].lbu.head(idxs.size()) = tau_box_->GetLowerBound(traj_.GetTau(node));
+                qp[node].ubu.head(idxs.size()) = tau_box_->GetUpperBound(traj_.GetTau(node));
             }
 
             // Friction cone constraints
@@ -295,27 +293,27 @@ namespace torc::mpc {
                 }
             }
 
-            // // Holonomic
-            // // TODO: I think I could enforce this for node 1 if I only consider the velocity part of the jacobian for that node
-            // if (holonomic_->IsInNodeRange(node)) { //(node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
-            //     // std::cerr << "Adding holonomic..." << std::endl;
-            //     for (const auto& frame : settings_.contact_frames) {
-            //         const auto [jac, y_segment] =
-            //             holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
-            //         if (dynamics_constraints_[0].IsInNodeRange(node)) {
-            //             qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][node]*jac;
-            //         } else {
-            //             qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
-            //                 in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
-            //             qp[node].D.block(ineq_row_idx, 0, y_segment.size(), nv_ - FLOATING_VEL) =
-            //                 in_contact_[frame][node]*jac.rightCols(nv_ - FLOATING_VEL);
-            //         }
-            //         qp[node].lg.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
-            //         qp[node].ug.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
-            //
-            //         ineq_row_idx += y_segment.size();
-            //     }
-            // }
+            // Holonomic
+            // TODO: I think I could enforce this for node 1 if I only consider the velocity part of the jacobian for that node
+            if (holonomic_->IsInNodeRange(node)) { //(node >= holonomic_->GetFirstNode() && node < holonomic_->GetLastNode() + 1) && node != boundary_node_) {
+                // std::cerr << "Adding holonomic..." << std::endl;
+                for (const auto& frame : settings_.contact_frames) {
+                    const auto [jac, y_segment] =
+                        holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
+                    if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][node]*jac;
+                    } else {
+                        qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
+                            in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
+                        qp[node].D.block(ineq_row_idx, 0, y_segment.size(), nv_ - FLOATING_VEL) =
+                            in_contact_[frame][node]*jac.rightCols(nv_ - FLOATING_VEL);
+                    }
+                    qp[node].lg.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
+                    qp[node].ug.segment<2>(ineq_row_idx) = -in_contact_[frame][node]*y_segment;
+
+                    ineq_row_idx += y_segment.size();
+                }
+            }
 
             // Collision
             if (collision_->IsInNodeRange(node)) {
@@ -943,8 +941,8 @@ namespace torc::mpc {
                     traj_.GetVelocity(node + 1), force, settings_.dt[node],
                     dq, dq2, dv, dv2, df);
 
-                std::cout << "Dynamics vio: |" << dyn_vio.squaredNorm() << "| " << dyn_vio.transpose() << std::endl;
-                std::cout << "Integration vio: |" << int_vio.squaredNorm() << "| " << int_vio.transpose() << std::endl;
+                // std::cout << "Dynamics vio: |" << dyn_vio.squaredNorm() << "| " << dyn_vio.transpose() << std::endl;
+                // std::cout << "Integration vio: |" << int_vio.squaredNorm() << "| " << int_vio.transpose() << std::endl;
                 // std::cout << "v: " << traj_.GetVelocity(node).transpose() << std::endl;
                 // std::cout << "dv: " << dv.transpose() << std::endl;
                 // std::cout << "v2: " << traj_.GetVelocity(node+1).transpose() << std::endl;
