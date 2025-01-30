@@ -303,8 +303,13 @@ namespace torc::mpc {
                     if (dynamics_constraints_[0].IsInNodeRange(node)) {
                         qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][node]*jac;
                     } else {
+                        // The issue seemed to go away when I used the LOCAL frame for the constraint
                         qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
                             in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
+                        // qp[node].C.block(ineq_row_idx, 0, y_segment.size(), FLOATING_VEL) =
+                        //     in_contact_[frame][node]*jac.leftCols(FLOATING_VEL);
+                        // qp[node].C.block(ineq_row_idx, nv_, y_segment.size(), FLOATING_VEL) =
+                        //     in_contact_[frame][node]*jac.middleCols(nv_, FLOATING_VEL);
                         qp[node].D.block(ineq_row_idx, 0, y_segment.size(), nv_ - FLOATING_VEL) =
                             in_contact_[frame][node]*jac.rightCols(nv_ - FLOATING_VEL);
                     }
@@ -539,61 +544,83 @@ namespace torc::mpc {
     }
 
     void HpipmMpc::NanCheck() {
-        for (int node = 0; node < settings_.nodes + 1; node++) {
-            if (node < settings_.nodes) {
-                if (qp[node].A.array().isNaN().any()) {
-                    throw std::runtime_error("NaN in A matrix in node: " + std::to_string(node));
-                }
-
-                if (qp[node].B.array().isNaN().any()) {
-                    throw std::runtime_error("NaN in B matrix in node: " + std::to_string(node));
-                }
-
-                if (qp[node].b.array().isNaN().any()) {
-                    throw std::runtime_error("NaN in b matrix in node: " + std::to_string(node));
+        auto print_nan_mat = [](const matrixx_t& mat, int node, const std::string& name)->bool {
+            bool is_nan = false;
+            for (int row = 0; row < mat.rows(); row++) {
+                for (int col = 0; col < mat.cols(); col++) {
+                    if (std::isnan(mat(row, col))) {
+                        // std::cerr << "NaN detected at (" << row << ", " << col << ") during node " << node << std::endl;
+                        is_nan = true;
+                    }
                 }
             }
+            if (is_nan) {
+                std::cerr << "Node: " << node << " " + name + ":\n" << mat << std::endl;
+                throw std::runtime_error("NaN detected in a matrix!");
+            }
+            return is_nan;
+        };
 
-            if (qp[node].Q.array().isNaN().any()) {
-                throw std::runtime_error("NaN in Q matrix in node: " + std::to_string(node));
+        auto print_nan_vec = [](const vectorx_t& vec, int node, const std::string& name)->bool {
+            bool is_nan = false;
+            if (vec.data()) {
+                for (int row = 0; row < vec.size(); row++) {
+                    if (std::isnan(vec[row])) {
+                        std::cerr << "NaN detected at (" << row << ") during node " << node << std::endl;
+                        is_nan = true;
+                    }
+                }
             }
 
-            if (qp[node].R.array().isNaN().any()) {
-                throw std::runtime_error("NaN in R matrix in node: " + std::to_string(node));
+            if (is_nan) {
+                std::cerr << name + ":\n" << vec << std::endl;
+                throw std::runtime_error("NaN detected in a vector!");
+            }
+            return is_nan;
+        };
+
+
+        for (int node = 0; node < settings_.nodes; node++) {
+            if (node < settings_.nodes - 1) {
+                print_nan_mat(qp[node].A, node, "A");
+
+                print_nan_mat(qp[node].B, node, "B");
+
+                print_nan_vec(qp[node].b, node, "b");
             }
 
-            if (qp[node].S.array().isNaN().any()) {
-                throw std::runtime_error("NaN in S matrix in node: " + std::to_string(node));
-            }
 
-            if (qp[node].q.array().isNaN().any()) {
-                throw std::runtime_error("NaN in q matrix in node: " + std::to_string(node));
-            }
+            print_nan_mat(qp[node].Q, node, "Q");
 
-            if (qp[node].r.array().isNaN().any()) {
-                throw std::runtime_error("NaN in r matrix in node: " + std::to_string(node));
-            }
+            print_nan_mat(qp[node].R, node, "R");
 
-            if (qp[node].lbx.array().isNaN().any()) {
-                throw std::runtime_error("NaN in lbx matrix in node: " + std::to_string(node));
-            }
+            print_nan_mat(qp[node].S, node, "S");
 
-            if (qp[node].ubx.array().isNaN().any()) {
-                throw std::runtime_error("NaN in ubx matrix in node: " + std::to_string(node));
-            }
+            print_nan_vec(qp[node].q, node, "q");
 
-            if (qp[node].lbu.array().isNaN().any()) {
-                throw std::runtime_error("NaN in lbu matrix in node: " + std::to_string(node));
-            }
+            print_nan_vec(qp[node].r, node, "r");
 
-            if (qp[node].ubu.array().isNaN().any()) {
-                throw std::runtime_error("NaN in ubu matrix in node: " + std::to_string(node));
-            }
+            print_nan_vec(qp[node].lbx, node, "lbx");
+
+            print_nan_vec(qp[node].ubx, node, "ubx");
+
+            print_nan_vec(qp[node].lbu, node, "lbu");
+
+            print_nan_vec(qp[node].ubu, node, "ubu");
+
+            print_nan_vec(qp[node].lg, node, "lg");
+
+            print_nan_vec(qp[node].ug, node, "ug");
         }
     }
 
 
     hpipm::HpipmStatus HpipmMpc::Compute(const vectorx_t &q0, const vectorx_t &v0, Trajectory& traj_out) {
+        if (std::abs(q0.segment<4>(3).norm() - 1) > 1e-8) {
+            std::cerr << "q: " << q0.transpose() << std::endl;
+            throw std::runtime_error("Initial condition does not have a normalized quaternion!");
+        }
+
         traj_.SetConfiguration(0, q0);
         traj_.SetVelocity(0, v0);
 
@@ -613,6 +640,8 @@ namespace torc::mpc {
             std::cout << "cost time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
         }
 
+        NanCheck();
+
         timer.Tic();
         const auto res = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
             qp, solution_); // TODO: Might need to remove this x0 input
@@ -624,10 +653,10 @@ namespace torc::mpc {
             std::cout << "Res: " << res << std::endl;
             std::cout << stats << std::endl;
             std::cout << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+            std::cout << "Constraint violation: " << GetConstraintViolation(solution_, 1) << std::endl;
+            std::cout << "Cost: " << GetCost(solution_, 1) << std::endl;
         }
 
-        std::cout << "Constraint violation: " << GetConstraintViolation(solution_, 1) << std::endl;
-        std::cout << "Cost: " << GetCost(solution_, 1) << std::endl;
 
         // Line Search
         // const auto [constraint_vio, cost] = LineSearch(solution_);
@@ -688,6 +717,11 @@ namespace torc::mpc {
                         traj_.GetForce(node, settings_.contact_frames[i]) + solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3));
                     // std::cout << "new force: " << traj_.GetForce(node, settings_.contact_frames[i]).transpose() << std::endl;
                 }
+            }
+
+            if (std::abs(traj_.GetConfiguration(node).segment<4>(3).norm() - 1) > 1e-8) {
+                std::cerr << "q: " << traj_.GetConfiguration(node) << std::endl;
+                throw std::runtime_error("Output quaternion is not normalized!");
             }
         }
 
@@ -1032,7 +1066,7 @@ namespace torc::mpc {
             // std::cout << "Running violation: (squared) " << violation << ", sqrt: " << std::sqrt(violation) << std::endl;
         }
 
-        std::cout << "Total violation: " << settings_.dt.back()*std::sqrt(violation) << std::endl;
+        // std::cout << "Total violation: " << settings_.dt.back()*std::sqrt(violation) << std::endl;
 
         return settings_.dt.back()*std::sqrt(violation);
     }

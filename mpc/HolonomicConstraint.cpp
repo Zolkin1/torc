@@ -20,7 +20,7 @@ namespace torc::mpc {
                     name_ + "_" + frame + "_holonomic_constraint",
                     deriv_lib_path,
                     ad::DerivativeOrder::FirstOrder, 2*model_.GetVelDim(),  model_.GetConfigDim() + model_.GetVelDim(),
-                    compile_derivs
+                    true //compile_derivs // TODO: Put back
                 ));
         }
     }
@@ -63,8 +63,8 @@ namespace torc::mpc {
 
         // Get the frame velocity
         const long frame_idx = model_.GetFrameIdx(frame);
-        // TODO: Consider going back to LocalWorldAligned frame!
-        const ad::ad_vector_t vel = pinocchio::getFrameVelocity(model_.GetADPinModel(), *model_.GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
+        // LOCAL frame seems to work a bit better, but there needs to be more testing
+        const ad::ad_vector_t vel = pinocchio::getFrameVelocity(model_.GetADPinModel(), *model_.GetADPinData(), frame_idx, pinocchio::LOCAL).linear();
         // const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
 
         // TODO: In the future we will want to rotate this into the ground frame so the constraint is always tangential to the terrain

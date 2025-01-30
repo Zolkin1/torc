@@ -959,8 +959,8 @@ namespace torc::mpc {
             dyn_vio.conservativeResize(FLOATING_VEL, Eigen::NoChange);
         }
 
-        std::cout << "FD vio: " << dyn_vio.transpose() << std::endl;
-        std::cout << "ID vio: " << id_violation.transpose() << std::endl;
+        // std::cout << "FD vio: " << dyn_vio.transpose() << std::endl;
+        // std::cout << "ID vio: " << id_violation.transpose() << std::endl;
 
         // std::cout << "v: " << v_eval.transpose() << std::endl;
         // std::cout << "F: " << force_eval.transpose() << std::endl;
