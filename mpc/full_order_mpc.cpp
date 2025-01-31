@@ -55,8 +55,8 @@ namespace torc::mpc {
         traj_.SetDtVector(dt_);
 
         // Create the reference generator
-        reference_generator_ = std::make_unique<ReferenceGenerator>(nodes_, config_dim_, vel_dim_, contact_frames_,
-            dt_, robot_model_, polytope_delta_);
+        // reference_generator_ = std::make_unique<ReferenceGenerator>(nodes_, config_dim_, vel_dim_, contact_frames_,
+        //     dt_, robot_model_, polytope_delta_);
 
         // ---------- Create the ad functions ---------- //
         integration_constraint_ = std::make_unique<ad::CppADInterface>(

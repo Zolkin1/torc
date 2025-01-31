@@ -89,6 +89,8 @@ namespace torc::mpc {
         double GetCost(const std::vector<hpipm::OcpQpSolution>& sol, double alpha);
         int GetSolveCounter() const;
 
+        std::map<std::string, std::vector<double>> GetSwingTrajectory() const;
+
         void UpdateContactSchedule(const ContactSchedule& sched);
         void UpdateSetttings(MpcSettings settings);
 

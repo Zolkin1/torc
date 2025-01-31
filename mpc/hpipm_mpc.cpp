@@ -36,6 +36,7 @@ namespace torc::mpc {
                 in_contact_[frame].push_back(1);
                 swing_traj_[frame].push_back(0);
                 contact_info_[frame].push_back(ContactSchedule::GetDefaultContactInfo());
+                // std::cout << "A:\n" << contact_info_[frame][i].A_ << std::endl;
             }
         }
 
@@ -339,11 +340,16 @@ namespace torc::mpc {
 
             // Polytope
             if (polytope_->IsInNodeRange(node)) {
+                // std::cerr << "Adding polytope..." << std::endl;
+                int slack_idx = 0;
                 for (const auto& frame : settings_.contact_frames) {
                     matrixx_t jac;
                     vectorx_t ub, lb;
+                    // std::cerr << "A:\n" << contact_info_[frame][node].A_ << std::endl;
+                    // std::cerr << "b: " << contact_info_[frame][node].b_.transpose() << std::endl;
                     polytope_->GetLinearization(traj_.GetConfiguration(node),
                         contact_info_[frame][node], frame, jac, ub, lb);
+                    // std::cout << "frame: " << frame << std::endl;
 
                     // std::cout << "node: " << node << " in contact " << in_contact_[frame][node] << std::endl;
                     // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
@@ -351,8 +357,16 @@ namespace torc::mpc {
 
                     qp[node].C.block(ineq_row_idx, 0, PolytopeConstraint::POLYTOPE_SIZE/2, nv_)
                         = jac;
+                    // // TODO: Remove after debugging
+                    // qp[node].C.block(ineq_row_idx, 0, PolytopeConstraint::POLYTOPE_SIZE/2, FLOATING_VEL).setZero();
+
                     qp[node].lg.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = lb;
                     qp[node].ug.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = ub;
+
+                    // Add in the slacks
+                    // qp[node].idxs[slack_idx] = ineq_row_idx;
+                    // qp[node].idxs[slack_idx + 1] = ineq_row_idx + 1;
+                    // slack_idx += 2;
 
                     ineq_row_idx += PolytopeConstraint::POLYTOPE_SIZE/2;
                 }
@@ -475,6 +489,7 @@ namespace torc::mpc {
             int nx_box = 0;
             int nu_box = 0;
             int n_other_constraints = 0;
+            int n_slack = 0;
             if (friction_cone_->IsInNodeRange(node)) {
                 n_other_constraints += settings_.num_contact_locations*friction_cone_->GetNumConstraints();
             }
@@ -489,6 +504,7 @@ namespace torc::mpc {
             }
             if (polytope_->IsInNodeRange(node)) {
                 n_other_constraints += polytope_->GetNumConstraints();
+                n_slack += polytope_->GetNumConstraints();
             }
             // TODO: Add other constraints
 
@@ -558,6 +574,15 @@ namespace torc::mpc {
             qp[node].lg = vectorx_t::Zero(n_other_constraints);
             qp[node].ug = vectorx_t::Zero(n_other_constraints);
             qp[node].ug_mask = vectorx_t::Ones(n_other_constraints);
+
+            // Slacks
+            // qp[node].idxs.resize(n_slack);
+            // qp[node].Zl = matrixx_t::Zero(n_slack, n_slack);
+            // qp[node].Zu = matrixx_t::Zero(n_slack, n_slack);
+            // qp[node].zl = vectorx_t::Zero(n_slack);
+            // qp[node].zu = vectorx_t::Zero(n_slack);
+            // qp[node].lls = vectorx_t::Zero(n_slack);
+            // qp[node].lus = vectorx_t::Zero(n_slack);
 
             solution_[node].x = vectorx_t::Zero(nx1);
             solution_[node].u = vectorx_t::Zero(nu);
@@ -649,6 +674,7 @@ namespace torc::mpc {
 
         // TODO: If I don't create the constraints right now then I need to re-create the constraints that involve the IC!
         torc::utils::TORCTimer timer;
+        std::cerr << "Starting constraint creation!" << std::endl;
         timer.Tic();
         CreateConstraints();
         timer.Toc();
@@ -656,6 +682,7 @@ namespace torc::mpc {
             std::cout << "constraint time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
         }
 
+        std::cerr << "Starting cost creation!" << std::endl;
         timer.Tic();
         CreateCost();
         timer.Toc();
@@ -665,6 +692,7 @@ namespace torc::mpc {
 
         NanCheck();
 
+        std::cerr << "Starting solve!" << std::endl;
         timer.Tic();
         const auto res = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
             qp, solution_); // TODO: Might need to remove this x0 input
@@ -692,6 +720,10 @@ namespace torc::mpc {
         if (settings_.verbose) {
             PrintNodeInfo();
         }
+
+        // if (res != hpipm::HpipmStatus::Success) {
+        //     throw std::runtime_error("[Compute] MPC not successful!");
+        // }
 
         solve_counter_++;
 
@@ -851,6 +883,7 @@ namespace torc::mpc {
 
                         contact_info_[frame][node] = polytopes[contact_idx];
                         contact_info_[frame][node].b_ -= polytope_delta;
+                        // std::cout << "[MPC] time: " << time << ", b: " << (contact_info_[frame][node].b_ + polytope_delta).transpose() << std::endl;
                     } else {
                         in_contact_[frame][node] = 0;
 
@@ -858,7 +891,7 @@ namespace torc::mpc {
                         contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
 
                         // if (contact_idx + 1 < polytopes.size()) {
-                        //     contact_info_[frame][node] = polytopes[contact_idx];
+                        //     contact_info_[frame][node] = polytopes[contact_idx + 1];
                         //     contact_info_[frame][node].b_ = contact_info_[frame][node].b_ - polytope_delta
                         //     + GetPolytopeConvergence(frame, time, sched)*polytope_convergence_scalar;
                         // } else {
@@ -907,6 +940,10 @@ namespace torc::mpc {
         double swing_dur = cs.GetSwingDuration(frame, time);
         double start_time = cs.GetSwingStartTime(frame, time);
         double lambda = 1 - ((time - start_time) / swing_dur);
+
+        if (lambda < 0 || lambda > 1) {
+            throw std::runtime_error("[GetPolytopeConvergence] Invalid lambda!");
+        }
 
         // Multiply range by a positive number
         return lambda*settings_.polytope_shrinking_rad;
@@ -1210,6 +1247,11 @@ namespace torc::mpc {
     int HpipmMpc::GetSolveCounter() const {
         return solve_counter_;
     }
+
+    std::map<std::string, std::vector<double> > HpipmMpc::GetSwingTrajectory() const {
+        return swing_traj_;
+    }
+
 
     void HpipmMpc::PrintNodeInfo() const {
 //     // Configurable column width

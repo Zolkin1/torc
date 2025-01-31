@@ -24,7 +24,7 @@ namespace torc::mpc {
         for (const auto& frame : frames) {
             frame_schedule_map.insert({frame, {}});
             contact_polytopes.insert({frame, {}});
-            contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
+            contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1, GetDefaultContactInfo());
         }
     }
 
@@ -42,15 +42,13 @@ namespace torc::mpc {
     void ContactSchedule::InsertSwing(const std::string& frame, double start_time, double stop_time) {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, stop_time);
-        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
-        contact_polytopes[frame].back() = GetDefaultContactInfo();
+        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1, GetDefaultContactInfo());
     }
 
     void ContactSchedule::InsertSwingByDuration(const std::string& frame, double start_time, double duration) {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, start_time + duration);
-        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1);
-        contact_polytopes[frame].back() = GetDefaultContactInfo();
+        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1, GetDefaultContactInfo());
     }
 
     bool ContactSchedule::InContact(const std::string& frame, double time) const {
@@ -131,8 +129,22 @@ namespace torc::mpc {
 
     void ContactSchedule::CleanContacts(double time_cutoff) {
         for (auto& [frame, contacts] : frame_schedule_map) {
+            int old_poly_size = contact_polytopes[frame].size();
+
             std::erase_if(contacts, [time_cutoff](const std::pair<double, double>& contact_pair) {return contact_pair.second < time_cutoff;});
-            contact_polytopes[frame].resize(GetNumContacts(frame));
+
+            if (old_poly_size < GetNumContacts(frame)) {
+                throw std::runtime_error("[ContactSchedule::CleanContacts] error cleaning up contacts with the polytope size!");
+            }
+
+            // Remove the contacts we are no longer using (always removed from the start)
+            for (int i = 0; i < old_poly_size - GetNumContacts(frame); i++) {
+                contact_polytopes[frame].erase(contact_polytopes[frame].begin());
+            }
+
+            if (contact_polytopes[frame].size() != GetNumContacts(frame)) {
+                throw std::runtime_error("[CleanContacts] issue removing polytopes!");
+            }
         }
     }
 

@@ -36,11 +36,11 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics + 100); //
+        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics); //
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
         settings.compile_derivs, false, settings.nodes_full_dynamics - 100, settings.nodes - 100);
 
-    SRBConstraint srb_dynamics(0 - 100, settings.nodes - 100, //settings.nodes_full_dynamics, settings.nodes,
+    SRBConstraint srb_dynamics(settings.nodes_full_dynamics, settings.nodes,
         "g1_srb",
         settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1, settings.q_target);
 
@@ -212,7 +212,7 @@ int main() {
     mpc.SetConfigTarget(q_target);
     mpc.SetVelTarget(v_target);
 
-    mpc.UpdateContactSchedule(cs);
+    // mpc.UpdateContactSchedule(cs);
 
     std::cout << "q ic: " << q.transpose() << std::endl;
     std::cout << "v ic: " << v.transpose() << std::endl;
