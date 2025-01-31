@@ -23,6 +23,7 @@
 #include "LinearLsCost.h"
 #include "contact_schedule.h"
 #include "MpcSettings.h"
+#include "PolytopeConstraint.h"
 #include "SRBConstraint.h"
 #include "SwingConstraint.h"
 
@@ -63,6 +64,7 @@ namespace torc::mpc {
         void SetSwingConstraint(SwingConstraint constraints);
         void SetHolonomicConstraint(HolonomicConstraint constraints);
         void SetCollisionConstraint(CollisionConstraint constraints);
+        void SetPolytopeConstraint(PolytopeConstraint constraint);
 
         // TODO: Write a version that takes in a SimpleTraj object
         void SetVelTrackingCost(LinearLsCost cost);
@@ -112,6 +114,8 @@ namespace torc::mpc {
 
         std::pair<double, double> LineSearch(const std::vector<hpipm::OcpQpSolution>& sol);
 
+        double GetPolytopeConvergence(const std::string& frame, double time, const ContactSchedule& cs) const;
+
     private:
         void SetSizes();
 
@@ -134,7 +138,7 @@ namespace torc::mpc {
 
         std::unique_ptr<HolonomicConstraint> holonomic_;
 
-        std::unique_ptr<SwingConstraint> polytope_;
+        std::unique_ptr<PolytopeConstraint> polytope_;
 
         std::unique_ptr<CollisionConstraint> collision_;
 

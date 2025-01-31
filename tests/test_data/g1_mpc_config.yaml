@@ -76,6 +76,8 @@ constraints:
   holonomic_end_node: 32 #32 #24 #32
   collision_start_node: 2
   collision_end_node: 32
+  polytope_start_node: 2
+  polytope_end_node: 32
 costs:
   - type: ConfigurationTracking
     name: "ConfigTracking"

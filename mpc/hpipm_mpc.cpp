@@ -108,6 +108,10 @@ namespace torc::mpc {
         collision_ = std::make_unique<CollisionConstraint>(std::move(constraints));
     }
 
+    void HpipmMpc::SetPolytopeConstraint(PolytopeConstraint constraint) {
+        polytope_ = std::make_unique<PolytopeConstraint>(std::move(constraint));
+    }
+
     void HpipmMpc::SetVelTrackingCost(LinearLsCost cost) {
         vel_tracking_ = std::make_unique<LinearLsCost>(std::move(cost));
     }
@@ -333,10 +337,26 @@ namespace torc::mpc {
                 }
             }
 
-            // // Polytope
-            // if (polytope_->IsInNodeRange(node)) {
-            //
-            // }
+            // Polytope
+            if (polytope_->IsInNodeRange(node)) {
+                for (const auto& frame : settings_.contact_frames) {
+                    matrixx_t jac;
+                    vectorx_t ub, lb;
+                    polytope_->GetLinearization(traj_.GetConfiguration(node),
+                        contact_info_[frame][node], frame, jac, ub, lb);
+
+                    // std::cout << "node: " << node << " in contact " << in_contact_[frame][node] << std::endl;
+                    // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
+                    // std::cout << "polytope b: " << contact_info_[frame][node].b_.transpose() << std::endl;
+
+                    qp[node].C.block(ineq_row_idx, 0, PolytopeConstraint::POLYTOPE_SIZE/2, nv_)
+                        = jac;
+                    qp[node].lg.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = lb;
+                    qp[node].ug.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = ub;
+
+                    ineq_row_idx += PolytopeConstraint::POLYTOPE_SIZE/2;
+                }
+            }
 
             // std::cout << "node: " << node << std::endl;
             // for (const auto& frame : settings_.contact_frames) {
@@ -466,6 +486,9 @@ namespace torc::mpc {
             }
             if (collision_->IsInNodeRange(node)) {
                 n_other_constraints += collision_->GetNumConstraints();
+            }
+            if (polytope_->IsInNodeRange(node)) {
+                n_other_constraints += polytope_->GetNumConstraints();
             }
             // TODO: Add other constraints
 
@@ -815,7 +838,7 @@ namespace torc::mpc {
             if (in_contact_.contains(frame)) {
 
                 // TODO: Fix
-                // const auto& polytopes = sched.GetPolytopes(frame);
+                const auto& polytopes = sched.GetPolytopes(frame);
 
                 // Break the continuous time contact schedule into each node
                 double time = 0;
@@ -826,21 +849,20 @@ namespace torc::mpc {
 
                         contact_idx = sched.GetContactIndex(frame, time);
 
-                        contact_info_[frame][node] = sched.GetDefaultContactInfo();
-
-                        // TODO: Put back - solve issue with feet dragging to another polytope!
-                        // contact_info_[frame][node] = sched.GetPolytopes(frame)[contact_idx];
+                        contact_info_[frame][node] = polytopes[contact_idx];
+                        contact_info_[frame][node].b_ -= polytope_delta;
                     } else {
                         in_contact_[frame][node] = 0;
-                        // TODO: Fix
+
+                        // TODO: Remove when I fix below
+                        contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
+
                         // if (contact_idx + 1 < polytopes.size()) {
-                        //     contact_info_[frame][node] = sched.GetDefaultContactInfo();
-                        //
-                        //     // TODO: Try putting back
-                        //     // foot_polytope_[frame][node] = polytopes[contact_idx].A_;
-                        //     // ub_lb_polytope[frame][node] = polytopes[contact_idx].b_ - polytope_delta + GetPolytopeConvergence(frame, time, contact_schedule)*polytope_convergence_scalar;
+                        //     contact_info_[frame][node] = polytopes[contact_idx];
+                        //     contact_info_[frame][node].b_ = contact_info_[frame][node].b_ - polytope_delta
+                        //     + GetPolytopeConvergence(frame, time, sched)*polytope_convergence_scalar;
                         // } else {
-                        //     contact_info_[frame][node] = sched.GetDefaultContactInfo();
+                        //     contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
                         // }
                     }
                     time += settings_.dt[node];
@@ -878,6 +900,16 @@ namespace torc::mpc {
         //     }
         //     std::cout << std::endl << std::endl;
         // }
+    }
+
+    double HpipmMpc::GetPolytopeConvergence(const std::string &frame, double time, const ContactSchedule& cs) const {
+        // Compute time left until the next contact
+        double swing_dur = cs.GetSwingDuration(frame, time);
+        double start_time = cs.GetSwingStartTime(frame, time);
+        double lambda = 1 - ((time - start_time) / swing_dur);
+
+        // Multiply range by a positive number
+        return lambda*settings_.polytope_shrinking_rad;
     }
 
     double HpipmMpc::GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol, double alpha) {

@@ -26,7 +26,8 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/ConfigTrackingCost.h"
     "${MPC_INC}/CollisionConstraint.h"
     "${MPC_INC}/CollisionData.h"
-    "${MPC_INC}/SRBConstraint.h")
+    "${MPC_INC}/SRBConstraint.h"
+    "${MPC_INC}/PolytopeConstraint.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -54,7 +55,8 @@ set(MPC_SOURCE_LIST
         NonlinearLsCost.cpp
         ConfigTrackingCost.cpp
         CollisionConstraint.cpp
-        SRBConstraint.cpp)
+        SRBConstraint.cpp
+        PolytopeConstraint.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}

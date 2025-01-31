@@ -267,6 +267,8 @@ namespace torc::mpc {
         holonomic_end_node = constraint_settings["holonomic_end_node"].as<int>();
         collision_start_node = constraint_settings["collision_start_node"].as<int>();
         collision_end_node = constraint_settings["collision_end_node"].as<int>();
+        polytope_start_node = constraint_settings["polytope_start_node"].as<int>();
+        polytope_end_node = constraint_settings["polytope_end_node"].as<int>();
 
         YAML::Node collision_settings = constraint_settings["collisions"];
         if (!collision_settings.IsSequence()) {

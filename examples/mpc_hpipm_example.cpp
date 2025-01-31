@@ -36,11 +36,11 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics); //
+        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics + 100); //
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
         settings.compile_derivs, false, settings.nodes_full_dynamics - 100, settings.nodes - 100);
 
-    SRBConstraint srb_dynamics(settings.nodes_full_dynamics, settings.nodes,
+    SRBConstraint srb_dynamics(0 - 100, settings.nodes - 100, //settings.nodes_full_dynamics, settings.nodes,
         "g1_srb",
         settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1, settings.q_target);
 
@@ -91,6 +91,10 @@ int main() {
     // ---------- Collision Constraints ---------- //
     CollisionConstraint collision_constraint(settings.collision_start_node, settings.collision_end_node,
         "collision_constraint", g1, settings.deriv_lib_path, settings.compile_derivs, settings.collision_data);
+
+    // ---------- Polytope Constraints ---------- //
+    PolytopeConstraint polytope_constraint(settings.polytope_start_node, settings.polytope_end_node, "polytope_constraint",
+        settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1);
 
     std::cout << "===== Constraints Created =====" << std::endl;
 
@@ -154,6 +158,7 @@ int main() {
     mpc.SetSwingConstraint(std::move(swing_constraint));
     mpc.SetHolonomicConstraint(std::move(holonomic_constraint));
     mpc.SetCollisionConstraint(std::move(collision_constraint));
+    mpc.SetPolytopeConstraint(std::move(polytope_constraint));
     std::cout << "===== MPC Constraints Added =====" << std::endl;
 
     mpc.SetVelTrackingCost(std::move(vel_tracking));
