@@ -86,27 +86,45 @@ TEST_CASE("Dynamics Constraint") {
     settings.Print();
 
     torc::models::FullOrderRigidBody g1("g1", g1_urdf, settings.joint_skip_names, settings.joint_skip_values);
-
-    std::vector<std::string> contact_frames = {"left_toe", "left_heel", "right_toe", "right_heel"};
+    std::cout << "Model Created." << std::endl;
 
     auto curr_path = fs::current_path();
     curr_path = curr_path / "dynamics_constraint_deriv_libs";
 
-    DynamicsConstraintsTest c1(g1, contact_frames, "g1_c1", curr_path, true, true,
-        0, 5);
+    // DynamicsConstraintsTest c1(g1, contact_frames, "g1_c1", curr_path, false, false, //true, true,
+    //     0, 5);
 
     // TODO: Pick different configs
-    vectorx_t q1 = g1.GetNeutralConfig();
-    vectorx_t q2 = g1.GetNeutralConfig();
+    vectorx_t q1 = g1.GetRandomConfig();
+    vectorx_t q2 = g1.GetRandomConfig();
 
     vectorx_t v1 = g1.GetRandomVel();
-    vectorx_t v2 = v1;
+    vectorx_t v2 = g1.GetRandomVel();
 
     vectorx_t tau = vectorx_t::Random(g1.GetVelDim() - 6);
+    vectorx_t tau_pin = vectorx_t::Zero(g1.GetVelDim());
+    tau_pin << vectorx_t::Zero(6), tau;
 
-    vectorx_t force = vectorx_t::Random(3*contact_frames.size());
+    std::vector<torc::models::ExternalForce<double>> f_ext;
+    for (const auto& f : settings.contact_frames) {
+        f_ext.emplace_back(f, vector3_t::Random());
+    }
 
-    const auto [A, B] = c1.GetLinDynamics(q1, q2, v1, v2, tau, force, 0.01);
+    pinocchio::Data data(g1.GetModel());
+    vectorx_t a_fd = torc::models::ForwardDynamics<double>(g1.GetModel(), data, q1, v1, tau_pin, f_ext);
+    vectorx_t tau_id = torc::models::InverseDynamics(g1.GetModel(), data, q1, v1, a_fd, f_ext);
 
+    std::cout << "tau: " << tau_pin.transpose() << std::endl;
+    std::cout << "tau_id: " << tau_id.transpose() << std::endl;
+
+    CHECK(tau_pin.isApprox(tau_id));
+
+    vectorx_t a_approx = (v2 - v1)/settings.dt[0];
+    tau_id = torc::models::InverseDynamics(g1.GetModel(), data, q1, v1, a_approx, f_ext);
+    a_fd = torc::models::ForwardDynamics(g1.GetModel(), data, q1, v1, tau_id, f_ext);
+
+    std::cout << "a approx: " << a_approx.transpose() << std::endl;
+    std::cout << "a_fd: " << a_fd.transpose() << std::endl;
+    CHECK(a_fd.isApprox(a_approx));
 }
 

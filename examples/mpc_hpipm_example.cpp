@@ -36,11 +36,11 @@ int main() {
     // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
     //     false, false, 5, settings.nodes);
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics + 100); //
+        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics); //
     dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
         settings.compile_derivs, false, settings.nodes_full_dynamics - 100, settings.nodes - 100);
 
-    SRBConstraint srb_dynamics(0 - 100, settings.nodes - 100, //settings.nodes_full_dynamics, settings.nodes,
+    SRBConstraint srb_dynamics(settings.nodes_full_dynamics, settings.nodes,
         "g1_srb",
         settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1, settings.q_target);
 
@@ -124,10 +124,21 @@ int main() {
     cs.InsertSwing("right_heel", 0.1, 0.5);
     cs.InsertSwing("left_toe", 0.5, 0.9);
     cs.InsertSwing("left_heel", 0.5, 0.9);
+
     cs.InsertSwing("right_toe", 0.9, 1.2);
     cs.InsertSwing("right_heel", 0.9, 1.2);
     cs.InsertSwing("left_toe", 1.2, 1.6);
     cs.InsertSwing("left_heel", 1.2, 1.6);
+
+    cs.InsertSwing("right_toe", 1.6, 2.0);
+    cs.InsertSwing("right_heel", 1.6, 2.0);
+    cs.InsertSwing("left_toe", 2.0, 2.4);
+    cs.InsertSwing("left_heel", 2.0, 2.4);
+
+    cs.InsertSwing("right_toe", 2.4, 2.8);
+    cs.InsertSwing("right_heel", 2.4, 2.8);
+    cs.InsertSwing("left_toe", 2.8, 3.2);
+    cs.InsertSwing("left_heel", 2.8, 3.2);
     // --------------------------------- //
     // -------------- MPC -------------- //
     // --------------------------------- //
@@ -218,7 +229,7 @@ int main() {
     // timer.Toc();
     // std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
 
-    // for (int i = 0; i < 10; i++) {
+    // for (int i = 0; i < 250; i++) {
     //     mpc.Compute(q, v, traj);
     // }
 
@@ -257,7 +268,7 @@ int main() {
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
-    for (int i = 0; i < 50; i++) { // 50
+    for (int i = 0; i < 250; i++) { // 50
         cs.ShiftSwings(-0.01);
         vectorx_t q_traj, v_traj;
         traj.GetConfigInterp(0.01, q_traj);

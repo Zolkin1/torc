@@ -130,7 +130,7 @@ namespace torc::mpc {
             const int jnt_idx = 1; //Use the root joint //model_.GetADPinModel().frames.at(frame_idx).parentJoint;
 
             // Get the translation from the joint frame to the contact frame
-            const ad::ad_vector3_t translationContactToJoint = data.oMf[frame_idx].translation() - qk_curr.head<POS_VARS>();
+            const ad::ad_vector3_t translationContactToJoint = data.oMf[frame_idx].translation() - data.oMi[jnt_idx].translation();
 
             // Get the rotation from the world frame to the joint frame
             const ad::ad_matrix3_t rotationWorldToJoint = data.oMi[jnt_idx].rotation().transpose();

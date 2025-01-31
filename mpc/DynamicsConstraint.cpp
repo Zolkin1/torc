@@ -43,39 +43,39 @@ namespace torc::mpc {
             compile_derivs
         );
 
-        // Load all the functions
-        std::cout << "Looking for casadi libs at " << std::filesystem::current_path() << std::endl;
-        casadi_dynamics_function_ = std::make_unique<casadi::Function>(casadi::external("dvkp1", "dynamics_functions.so"));
-        casadi_dq_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dq", "dynamics_functions.so"));
-        casadi_dv_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dv", "dynamics_functions.so"));
-        casadi_dtau_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dtau", "dynamics_functions.so"));
-        casadi_dF_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dF", "dynamics_functions.so"));
-
-
-        // Try calling the function
-        vectorx_t q = model_.GetRandomConfig();
-        vectorx_t dq1 = vectorx_t::Random(model_.GetVelDim());
-        // dq1.segment<3>(3).setZero();
-        // dq1(3) = 0.1;
-        Eigen::Quaternion<double> quat(q.template segment<4>(3));
-        // std::cerr << "quat <vec>: " << q.segment<4>(3).transpose() << std::endl;
-        // std::cerr << "quat: " << quat << std::endl;
-        // std::cerr << "dquat: " << dq1.segment<3>(3).transpose() << std::endl;
-        // std::cerr << "exp3: " << pinocchio::quaternion::exp3(dq1.segment<3>(3)) << std::endl;
-        // std::cerr << "quat mult: " << quat * pinocchio::quaternion::exp3(dq1.segment<3>(3)) << std::endl;
-        vectorx_t v = vectorx_t::Random(model_.GetVelDim());
-        vectorx_t dv1 = vectorx_t::Random(model_.GetVelDim());
-        vectorx_t v2 = vectorx_t::Random(model_.GetVelDim());
-        vectorx_t tau = vectorx_t::Random(model_.GetVelDim());
-        vectorx_t dtau = vectorx_t::Random(model_.GetVelDim());
-        vectorx_t F = vectorx_t::Random(CONTACT_3DOF*num_contacts_);
-        vectorx_t dF = vectorx_t::Random(CONTACT_3DOF*num_contacts_);
-        double dt = 0.015;
-
-        matrixx_t Jdq, Jdv, Jdtau, JdF;
-        vectorx_t b;
-
-        ComputeDynamicsJacobians(q, v, v2, tau, F, dt, dq1, dv1, dtau, dF, Jdq, Jdv, Jdtau, JdF, b);
+        // // Load all the functions
+        // std::cout << "Looking for casadi libs at " << std::filesystem::current_path() << std::endl;
+        // casadi_dynamics_function_ = std::make_unique<casadi::Function>(casadi::external("dvkp1", "dynamics_functions.so"));
+        // casadi_dq_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dq", "dynamics_functions.so"));
+        // casadi_dv_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dv", "dynamics_functions.so"));
+        // casadi_dtau_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dtau", "dynamics_functions.so"));
+        // casadi_dF_jac_function_ = std::make_unique<casadi::Function>(casadi::external("derivatives_fun_dF", "dynamics_functions.so"));
+        //
+        //
+        // // Try calling the function
+        // vectorx_t q = model_.GetRandomConfig();
+        // vectorx_t dq1 = vectorx_t::Random(model_.GetVelDim());
+        // // dq1.segment<3>(3).setZero();
+        // // dq1(3) = 0.1;
+        // Eigen::Quaternion<double> quat(q.template segment<4>(3));
+        // // std::cerr << "quat <vec>: " << q.segment<4>(3).transpose() << std::endl;
+        // // std::cerr << "quat: " << quat << std::endl;
+        // // std::cerr << "dquat: " << dq1.segment<3>(3).transpose() << std::endl;
+        // // std::cerr << "exp3: " << pinocchio::quaternion::exp3(dq1.segment<3>(3)) << std::endl;
+        // // std::cerr << "quat mult: " << quat * pinocchio::quaternion::exp3(dq1.segment<3>(3)) << std::endl;
+        // vectorx_t v = vectorx_t::Random(model_.GetVelDim());
+        // vectorx_t dv1 = vectorx_t::Random(model_.GetVelDim());
+        // vectorx_t v2 = vectorx_t::Random(model_.GetVelDim());
+        // vectorx_t tau = vectorx_t::Random(model_.GetVelDim());
+        // vectorx_t dtau = vectorx_t::Random(model_.GetVelDim());
+        // vectorx_t F = vectorx_t::Random(CONTACT_3DOF*num_contacts_);
+        // vectorx_t dF = vectorx_t::Random(CONTACT_3DOF*num_contacts_);
+        // double dt = 0.015;
+        //
+        // matrixx_t Jdq, Jdv, Jdtau, JdF;
+        // vectorx_t b;
+        //
+        // ComputeDynamicsJacobians(q, v, v2, tau, F, dt, dq1, dv1, dtau, dF, Jdq, Jdv, Jdtau, JdF, b);
 
         // std::cout << "Jdq:\n" << Jdq << std::endl;
         // std::cout << "Jdv:\n" << Jdv << std::endl;
@@ -246,29 +246,48 @@ namespace torc::mpc {
         // vectorx_t dq2 = models::qDifference(q2_default, q2_lin);
 
         if (boundary) {
-            // Try #1: Just use the centroidal dynamics -- must be called from the non-full order node
             A.setZero();
             B.setZero();
             b.setZero();
 
-            // TODO: Check to be sure this is grabbing the block I want
-            // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
-            if (dyn_jac.rows() != FLOATING_VEL) {
-                throw std::runtime_error("dyn jac wrong number of rows!");
-            }
-            matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, FLOATING_VEL).inverse();
+            matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, vel_dim_).inverse();
             matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
-            // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
 
+            // Integration
             A.topRows(vel_dim_) << -dq2_inv*int_jac.leftCols(vel_dim_), -dq2_inv*int_jac.middleCols(2*vel_dim_, vel_dim_);
-            A.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.leftCols(2*vel_dim_);
 
-            B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(3*vel_dim_, tau_dim_),
-                dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
-            B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
+            // Dynamics
+            matrixx_t A_dyn_temp = -dv2_inv*dyn_jac.leftCols(2*vel_dim_);
+            A.bottomRows<FLOATING_VEL>() = A_dyn_temp.topRows<FLOATING_VEL>();
 
-            // b << int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
-            b << -dq2_inv*int_fbar, -dv2_inv*fbar;
+            matrixx_t B_dyn_temp = matrixx_t::Zero(vel_dim_, tau_dim_ + CONTACT_3DOF*num_contacts_);
+            B_dyn_temp << -dv2_inv*dyn_jac.middleCols(3*vel_dim_, tau_dim_),
+                -dv2_inv*dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
+            B.bottomRows<FLOATING_VEL>() = B_dyn_temp.topRows<FLOATING_VEL>();
+
+            b << -dq2_inv*int_fbar, -(dv2_inv*fbar).topRows<FLOATING_VEL>();
+
+            // // Try #1: Just use the centroidal dynamics -- must be called from the non-full order node
+            // A.setZero();
+            // B.setZero();
+            // b.setZero();
+            //
+            // // TODO: Check to be sure this is grabbing the block I want
+            // // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
+            //
+            // matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, FLOATING_VEL).inverse();
+            // matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
+            // // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
+            //
+            // A.topRows(vel_dim_) << -dq2_inv*int_jac.leftCols(vel_dim_), -dq2_inv*int_jac.middleCols(2*vel_dim_, vel_dim_);
+            // A.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.leftCols(2*vel_dim_);
+            //
+            // B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(3*vel_dim_, tau_dim_),
+            //     dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
+            // B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
+            //
+            // // b << int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
+            // b << -dq2_inv*int_fbar, -dv2_inv*fbar;
         } else if (full_order_) {
             A.setZero();
             B.setZero();
@@ -283,7 +302,6 @@ namespace torc::mpc {
             A.bottomRows(vel_dim_) = -dv2_inv*dyn_jac.leftCols(2*vel_dim_);
 
             B.topRows(vel_dim_).setZero();
-            // TODO: Put torque part back
             B.bottomRows(vel_dim_) << dyn_jac.middleCols(3*vel_dim_, tau_dim_),
                 dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
             // B.block(vel_dim_, tau_dim_, vel_dim_, CONTACT_3DOF*num_contacts_)
@@ -939,19 +957,18 @@ namespace torc::mpc {
             idx += CONTACT_3DOF;
         }
 
-
         vectorx_t a_pin = models::ForwardDynamics(model_.GetModel(), data, q_eval, v_eval, tau_eval, f_ext);
         vectorx_t cpp_dv2 = dt*a_pin + v_eval - v2_lin;
 
-        vectorx_t xid(dynamics_function_->GetDomainSize());
-        xid << dq1, dv1, dv2, dtau, dforce;
-
-        vectorx_t pid(dynamics_function_->GetParameterSize());
-
-        vectorx_t id_violation(dynamics_function_->GetRangeSize());
-
-        pid << q1_lin, v1_lin, v2_lin, tau_lin, force_lin, dt;
-        dynamics_function_->GetFunctionValue(xid, pid, id_violation);
+        // vectorx_t xid(dynamics_function_->GetDomainSize());
+        // xid << dq1, dv1, dv2, dtau, dforce;
+        //
+        // vectorx_t pid(dynamics_function_->GetParameterSize());
+        //
+        // vectorx_t id_violation(dynamics_function_->GetRangeSize());
+        //
+        // pid << q1_lin, v1_lin, v2_lin, tau_lin, force_lin, dt;
+        // dynamics_function_->GetFunctionValue(xid, pid, id_violation);
 
         vectorx_t dyn_vio = dv2 - cpp_dv2;
 

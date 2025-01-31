@@ -165,7 +165,7 @@ namespace torc::mpc {
         // DEBUG CHECK
         for (int node = 0; node < nodes; node++) {
             double time = GetTime(dt_vec, node);
-            if (InSwing(frame, time) && swing_traj[node] < end_height) {
+            if (InSwing(frame, time) && swing_traj[node] - end_height < -1e-4 ) {
                 std::cerr << "Time: " << time << std::endl;
                 std::cerr << "frame: " << frame << std::endl;
                 std::cerr << "swing height: " << swing_traj[node] << std::endl;

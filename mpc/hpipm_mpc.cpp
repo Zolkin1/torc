@@ -165,7 +165,7 @@ namespace torc::mpc {
                         qp[node].A, qp[node].B, qp[node].b);
                 } else if (node == dynamics_constraints_[0].GetLastNode() - 1) {
                     // std::cerr << "Adding boundary dynamics..." << std::endl;
-                    dynamics_constraints_[1].GetLinDynamics(
+                    dynamics_constraints_[0].GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
                         traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
                         traj_.GetTau(node), force, settings_.dt[node], true,
@@ -277,7 +277,6 @@ namespace torc::mpc {
                 }
             }
 
-            // TODO: I am having issues when I have BOTH the swing height and the holonomic constraints in. Solutions degenerate over solves.
             // Swing height
             if (swing_constraint_->IsInNodeRange(node)) { //(node >= swing_constraint_->GetFirstNode() && node < swing_constraint_->GetLastNode() + 1) && node != boundary_node_) {
                 // std::cerr << "Adding swing..." << std::endl;
@@ -302,10 +301,12 @@ namespace torc::mpc {
                         holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
                     if (dynamics_constraints_[0].IsInNodeRange(node)) {
                         qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][node]*jac;
+                        // qp[node].C.block(ineq_row_idx, nv_, y_segment.size(), nv_).setZero(); // TODO: Remove after debugging
                     } else {
                         // The issue seemed to go away when I used the LOCAL frame for the constraint
                         qp[node].C.middleRows(ineq_row_idx, y_segment.size()) =
                             in_contact_[frame][node]*jac.leftCols(nv_ + FLOATING_VEL);
+
                         // qp[node].C.block(ineq_row_idx, 0, y_segment.size(), FLOATING_VEL) =
                         //     in_contact_[frame][node]*jac.leftCols(FLOATING_VEL);
                         // qp[node].C.block(ineq_row_idx, nv_, y_segment.size(), FLOATING_VEL) =
@@ -402,7 +403,6 @@ namespace torc::mpc {
                 qp[node].r.head(ntau_) = lin;
             }
 
-            // TODO: Check. Forces don't seem to be very even for contacts
             if (force_tracking_->IsInNodeRange(node)) {
                 int block_idx = ntau_;
                 for (const auto& frame : settings_.contact_frames) {
