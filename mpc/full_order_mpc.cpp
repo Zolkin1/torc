@@ -826,13 +826,14 @@ namespace torc::mpc {
         utils::TORCTimer timer;
         timer.Tic();
         // Note this is clocking in at about 0.55-0.6ms when walking around
-        auto [qt, vt] = reference_generator_->GenerateReference(q_current, v_current, q_target, v_target,
-            swing_traj_, hip_offsets_, contact_schedule, des_foot_pos_);
+        throw std::runtime_error("[GenerateCostReference] API Changed!");
+        // auto [qt, vt] = reference_generator_->GenerateReference(q_current, v_current, q_target, v_target,
+        //     swing_traj_, hip_offsets_, contact_schedule, des_foot_pos_);
 
         timer.Toc();
         // std::cout << "Reference gen took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms." << std::endl;
-        q_target_ = qt;
-        v_target_ = vt;
+        // q_target_ = qt;
+        // v_target_ = vt;
     }
 
     SimpleTrajectory FullOrderMpc::GetConfigTargets() {

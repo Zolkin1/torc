@@ -67,7 +67,7 @@ namespace torc::mpc {
             deriv_lib_path,
             ad::DerivativeOrder::FirstOrder, 3 * vel_dim_ + CONTACT_3DOF * num_contacts_,
             1 + config_dim_ + 2 * vel_dim_ + CONTACT_3DOF * num_contacts_,
-            true //compile_derivs
+            compile_derivs
         );
 
         integration_function_ = std::make_unique<ad::CppADInterface>(
@@ -76,7 +76,7 @@ namespace torc::mpc {
             name_ + "_integration_constraint",
             deriv_lib_path,
             ad::DerivativeOrder::FirstOrder, 2 * vel_dim_, 1 + 2 * config_dim_ + vel_dim_,
-            true //compile_derivs
+            compile_derivs
         );
     }
 

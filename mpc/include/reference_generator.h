@@ -39,7 +39,7 @@ namespace torc::mpc {
             const std::map<std::string, std::vector<double>>& swing_traj,
             const std::vector<double>& hip_offsets,
             const ContactSchedule& contact_schedule,
-            std::map<std::string, std::vector<vector2_t>>& contact_foot_pos);
+            std::map<std::string, std::vector<vector3_t>>& contact_foot_pos);
 
     protected:
     private:

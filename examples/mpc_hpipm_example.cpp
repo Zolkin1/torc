@@ -5,6 +5,7 @@
 #include <torc_timer.h>
 
 #include "DynamicsConstraint.h"
+#include "ForwardKinematicsCost.h"
 #include "hpipm_mpc.h"
 #include "SRBConstraint.h"
 
@@ -118,6 +119,11 @@ int main() {
     ConfigTrackingCost config_tracking(0, settings.nodes, "config_tracking", settings.cost_data.at(0).weight,
         settings.deriv_lib_path, settings.compile_derivs, g1);
 
+    // ---------- Forward Kinematics Tracking ---------- //
+    // For now they all need the same weight
+    ForwardKinematicsCost fk_cost(0, settings.nodes, "fk_cost", settings.cost_data.at(4).weight,
+        settings.deriv_lib_path, settings.compile_derivs, g1, settings.contact_frames);
+
     // --------------------------------- //
     // ------- Contact Schedule -------- //
     // --------------------------------- //
@@ -165,6 +171,7 @@ int main() {
     mpc.SetTauTrackingCost(std::move(tau_tracking));
     mpc.SetForceTrackingCost(std::move(force_tracking));
     mpc.SetConfigTrackingCost(std::move(config_tracking));
+    mpc.SetFowardKinematicsCost(std::move(fk_cost));
 
     std::cout << "===== MPC Costs Added =====" << std::endl;
 

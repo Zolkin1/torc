@@ -46,7 +46,7 @@ namespace torc::mpc {
         const std::map<std::string, std::vector<double>>& swing_traj,
         const std::vector<double>& hip_offsets,
         const ContactSchedule& contact_schedule,
-        std::map<std::string, std::vector<vector2_t>>& des_foot_pos) {
+        std::map<std::string, std::vector<vector3_t>>& des_foot_pos) {
         if (hip_offsets.size() != 2*contact_frames_.size()) {
             throw std::runtime_error("Hip offsets size != 2*contact_frames_.size()");
         }
@@ -260,7 +260,9 @@ namespace torc::mpc {
                         // }
                     }
 
-                    des_foot_pos[frame].emplace_back(swing_intermediate_pos);
+                    vector3_t foot_pos;
+                    foot_pos << swing_intermediate_pos, swing_traj.at(frame)[node];
+                    des_foot_pos[frame].emplace_back(foot_pos);
                 } else {
                     if (!contact_schedule.InContact(frame, GetTime(node))) {
                         throw std::runtime_error("[Reference Generator] should be in contact!");
@@ -292,7 +294,9 @@ namespace torc::mpc {
                         }
                     }
 
-                    des_foot_pos[frame].emplace_back(contact_foot_pos[frame].at(current_contact_idx));
+                    vector3_t foot_pos;
+                    foot_pos << contact_foot_pos[frame].at(current_contact_idx), swing_traj.at(frame)[node];
+                    des_foot_pos[frame].emplace_back(foot_pos);
                 }
             }
             if (des_foot_pos[frame].size() != nodes_) {
@@ -407,7 +411,8 @@ namespace torc::mpc {
             // TODO: Put back
             // base_config << GetBasePositionInterp(GetTime(i), times_and_bases, q_target, q).head<7>();
             base_config << GetCommandedConfig(i, q_target).head<7>();
-            q_ref[i] = model_.InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
+            // TODO: Put back if I want it
+            // q_ref[i] = model_.InverseKinematics(base_config, end_effectors_pos, contact_frames_, q_ref[i - 1], false);
             // std::cout << "i: " << i << ", qref: " << q_ref[i].transpose() << std::endl;
         }
         // std::cerr << "IK completed!" << std::endl;

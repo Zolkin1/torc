@@ -28,16 +28,20 @@ namespace torc::mpc {
         qp_settings = settings_.qp_settings;
 
         traj_.UpdateSizes(nq_, nv_, ntau_, settings_.contact_frames, settings.nodes);
+        int frame_idx = 0;
         for (const auto& frame : settings_.contact_frames) {
             in_contact_.insert({frame, {}});
             swing_traj_.insert({frame, {}});
             contact_info_.insert({frame, {}});
+            end_effector_targets_.insert({frame, {}});
             for (int i = 0; i < settings_.nodes; i++) {
                 in_contact_[frame].push_back(1);
                 swing_traj_[frame].push_back(0);
                 contact_info_[frame].push_back(ContactSchedule::GetDefaultContactInfo());
+                end_effector_targets_[frame].emplace_back(settings_.hip_offsets[2*frame_idx], settings_.hip_offsets[2*frame_idx + 1], 0);
                 // std::cout << "A:\n" << contact_info_[frame][i].A_ << std::endl;
             }
+            frame_idx++;
         }
 
         for (int i = 0; i < settings_.nodes; i++) {
@@ -127,6 +131,10 @@ namespace torc::mpc {
 
     void HpipmMpc::SetConfigTrackingCost(ConfigTrackingCost cost) {
         config_tracking_ = std::make_unique<ConfigTrackingCost>(std::move(cost));
+    }
+
+    void HpipmMpc::SetFowardKinematicsCost(ForwardKinematicsCost cost) {
+        fk_cost_ = std::make_unique<ForwardKinematicsCost>(std::move(cost));
     }
 
     void HpipmMpc::UpdateSetttings(MpcSettings settings) {
@@ -456,12 +464,24 @@ namespace torc::mpc {
                 qp[node].q.head(nv_) = lin;
             }
 
+            if (fk_cost_->IsInNodeRange(node)) {
+                for (const auto& frame : settings_.contact_frames) {
+                    const auto [hess, lin] = fk_cost_->GetQuadraticApprox(
+                        traj_.GetConfiguration(node),
+                        GetEndEffectorTarget(node, frame), frame);
+                    // std::cout << "node: " << node << " hess:\n" << hess << std::endl;
+                    // std::cout << "lin: " << lin.transpose() << std::endl;
+                    // std::cout << "target: " << GetEndEffectorTarget(node, frame).transpose() << std::endl;
+                    qp[node].Q.topLeftCorner(nv_, nv_) += hess;
+                    qp[node].q.head(nv_) += lin;
+                }
+            }
+
             // std::cout << "node: " << node << std::endl;
             // std::cout << "Q:\n" << qp[node].Q << std::endl;
             // std::cout << "q:\n" << qp[node].q.transpose() << std::endl;
             // std::cout << "R:\n" << qp[node].R << std::endl;
             // std::cout << "r:\n" << qp[node].r.transpose() << std::endl;
-
         }
 
         // Terminal cost
@@ -475,6 +495,13 @@ namespace torc::mpc {
                     config_tracking_->GetQuadraticApprox(traj_.GetConfiguration(node), GetConfigTarget(node));
         qp[node].Q.topLeftCorner(nv_, nv_) = hessq;
         qp[node].q.head(nv_) = linq;
+
+        // for (const auto& frame : settings_.contact_frames) {
+        //     const auto [hess, lin] = fk_cost_->GetQuadraticApprox(traj_.GetConfiguration(node),
+        //         GetEndEffectorTarget(node, frame), frame);
+        //     qp[node].Q.topLeftCorner(nv_, nv_) += hess;
+        //     qp[node].q.head(nv_) += lin;
+        // }
 
         qp[node].Q *= settings_.terminal_weight;
         qp[node].q *= settings_.terminal_weight;
@@ -821,6 +848,10 @@ namespace torc::mpc {
         return q_target_[node];
     }
 
+    vector3_t HpipmMpc::GetEndEffectorTarget(int node, const std::string &frame) const {
+        return end_effector_targets_.at(frame)[node];
+    }
+
     // --------- Set Targets --------- //
     void HpipmMpc::SetVelTarget(const SimpleTrajectory &v_target) {
         v_target_ = v_target;
@@ -829,6 +860,11 @@ namespace torc::mpc {
     void HpipmMpc::SetConfigTarget(const SimpleTrajectory &q_target) {
         q_target_ = q_target;
     }
+
+    void HpipmMpc::SetForwardKinematicsTarget(const std::map<std::string, std::vector<vector3_t> > &fk_positions) {
+        end_effector_targets_ = fk_positions;
+    }
+
 
     void HpipmMpc::SetLinTraj(const Trajectory &traj_in) {
         traj_ = traj_in;

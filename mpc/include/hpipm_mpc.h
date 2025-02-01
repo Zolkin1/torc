@@ -22,6 +22,7 @@
 #include "HolonomicConstraint.h"
 #include "LinearLsCost.h"
 #include "contact_schedule.h"
+#include "ForwardKinematicsCost.h"
 #include "MpcSettings.h"
 #include "PolytopeConstraint.h"
 #include "SRBConstraint.h"
@@ -71,6 +72,7 @@ namespace torc::mpc {
         void SetTauTrackingCost(LinearLsCost cost);
         void SetForceTrackingCost(LinearLsCost cost);
         void SetConfigTrackingCost(ConfigTrackingCost cost);
+        void SetFowardKinematicsCost(ForwardKinematicsCost cost);
 
         void CreateConstraints();
         void CreateCost();
@@ -79,6 +81,7 @@ namespace torc::mpc {
 
         void SetConfigTarget(const SimpleTrajectory& q_target);
         void SetVelTarget(const SimpleTrajectory& v_target);
+        void SetForwardKinematicsTarget(const std::map<std::string, std::vector<vector3_t>>& fk_positions);
 
         void SetLinTraj(const Trajectory& traj_in);
         void SetLinTrajConfig(const SimpleTrajectory& config_traj);
@@ -113,6 +116,7 @@ namespace torc::mpc {
         vectorx_t GetTauTarget(int node) const;
         vector3_t GetForceTarget(int node, const std::string& frame) const;
         vectorx_t GetConfigTarget(int node) const;
+        vector3_t GetEndEffectorTarget(int node, const std::string& frame) const;
 
         std::pair<double, double> LineSearch(const std::vector<hpipm::OcpQpSolution>& sol);
 
@@ -149,11 +153,14 @@ namespace torc::mpc {
         std::unique_ptr<LinearLsCost> vel_tracking_;
         std::unique_ptr<LinearLsCost> tau_tracking_;
         std::unique_ptr<LinearLsCost> force_tracking_;
+        std::unique_ptr<ForwardKinematicsCost> fk_cost_;
 
         // TODO: Consider allowing this to vary by node
         SimpleTrajectory v_target_;
         SimpleTrajectory q_target_;
         SimpleTrajectory tau_target_;
+
+        std::map<std::string, std::vector<vector3_t>> end_effector_targets_;
 
         // Solver
         std::vector<hpipm::OcpQp> qp;
