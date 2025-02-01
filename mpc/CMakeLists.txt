@@ -28,7 +28,8 @@ set(MPC_HEADER_LIST
     "${MPC_INC}/CollisionData.h"
     "${MPC_INC}/SRBConstraint.h"
     "${MPC_INC}/PolytopeConstraint.h"
-    "${MPC_INC}/ForwardKinematicsCost.h")
+    "${MPC_INC}/ForwardKinematicsCost.h"
+    "${MPC_INC}/CentroidalDynamicsConstraint.h")
 #    "${MPC_INC}/mpc_contact.h")
 
 set(MPC_SOURCE_LIST
@@ -58,7 +59,8 @@ set(MPC_SOURCE_LIST
         CollisionConstraint.cpp
         SRBConstraint.cpp
         PolytopeConstraint.cpp
-        ForwardKinematicsCost.cpp)
+        ForwardKinematicsCost.cpp
+        CentroidalDynamicsConstraint.cpp)
 
 add_library(Mpc
     ${MPC_SOURCE_LIST}

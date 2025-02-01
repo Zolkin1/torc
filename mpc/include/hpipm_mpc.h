@@ -11,6 +11,7 @@
 #include <filesystem>
 
 #include "BoxConstraint.h"
+#include "CentroidalDynamicsConstraint.h"
 #include "CollisionConstraint.h"
 #include "ConfigTrackingCost.h"
 #include "hpipm-cpp/hpipm-cpp.hpp"
@@ -56,7 +57,8 @@ namespace torc::mpc {
     public:
         HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model);
 
-        void SetDynamicsConstraints(std::vector<DynamicsConstraint> constraints);
+        void SetDynamicsConstraints(DynamicsConstraint constraint);
+        void SetCentroidalDynamicsConstraints(CentroidalDynamicsConstraint constraint);
         void SetSrbConstraint(SRBConstraint constraint);
         void SetConfigBox(const BoxConstraint& constraints);
         void SetVelBox(const BoxConstraint& constraints);
@@ -132,7 +134,8 @@ namespace torc::mpc {
 
 
         // --------- Constraints --------- //
-        std::vector<DynamicsConstraint> dynamics_constraints_;
+        std::unique_ptr<DynamicsConstraint> dynamics_constraint_;
+        std::unique_ptr<CentroidalDynamicsConstraint> centroidal_dynamics_constraint_;
         std::unique_ptr<SRBConstraint> srb_constraint_;
         std::unique_ptr<BoxConstraint> config_box_;
         std::unique_ptr<BoxConstraint> vel_box_;

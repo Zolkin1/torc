@@ -4,6 +4,7 @@
 
 #include <torc_timer.h>
 
+#include "CentroidalDynamicsConstraint.h"
 #include "DynamicsConstraint.h"
 #include "ForwardKinematicsCost.h"
 #include "hpipm_mpc.h"
@@ -30,17 +31,15 @@ int main() {
     // --------------------------------- //
     // ---------- Constraints ---------- //
     // --------------------------------- //
-    // ---------- Dynamics ---------- //
-    std::vector<DynamicsConstraint> dynamics_constraints;
-    // dynamics_constraints.emplace_back(DynamicsConstraint(g1, contact_frames, "g1_full_order",
-    //     deriv_lib_path, false, true, 0, 5));
-    // dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-    //     false, false, 5, settings.nodes);
-    dynamics_constraints.emplace_back(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics); //
-    dynamics_constraints.emplace_back(g1, contact_frames, "g1_centroidal", deriv_lib_path,
-        settings.compile_derivs, false, settings.nodes_full_dynamics - 100, settings.nodes - 100);
+    // ---------- FO Dynamics ---------- //
+    DynamicsConstraint dynamics_constraints(g1, contact_frames, "g1_full_order",
+        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics);
 
+    // ---------- Centroidal Dynamics ---------- //
+    CentroidalDynamicsConstraint centroidal_dynamics(g1, settings.contact_frames, "g1_centroidal", settings.deriv_lib_path,
+        settings.compile_derivs, settings.nodes_full_dynamics, settings.nodes);
+
+    // ---------- SRB Dynamics ---------- //
     SRBConstraint srb_dynamics(settings.nodes_full_dynamics, settings.nodes,
         "g1_srb",
         settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1, settings.q_target);
@@ -156,7 +155,8 @@ int main() {
 
     std::cout << "===== MPC Created =====" << std::endl;
     mpc.SetDynamicsConstraints(std::move(dynamics_constraints));
-    mpc.SetSrbConstraint(std::move(srb_dynamics));
+    mpc.SetCentroidalDynamicsConstraints(std::move(centroidal_dynamics));
+    // mpc.SetSrbConstraint(std::move(srb_dynamics));
     mpc.SetConfigBox(config_box);
     mpc.SetVelBox(vel_box);
     mpc.SetTauBox(tau_box);

@@ -3,8 +3,6 @@
 //
 
 #include "hpipm_mpc.h"
-
-#include <set>
 #include <torc_timer.h>
 
 // TODO: Can I have changing sizes every solve without causing slow downs? Then I may be able to remove some constraints (swing related)
@@ -60,24 +58,12 @@ namespace torc::mpc {
         q_target_.SetAllData(traj_.GetConfiguration(0));
     }
 
-    void HpipmMpc::SetDynamicsConstraints(std::vector<DynamicsConstraint> constraints) {
-        dynamics_constraints_ = std::move(constraints);
-        // if (dynamics_constraints_.size() !=2) {
-        //     throw std::runtime_error("For now we only accept exactly 2 dynamics constraints!");
-        // }
-        //
-        // if (dynamics_constraints_[0].GetFirstNode() != 0) {
-        //     throw std::runtime_error("First dynamics constraint must start at node = 0!");
-        // }
-        // TODO: Put back
-        // if (dynamics_constraints_[0].GetLastNode() != dynamics_constraints_[1].GetFirstNode()) {
-        //     throw std::runtime_error("First and last nodes for the dynamics constraints must match!");
-        // }
-        // if (dynamics_constraints_[1].GetLastNode() != settings_.nodes) {
-        //     throw std::runtime_error("Last dynamics node must match the settings!");
-        // }
+    void HpipmMpc::SetDynamicsConstraints(DynamicsConstraint constraints) {
+        dynamics_constraint_ = std::make_unique<DynamicsConstraint>(std::move(constraints));
+    }
 
-        // boundary_node_ = dynamics_constraints_[0].GetLastNode();
+    void HpipmMpc::SetCentroidalDynamicsConstraints(CentroidalDynamicsConstraint constraint) {
+        centroidal_dynamics_constraint_ = std::make_unique<CentroidalDynamicsConstraint>(std::move(constraint));
     }
 
     void HpipmMpc::SetSrbConstraint(SRBConstraint constraint) {
@@ -143,6 +129,10 @@ namespace torc::mpc {
 
     // TODO: Make sure there are no input constraint in the last node
     void HpipmMpc::CreateConstraints() {
+        if (srb_constraint_ && centroidal_dynamics_constraint_) {
+            throw std::runtime_error("Can't have both the SRB and centroidal constraint!");
+        }
+
         // Maybe the first time I should set all the sizes for hpipm
         if (first_constraint_gen_) {
             if (!config_box_ || !vel_box_ || !tau_box_ || !friction_cone_ || !swing_constraint_ || !holonomic_) {
@@ -169,16 +159,16 @@ namespace torc::mpc {
             // Dynamics Constraints
             if (node < settings_.nodes) {
                 // TODO: verify all of these mats (again)
-                if (node < dynamics_constraints_[0].GetLastNode() - 1 && node < settings_.nodes - 1) {
+                if (node < dynamics_constraint_->GetLastNode() - 1 && node < settings_.nodes - 1) {
                     // std::cerr << "Adding FO dynamics..." << std::endl;
-                    dynamics_constraints_[0].GetLinDynamics(
+                    dynamics_constraint_->GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
                         traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
                         traj_.GetTau(node), force, settings_.dt[node], false,
                         qp[node].A, qp[node].B, qp[node].b);
-                } else if (node == dynamics_constraints_[0].GetLastNode() - 1) {
+                } else if (node == dynamics_constraint_->GetLastNode() - 1) {
                     // std::cerr << "Adding boundary dynamics..." << std::endl;
-                    dynamics_constraints_[0].GetLinDynamics(
+                    dynamics_constraint_->GetLinDynamics(
                         traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
                         traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
                         traj_.GetTau(node), force, settings_.dt[node], true,
@@ -186,14 +176,19 @@ namespace torc::mpc {
 
                 } else if (node < settings_.nodes - 1) {
                     // std::cerr << "Adding ROM dynamics..." << std::endl;
-                    // dynamics_constraints_[1].GetLinDynamics(
-                    //     traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
-                    //     traj_.GetVelocity(node), traj_.GetVelocity(node + 1),
-                    //     traj_.GetTau(node), force, settings_.dt[node], false,
-                    //     qp[node].A, qp[node].B, qp[node].b);
-                    srb_constraint_->GetLinDynamics(traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
-                        traj_.GetVelocity(node), traj_.GetVelocity(node + 1), force, settings_.dt[node],
-                        qp[node].A, qp[node].B, qp[node].b);
+                    if (centroidal_dynamics_constraint_) {
+                        centroidal_dynamics_constraint_->GetLinDynamics(
+                            traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
+                            traj_.GetVelocity(node), traj_.GetVelocity(node + 1), force, settings_.dt[node],
+                            qp[node].A, qp[node].B, qp[node].b);
+                    }
+
+                    if (srb_constraint_) {
+                        // SRB model
+                        srb_constraint_->GetLinDynamics(traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1),
+                            traj_.GetVelocity(node), traj_.GetVelocity(node + 1), force, settings_.dt[node],
+                            qp[node].A, qp[node].B, qp[node].b);
+                    }
                 }
             }
 
@@ -218,7 +213,7 @@ namespace torc::mpc {
             if (vel_box_->IsInNodeRange(node)) { //(node >= vel_box_->GetFirstNode() && node < vel_box_->GetLastNode() + 1) && node != boundary_node_) {
                 // std::cerr << "Adding vel box..." << std::endl;
                 // Full order model this is in the state
-                if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                if (dynamics_constraint_->IsInNodeRange(node)) {
                     // Set box indexes
                     const auto& idxs = vel_box_->GetIdxs();
                     for (int i = 0; i < idxs.size(); i++) {
@@ -245,7 +240,7 @@ namespace torc::mpc {
             }
 
             // Torque box constraints
-            if (dynamics_constraints_[0].IsInNodeRange(node) && tau_box_->IsInNodeRange(node)) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
+            if (dynamics_constraint_->IsInNodeRange(node) && tau_box_->IsInNodeRange(node)) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
                 // std::cerr << "Adding tau box..." << std::endl;
                 // Set box indexes
                 const auto& idxs = tau_box_->GetIdxs();
@@ -312,7 +307,7 @@ namespace torc::mpc {
                 for (const auto& frame : settings_.contact_frames) {
                     const auto [jac, y_segment] =
                         holonomic_->GetLinearization(traj_.GetConfiguration(node), traj_.GetVelocity(node), frame);
-                    if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                    if (dynamics_constraint_->IsInNodeRange(node)) {
                         qp[node].C.middleRows(ineq_row_idx, y_segment.size()) = in_contact_[frame][node]*jac;
                         // qp[node].C.block(ineq_row_idx, nv_, y_segment.size(), nv_).setZero(); // TODO: Remove after debugging
                     } else {
@@ -426,7 +421,7 @@ namespace torc::mpc {
                 const auto [hess, lin]
                     = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node));
 
-                if (dynamics_constraints_[0].IsInNodeRange(node)) {
+                if (dynamics_constraint_->IsInNodeRange(node)) {
                     qp[node].Q.bottomRightCorner(nv_, nv_) = hess;
                     qp[node].q.tail(nv_) = lin;
                 } else {
@@ -437,7 +432,7 @@ namespace torc::mpc {
                 }
             }
 
-            if (tau_tracking_->IsInNodeRange(node) && dynamics_constraints_[0].IsInNodeRange(node)) {
+            if (tau_tracking_->IsInNodeRange(node) && dynamics_constraint_->IsInNodeRange(node)) {
                 const auto [hess, lin]
                     = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node));
 
@@ -464,7 +459,7 @@ namespace torc::mpc {
                 qp[node].q.head(nv_) = lin;
             }
 
-            if (fk_cost_->IsInNodeRange(node)) {
+            if (fk_cost_ && fk_cost_->IsInNodeRange(node)) {
                 for (const auto& frame : settings_.contact_frames) {
                     const auto [hess, lin] = fk_cost_->GetQuadraticApprox(
                         traj_.GetConfiguration(node),
@@ -535,7 +530,7 @@ namespace torc::mpc {
             }
             // TODO: Add other constraints
 
-            if (node < dynamics_constraints_[0].GetLastNode() - 1) {
+            if (node < dynamics_constraint_->GetLastNode() - 1) {
                 nx1 = nv_ + nv_;
                 nx2 = nx1;
                 if (config_box_->IsInNodeRange(node)) {
@@ -547,7 +542,7 @@ namespace torc::mpc {
                 if (tau_box_->IsInNodeRange(node)) {
                     nu_box += ntau_;
                 }
-            } else if (node == dynamics_constraints_[0].GetLastNode() - 1) {
+            } else if (node == dynamics_constraint_->GetLastNode() - 1) {
                 nx1 = nv_ + nv_;
                 nx2 = nv_ + FLOATING_VEL;
                 if (config_box_->IsInNodeRange(node)) {
@@ -701,7 +696,7 @@ namespace torc::mpc {
 
         // TODO: If I don't create the constraints right now then I need to re-create the constraints that involve the IC!
         torc::utils::TORCTimer timer;
-        std::cerr << "Starting constraint creation!" << std::endl;
+        // std::cerr << "Starting constraint creation!" << std::endl;
         timer.Tic();
         CreateConstraints();
         timer.Toc();
@@ -709,7 +704,7 @@ namespace torc::mpc {
             std::cout << "constraint time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
         }
 
-        std::cerr << "Starting cost creation!" << std::endl;
+        // std::cerr << "Starting cost creation!" << std::endl;
         timer.Tic();
         CreateCost();
         timer.Toc();
@@ -719,7 +714,7 @@ namespace torc::mpc {
 
         NanCheck();
 
-        std::cerr << "Starting solve!" << std::endl;
+        // std::cerr << "Starting solve!" << std::endl;
         timer.Tic();
         const auto res = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
             qp, solution_); // TODO: Might need to remove this x0 input
@@ -735,6 +730,7 @@ namespace torc::mpc {
             std::cout << "Cost: " << GetCost(solution_, 1) << std::endl;
         }
 
+        std::cerr << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
         // Line Search
         // const auto [constraint_vio, cost] = LineSearch(solution_);
@@ -765,7 +761,7 @@ namespace torc::mpc {
             // std::cout << "x: " << solution_[node].x.transpose() << std::endl;
             // std::cout << "u: " << solution_[node].u.transpose() << std::endl;
 
-            if (dynamics_constraints_[0].IsInNodeRange(node)) {
+            if (dynamics_constraint_->IsInNodeRange(node)) {
                 if (node != 0) {
                     traj_.SetConfiguration(node, models::ConvertdqToq<double>(solution_[node].x.head(nv_), traj_.GetConfiguration(node)));
 
@@ -999,7 +995,7 @@ namespace torc::mpc {
             vectorx_t dv = vectorx_t::Zero(nv_);
             vectorx_t dtau = vectorx_t::Zero(ntau_);
             dv.head<FLOATING_VEL>() = sol[node].x.segment<FLOATING_VEL>(nv_);
-            if (dynamics_constraints_[0].IsInNodeRange(node)) {
+            if (dynamics_constraint_->IsInNodeRange(node)) {
                 dv.tail(ntau_) = sol[node].x.segment(FLOATING_VEL + nv_, ntau_);
                 if (node < settings_.nodes - 1) {
                     dtau = sol[node].u.head(ntau_);
@@ -1020,7 +1016,7 @@ namespace torc::mpc {
             // std::cout << "node: " << node << std::endl;
             // std::cout << "x: " << sol[node].x.transpose() << std::endl;
 
-            if (node < dynamics_constraints_[0].GetLastNode() - 1 && node < settings_.nodes - 1) {
+            if (node < dynamics_constraint_->GetLastNode() - 1 && node < settings_.nodes - 1) {
 
                 vectorx_t dq2 = sol[node+1].x.head(nv_);
                 vectorx_t dv2 = sol[node+1].x.tail(nv_);
@@ -1035,7 +1031,7 @@ namespace torc::mpc {
                 // dq2 *= 0;
                 // dv2 *= 0;
 
-                const auto[int_vio, dyn_vio] = dynamics_constraints_[0].GetViolation(traj_.GetConfiguration(node),
+                const auto[int_vio, dyn_vio] = dynamics_constraint_->GetViolation(traj_.GetConfiguration(node),
                     traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
                     traj_.GetVelocity(node + 1), traj_.GetTau(node), force, settings_.dt[node],
                     dq, dq2, dv, dv2, dtau, df);
@@ -1070,15 +1066,21 @@ namespace torc::mpc {
 
                 dtau.setZero();
 
-                // const auto[int_vio, dyn_vio] = dynamics_constraints_[1].GetViolation(traj_.GetConfiguration(node),
-                //     traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
-                //     traj_.GetVelocity(node + 1), traj_.GetTau(node), force, settings_.dt[node],
-                //     dq, dq2, dv, dv2, dtau, df);
+                vectorx_t int_vio, dyn_vio;
 
-                const auto [int_vio, dyn_vio] = srb_constraint_->GetViolation(
-                    traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
-                    traj_.GetVelocity(node + 1), force, settings_.dt[node],
-                    dq, dq2, dv, dv2, df);
+                if (centroidal_dynamics_constraint_) {
+                    std::tie(int_vio, dyn_vio) = centroidal_dynamics_constraint_->GetViolation(
+                        traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
+                        traj_.GetVelocity(node + 1), force, settings_.dt[node],
+                        dq, dq2, dv, dv2, df);
+                }
+
+                if (srb_constraint_) {
+                    std::tie(int_vio, dyn_vio) = srb_constraint_->GetViolation(
+                        traj_.GetConfiguration(node), traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
+                        traj_.GetVelocity(node + 1), force, settings_.dt[node],
+                        dq, dq2, dv, dv2, df);
+                }
 
                 // std::cout << "Dynamics vio: |" << dyn_vio.squaredNorm() << "| " << dyn_vio.transpose() << std::endl;
                 // std::cout << "Integration vio: |" << int_vio.squaredNorm() << "| " << int_vio.transpose() << std::endl;
@@ -1112,7 +1114,7 @@ namespace torc::mpc {
                 violation += vio_vec.squaredNorm();
             }
 
-            if (tau_box_->IsInNodeRange(node) && dynamics_constraints_[0].IsInNodeRange(node)) {
+            if (tau_box_->IsInNodeRange(node) && dynamics_constraint_->IsInNodeRange(node)) {
                 vectorx_t vio_vec = tau_box_->GetViolation(traj_.GetTau(node), dtau);
                 // std::cout << "Tau box vio: |" << vio_vec.squaredNorm() << "| " << vio_vec.transpose() << std::endl;
                 violation += vio_vec.squaredNorm();
@@ -1183,7 +1185,7 @@ namespace torc::mpc {
             vectorx_t dv(nv_);
             vectorx_t dtau = vectorx_t::Zero(ntau_);
             dv.head<FLOATING_VEL>() = sol[node].x.segment<FLOATING_VEL>(nv_);
-            if (dynamics_constraints_[0].IsInNodeRange(node)) {
+            if (dynamics_constraint_->IsInNodeRange(node)) {
                 dv.tail(ntau_) = sol[node].x.segment(FLOATING_VEL + nv_, ntau_);
                 if (node < settings_.nodes - 1) {
                     dtau = sol[node].u.head(ntau_);
@@ -1206,7 +1208,7 @@ namespace torc::mpc {
                     cost += vel_tracking_->GetCost(traj_.GetVelocity(node), dv, GetVelocityTarget(node));
                 }
 
-                if (tau_tracking_->IsInNodeRange(node) && dynamics_constraints_[0].IsInNodeRange(node)) {
+                if (tau_tracking_->IsInNodeRange(node) && dynamics_constraint_->IsInNodeRange(node)) {
                     cost += tau_tracking_->GetCost(traj_.GetTau(node), dtau, GetTauTarget(node));
                 }
 
@@ -1382,7 +1384,7 @@ namespace torc::mpc {
 
         std::cout << std::setw(20) << "Dynamics" << "  ";
         for (int node = 0; node < settings_.nodes; node++) {
-            if (dynamics_constraints_[0].IsInNodeRange(node)) {
+            if (dynamics_constraint_->IsInNodeRange(node)) {
                 std::cout << std::setw(1) << std::fixed << std::setprecision(2) << " " << "FO  " ;
             } else {
                 std::cout << std::setw(1) << std::fixed << std::setprecision(2) << " " << "ROM ";

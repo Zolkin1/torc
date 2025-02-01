@@ -44,6 +44,10 @@ namespace torc::mpc {
             const ad::ad_vector_t &dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t &qk_vk_vkp1_tauk_fk_dt,
             ad::ad_vector_t &violation);
 
+        void CentroidalInverseDynamics(const std::vector<std::string> &frames,
+            const ad::ad_vector_t &dqk_dvk_dvkp1base_dfk, const ad::ad_vector_t &qk_vk_vkp1base_fk_dt,
+            ad::ad_vector_t &violation);
+
         void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk,
             const ad::ad_vector_t& dt_qkbar_qkp1bar_vk_vkp1, ad::ad_vector_t& violation);
 

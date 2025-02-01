@@ -24,6 +24,10 @@ namespace torc::mpc {
         num_contacts_ = contact_frames.size();
         contact_frames_ = contact_frames;
 
+        if (!full_order_) {
+            throw std::runtime_error("Non-full order mode is deprecated on this node!"); // TODO: Remove all non-full order stuff
+        }
+
         // Make the auto diff function
         dynamics_function_ = std::make_unique<ad::CppADInterface>(
             std::bind(&DynamicsConstraint::InverseDynamics, this, contact_frames, std::placeholders::_1,
@@ -266,28 +270,6 @@ namespace torc::mpc {
             B.bottomRows<FLOATING_VEL>() = B_dyn_temp.topRows<FLOATING_VEL>();
 
             b << -dq2_inv*int_fbar, -(dv2_inv*fbar).topRows<FLOATING_VEL>();
-
-            // // Try #1: Just use the centroidal dynamics -- must be called from the non-full order node
-            // A.setZero();
-            // B.setZero();
-            // b.setZero();
-            //
-            // // TODO: Check to be sure this is grabbing the block I want
-            // // std::cerr << "jv2:\n" << dyn_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL) << std::endl;
-            //
-            // matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, FLOATING_VEL).inverse();
-            // matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
-            // // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
-            //
-            // A.topRows(vel_dim_) << -dq2_inv*int_jac.leftCols(vel_dim_), -dq2_inv*int_jac.middleCols(2*vel_dim_, vel_dim_);
-            // A.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.leftCols(2*vel_dim_);
-            //
-            // B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(3*vel_dim_, tau_dim_),
-            //     dyn_jac.middleCols(3*vel_dim_ + tau_dim_, CONTACT_3DOF*num_contacts_);
-            // B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
-            //
-            // // b << int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
-            // b << -dq2_inv*int_fbar, -dv2_inv*fbar;
         } else if (full_order_) {
             A.setZero();
             B.setZero();
@@ -329,20 +311,15 @@ namespace torc::mpc {
             matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
             // std::cout << "dq2_inv:\n" << dq2_inv << std::endl;
 
+            // Integration
             A.topRows(vel_dim_) << -dq2_inv*int_jac.leftCols(vel_dim_), -dq2_inv*int_jac.middleCols(2*vel_dim_, FLOATING_VEL);
-            // A.topRightCorner<FLOATING_VEL, FLOATING_VEL>() =
-            //     int_jac.block(0, 2*vel_dim_, FLOATING_VEL, FLOATING_VEL);
-            A.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
-
             B.topLeftCorner(vel_dim_, vel_dim_ - FLOATING_VEL) = -dq2_inv*int_jac.rightCols(vel_dim_ - FLOATING_VEL);
-            // B.block(FLOATING_VEL, 0, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL) =
-            //     int_jac.block(FLOATING_VEL, 2*vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL, vel_dim_ - FLOATING_VEL);
 
-            B.bottomRows<FLOATING_VEL>() << dyn_jac.middleCols(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL),
-                dyn_jac.rightCols(num_contacts_*CONTACT_3DOF);
-            B.bottomRows<FLOATING_VEL>() = -dv2_inv*B.bottomRows<FLOATING_VEL>();
+            // Dynamics
+            A.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.leftCols(vel_dim_ + FLOATING_VEL);
+            B.bottomRows<FLOATING_VEL>() << -dv2_inv*dyn_jac.middleCols(vel_dim_ + FLOATING_VEL, vel_dim_ - FLOATING_VEL),
+                -dv2_inv*dyn_jac.rightCols(num_contacts_*CONTACT_3DOF);
 
-            // b << int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
             b << -dq2_inv*int_fbar, -dv2_inv*fbar.head<FLOATING_VEL>();
         }
     }
@@ -700,6 +677,9 @@ namespace torc::mpc {
     void DynamicsConstraint::InverseDynamics(const std::vector<std::string> &frames,
         const ad::ad_vector_t &dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t &qk_vk_vkp1_tauk_fk_dt,
         ad::ad_vector_t &violation) {
+        if (!full_order_) {
+            throw std::logic_error("Running full order inverse dynamics with the centroidal model!");
+        }
         // Decision variables
         const ad::ad_vector_t& dqk = dqk_dvk_dvkp1_dtauk_dfk.head(vel_dim_);
         const ad::ad_vector_t& dvk = dqk_dvk_dvkp1_dtauk_dfk.segment(vel_dim_, vel_dim_);
@@ -740,10 +720,55 @@ namespace torc::mpc {
 
         violation = tau_id - tauk_curr;
 
-        if (!full_order_) {
-            violation.conservativeResize(FLOATING_VEL, Eigen::NoChange);
-        }
+        // if (!full_order_) {
+        //     violation.conservativeResize(FLOATING_VEL, Eigen::NoChange);
+        // }
     }
+
+    void DynamicsConstraint::CentroidalInverseDynamics(const std::vector<std::string> &frames,
+        const ad::ad_vector_t &dqk_dvk_dvkp1base_dfk, const ad::ad_vector_t &qk_vk_vkp1base_fk_dt,
+        ad::ad_vector_t &violation) {
+        if (full_order_) {
+            throw std::logic_error("Running centroidal inverse dynamics with the full order model!");
+        }
+        // Decision variables
+        const ad::ad_vector_t& dqk = dqk_dvk_dvkp1base_dfk.head(vel_dim_);
+        const ad::ad_vector_t& dvk = dqk_dvk_dvkp1base_dfk.segment(vel_dim_, vel_dim_);
+        const ad::ad_vector_t& dvkp1base = dqk_dvk_dvkp1base_dfk.segment(2*vel_dim_, FLOATING_VEL);
+        const ad::ad_vector_t& dfk = dqk_dvk_dvkp1base_dfk.segment(2*vel_dim_ + FLOATING_VEL, CONTACT_3DOF*num_contacts_);
+
+        // Reference trajectory
+        const ad::ad_vector_t& qk = qk_vk_vkp1base_fk_dt.head(config_dim_);
+        const ad::ad_vector_t& vk = qk_vk_vkp1base_fk_dt.segment(config_dim_, vel_dim_);
+        const ad::ad_vector_t& vkp1base = qk_vk_vkp1base_fk_dt.segment(config_dim_ + vel_dim_, FLOATING_VEL);
+        const ad::ad_vector_t& fk = qk_vk_vkp1base_fk_dt.segment(config_dim_ + vel_dim_ + FLOATING_VEL, CONTACT_3DOF*num_contacts_);
+        const ad::adcg_t& dt = qk_vk_vkp1base_fk_dt(config_dim_ + vel_dim_ + FLOATING_VEL + CONTACT_3DOF*num_contacts_);
+
+        // Current values
+        const ad::ad_vector_t qk_curr = models::ConvertdqToq(dqk, qk);
+        const ad::ad_vector_t vk_curr = dvk + vk;
+        const ad::ad_vector_t vkp1base_curr = dvkp1base + vkp1base;
+        const ad::ad_vector_t fk_curr = dfk + fk;
+
+        // Intermediate values
+        // TODO: Do I need to account for the different local frames somehow?
+        ad::ad_vector_t a(vel_dim_);
+        a << (vkp1base_curr - vk_curr.head<FLOATING_VEL>())/dt, vectorx_t::Zero(vel_dim_ - FLOATING_VEL);
+
+        std::vector<models::ExternalForce<ad::adcg_t>> f_ext;
+        int idx = 0;
+        for (const auto& frame : frames) {
+            f_ext.emplace_back(frame, fk_curr.segment<CONTACT_3DOF>(idx));
+            idx += CONTACT_3DOF;
+        }
+
+        // Compute error
+        const ad::ad_vector_t tau_id = models::InverseDynamics(model_.GetADPinModel(), *model_.GetADPinData(),
+            qk_curr, vk_curr, a, f_ext);
+
+        violation = tau_id.head<FLOATING_VEL>();
+    }
+
 
     std::pair<matrixx_t, matrixx_t> DynamicsConstraint::GetBoundaryDynamics() {
         matrixx_t B = matrixx_t::Zero(vel_dim_ + FLOATING_VEL, tau_dim_ + CONTACT_3DOF*num_contacts_);
