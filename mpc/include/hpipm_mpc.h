@@ -111,7 +111,7 @@ namespace torc::mpc {
          */
         std::pair<int, int> GetFrictionIndex(int node);
 
-        void ConvertQpSolToTraj();
+        void ConvertQpSolToTraj(double alpha);
 
         // TODO: Make these const refs
         vectorx_t GetVelocityTarget(int node) const;
@@ -199,6 +199,7 @@ namespace torc::mpc {
 
         // Line search
         HpipmLineSearchCondition ls_condition_;
+        double alpha_;
 
     };
 }

@@ -132,8 +132,8 @@ namespace torc::mpc {
             contact_foot_pos.insert({frame, {}});
             des_foot_pos.insert({frame, {}});
 
-            vector2_t hip_offset;
-            hip_offset << hip_offsets[2*j], hip_offsets[2*j + 1];
+            vector3_t hip_offset;
+            hip_offset << hip_offsets[2*j], hip_offsets[2*j + 1], 0;
 
             // Determine all contact locations for the given frame
             for (int i = 0; i < contact_midtimes[frame].size(); i++) {
@@ -144,24 +144,26 @@ namespace torc::mpc {
                     double time = contact_midtimes[frame][i];
                     vectorx_t q_command = GetCommandedConfig(time, q_target, v_target);
                     const quat_t quat(q_command.segment<4>(3));
-                    const matrix3_t R = quat.toRotationMatrix();
+                    const matrix3_t R = quat.toRotationMatrix();    // TODO: Should this be transposed?
 
-                    contact_foot_pos[frame].emplace_back(R.topLeftCorner<2,2>()*hip_offset
-                        + q_command.head<2>());
+                    // TODO: Verify this is correct when tilted!
+                    // contact_foot_pos[frame].emplace_back((R*hip_offset).head<2>()
+                    //     + q_command.head<2>());
+                    contact_foot_pos[frame].emplace_back(R.topLeftCorner<2,2>()*hip_offset.head<2>().head<2>() + q_command.head<2>());
 
                     // Raibert Heuristic
                     if (i == 0) {
                         // For now just in the plane
                         constexpr double g = 9.81;
                         const double hnom = q_target[0][2];
-                        contact_foot_pos[frame].back() = contact_foot_pos[frame].back() + R.topLeftCorner<2,2>()*std::sqrt(hnom/g)*(v.head<2>() - v_target[0].head<2>());
+                        contact_foot_pos[frame].back() = contact_foot_pos[frame].back() + (R.topLeftCorner<2,2>()*std::sqrt(hnom/g)*(v.head<2>() - v_target[0].head<2>())).head<2>();
                     }
 
                     // std::cout << "[RG] time: " << time << ", b: " <<
                     //     contact_schedule.GetPolytopes(frame).at(i + polytope_idx_offset[frame]).b_.transpose() << std::endl;
 
                     int contact_idx_temp = contact_schedule.GetContactIndex(frame, time);
-                    std::cout << "contact_idx_temp: " << contact_idx_temp << ", polytope idx: " << i + polytope_idx_offset[frame] << std::endl;
+                    // std::cout << "contact_idx_temp: " << contact_idx_temp << ", polytope idx: " << i + polytope_idx_offset[frame] << std::endl;
                     if (contact_idx_temp != i + polytope_idx_offset[frame]) {
                         throw std::runtime_error("[Reference generator] contact_idx_temp != contact_idx_temp");
                     }

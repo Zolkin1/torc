@@ -56,6 +56,8 @@ namespace torc::mpc {
         v_target_.SetAllData(vectorx_t::Zero(model_.GetVelDim()));
         tau_target_.SetAllData(vectorx_t::Zero(model_.GetVelDim() - FLOATING_VEL));
         q_target_.SetAllData(traj_.GetConfiguration(0));
+
+        alpha_ = 1;
     }
 
     void HpipmMpc::SetDynamicsConstraints(DynamicsConstraint constraints) {
@@ -717,7 +719,7 @@ namespace torc::mpc {
         // std::cerr << "Starting solve!" << std::endl;
         timer.Tic();
         const auto res = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
-            qp, solution_); // TODO: Might need to remove this x0 input
+            qp, solution_);
         timer.Toc();
 
         const auto stats = solver_->getSolverStatistics();
@@ -733,11 +735,12 @@ namespace torc::mpc {
         std::cerr << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
         // Line Search
+        // TODO: Line search almost never does anything. Just seems to take time, for now removing it.
         // const auto [constraint_vio, cost] = LineSearch(solution_);
         // std::cout << "Post LS constraint violation: " << constraint_vio << std::endl;
         // std::cout << "Post LS cost: " << cost << std::endl;
 
-        ConvertQpSolToTraj();   // TODO: add alpha term here
+        ConvertQpSolToTraj(alpha_);   // TODO: add alpha term here
         traj_out = traj_;
 
         if (settings_.verbose) {
@@ -751,10 +754,9 @@ namespace torc::mpc {
         solve_counter_++;
 
         return res;
-        std::cout << "DONE WITH COMPUTE" << std::endl;
     }
 
-    void HpipmMpc::ConvertQpSolToTraj() {
+    void HpipmMpc::ConvertQpSolToTraj(double alpha) {
         for (int node = 0; node < settings_.nodes; node++) {
             // std::cout << "node: " << node << std::endl;
             // std::cout << "traj idx: " << traj_idx << std::endl;
@@ -763,25 +765,27 @@ namespace torc::mpc {
 
             if (dynamics_constraint_->IsInNodeRange(node)) {
                 if (node != 0) {
-                    traj_.SetConfiguration(node, models::ConvertdqToq<double>(solution_[node].x.head(nv_), traj_.GetConfiguration(node)));
+                    traj_.SetConfiguration(node, models::ConvertdqToq<double>(alpha*solution_[node].x.head(nv_),
+                        traj_.GetConfiguration(node)));
 
-                    traj_.SetVelocity(node, traj_.GetVelocity(node) + solution_[node].x.tail(nv_));
+                    traj_.SetVelocity(node, traj_.GetVelocity(node) + alpha*solution_[node].x.tail(nv_));
 
                     // std::cout << "q: " << traj_.GetConfiguration(traj_idx).transpose() << std::endl;
                     // std::cout << "v: " << traj_.GetVelocity(traj_idx).transpose() << std::endl;
                 }
                 if (node < settings_.nodes - 1) {
-                    traj_.SetTau(node, traj_.GetTau(node) + solution_[node].u.head(ntau_));
+                    traj_.SetTau(node, traj_.GetTau(node) + alpha*solution_[node].u.head(ntau_));
                 }
             } else {
-                traj_.SetConfiguration(node, models::ConvertdqToq<double>(solution_[node].x.head(nv_), traj_.GetConfiguration(node)));
+                traj_.SetConfiguration(node, models::ConvertdqToq<double>(alpha*solution_[node].x.head(nv_),
+                    traj_.GetConfiguration(node)));
 
                 vectorx_t v = vectorx_t::Zero(nv_);
-                v.head<FLOATING_VEL>() = solution_[node].x.tail<FLOATING_VEL>();
+                v.head<FLOATING_VEL>() = alpha*solution_[node].x.tail<FLOATING_VEL>();
                 // std::cout << "node " << node << " v: " << v.transpose() << "\ntraj v: " << traj_.GetVelocity(node).transpose() << std::endl;
 
                 if (node < settings_.nodes - 1) {
-                    v.tail(ntau_) = solution_[node].u.head(ntau_);
+                    v.tail(ntau_) = alpha*solution_[node].u.head(ntau_);
                 }
                 traj_.SetVelocity(node, traj_.GetVelocity(node) + v);
             }
@@ -792,7 +796,7 @@ namespace torc::mpc {
                     // std::cout << "dforce: " << solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3).transpose() << std::endl;
                     // std::cout << "current force: " << traj_.GetForce(node, settings_.contact_frames[i]).transpose() << std::endl;
                     traj_.SetForce(node, settings_.contact_frames[i],
-                        traj_.GetForce(node, settings_.contact_frames[i]) + solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3));
+                        traj_.GetForce(node, settings_.contact_frames[i]) + alpha*solution_[node].u.segment<CONTACT_3DOF>(ntau_ + i*3));
                     // std::cout << "new force: " << traj_.GetForce(node, settings_.contact_frames[i]).transpose() << std::endl;
                 }
             }
@@ -904,6 +908,11 @@ namespace torc::mpc {
                 // TODO: Fix
                 const auto& polytopes = sched.GetPolytopes(frame);
 
+                int current_contact = -1;
+                if (sched.InContact(frame, 0)) {
+                    current_contact = sched.GetContactIndex(frame, 0);
+                }
+
                 // Break the continuous time contact schedule into each node
                 double time = 0;
                 int contact_idx = 0;
@@ -914,17 +923,20 @@ namespace torc::mpc {
                         contact_idx = sched.GetContactIndex(frame, time);
 
                         contact_info_[frame][node] = polytopes[contact_idx];
-                        contact_info_[frame][node].b_ -= polytope_delta;
+                        if (contact_idx != current_contact) {
+                            // Only add the margin for future polytopes
+                            contact_info_[frame][node].b_ -= polytope_delta;
+                        }
                         // std::cout << "[MPC] time: " << time << ", b: " << (contact_info_[frame][node].b_ + polytope_delta).transpose() << std::endl;
                     } else {
                         in_contact_[frame][node] = 0;
 
-                        // TODO: Remove when I fix below
                         contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
 
+                        // TODO: This seems to make it worse, might need to be careful with the funciton used for the scaling
                         // if (contact_idx + 1 < polytopes.size()) {
                         //     contact_info_[frame][node] = polytopes[contact_idx + 1];
-                        //     contact_info_[frame][node].b_ = contact_info_[frame][node].b_ - polytope_delta
+                        //     contact_info_[frame][node].b_ = contact_info_[frame][node].b_  //- polytope_delta
                         //     + GetPolytopeConvergence(frame, time, sched)*polytope_convergence_scalar;
                         // } else {
                         //     contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
@@ -943,14 +955,6 @@ namespace torc::mpc {
                 settings_.apex_time, settings_.dt, traj);
             frame_idx++;
         }
-
-        // TODO: Why do I need this?????
-        // TODO: Remove
-        // for (int i = 0; i < settings_.nodes; i++) {
-        //     for (const auto& frame : settings_.contact_frames) {
-        //         traj_.SetForce(i, frame, GetForceTarget(i, frame));
-        //     }
-        // }
 
         // PrintNodeInfo();
 
@@ -1235,44 +1239,44 @@ namespace torc::mpc {
 
 
     std::pair<double, double> HpipmMpc::LineSearch(const std::vector<hpipm::OcpQpSolution> &sol) {
-        double alpha = 1;
+        alpha_ = 1;
 
         double theta_k = GetConstraintViolation(sol, 0);
         double phi_k = GetCost(sol, 0);
 
-        while (alpha > settings_.ls_alpha_min) {
-            double theta_kp1 = GetConstraintViolation(sol, alpha);
+        while (alpha_ > settings_.ls_alpha_min) {
+            double theta_kp1 = GetConstraintViolation(sol, alpha_);
 
             if (theta_kp1 >= settings_.ls_theta_max) {
                 if (theta_kp1 < (1 - settings_.ls_gamma_theta)*theta_k) {
                     // ls_condition_ = ConstraintViolation;
                     std::cout << "CONSTRAINT REDUCTION" << std::endl;
-                    std::cout << "alpha = " << alpha << std::endl;
-                    double phi_kp1 = GetCost(sol, alpha);
+                    std::cout << "alpha = " << alpha_ << std::endl;
+                    double phi_kp1 = GetCost(sol, alpha_);
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
                 // TODO: Fix for the new solver
             } else if (std::max(theta_k, theta_kp1) < settings_.ls_theta_min) { // && osqp_instance_.objective_vector.dot(qp_res) < 0) {   // TODO: Fix/put back
-                double phi_kp1 = GetCost(sol, alpha);
+                double phi_kp1 = GetCost(sol, alpha_);
                 if (phi_kp1 < (phi_k)) { // + settings_.ls_eta*alpha*osqp_instance_.objective_vector.dot(qp_res))) {    // TODO: Fix/put back
                     // ls_condition_ = CostReduction;
                     std::cout << "COST REDUCTION" << std::endl;
-                    std::cout << "alpha = " << alpha << std::endl;
+                    std::cout << "alpha = " << alpha_ << std::endl;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             } else {
-                double phi_kp1 = GetCost(sol, alpha);
+                double phi_kp1 = GetCost(sol, alpha_);
                 if (phi_kp1 < (1 - settings_.ls_gamma_phi)*phi_k || theta_kp1 < (1 - settings_.ls_gamma_theta)*theta_k) {
                     // ls_condition_ = Both;
                     std::cout << "CONSTRAINT & COST REDUCTION" << std::endl;
-                    std::cout << "alpha = " << alpha << std::endl;
+                    std::cout << "alpha = " << alpha_ << std::endl;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             }
-            alpha = settings_.ls_gamma_alpha*alpha;
+            alpha_ = settings_.ls_gamma_alpha*alpha_;
         }
         // ls_condition_ = MinAlpha;
-        alpha = 0;
+        alpha_ = 0;
 
         return std::make_pair(theta_k, phi_k);
     }
