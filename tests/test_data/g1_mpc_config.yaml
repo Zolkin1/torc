@@ -126,9 +126,21 @@ costs:
     name: "ForceReg"
     weight: [ 0.01, 0.01, 0.0001 ]
   - type: ForwardKinematics
-    name: left_toe_fk
+    name: "left_heel_fk"
+    frame: "left_heel"
+    weight: [2, 2, 1]
+  - type: ForwardKinematics
+    name: "right_heel_fk"
+    frame: "right_heel"
+    weight: [2, 2, 1]
+  - type: ForwardKinematics
+    name: "left_toe_fk"
     frame: "left_toe"
-    weight: [1, 1, 1]
+    weight: [2, 2, 1]
+  - type: ForwardKinematics
+    name: "right_toe_fk"
+    frame: "right_toe"
+    weight: [2, 2, 1]
 #  - type: ConfigurationTracking
 #    name: "ConfigTracking"
 #    weight:  [1, 1, 20,
