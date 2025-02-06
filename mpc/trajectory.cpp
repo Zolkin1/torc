@@ -36,6 +36,7 @@ namespace torc::mpc {
             tau_.InsertData(node, vectorx_t::Zero(tau_size_));
             for (int frame = 0; frame < num_frames_; frame++) {
                 forces_[node][frame].setZero();
+                in_contact_[node][frame] = true;   // Default to in contact
             }
         }
     }
@@ -50,9 +51,14 @@ namespace torc::mpc {
         v_.SetSizes(vel_size_, nodes_);
         tau_.SetSizes(tau_size_, nodes_);
         forces_.resize(nodes_);
+        in_contact_.resize(nodes_);
         dt_.resize(nodes_);
         for (auto& force : forces_) {
             force.resize(num_frames_);
+        }
+
+        for (auto& contact : in_contact_) {
+            contact.resize(num_frames_);
         }
     }
 
@@ -70,6 +76,10 @@ namespace torc::mpc {
 
     void Trajectory::SetForce(int node, const std::string& frame, const torc::mpc::vector3_t& f) {
         forces_[node][force_frames_[frame]] = f;
+    }
+
+    void Trajectory::SetInContact(int node, const std::string &frame, bool in_contact) {
+        in_contact_[node][force_frames_[frame]] = in_contact;
     }
 
     void Trajectory::SetDtVector(const std::vector<double>& dt) {
@@ -123,12 +133,24 @@ namespace torc::mpc {
         return  total_time;
     }
 
-
+    bool Trajectory::GetInContact(const std::string &frame, int node) const {
+        return in_contact_[node][force_frames_.at(frame)];
+    }
 
 
     // -------------------------- //
     // ----- Interpolations ----- //
     // -------------------------- //
+    bool Trajectory::GetInContactInterp(double time, const std::string &frame) {
+        const auto node = GetNode(time);
+        if (node.has_value()) {
+            return in_contact_[node.value()][force_frames_[frame]];
+        } else {
+            throw std::runtime_error("Trajectory::GetInContact : invalid time!");
+        }
+    }
+
+
     void Trajectory::GetConfigInterp(double time, vectorx_t& q_out) {
         if (time < 0) {
             std::cerr << "Interpolation time < 0! Returning 0!" << std::endl;

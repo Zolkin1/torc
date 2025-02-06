@@ -8,9 +8,9 @@
 
 namespace torc::mpc {
     ForwardKinematicsCost::ForwardKinematicsCost(int first_node, int last_node, const std::string &name,
-        const vectorx_t &weights, const std::filesystem::path &deriv_lib_path, bool compile_derivs,
+        int var_size, const std::filesystem::path &deriv_lib_path, bool compile_derivs,
         const models::FullOrderRigidBody &model, const std::vector<std::string>& frames)
-            : Cost(first_node, last_node, name, weights), model_(model), nq_(model.GetConfigDim()),
+            : Cost(first_node, last_node, name), model_(model), nq_(model.GetConfigDim()),
             nv_(model.GetVelDim()) {
 
         for (const auto& frame : frames) {
@@ -19,20 +19,20 @@ namespace torc::mpc {
                     std::placeholders::_2, std::placeholders::_3),
                 name_ + "_" + frame + "_forward_kinematics_cost",
                 deriv_lib_path,
-                torc::ad::DerivativeOrder::FirstOrder, model.GetVelDim(), model.GetConfigDim() + 3 + weights.size(),
+                torc::ad::DerivativeOrder::FirstOrder, model.GetVelDim(), model.GetConfigDim() + 3 + var_size,
                 compile_derivs
                 ));
         }
     }
 
     std::pair<matrixx_t, vectorx_t> ForwardKinematicsCost::GetQuadraticApprox(const vectorx_t &x_lin, const vectorx_t &p,
-        const std::string& frame) {
+        const vectorx_t& weight, const std::string& frame) {
         if (x_lin.size() != nq_ || p.size() != 3) {
             throw std::runtime_error("[Cost Function] configuration approx reference or target has the wrong size!");
         }
 
         vectorx_t ad_p(cost_functions_[frame]->GetParameterSize());
-        ad_p << x_lin, p, weights_;
+        ad_p << x_lin, p, weight;
 
         matrixx_t hessian_term;
         vectorx_t linear_term;
@@ -48,14 +48,15 @@ namespace torc::mpc {
         return {hessian_term, linear_term};
     }
 
-    double ForwardKinematicsCost::GetCost(const std::string& frame, const vectorx_t &x, const vectorx_t &dx, const vectorx_t &p) {
+    double ForwardKinematicsCost::GetCost(const std::string& frame, const vectorx_t &x, const vectorx_t &dx,
+        const vectorx_t &p, const vectorx_t& weight) {
         vectorx_t x_ad(cost_functions_[frame]->GetDomainSize());
         x_ad << dx;
 
         vectorx_t y;
 
         vectorx_t p_ad(cost_functions_[frame]->GetParameterSize());
-        p_ad << x, p, weights_;
+        p_ad << x, p, weight;
 
         cost_functions_[frame]->GetFunctionValue(x_ad, p_ad, y);
         return y.squaredNorm();

@@ -48,6 +48,7 @@ namespace torc::mpc {
             traj_.SetConfiguration(i, q);
             for (const auto& frame : settings_.contact_frames) {
                 traj_.SetForce(i, frame, GetForceTarget(i, frame));
+                traj_.SetInContact(i, frame, true);
             }
         }
 
@@ -58,6 +59,34 @@ namespace torc::mpc {
         q_target_.SetAllData(traj_.GetConfiguration(0));
 
         alpha_ = 1;
+
+        for (int i = 0; i < settings_.cost_data.size(); i++) {
+            if (settings_.cost_data[i].type == CostTypes::Configuration) {
+                fo_config_idx_ = i;
+            }
+            if (settings_.cost_data[i].type == CostTypes::VelocityTracking) {
+                fo_vel_idx_ = i;
+            }
+            if (settings_.cost_data[i].type == CostTypes::TorqueReg) {
+                fo_tau_idx_ = i;
+            }
+            if (settings_.cost_data[i].type == CostTypes::ForceReg) {
+                fo_force_idx_ = i;
+            }
+            if (settings_.cost_data[i].type == CostTypes::ForwardKinematics) {
+                frame_tracking_idx_ = i;
+            }
+            if (settings_.cost_data[i].type == CostTypes::CentroidalConfiguration) {
+                cent_config_idx_ = i;
+            }
+            if (settings_.cost_data[i].type == CostTypes::CentroidalVelocity) {
+                cent_vel_idx_ = i;
+            }
+            if (settings_.cost_data[i].type == CostTypes::CentroidalForce) {
+                cent_force_idx_ = i;
+            }
+        }
+
     }
 
     void HpipmMpc::SetDynamicsConstraints(DynamicsConstraint constraints) {
@@ -160,7 +189,6 @@ namespace torc::mpc {
 
             // Dynamics Constraints
             if (node < settings_.nodes) {
-                // TODO: verify all of these mats (again)
                 if (node < dynamics_constraint_->GetLastNode() - 1 && node < settings_.nodes - 1) {
                     // std::cerr << "Adding FO dynamics..." << std::endl;
                     dynamics_constraint_->GetLinDynamics(
@@ -421,7 +449,9 @@ namespace torc::mpc {
 
             if (vel_tracking_->IsInNodeRange(node)) {
                 const auto [hess, lin]
-                    = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node));
+                    = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node),
+                        dynamics_constraint_->IsInNodeRange(node) ?
+                            settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
 
                 if (dynamics_constraint_->IsInNodeRange(node)) {
                     qp[node].Q.bottomRightCorner(nv_, nv_) = hess;
@@ -429,14 +459,13 @@ namespace torc::mpc {
                 } else {
                     qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
                     qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
-                    qp[node].R.topLeftCorner(ntau_, ntau_) = hess.bottomRightCorner(ntau_, ntau_);
-                    qp[node].r.head(ntau_) = lin.tail(ntau_);
                 }
             }
 
             if (tau_tracking_->IsInNodeRange(node) && dynamics_constraint_->IsInNodeRange(node)) {
                 const auto [hess, lin]
-                    = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node));
+                    = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
+                        settings_.cost_data[fo_tau_idx_].weight);
 
                 qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
                 qp[node].r.head(ntau_) = lin;
@@ -447,7 +476,9 @@ namespace torc::mpc {
                 for (const auto& frame : settings_.contact_frames) {
                     const auto [hess, lin]
                         = force_tracking_->GetQuadraticApprox(
-                            traj_.GetForce(node, frame), GetForceTarget(node, frame));
+                            traj_.GetForce(node, frame), GetForceTarget(node, frame),
+                            dynamics_constraint_->IsInNodeRange(node) ?
+                            settings_.cost_data[fo_force_idx_].weight : settings_.cost_data[cent_force_idx_].weight);
                     qp[node].R.block<CONTACT_3DOF, CONTACT_3DOF>(block_idx, block_idx) = hess;
                     qp[node].r.segment<CONTACT_3DOF>(block_idx) = lin;
                     block_idx += CONTACT_3DOF;
@@ -456,7 +487,9 @@ namespace torc::mpc {
 
             if (config_tracking_->IsInNodeRange(node)) {
                 const auto [hess, lin] =
-                    config_tracking_->GetQuadraticApprox(traj_.GetConfiguration(node), GetConfigTarget(node));
+                    config_tracking_->GetQuadraticApprox(traj_.GetConfiguration(node), GetConfigTarget(node),
+                    dynamics_constraint_->IsInNodeRange(node) ?
+                        settings_.cost_data[fo_config_idx_].weight : settings_.cost_data[cent_config_idx_].weight);
                 qp[node].Q.topLeftCorner(nv_, nv_) = hess;
                 qp[node].q.head(nv_) = lin;
             }
@@ -465,7 +498,8 @@ namespace torc::mpc {
                 for (const auto& frame : settings_.contact_frames) {
                     const auto [hess, lin] = fk_cost_->GetQuadraticApprox(
                         traj_.GetConfiguration(node),
-                        GetEndEffectorTarget(node, frame), frame);
+                        GetEndEffectorTarget(node, frame),
+                        settings_.cost_data[frame_tracking_idx_].weight, frame);
                     // std::cout << "node: " << node << " hess:\n" << hess << std::endl;
                     // std::cout << "lin: " << lin.transpose() << std::endl;
                     // std::cout << "target: " << GetEndEffectorTarget(node, frame).transpose() << std::endl;
@@ -473,6 +507,12 @@ namespace torc::mpc {
                     qp[node].q.head(nv_) += lin;
                 }
             }
+
+            qp[node].Q *= settings_.dt[node];
+            qp[node].q *= settings_.dt[node];
+            qp[node].R *= settings_.dt[node];
+            qp[node].r *= settings_.dt[node];
+            qp[node].S *= settings_.dt[node];
 
             // std::cout << "node: " << node << std::endl;
             // std::cout << "Q:\n" << qp[node].Q << std::endl;
@@ -483,25 +523,33 @@ namespace torc::mpc {
 
         // Terminal cost
         int node = settings_.nodes - 1;
-        const auto [hess, lin]
-            = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node));
-        qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
-        qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
+        if (dynamics_constraint_->IsInNodeRange(node)) {
+            const auto [hess, lin]
+                = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node),
+                        dynamics_constraint_->IsInNodeRange(node) ?
+                        settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
+            qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
+            qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
+        }
 
         const auto [hessq, linq] =
-                    config_tracking_->GetQuadraticApprox(traj_.GetConfiguration(node), GetConfigTarget(node));
+                    config_tracking_->GetQuadraticApprox(traj_.GetConfiguration(node), GetConfigTarget(node),
+                    dynamics_constraint_->IsInNodeRange(node) ?
+                    settings_.cost_data[fo_config_idx_].weight : settings_.cost_data[cent_config_idx_].weight);
         qp[node].Q.topLeftCorner(nv_, nv_) = hessq;
         qp[node].q.head(nv_) = linq;
 
-        // for (const auto& frame : settings_.contact_frames) {
-        //     const auto [hess, lin] = fk_cost_->GetQuadraticApprox(traj_.GetConfiguration(node),
-        //         GetEndEffectorTarget(node, frame), frame);
-        //     qp[node].Q.topLeftCorner(nv_, nv_) += hess;
-        //     qp[node].q.head(nv_) += lin;
-        // }
+        for (const auto& frame : settings_.contact_frames) {
+            const auto [hess, lin] = fk_cost_->GetQuadraticApprox(
+                traj_.GetConfiguration(node),
+                GetEndEffectorTarget(node, frame),
+                settings_.cost_data[frame_tracking_idx_].weight, frame);
+            qp[node].Q.topLeftCorner(nv_, nv_) += hess;
+            qp[node].q.head(nv_) += lin;
+        }
 
-        qp[node].Q *= settings_.terminal_weight;
-        qp[node].q *= settings_.terminal_weight;
+        qp[node].Q *= settings_.terminal_weight*settings_.dt[node];
+        qp[node].q *= settings_.terminal_weight*settings_.dt[node];
     }
 
 
@@ -530,7 +578,6 @@ namespace torc::mpc {
                 n_other_constraints += polytope_->GetNumConstraints();
                 n_slack += polytope_->GetNumConstraints();
             }
-            // TODO: Add other constraints
 
             if (node < dynamics_constraint_->GetLastNode() - 1) {
                 nx1 = nv_ + nv_;
@@ -740,8 +787,11 @@ namespace torc::mpc {
         // std::cout << "Post LS constraint violation: " << constraint_vio << std::endl;
         // std::cout << "Post LS cost: " << cost << std::endl;
 
-        ConvertQpSolToTraj(alpha_);   // TODO: add alpha term here
+        ConvertQpSolToTraj(alpha_);
         traj_out = traj_;
+
+        // Make the first torque target what we are currently applying to prevent too much jumping
+        // tau_target_[0] = traj_.GetTau(2);
 
         if (settings_.verbose) {
             PrintNodeInfo();
@@ -919,6 +969,7 @@ namespace torc::mpc {
                 for (int node = 0; node < settings_.nodes; node++) {
                     if (sched.InContact(frame, time)) {
                         in_contact_[frame][node] = 1;
+                        traj_.SetInContact(node, frame, true);
 
                         contact_idx = sched.GetContactIndex(frame, time);
 
@@ -930,6 +981,7 @@ namespace torc::mpc {
                         // std::cout << "[MPC] time: " << time << ", b: " << (contact_info_[frame][node].b_ + polytope_delta).transpose() << std::endl;
                     } else {
                         in_contact_[frame][node] = 0;
+                        traj_.SetInContact(node, frame, false);
 
                         contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
 
@@ -1209,28 +1261,42 @@ namespace torc::mpc {
 
             if (node < settings_.nodes - 1) {
                 if (vel_tracking_->IsInNodeRange(node)) {
-                    cost += vel_tracking_->GetCost(traj_.GetVelocity(node), dv, GetVelocityTarget(node));
+                    cost += settings_.dt[node]*vel_tracking_->GetCost(traj_.GetVelocity(node), dv, GetVelocityTarget(node),
+                    dynamics_constraint_->IsInNodeRange(node) ?
+                    settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
                 }
 
                 if (tau_tracking_->IsInNodeRange(node) && dynamics_constraint_->IsInNodeRange(node)) {
-                    cost += tau_tracking_->GetCost(traj_.GetTau(node), dtau, GetTauTarget(node));
+                    cost += settings_.dt[node]*tau_tracking_->GetCost(traj_.GetTau(node), dtau, GetTauTarget(node),
+                        settings_.cost_data[fo_tau_idx_].weight);
                 }
 
                 if (force_tracking_->IsInNodeRange(node)) {
                     int f_idx = 0;
                     for (const auto& frame : settings_.contact_frames) {
-                        cost += force_tracking_->GetCost(traj_.GetForce(node, frame),
-                            df.segment<CONTACT_3DOF>(f_idx), GetForceTarget(node, frame));
+                        cost += settings_.dt[node]*force_tracking_->GetCost(traj_.GetForce(node, frame),
+                            df.segment<CONTACT_3DOF>(f_idx), GetForceTarget(node, frame),
+                            dynamics_constraint_->IsInNodeRange(node) ?
+                            settings_.cost_data[fo_force_idx_].weight : settings_.cost_data[cent_force_idx_].weight);
                         f_idx += CONTACT_3DOF;
                     }
                 }
 
                 if (config_tracking_->IsInNodeRange(node)) {
-                    cost += config_tracking_->GetCost(traj_.GetConfiguration(node), dq, GetConfigTarget(node));
+                    cost += settings_.dt[node]*config_tracking_->GetCost(traj_.GetConfiguration(node), dq,
+                        GetConfigTarget(node),
+                        dynamics_constraint_->IsInNodeRange(node) ?
+                        settings_.cost_data[fo_config_idx_].weight : settings_.cost_data[cent_config_idx_].weight);
                 }
             } else {
-                cost += settings_.terminal_weight*vel_tracking_->GetCost(traj_.GetVelocity(node), dv, GetVelocityTarget(node));
-                cost += settings_.terminal_weight*config_tracking_->GetCost(traj_.GetConfiguration(node), dq, GetConfigTarget(node));
+                cost += settings_.dt[node]*settings_.terminal_weight*vel_tracking_->GetCost(
+                    traj_.GetVelocity(node), dv, GetVelocityTarget(node),
+                    dynamics_constraint_->IsInNodeRange(node) ?
+                        settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
+                cost += settings_.dt[node]*settings_.terminal_weight*config_tracking_->GetCost(
+                    traj_.GetConfiguration(node), dq, GetConfigTarget(node),
+                    dynamics_constraint_->IsInNodeRange(node) ?
+                        settings_.cost_data[fo_config_idx_].weight : settings_.cost_data[cent_config_idx_].weight);
             }
         }
 

@@ -7,24 +7,25 @@
 #include "pinocchio_interface.h"
 
 namespace torc::mpc {
-    ConfigTrackingCost::ConfigTrackingCost(int start_node, int last_node, const std::string& name, const vectorx_t &weights,
+    ConfigTrackingCost::ConfigTrackingCost(int start_node, int last_node, const std::string& name, int var_size,
         const std::filesystem::path &deriv_lib_path, bool compile_derivs, const models::FullOrderRigidBody& model)
-    : Cost(start_node, last_node, name, weights), nq_(model.GetConfigDim()), nv_(model.GetVelDim()), var_size_(weights.size()) {
+    : Cost(start_node, last_node, name), nq_(model.GetConfigDim()), nv_(model.GetVelDim()) {
         cost_function_ = std::make_unique<ad::CppADInterface>(
             std::bind(&ConfigTrackingCost::CostFunction, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
             name_ + "_nonlinear_ls_cost",
             deriv_lib_path,
-            torc::ad::DerivativeOrder::FirstOrder, model.GetVelDim(), 2*model.GetConfigDim() + weights.size(),
+            torc::ad::DerivativeOrder::FirstOrder, model.GetVelDim(), 2*model.GetConfigDim() + var_size,
             compile_derivs);
     }
 
-    std::pair<matrixx_t, vectorx_t> ConfigTrackingCost::GetQuadraticApprox(const vectorx_t &x_lin, const vectorx_t &p) {
+    std::pair<matrixx_t, vectorx_t> ConfigTrackingCost::GetQuadraticApprox(const vectorx_t &x_lin, const vectorx_t &p,
+        const vectorx_t& weight) {
         if (x_lin.size() != nq_ || p.size() != nq_) {
             throw std::runtime_error("[Cost Function] configuration approx reference or target has the wrong size!");
         }
 
         vectorx_t ad_p(cost_function_->GetParameterSize());
-        ad_p << x_lin, p, weights_;
+        ad_p << x_lin, p, weight;
 
         matrixx_t hessian_term;
         vectorx_t linear_term;
@@ -40,14 +41,14 @@ namespace torc::mpc {
         return {hessian_term, linear_term};
     }
 
-    double ConfigTrackingCost::GetCost(const vectorx_t &x, const vectorx_t &dx, const vectorx_t &p) const {
+    double ConfigTrackingCost::GetCost(const vectorx_t &x, const vectorx_t &dx, const vectorx_t &p, const vectorx_t& weight) const {
         vectorx_t x_ad(cost_function_->GetDomainSize());
         x_ad << dx;
 
         vectorx_t y;
 
         vectorx_t p_ad(cost_function_->GetParameterSize());
-        p_ad << x, p, weights_;
+        p_ad << x, p, weight;
 
         cost_function_->GetFunctionValue(x_ad, p_ad, y);
         return y.squaredNorm();

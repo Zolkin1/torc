@@ -157,6 +157,16 @@ namespace torc::mpc {
         std::unique_ptr<LinearLsCost> tau_tracking_;
         std::unique_ptr<LinearLsCost> force_tracking_;
         std::unique_ptr<ForwardKinematicsCost> fk_cost_;
+        int fo_config_idx_;
+        int fo_vel_idx_;
+        int fo_force_idx_;
+        int fo_tau_idx_;
+
+        int cent_config_idx_;
+        int cent_vel_idx_;
+        int cent_force_idx_;
+
+        int frame_tracking_idx_;
 
         // TODO: Consider allowing this to vary by node
         SimpleTrajectory v_target_;

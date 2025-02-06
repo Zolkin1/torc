@@ -15,7 +15,7 @@ namespace torc::mpc {
 
     class Cost {
     public:
-        Cost(int first_node, int last_node, const std::string &name, const vectorx_t& weights);
+        Cost(int first_node, int last_node, const std::string &name);
 
         int GetFirstNode() const;
         int GetLastNode() const;
@@ -23,13 +23,10 @@ namespace torc::mpc {
 
         virtual bool IsInNodeRange(int node) const;
 
-        vectorx_t GetWeights() const;
     protected:
         int first_node_;
         int last_node_;
         std::string name_;
-
-        vectorx_t weights_;
     private:
     };
 }

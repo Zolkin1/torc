@@ -317,6 +317,12 @@ namespace torc::mpc {
                     cost_data[idx].type = CostTypes::ForceReg;
                 } else if (type == "ForwardKinematics") {
                     cost_data[idx].type = CostTypes::ForwardKinematics;
+                } else if (type == "CentroidalConfiguration") {
+                    cost_data[idx].type = CostTypes::CentroidalConfiguration;
+                } else if (type == "CentroidalVelocity") {
+                    cost_data[idx].type = CostTypes::CentroidalVelocity;
+                } else if (type == "CentroidalForce") {
+                    cost_data[idx].type = CostTypes::CentroidalForce;
                 } else {
                     throw std::runtime_error("Provided cost type does not exist!");
                 }

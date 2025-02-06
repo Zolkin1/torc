@@ -42,5 +42,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(osqp-cpp)
 target_link_libraries(Wbc PUBLIC osqp-cpp)
 
+#----------- YAML ----------- #
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG 0.8.0 # note all other versions are of the form yaml-cpp-x.y.z
+)
+FetchContent_MakeAvailable(yaml-cpp)
+
+target_link_libraries(Wbc PUBLIC yaml-cpp::yaml-cpp)
+
 # ------- Utils ------ #
 target_link_libraries(Wbc PUBLIC Utils)

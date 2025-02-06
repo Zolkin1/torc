@@ -38,6 +38,9 @@ namespace torc::mpc {
         ForceReg,
         ForwardKinematics,
         FootPolytope,
+        CentroidalConfiguration,
+        CentroidalVelocity,
+        CentroidalForce,
     };
 
     /**

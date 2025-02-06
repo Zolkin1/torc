@@ -19,7 +19,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/pelvis.STL"/>
+        <mesh filename="package://g1_model/meshes/pelvis.STL"/>
       </geometry>
       <material name="dark">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -35,7 +35,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/pelvis_contour_link.STL"/>
+        <mesh filename="package://g1_model/meshes/pelvis_contour_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -44,7 +44,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/pelvis_contour_link.STL"/>
+        <mesh filename="package://g1_model/meshes/pelvis_contour_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -64,7 +64,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hip_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hip_pitch_link.STL"/>
       </geometry>
       <material name="dark">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -73,7 +73,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hip_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hip_pitch_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -82,7 +82,7 @@
     <parent link="pelvis"/>
     <child link="left_hip_pitch_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.5307" upper="2.8798" effort="88" velocity="32"/>
+    <limit lower="-2.5307" upper="2.8798" effort="88" velocity="12"/>
   </joint>
   <link name="left_hip_roll_link">
     <inertial>
@@ -93,7 +93,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hip_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hip_roll_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -102,7 +102,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hip_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hip_roll_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -111,7 +111,7 @@
     <parent link="left_hip_pitch_link"/>
     <child link="left_hip_roll_link"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-0.5236" upper="2.9671" effort="88" velocity="32"/>
+    <limit lower="-0.5236" upper="2.9671" effort="88" velocity="12"/>
   </joint>
   <link name="left_hip_yaw_link">
     <inertial>
@@ -122,7 +122,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hip_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hip_yaw_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -131,7 +131,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hip_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hip_yaw_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -140,7 +140,7 @@
     <parent link="left_hip_roll_link"/>
     <child link="left_hip_yaw_link"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.7576" upper="2.7576" effort="88" velocity="32"/>
+    <limit lower="-2.7576" upper="2.7576" effort="88" velocity="12"/>
   </joint>
   <link name="left_knee_link">
     <inertial>
@@ -151,7 +151,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_knee_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_knee_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -160,7 +160,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_knee_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_knee_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -169,7 +169,7 @@
     <parent link="left_hip_yaw_link"/>
     <child link="left_knee_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-0.087267" upper="2.8798" effort="139" velocity="20"/>
+    <limit lower="-0.087267" upper="2.8798" effort="139" velocity="12"/>
   </joint>
   <link name="left_ankle_pitch_link">
     <inertial>
@@ -180,7 +180,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_ankle_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_ankle_pitch_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -189,7 +189,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_ankle_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_ankle_pitch_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -198,7 +198,7 @@
     <parent link="left_knee_link"/>
     <child link="left_ankle_pitch_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-0.87267" upper="0.5236" effort="50" velocity="37"/>
+    <limit lower="-0.87267" upper="0.5236" effort="50" velocity="12"/>
   </joint>
   <link name="left_ankle_roll_link">
     <inertial>
@@ -209,7 +209,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_ankle_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_ankle_roll_link.STL"/>
       </geometry>
       <material name="dark">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -245,11 +245,10 @@
     <parent link="left_ankle_pitch_link"/>
     <child link="left_ankle_roll_link"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-0.2618" upper="0.2618" effort="50" velocity="37"/>
+    <limit lower="-0.2618" upper="0.2618" effort="50" velocity="12"/>
   </joint>
 
   <!-- Left Foot contact frames -->
-  <!-- TODO: Consider adding two more contacts -->
   <link name="left_toe"/>
   <joint name="left_toe_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.12 0 -0.03"/>
@@ -264,6 +263,35 @@
     <child link="left_heel"/>
   </joint>
 
+
+  <link name="ll_toe"/>
+  <joint name="ll_toe_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.12 0.03 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="ll_toe"/>
+  </joint>
+
+  <link name="lr_toe"/>
+  <joint name="lr_toe_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.12 -0.03 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="lr_toe"/>
+  </joint>
+
+  <link name="ll_heel"/>
+  <joint name="ll_heel_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.05 0.025 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="ll_heel"/>
+  </joint>
+
+  <link name="lr_heel"/>
+  <joint name="lr_heel_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.05 -0.025 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="lr_heel"/>
+  </joint>
+
   <!-- Right Leg -->
   <link name="right_hip_pitch_link">
     <inertial>
@@ -274,7 +302,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hip_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hip_pitch_link.STL"/>
       </geometry>
       <material name="dark">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -283,7 +311,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hip_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hip_pitch_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -292,7 +320,7 @@
     <parent link="pelvis"/>
     <child link="right_hip_pitch_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.5307" upper="2.8798" effort="88" velocity="32"/>
+    <limit lower="-2.5307" upper="2.8798" effort="88" velocity="12"/>
   </joint>
   <link name="right_hip_roll_link">
     <inertial>
@@ -303,7 +331,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hip_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hip_roll_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -312,7 +340,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hip_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hip_roll_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -321,7 +349,7 @@
     <parent link="right_hip_pitch_link"/>
     <child link="right_hip_roll_link"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-2.9671" upper="0.5236" effort="88" velocity="32"/>
+    <limit lower="-2.9671" upper="0.5236" effort="88" velocity="12"/>
   </joint>
   <link name="right_hip_yaw_link">
     <inertial>
@@ -332,7 +360,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hip_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hip_yaw_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -341,7 +369,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hip_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hip_yaw_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -350,7 +378,7 @@
     <parent link="right_hip_roll_link"/>
     <child link="right_hip_yaw_link"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.7576" upper="2.7576" effort="88" velocity="32"/>
+    <limit lower="-2.7576" upper="2.7576" effort="88" velocity="12"/>
   </joint>
   <link name="right_knee_link">
     <inertial>
@@ -361,7 +389,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_knee_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_knee_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -370,7 +398,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_knee_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_knee_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -379,7 +407,7 @@
     <parent link="right_hip_yaw_link"/>
     <child link="right_knee_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-0.087267" upper="2.8798" effort="139" velocity="20"/>
+    <limit lower="-0.087267" upper="2.8798" effort="139" velocity="12"/>
   </joint>
   <link name="right_ankle_pitch_link">
     <inertial>
@@ -390,7 +418,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_ankle_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_ankle_pitch_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -399,7 +427,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_ankle_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_ankle_pitch_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -408,7 +436,7 @@
     <parent link="right_knee_link"/>
     <child link="right_ankle_pitch_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-0.87267" upper="0.5236" effort="50" velocity="37"/>
+    <limit lower="-0.87267" upper="0.5236" effort="50" velocity="12"/>
   </joint>
   <link name="right_ankle_roll_link">
     <inertial>
@@ -419,7 +447,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_ankle_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_ankle_roll_link.STL"/>
       </geometry>
       <material name="dark">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -455,11 +483,10 @@
     <parent link="right_ankle_pitch_link"/>
     <child link="right_ankle_roll_link"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-0.2618" upper="0.2618" effort="50" velocity="37"/>
+    <limit lower="-0.2618" upper="0.2618" effort="50" velocity="12"/>
   </joint>
 
   <!-- Right Foot contact frames -->
-  <!-- TODO: Consider adding two more contacts -->
   <link name="right_toe"/>
   <joint name="right_toe_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.12 0 -0.03"/>
@@ -474,6 +501,36 @@
     <child link="right_heel"/>
   </joint>
 
+
+  <link name="rl_toe"/>
+  <joint name="rl_toe_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.12 0.03 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="rl_toe"/>
+  </joint>
+
+  <link name="rr_toe"/>
+  <joint name="rr_toe_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.12 -0.03 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="rr_toe"/>
+  </joint>
+
+  <link name="rl_heel"/>
+  <joint name="rl_heel_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.05 0.025 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="rl_heel"/>
+  </joint>
+
+  <link name="rr_heel"/>
+  <joint name="rr_heel_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.05 -0.025 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="rr_heel"/>
+  </joint>
+
+
   <!-- Torso -->
   <link name="waist_yaw_link">
     <inertial>
@@ -484,7 +541,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/waist_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/waist_yaw_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -496,7 +553,7 @@
     <parent link="pelvis"/>
     <child link="waist_yaw_link"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.618" upper="2.618" effort="88" velocity="32"/>
+    <limit lower="-2.618" upper="2.618" effort="88" velocity="12"/>
   </joint>
   <link name="waist_roll_link">
     <inertial>
@@ -507,7 +564,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/waist_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/waist_roll_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -519,7 +576,7 @@
     <parent link="waist_yaw_link"/>
     <child link="waist_roll_link"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-0.52" upper="0.52" effort="50" velocity="37"/>
+    <limit lower="-0.52" upper="0.52" effort="50" velocity="12"/>
   </joint>
   <link name="torso_link">
     <inertial>
@@ -530,7 +587,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/torso_link.STL"/>
+        <mesh filename="package://g1_model/meshes/torso_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -539,7 +596,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/torso_link.STL"/>
+        <mesh filename="package://g1_model/meshes/torso_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -548,7 +605,7 @@
     <parent link="waist_roll_link"/>
     <child link="torso_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-0.52" upper="0.52" effort="50" velocity="37"/>
+    <limit lower="-0.52" upper="0.52" effort="50" velocity="12"/>
   </joint>
 
   <!-- LOGO -->
@@ -566,7 +623,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/logo_link.STL"/>
+        <mesh filename="package://g1_model/meshes/logo_link.STL"/>
       </geometry>
       <material name="dark">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -575,7 +632,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/logo_link.STL"/>
+        <mesh filename="package://g1_model/meshes/logo_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -590,7 +647,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/head_link.STL"/>
+        <mesh filename="package://g1_model/meshes/head_link.STL"/>
       </geometry>
       <material name="dark">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -599,7 +656,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/head_link.STL"/>
+        <mesh filename="package://g1_model/meshes/head_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -619,7 +676,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/waist_support_link.STL"/>
+        <mesh filename="package://g1_model/meshes/waist_support_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -628,7 +685,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/waist_support_link.STL"/>
+        <mesh filename="package://g1_model/meshes/waist_support_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -672,7 +729,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_shoulder_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_shoulder_pitch_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -690,7 +747,7 @@
     <parent link="torso_link"/>
     <child link="left_shoulder_pitch_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-3.0892" upper="2.6704" effort="25" velocity="37"/>
+    <limit lower="-3.0892" upper="2.6704" effort="25" velocity="12"/>
   </joint>
   <link name="left_shoulder_roll_link">
     <inertial>
@@ -701,7 +758,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_shoulder_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_shoulder_roll_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -719,7 +776,7 @@
     <parent link="left_shoulder_pitch_link"/>
     <child link="left_shoulder_roll_link"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-1.5882" upper="2.2515" effort="25" velocity="37"/>
+    <limit lower="-1.5882" upper="2.2515" effort="25" velocity="12"/>
   </joint>
   <link name="left_shoulder_yaw_link">
     <inertial>
@@ -730,7 +787,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_shoulder_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_shoulder_yaw_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -739,7 +796,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_shoulder_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_shoulder_yaw_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -748,7 +805,7 @@
     <parent link="left_shoulder_roll_link"/>
     <child link="left_shoulder_yaw_link"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.618" upper="2.618" effort="25" velocity="37"/>
+    <limit lower="-2.618" upper="2.618" effort="25" velocity="12"/>
   </joint>
   <link name="left_elbow_link">
     <inertial>
@@ -759,7 +816,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_elbow_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_elbow_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -768,7 +825,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_elbow_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_elbow_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -777,14 +834,14 @@
     <parent link="left_shoulder_yaw_link"/>
     <child link="left_elbow_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.0472" upper="2.0944" effort="25" velocity="37"/>
+    <limit lower="-1.0472" upper="2.0944" effort="25" velocity="12"/>
   </joint>
   <joint name="left_wrist_roll_joint" type="revolute">
     <origin xyz="0.100 0.00188791 -0.010" rpy="0 0 0"/>
     <axis xyz="1 0 0"/>
     <parent link="left_elbow_link"/>
     <child link="left_wrist_roll_link"/>
-    <limit effort="25" velocity="37" lower="-1.972222054" upper="1.972222054"/>
+    <limit effort="25" velocity="12" lower="-1.972222054" upper="1.972222054"/>
   </joint>
   <link name="left_wrist_roll_link">
     <inertial>
@@ -795,7 +852,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_wrist_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_wrist_roll_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -804,7 +861,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_wrist_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_wrist_roll_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -824,7 +881,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_wrist_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_wrist_pitch_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -833,7 +890,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_wrist_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_wrist_pitch_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -853,7 +910,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_wrist_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_wrist_yaw_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -862,7 +919,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_wrist_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_wrist_yaw_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -880,7 +937,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_palm_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_palm_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -889,7 +946,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_palm_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_palm_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -909,7 +966,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_thumb_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_thumb_0_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -918,7 +975,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_thumb_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_thumb_0_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -938,7 +995,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_thumb_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_thumb_1_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -967,7 +1024,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_thumb_2_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_thumb_2_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -976,7 +1033,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_thumb_2_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_thumb_2_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -996,7 +1053,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_middle_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_middle_0_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1005,7 +1062,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_middle_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_middle_0_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1025,7 +1082,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_middle_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_middle_1_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1034,7 +1091,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_middle_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_middle_1_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1054,7 +1111,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_index_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_index_0_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1063,7 +1120,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_index_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_index_0_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1083,7 +1140,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_index_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_index_1_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1092,7 +1149,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/left_hand_index_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/left_hand_index_1_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1105,7 +1162,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_shoulder_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_shoulder_pitch_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1123,7 +1180,7 @@
     <parent link="torso_link"/>
     <child link="right_shoulder_pitch_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-3.0892" upper="2.6704" effort="25" velocity="37"/>
+    <limit lower="-3.0892" upper="2.6704" effort="25" velocity="12"/>
   </joint>
   <link name="right_shoulder_roll_link">
     <inertial>
@@ -1134,7 +1191,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_shoulder_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_shoulder_roll_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1152,7 +1209,7 @@
     <parent link="right_shoulder_pitch_link"/>
     <child link="right_shoulder_roll_link"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-2.2515" upper="1.5882" effort="25" velocity="37"/>
+    <limit lower="-2.2515" upper="1.5882" effort="25" velocity="12"/>
   </joint>
   <link name="right_shoulder_yaw_link">
     <inertial>
@@ -1163,7 +1220,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_shoulder_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_shoulder_yaw_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1172,7 +1229,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_shoulder_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_shoulder_yaw_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1181,7 +1238,7 @@
     <parent link="right_shoulder_roll_link"/>
     <child link="right_shoulder_yaw_link"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.618" upper="2.618" effort="25" velocity="37"/>
+    <limit lower="-2.618" upper="2.618" effort="25" velocity="12"/>
   </joint>
   <link name="right_elbow_link">
     <inertial>
@@ -1192,7 +1249,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_elbow_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_elbow_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1201,7 +1258,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_elbow_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_elbow_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1210,14 +1267,14 @@
     <parent link="right_shoulder_yaw_link"/>
     <child link="right_elbow_link"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.0472" upper="2.0944" effort="25" velocity="37"/>
+    <limit lower="-1.0472" upper="2.0944" effort="25" velocity="12"/>
   </joint>
   <joint name="right_wrist_roll_joint" type="revolute">
     <origin xyz="0.100 -0.00188791 -0.010" rpy="0 0 0"/>
     <axis xyz="1 0 0"/>
     <parent link="right_elbow_link"/>
     <child link="right_wrist_roll_link"/>
-    <limit effort="25" velocity="37" lower="-1.972222054" upper="1.972222054"/>
+    <limit effort="25" velocity="12" lower="-1.972222054" upper="1.972222054"/>
   </joint>
   <link name="right_wrist_roll_link">
     <inertial>
@@ -1228,7 +1285,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_wrist_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_wrist_roll_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1237,7 +1294,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_wrist_roll_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_wrist_roll_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1257,7 +1314,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_wrist_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_wrist_pitch_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1266,7 +1323,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_wrist_pitch_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_wrist_pitch_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1286,7 +1343,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_wrist_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_wrist_yaw_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1295,7 +1352,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_wrist_yaw_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_wrist_yaw_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1313,7 +1370,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_palm_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_palm_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1322,7 +1379,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_palm_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_palm_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1342,7 +1399,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_thumb_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_thumb_0_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1351,7 +1408,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_thumb_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_thumb_0_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1371,7 +1428,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_thumb_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_thumb_1_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1400,7 +1457,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_thumb_2_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_thumb_2_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1409,7 +1466,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_thumb_2_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_thumb_2_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1429,7 +1486,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_middle_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_middle_0_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1438,7 +1495,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_middle_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_middle_0_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1458,7 +1515,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_middle_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_middle_1_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1467,7 +1524,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_middle_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_middle_1_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1487,7 +1544,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_index_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_index_0_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1496,7 +1553,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_index_0_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_index_0_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -1516,7 +1573,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_index_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_index_1_link.STL"/>
       </geometry>
       <material name="white">
         <color rgba="0.7 0.7 0.7 1"/>
@@ -1525,7 +1582,7 @@
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="/home/zolkin/AmberLab/Project-Locomotion-MPC/locomotion-mpc/configurations/robots/meshes/g1/right_hand_index_1_link.STL"/>
+        <mesh filename="package://g1_model/meshes/right_hand_index_1_link.STL"/>
       </geometry>
     </collision>
   </link>

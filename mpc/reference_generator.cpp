@@ -34,8 +34,7 @@ namespace torc::mpc {
         }
     }
 
-    // TODO: I still get some IK errors when traveling around 1m/s. Need to investigate
-
+    // TODO: Clean up!
     // TODO: Consider modulating the commanded velocity and position dependent on the polytopes.
     //  e.g. if we are asked to walk off a polytope and no other polytope is selected then we should modulate the position
     //  and velocity to keep the body in the polytope, which will make the optimization easier. Just need to be careful
@@ -47,6 +46,8 @@ namespace torc::mpc {
         const std::vector<double>& hip_offsets,
         const ContactSchedule& contact_schedule,
         std::map<std::string, std::vector<vector3_t>>& des_foot_pos) {
+        // std::cerr << "In reference generator!" << std::endl;
+
         if (hip_offsets.size() != 2*contact_frames_.size()) {
             throw std::runtime_error("Hip offsets size != 2*contact_frames_.size()");
         }
@@ -57,6 +58,8 @@ namespace torc::mpc {
         std::map<std::string, std::vector<double>> contact_midtimes;
         std::vector<vector3_t> contact_base_positions;
         std::vector<vector3_t> ik_base_positions(nodes_);
+
+        // std::cerr << "About to start contact mid times!" << std::endl;
         // -------------------------------------------------- //
         // -------------------------------------------------- //
         // Compute contact mid point times
@@ -64,6 +67,8 @@ namespace torc::mpc {
         // -------------------------------------------------- //
         const auto& contact_map = contact_schedule.GetScheduleMap();
         for (const auto& [frame, swings] : contact_map) {
+            // std::cerr << "Frame: " << frame << std::endl;
+            // std::cerr << "swings[0]: " << swings[0].second << " first: " << swings[0].first << std::endl;
             contact_midtimes.insert({frame, {}});
 
             double swing_time = swings[0].second - swings[0].first;
@@ -85,6 +90,7 @@ namespace torc::mpc {
             //     std::cout << time << " ";
             // }
             // std::cout << std::endl;
+            // std::cerr << "Starting debug checks!" << std::endl;
 
             // DEBUG CHECK
             if (contact_schedule.GetPolytopes(frame).size() != contact_midtimes[frame].size()) {
@@ -151,6 +157,9 @@ namespace torc::mpc {
                     //     + q_command.head<2>());
                     contact_foot_pos[frame].emplace_back(R.topLeftCorner<2,2>()*hip_offset.head<2>().head<2>() + q_command.head<2>());
 
+                    // TODO: Put back!
+                    // TODO: Need to use the MPC desired trajectory I think rather than the commanded traj
+                    //  As it is right now, I get oscillations but the MPC is commanding the velocities seen as error
                     // Raibert Heuristic
                     if (i == 0) {
                         // For now just in the plane

@@ -103,24 +103,24 @@ int main() {
     // --------------------------------- //
     // ---------- Velocity Tracking ---------- //
     std::cout << settings.cost_data.at(1).weight.transpose() << std::endl;
-    LinearLsCost vel_tracking(0, settings.nodes, "vel_tracking", settings.cost_data.at(1).weight,
-        settings.deriv_lib_path, settings.compile_derivs);
+    LinearLsCost vel_tracking(0, settings.nodes, "vel_tracking",
+        settings.deriv_lib_path, settings.compile_derivs, settings.cost_data.at(1).weight.size());
 
     // ---------- Tau Tracking ---------- //
-    LinearLsCost tau_tracking(0, settings.nodes, "tau_tracking", settings.cost_data.at(2).weight,
-        settings.deriv_lib_path, settings.compile_derivs);
+    LinearLsCost tau_tracking(0, settings.nodes, "tau_tracking",
+        settings.deriv_lib_path, settings.compile_derivs, settings.cost_data.at(2).weight.size());
 
     // ---------- Force Tracking ---------- //
-    LinearLsCost force_tracking(0, settings.nodes, "force_tracking", settings.cost_data.at(3).weight,
-        settings.deriv_lib_path, settings.compile_derivs);
+    LinearLsCost force_tracking(0, settings.nodes, "force_tracking",
+        settings.deriv_lib_path, settings.compile_derivs, settings.cost_data.at(3).weight.size());
 
     // ---------- Config Tracking ---------- //
-    ConfigTrackingCost config_tracking(0, settings.nodes, "config_tracking", settings.cost_data.at(0).weight,
+    ConfigTrackingCost config_tracking(0, settings.nodes, "config_tracking", settings.cost_data.at(0).weight.size(),
         settings.deriv_lib_path, settings.compile_derivs, g1);
 
     // ---------- Forward Kinematics Tracking ---------- //
     // For now they all need the same weight
-    ForwardKinematicsCost fk_cost(0, settings.nodes, "fk_cost", settings.cost_data.at(4).weight,
+    ForwardKinematicsCost fk_cost(0, settings.nodes, "fk_cost", settings.cost_data.at(4).weight.size(),
         settings.deriv_lib_path, settings.compile_derivs, g1, settings.contact_frames);
 
     // --------------------------------- //

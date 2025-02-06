@@ -114,6 +114,7 @@ namespace torc::mpc {
         // Intermediate values
         // TODO: Do I need to account for the different local frames somehow?
         ad::ad_vector_t a(vel_dim_);
+        // TODO: At least add the v2 joint velocities for linearization!
         a << (vkp1base_curr - vk_curr.head<FLOATING_VEL>())/dt, vectorx_t::Zero(vel_dim_ - FLOATING_VEL);
 
         std::vector<models::ExternalForce<ad::adcg_t>> f_ext;

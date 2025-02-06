@@ -4,6 +4,9 @@
 
 #ifndef WBC_CONTROLLER_H
 #define WBC_CONTROLLER_H
+
+#include <fstream>
+
 #include "osqp++.h"
 
 #include "cpp_ad_interface.h"
@@ -11,18 +14,42 @@
 
 namespace torc::controller {
     using vectorx_t = Eigen::VectorXd;
+    using vector3_t = Eigen::Vector3d;
     using vector4_t = Eigen::Vector4d;
     using matrixx_t = Eigen::MatrixXd;
     using matrix6_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
 
+    class WbcSettings {
+        public:
+        WbcSettings(const std::filesystem::path& config_file);
+
+        vectorx_t base_weight, joint_weight, tau_weight, force_weight;
+        vectorx_t kp, kd;
+        bool verbose;
+        std::vector<std::string> tracking_frames_;
+        std::vector<vector3_t> tracking_weights_;
+        std::vector<vector3_t> tracking_kp;
+        std::vector<vector3_t> tracking_kd;
+
+        std::vector<std::string> skip_joints;
+        std::vector<double> joint_values;
+        std::vector<std::string> contact_frames;
+
+        bool log;
+        int log_period;
+
+        bool compile_derivs;
+        double alpha;
+    };
+
     class WbcController {
     public:
         WbcController(const models::FullOrderRigidBody& model, const std::vector<std::string>& contact_frames,
-            const vectorx_t& base_weight, const vectorx_t& joint_weight,
-            const vectorx_t& tau_weight, const vectorx_t& force_weight,
-            const vectorx_t& kp, const vectorx_t& kd,
+            WbcSettings settings,
             double friction_coef, bool verbose,
             const std::filesystem::path deriv_lib_path, bool compile_derivs);
+
+        ~WbcController();
 
         vectorx_t ComputeControl(const vectorx_t& q, const vectorx_t& v,
             const vectorx_t& q_des, const vectorx_t& v_des, const vectorx_t& tau_des, const vectorx_t& F_des,
@@ -40,22 +67,33 @@ namespace torc::controller {
 
         std::pair<matrixx_t, vectorx_t> StateTracking(const vectorx_t& q, const vectorx_t& v, const vectorx_t& q_des, const vectorx_t& v_des);
 
-        std::pair<matrixx_t, vectorx_t> TorqueTracking(const vectorx_t& tau_des) const;
+        std::pair<matrixx_t, vectorx_t> TorqueTracking(const vectorx_t& tau_des);
 
-        std::pair<matrixx_t, vectorx_t> ForceTracking(const vectorx_t& F_des) const;
+        std::pair<matrixx_t, vectorx_t> ForceTracking(const vectorx_t& F_des);
+
+        std::pair<matrixx_t, vectorx_t> FrameTracking(const vectorx_t& q, const vectorx_t& v,
+            const vectorx_t& q_des, const vectorx_t& v_des, const std::vector<bool>& in_contact);
+
+        void FrameTrackingFunction(const std::string& frame,
+            const ad::ad_vector_t& a, const ad::ad_vector_t& q_v_kp_kd, ad::ad_vector_t& violation);
 
         void DynamicsFunction(const ad::ad_vector_t& a_tau_F, const ad::ad_vector_t& q_v, ad::ad_vector_t& violation);
 
+        void LogEigenVec(const vectorx_t& vec);
+
         bool verbose_;
 
-        vectorx_t kp_, kd_;
-        vectorx_t base_weight_, joint_weight_, tau_weight_, force_weight_;
+        WbcSettings settings_;
+
+        // vectorx_t kp_, kd_;
+        // vectorx_t base_weight_, joint_weight_, tau_weight_, force_weight_;
         double mu_;
 
         // Model
         std::vector<std::string> contact_frames_;
         models::FullOrderRigidBody model_;
         pinocchio::Data pin_data_;
+        int nq_;
         int nv_;
         int ntau_;
         int nF_;
@@ -72,9 +110,14 @@ namespace torc::controller {
 
         // Autodiff
         std::unique_ptr<ad::CppADInterface> inverse_dynamics_;
+        // std::map<std::string, std::unique_ptr<ad::CppADInterface>> frame_tracking_;
 
         static constexpr int FLOATING_VEL = 6;
         static constexpr int CONTACT_3DOF = 3;
+
+        // Logging
+        unsigned long solve_count_;
+        std::ofstream log_file_;
     private:
     };
 }
