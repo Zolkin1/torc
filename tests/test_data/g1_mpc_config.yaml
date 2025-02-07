@@ -6,7 +6,7 @@ general_settings:
   node_group_2_n: 27
   node_dt_1: 0.015
   node_dt_2: 0.025
-  compile_derivatives: False #True
+  compile_derivatives: False
   base_frame: "pelvis"
   scale_cost: False
   max_initial_solves: 20

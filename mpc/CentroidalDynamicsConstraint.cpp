@@ -25,8 +25,8 @@ namespace torc::mpc {
                 std::placeholders::_2, std::placeholders::_3),
             name_ + "_centroidal_dynamics_constraint",
             deriv_lib_path,
-            ad::DerivativeOrder::FirstOrder, 2*vel_dim_ + FLOATING_VEL + CONTACT_3DOF*num_contacts_,
-            1 + config_dim_ + vel_dim_ + FLOATING_VEL + CONTACT_3DOF*num_contacts_,
+            ad::DerivativeOrder::FirstOrder, 2*vel_dim_ + vel_dim_ + CONTACT_3DOF*num_contacts_,
+            1 + config_dim_ + vel_dim_ + vel_dim_ + CONTACT_3DOF*num_contacts_,
             compile_derivs
         );
 
@@ -47,7 +47,7 @@ namespace torc::mpc {
         vectorx_t x_zero = vectorx_t::Zero(dynamics_function_->GetDomainSize());
 
         vectorx_t p(dynamics_function_->GetParameterSize());
-        p << q1_lin, v1_lin, v2_lin.head<FLOATING_VEL>(), force_lin, dt;
+        p << q1_lin, v1_lin, v2_lin, force_lin, dt;
 
         matrixx_t dyn_jac;
         dynamics_function_->GetJacobian(x_zero, p, dyn_jac);
@@ -74,6 +74,7 @@ namespace torc::mpc {
         b.setZero();
 
 
+        // TODO: Investigate this again
         matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, FLOATING_VEL).inverse();
         matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
 
@@ -90,32 +91,32 @@ namespace torc::mpc {
     }
 
     void CentroidalDynamicsConstraint::CentroidalInverseDynamics(const std::vector<std::string> &frames,
-        const ad::ad_vector_t &dqk_dvk_dvkp1base_dfk, const ad::ad_vector_t &qk_vk_vkp1base_fk_dt,
+        const ad::ad_vector_t &dqk_dvk_dvkp1_dfk, const ad::ad_vector_t &qk_vk_vkp1_fk_dt,
         ad::ad_vector_t &violation) {
         // Decision variables
-        const ad::ad_vector_t& dqk = dqk_dvk_dvkp1base_dfk.head(vel_dim_);
-        const ad::ad_vector_t& dvk = dqk_dvk_dvkp1base_dfk.segment(vel_dim_, vel_dim_);
-        const ad::ad_vector_t& dvkp1base = dqk_dvk_dvkp1base_dfk.segment(2*vel_dim_, FLOATING_VEL);
-        const ad::ad_vector_t& dfk = dqk_dvk_dvkp1base_dfk.segment(2*vel_dim_ + FLOATING_VEL, CONTACT_3DOF*num_contacts_);
+        const ad::ad_vector_t& dqk = dqk_dvk_dvkp1_dfk.head(vel_dim_);
+        const ad::ad_vector_t& dvk = dqk_dvk_dvkp1_dfk.segment(vel_dim_, vel_dim_);
+        const ad::ad_vector_t& dvkp1 = dqk_dvk_dvkp1_dfk.segment(2*vel_dim_, vel_dim_);
+        const ad::ad_vector_t& dfk = dqk_dvk_dvkp1_dfk.segment(2*vel_dim_ + vel_dim_, CONTACT_3DOF*num_contacts_);
 
         // Reference trajectory
-        const ad::ad_vector_t& qk = qk_vk_vkp1base_fk_dt.head(config_dim_);
-        const ad::ad_vector_t& vk = qk_vk_vkp1base_fk_dt.segment(config_dim_, vel_dim_);
-        const ad::ad_vector_t& vkp1base = qk_vk_vkp1base_fk_dt.segment(config_dim_ + vel_dim_, FLOATING_VEL);
-        const ad::ad_vector_t& fk = qk_vk_vkp1base_fk_dt.segment(config_dim_ + vel_dim_ + FLOATING_VEL, CONTACT_3DOF*num_contacts_);
-        const ad::adcg_t& dt = qk_vk_vkp1base_fk_dt(config_dim_ + vel_dim_ + FLOATING_VEL + CONTACT_3DOF*num_contacts_);
+        const ad::ad_vector_t& qk = qk_vk_vkp1_fk_dt.head(config_dim_);
+        const ad::ad_vector_t& vk = qk_vk_vkp1_fk_dt.segment(config_dim_, vel_dim_);
+        const ad::ad_vector_t& vkp1 = qk_vk_vkp1_fk_dt.segment(config_dim_ + vel_dim_, vel_dim_);
+        const ad::ad_vector_t& fk = qk_vk_vkp1_fk_dt.segment(config_dim_ + vel_dim_ + vel_dim_, CONTACT_3DOF*num_contacts_);
+        const ad::adcg_t& dt = qk_vk_vkp1_fk_dt(config_dim_ + vel_dim_ + vel_dim_ + CONTACT_3DOF*num_contacts_);
 
         // Current values
         const ad::ad_vector_t qk_curr = models::ConvertdqToq(dqk, qk);
         const ad::ad_vector_t vk_curr = dvk + vk;
-        const ad::ad_vector_t vkp1base_curr = dvkp1base + vkp1base;
+        const ad::ad_vector_t vkp1_curr = dvkp1 + vkp1;
         const ad::ad_vector_t fk_curr = dfk + fk;
 
         // Intermediate values
         // TODO: Do I need to account for the different local frames somehow?
         ad::ad_vector_t a(vel_dim_);
         // TODO: At least add the v2 joint velocities for linearization!
-        a << (vkp1base_curr - vk_curr.head<FLOATING_VEL>())/dt, vectorx_t::Zero(vel_dim_ - FLOATING_VEL);
+        a << (vkp1_curr - vk_curr)/dt; //(vkp1base_curr - vk_curr.head<FLOATING_VEL>())/dt, vectorx_t::Zero(vel_dim_ - FLOATING_VEL);
 
         std::vector<models::ExternalForce<ad::adcg_t>> f_ext;
         int idx = 0;
@@ -178,23 +179,35 @@ namespace torc::mpc {
         const vectorx_t &dq1, const vectorx_t &dq2, const vectorx_t &dv1, const vectorx_t &dv2,
         const vectorx_t &dforce) {
 
-        vectorx_t q_eval = models::ConvertdqToq(dq1, q1_lin);
-        vectorx_t v_eval = (v1_lin + dv1);
-        vectorx_t tau_eval = vectorx_t::Zero(vel_dim_); // TODO: is this what I want?
-        vectorx_t force_eval = force_lin + dforce;
-        pinocchio::Data data(model_.GetModel());
+        // vectorx_t q_eval = models::ConvertdqToq(dq1, q1_lin);
+        // vectorx_t v_eval = (v1_lin + dv1);
+        // vectorx_t tau_eval = vectorx_t::Zero(vel_dim_); // TODO: is this what I want?
+        // vectorx_t force_eval = force_lin + dforce;
+        // pinocchio::Data data(model_.GetModel());    // TODO: Make this elsewhere
+        //
+        // int idx = 0;
+        // std::vector<models::ExternalForce<double>> f_ext;
+        // for (const auto& frame : contact_frames_) {
+        //     f_ext.emplace_back(frame, force_eval.segment<CONTACT_3DOF>(idx));
+        //     idx += CONTACT_3DOF;
+        // }
+        //
+        // // TODO: This won't match with the centroidal dynamics model!
+        // vectorx_t a_pin = models::ForwardDynamics(model_.GetModel(), data, q_eval, v_eval, tau_eval, f_ext);
+        // vectorx_t cpp_dv2base = (dt*a_pin + v_eval - v2_lin).head<FLOATING_VEL>();
+        //
+        // vectorx_t dyn_vio = dv2.head<FLOATING_VEL>() - cpp_dv2base;
 
-        int idx = 0;
-        std::vector<models::ExternalForce<double>> f_ext;
-        for (const auto& frame : contact_frames_) {
-            f_ext.emplace_back(frame, force_eval.segment<CONTACT_3DOF>(idx));
-            idx += CONTACT_3DOF;
-        }
+        vectorx_t x_dyn(dynamics_function_->GetDomainSize());
+        x_dyn << dq1, dv1, vectorx_t::Zero(vel_dim_), dforce;
 
-        vectorx_t a_pin = models::ForwardDynamics(model_.GetModel(), data, q_eval, v_eval, tau_eval, f_ext);
-        vectorx_t cpp_dv2base = (dt*a_pin + v_eval - v2_lin).head<FLOATING_VEL>();
+        vectorx_t p_dyn(dynamics_function_->GetParameterSize());
+        p_dyn << q1_lin, v1_lin, v2_lin, force_lin, dt;
 
-        vectorx_t dyn_vio = dv2.head<FLOATING_VEL>() - cpp_dv2base;
+        vectorx_t y;
+        dynamics_function_->GetFunctionValue(x_dyn, p_dyn, y);
+        vectorx_t dyn_vio = y;    // Note that this violation is at a different scale than the optimization problem
+
 
         vectorx_t int_violation(integration_function_->GetRangeSize());
         vectorx_t x(integration_function_->GetDomainSize());
@@ -202,6 +215,7 @@ namespace torc::mpc {
         vectorx_t p(integration_function_->GetParameterSize());
         p << dt, q1_lin, q2_lin, v1_lin;
         integration_function_->GetFunctionValue(x, p, int_violation);
+
 
         return {int_violation, dyn_vio};
     }

@@ -280,7 +280,7 @@ int main() {
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
-    for (int i = 0; i < 250; i++) { // 50
+    for (int i = 0; i < 50; i++) { // 50
         cs.ShiftSwings(-0.01);
         vectorx_t q_traj, v_traj;
         traj.GetConfigInterp(0.01, q_traj);

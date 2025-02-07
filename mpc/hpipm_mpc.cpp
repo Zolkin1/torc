@@ -459,6 +459,9 @@ namespace torc::mpc {
                 } else {
                     qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
                     qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
+
+                    qp[node].R.topLeftCorner(ntau_, ntau_) = hess.bottomRightCorner(ntau_, ntau_);
+                    qp[node].r.head(ntau_) = lin.tail(ntau_);
                 }
             }
 
