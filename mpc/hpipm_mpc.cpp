@@ -87,6 +87,15 @@ namespace torc::mpc {
             }
         }
 
+        if (settings_.log) {
+            log_file_.open("hpipm_mpc_log.csv");
+        }
+    }
+
+    HpipmMpc::~HpipmMpc() {
+        if (settings_.log) {
+            log_file_.close();
+        }
     }
 
     void HpipmMpc::SetDynamicsConstraints(DynamicsConstraint constraints) {
@@ -324,8 +333,9 @@ namespace torc::mpc {
                     const auto [c_block, y_segment] =
                         swing_constraint_->GetLinearization(traj_.GetConfiguration(node), swing_traj_[frame][node], frame);
                     qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nv_) = c_block;
-                    qp[node].lg(ineq_row_idx) = -y_segment(0);
-                    qp[node].ug(ineq_row_idx) = -y_segment(0);
+                    // TODO: Consider removing the buffer
+                    qp[node].lg(ineq_row_idx) = -y_segment(0) - 0.005;  // Buffer
+                    qp[node].ug(ineq_row_idx) = -y_segment(0) + 0.005;  // Buffer
                     ineq_row_idx += y_segment.size();
                 }
             }
@@ -737,7 +747,7 @@ namespace torc::mpc {
     }
 
 
-    hpipm::HpipmStatus HpipmMpc::Compute(const vectorx_t &q0, const vectorx_t &v0, Trajectory& traj_out) {
+    hpipm::HpipmStatus HpipmMpc::Compute(double time, const vectorx_t &q0, const vectorx_t &v0, Trajectory& traj_out) {
         if (std::abs(q0.segment<4>(3).norm() - 1) > 1e-8) {
             std::cerr << "q: " << q0.transpose() << std::endl;
             throw std::runtime_error("Initial condition does not have a normalized quaternion!");
@@ -803,6 +813,27 @@ namespace torc::mpc {
         // if (res != hpipm::HpipmStatus::Success) {
         //     throw std::runtime_error("[Compute] MPC not successful!");
         // }
+
+        if (settings_.log) {
+            log_file_ << stats.iter << ",";
+            if (res == hpipm::HpipmStatus::Success) {
+                log_file_ << 1 << ",";
+            } else if (res == hpipm::HpipmStatus::MaxIterReached) {
+                log_file_ << 2 << ",";
+            } else if (res == hpipm::HpipmStatus::MinStepLengthReached) {
+                log_file_ << 3 << ",";
+            } else {
+                log_file_ << 4 << ",";
+            }
+
+            log_file_ << stats.obj[stats.obj.size()-2] << ",";
+            log_file_ << stats.max_res_stat << "," << stats.max_res_eq << "," << stats.max_res_ineq << "," <<
+                stats.max_res_comp << ",";
+            log_file_ << timer.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
+
+            // log_file_ <<
+            LogData(time, q0, v0);
+        }
 
         solve_counter_++;
 
@@ -1362,6 +1393,86 @@ namespace torc::mpc {
     std::map<std::string, std::vector<double> > HpipmMpc::GetSwingTrajectory() const {
         return swing_traj_;
     }
+
+    void HpipmMpc::LogData(double time, const vectorx_t &q, const vectorx_t &v) {
+        torc::utils::TORCTimer timer;
+        timer.Tic();
+        // Solve number
+        log_file_ << time << "," << solve_counter_ << "," << settings_.nodes << ",";
+
+        // Initial condition
+        LogEigenVec(q);
+        LogEigenVec(v);
+
+        // Computed traj & dt
+        for (int i = 0; i < settings_.nodes; i++) {
+            LogEigenVec(traj_.GetConfiguration(i));
+            LogEigenVec(traj_.GetVelocity(i));
+            LogEigenVec(traj_.GetTau(i));
+            for (const auto& frame : settings_.contact_frames) {
+                LogEigenVec(traj_.GetForce(i, frame));
+            }
+            log_file_ << settings_.dt[i] <<  ",";
+        }
+
+        // Contact status
+        for (int i = 0; i < settings_.nodes; i++) {
+            for (const auto& frame : settings_.contact_frames) {
+                log_file_ << in_contact_[frame][i] << ",";
+            }
+        }
+
+        // Swing traj
+        for (int i = 0; i < settings_.nodes; i++) {
+            for (const auto& frame : settings_.contact_frames) {
+                log_file_ << swing_traj_[frame][i] << ",";
+            }
+        }
+
+        // Current frame positions
+        for (const auto& frame : settings_.contact_frames) {
+            LogEigenVec(model_.GetFrameState(frame, q, v, pinocchio::WORLD).placement.translation().transpose());
+        }
+
+        // Current frame velocities
+        for (const auto& frame : settings_.contact_frames) {
+            LogEigenVec(model_.GetFrameState(frame, q, v, pinocchio::WORLD).vel.linear());
+        }
+
+        // Target frame positions
+        for (int i = 0; i < settings_.nodes; i++) {
+            for (const auto& frame : settings_.contact_frames) {
+                LogEigenVec(end_effector_targets_[frame][i]);
+            }
+        }
+
+        // Optimized frame positions
+        for (int i = 0; i < settings_.nodes; i++) {
+            for (const auto& frame : settings_.contact_frames) {
+                LogEigenVec(model_.GetFrameState(frame, traj_.GetConfiguration(i), traj_.GetVelocity(i),
+                    pinocchio::WORLD).placement.translation().transpose());
+            }
+        }
+
+        // Optimized frame velocities
+        for (int i = 0; i < settings_.nodes; i++) {
+            for (const auto& frame : settings_.contact_frames) {
+                LogEigenVec(model_.GetFrameState(frame, traj_.GetConfiguration(i), traj_.GetVelocity(i),
+                    pinocchio::WORLD).vel.linear());
+            }
+        }
+
+        log_file_ << std::endl;
+        timer.Toc();
+        std::cout << "Logging took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << " ms" << std::endl;
+    }
+
+    void HpipmMpc::LogEigenVec(const vectorx_t &x) {
+        for (int i = 0; i < x.size(); i++) {
+            log_file_ << x(i) << ",";
+        }
+    }
+
 
 
     void HpipmMpc::PrintNodeInfo() const {

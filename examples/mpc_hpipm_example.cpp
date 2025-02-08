@@ -224,9 +224,11 @@ int main() {
     std::cout << "q ic: " << q.transpose() << std::endl;
     std::cout << "v ic: " << v.transpose() << std::endl;
 
+    double time = 0;
+
     torc::utils::TORCTimer timer;
     timer.Tic();
-    mpc.Compute(q, v, traj);
+    mpc.Compute(time, q, v, traj);
     timer.Toc();
     std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
     traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output_1.csv");
@@ -286,7 +288,8 @@ int main() {
         traj.GetConfigInterp(0.01, q_traj);
         traj.GetVelocityInterp(0.01, v_traj);
         mpc.UpdateContactSchedule(cs);
-        mpc.Compute(q_traj, v_traj, traj);
+        time += 0.01;
+        mpc.Compute(time, q_traj, v_traj, traj);
     }
     mpc.PrintNodeInfo();
 

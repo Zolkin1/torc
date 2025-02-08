@@ -161,6 +161,8 @@ namespace torc::mpc {
             }
 
             terminal_weight = (general_settings["terminal_cost_weight"] ? general_settings["terminal_cost_weight"].as<double>() : 1.0);
+
+            log = (general_settings["log"] ? general_settings["log"].as<bool>() : true);
         }
     }
 
@@ -462,6 +464,7 @@ namespace torc::mpc {
             std::cout << "\tMax initial solves: " << max_initial_solves << std::endl;
             std::cout << "\tInitial constraint tolerance: " << initial_solve_tolerance << std::endl;
             std::cout << "\tNodes with full dynamics: " << nodes_full_dynamics << std::endl;
+            std::cout << "\tLogging: " << log << std::endl;
 
             std::cout << "Solver settings: " << std::endl;
             // std::cout << "\tRelative tolerance: " << osqp_settings_.eps_rel << std::endl;

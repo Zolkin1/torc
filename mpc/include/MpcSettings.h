@@ -92,6 +92,9 @@ namespace torc::mpc {
         vectorx_t q_target;
         vectorx_t v_target;
 
+        // Log
+        bool log;
+
     protected:
     private:
         fs::path config_file_;

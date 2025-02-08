@@ -56,6 +56,7 @@ namespace torc::mpc {
     class HpipmMpc {
     public:
         HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model);
+        ~HpipmMpc();
 
         void SetDynamicsConstraints(DynamicsConstraint constraint);
         void SetCentroidalDynamicsConstraints(CentroidalDynamicsConstraint constraint);
@@ -79,7 +80,8 @@ namespace torc::mpc {
         void CreateConstraints();
         void CreateCost();
 
-        hpipm::HpipmStatus Compute(const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
+        // NOTE: The time is just for logging purposes
+        hpipm::HpipmStatus Compute(double time, const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
 
         void SetConfigTarget(const SimpleTrajectory& q_target);
         void SetVelTarget(const SimpleTrajectory& v_target);
@@ -125,6 +127,10 @@ namespace torc::mpc {
         double GetPolytopeConvergence(const std::string& frame, double time, const ContactSchedule& cs) const;
 
     private:
+        void LogData(double time, const vectorx_t& q, const vectorx_t& v);
+
+        void LogEigenVec(const vectorx_t& x);
+
         void SetSizes();
 
         void NanCheck();
@@ -210,6 +216,9 @@ namespace torc::mpc {
         // Line search
         HpipmLineSearchCondition ls_condition_;
         double alpha_;
+
+        // Logging
+        std::ofstream log_file_;
 
     };
 }
