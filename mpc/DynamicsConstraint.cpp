@@ -929,51 +929,16 @@ namespace torc::mpc {
         vectorx_t tau_casadi = vectorx_t::Zero(vel_dim_);
         tau_casadi.tail(tau_dim_) = tau_lin;
 
-        vectorx_t dtau_casadi = vectorx_t::Zero(vel_dim_);
-        dtau_casadi.tail(tau_dim_) = dtau;
-
-        // std::vector<double> dq1_vec((size_t)model_.GetVelDim());
-        // Eigen::Map<Eigen::VectorXd>(dq1_vec.data(), model_.GetVelDim()) = dq1;
-        //
-        // std::vector<double> dv1_vec((size_t)model_.GetVelDim());
-        // Eigen::Map<Eigen::VectorXd>(dv1_vec.data(), model_.GetVelDim(), 1) = dv1;
-        //
-        // std::vector<double> dtau1_vec((size_t)model_.GetVelDim());
-        // Eigen::Map<Eigen::VectorXd>(dtau1_vec.data(), model_.GetVelDim(), 1) = dtau_casadi;
-        //
-        // std::vector<double> dF1_vec((size_t)(CONTACT_3DOF*num_contacts_));
-        // Eigen::Map<Eigen::VectorXd>(dF1_vec.data(), CONTACT_3DOF*num_contacts_, 1) = dforce;
-        //
-        //
-        // std::vector<double> q1_vec((size_t)model_.GetConfigDim());
-        // Eigen::Map<Eigen::VectorXd>(q1_vec.data(), model_.GetConfigDim(), 1) = q1_lin;
-        //
-        // std::vector<double> v1_vec((size_t)model_.GetVelDim());
-        // Eigen::Map<Eigen::VectorXd>(v1_vec.data(), model_.GetVelDim(), 1) = v1_lin;
-        //
-        // std::vector<double> v2_vec((size_t)model_.GetVelDim());
-        // Eigen::Map<Eigen::VectorXd>(v2_vec.data(), model_.GetVelDim(), 1) = v2_lin;
-        //
-        // std::vector<double> tau1_vec((size_t)model_.GetVelDim());
-        // Eigen::Map<Eigen::VectorXd>(tau1_vec.data(), model_.GetVelDim(), 1) = tau_casadi;
-        //
-        // std::vector<double> F1_vec((size_t)(CONTACT_3DOF*num_contacts_));
-        // Eigen::Map<Eigen::VectorXd>(F1_vec.data(), CONTACT_3DOF*num_contacts_, 1) = force_lin;
-        //
-        //
-        // // TODO: Should verify this against the C++
-        // casadi::DM dvkp1_res = (*casadi_dynamics_function_)(casadi::DMVector{dq1_vec, dv1_vec, dtau1_vec, dF1_vec,
-        //     q1_vec, v1_vec, v2_vec, tau1_vec, F1_vec, dt})[0];
-        // vectorx_t dvkp1 = Eigen::Map<vectorx_t>(
-        //   static_cast<std::vector<double>>(dvkp1_res).data(), model_.GetVelDim(), 1);
+        vectorx_t dtau_full = vectorx_t::Zero(vel_dim_);
+        dtau_full.tail(tau_dim_) = dtau;
 
 
         // Check against C++
         vectorx_t q_eval = models::ConvertdqToq(dq1, q1_lin);
         vectorx_t v_eval = (v1_lin + dv1);
-        vectorx_t tau_eval = (tau_casadi + dtau_casadi);
+        vectorx_t tau_eval = (tau_casadi + dtau_full);
         vectorx_t force_eval = force_lin + dforce;
-        pinocchio::Data data(model_.GetModel());
+        pinocchio::Data data(model_.GetModel());    // TODO: Do this elsewhere
 
         int idx = 0;
         std::vector<models::ExternalForce<double>> f_ext;
@@ -983,35 +948,10 @@ namespace torc::mpc {
         }
 
         vectorx_t a_pin = models::ForwardDynamics(model_.GetModel(), data, q_eval, v_eval, tau_eval, f_ext);
-        vectorx_t cpp_dv2 = dt*a_pin + v_eval - v2_lin;
+        vectorx_t check_dv2 = dt*a_pin + v_eval - v2_lin;
 
-        // vectorx_t xid(dynamics_function_->GetDomainSize());
-        // xid << dq1, dv1, dv2, dtau, dforce;
-        //
-        // vectorx_t pid(dynamics_function_->GetParameterSize());
-        //
-        // vectorx_t id_violation(dynamics_function_->GetRangeSize());
-        //
-        // pid << q1_lin, v1_lin, v2_lin, tau_lin, force_lin, dt;
-        // dynamics_function_->GetFunctionValue(xid, pid, id_violation);
+        vectorx_t dyn_vio = dv2 - check_dv2;
 
-        vectorx_t dyn_vio = dv2 - cpp_dv2;
-
-        if (!full_order_) {
-            dyn_vio.conservativeResize(FLOATING_VEL, Eigen::NoChange);
-        }
-
-        // std::cout << "FD vio: " << dyn_vio.transpose() << std::endl;
-        // std::cout << "ID vio: " << id_violation.transpose() << std::endl;
-
-        // std::cout << "v: " << v_eval.transpose() << std::endl;
-        // std::cout << "F: " << force_eval.transpose() << std::endl;
-        // std::cout << "tau: " << tau_eval.transpose() << std::endl;
-        // std::cout << "pin a: " << a_pin.transpose() << std::endl;
-        // std::cout << "Casadi dv2: " << dvkp1.transpose() << std::endl;
-        // std::cout << "C++ dv2: " << cpp_dv2.transpose() << std::endl;
-        // std::cout << "solution dv2: " << dv2.transpose() << std::endl;
-        // std::cout << "id vio: |" << id_violation.squaredNorm() << "| " << id_violation.transpose() << std::endl;
 
         vectorx_t int_violation(integration_function_->GetRangeSize());
         vectorx_t x(integration_function_->GetDomainSize());

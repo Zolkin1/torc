@@ -135,6 +135,8 @@ namespace torc::mpc {
 
         void NanCheck();
 
+        double SolutionGradientDot(const std::vector<hpipm::OcpQpSolution>& sol);
+
         std::vector<Constraint> constraints;
         MpcSettings settings_;
 

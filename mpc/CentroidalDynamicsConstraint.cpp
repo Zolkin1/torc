@@ -179,34 +179,42 @@ namespace torc::mpc {
         const vectorx_t &dq1, const vectorx_t &dq2, const vectorx_t &dv1, const vectorx_t &dv2,
         const vectorx_t &dforce) {
 
-        // vectorx_t q_eval = models::ConvertdqToq(dq1, q1_lin);
-        // vectorx_t v_eval = (v1_lin + dv1);
-        // vectorx_t tau_eval = vectorx_t::Zero(vel_dim_); // TODO: is this what I want?
-        // vectorx_t force_eval = force_lin + dforce;
-        // pinocchio::Data data(model_.GetModel());    // TODO: Make this elsewhere
-        //
-        // int idx = 0;
-        // std::vector<models::ExternalForce<double>> f_ext;
-        // for (const auto& frame : contact_frames_) {
-        //     f_ext.emplace_back(frame, force_eval.segment<CONTACT_3DOF>(idx));
-        //     idx += CONTACT_3DOF;
-        // }
-        //
-        // // TODO: This won't match with the centroidal dynamics model!
-        // vectorx_t a_pin = models::ForwardDynamics(model_.GetModel(), data, q_eval, v_eval, tau_eval, f_ext);
-        // vectorx_t cpp_dv2base = (dt*a_pin + v_eval - v2_lin).head<FLOATING_VEL>();
-        //
-        // vectorx_t dyn_vio = dv2.head<FLOATING_VEL>() - cpp_dv2base;
+        vectorx_t q_eval = models::ConvertdqToq(dq1, q1_lin);
+        vectorx_t v_eval = (v1_lin + dv1);
+        vectorx_t force_eval = force_lin + dforce;
+        pinocchio::Data data(model_.GetModel());    // TODO: Make this elsewhere
 
-        vectorx_t x_dyn(dynamics_function_->GetDomainSize());
-        x_dyn << dq1, dv1, vectorx_t::Zero(vel_dim_), dforce;
+        int idx = 0;
+        std::vector<models::ExternalForce<double>> f_ext;
+        for (const auto& frame : contact_frames_) {
+            f_ext.emplace_back(frame, force_eval.segment<CONTACT_3DOF>(idx));
+            idx += CONTACT_3DOF;
+        }
 
-        vectorx_t p_dyn(dynamics_function_->GetParameterSize());
-        p_dyn << q1_lin, v1_lin, v2_lin, force_lin, dt;
+        // Compute M
+        pinocchio::crba(model_.GetModel(), data, q_eval);
+        // Make M symmetric
+        data.M.triangularView<Eigen::StrictlyLower>() = data.M.transpose().triangularView<Eigen::StrictlyLower>();
 
-        vectorx_t y;
-        dynamics_function_->GetFunctionValue(x_dyn, p_dyn, y);
-        vectorx_t dyn_vio = y;    // Note that this violation is at a different scale than the optimization problem
+        // Compute nonlinear effects
+        pinocchio::nonLinearEffects(model_.GetModel(), data, q_eval, v_eval);
+
+        // Compute force Jacobians
+        matrixx_t J = matrixx_t::Zero(3*num_contacts_, vel_dim_);
+        for (int i = 0 ; i < num_contacts_; i++) {
+            matrixx_t Jtemp = matrixx_t::Zero(6, vel_dim_);
+            pinocchio::computeFrameJacobian(model_.GetModel(), data, q_eval,
+                model_.GetFrameIdx(contact_frames_[i]), pinocchio::LOCAL, Jtemp);
+            J.middleRows<3>(3*i) = Jtemp.topRows<3>();
+        }
+
+        // Compute acceleration for the centroidal dynamics
+        vectorx_t a_base = data.M.topLeftCorner<6,6>().inverse()*(-data.nle.head<6>() +
+            -data.M.block(0, 6, 6, vel_dim_ - FLOATING_VEL)*(v_eval - v2_lin).tail(vel_dim_ - FLOATING_VEL) +
+            J.transpose().topRows<6>()*force_eval);
+        vectorx_t dv2base = dt*a_base + (v_eval - v2_lin).head<FLOATING_VEL>();
+
+        vectorx_t dyn_vio = dv2.head<FLOATING_VEL>() - dv2base;
 
 
         vectorx_t int_violation(integration_function_->GetRangeSize());

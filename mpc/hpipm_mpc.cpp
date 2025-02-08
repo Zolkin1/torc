@@ -334,8 +334,8 @@ namespace torc::mpc {
                         swing_constraint_->GetLinearization(traj_.GetConfiguration(node), swing_traj_[frame][node], frame);
                     qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nv_) = c_block;
                     // TODO: Consider removing the buffer
-                    qp[node].lg(ineq_row_idx) = -y_segment(0) - 0.005;  // Buffer
-                    qp[node].ug(ineq_row_idx) = -y_segment(0) + 0.005;  // Buffer
+                    qp[node].lg(ineq_row_idx) = -y_segment(0) - 0.002;  // Buffer
+                    qp[node].ug(ineq_row_idx) = -y_segment(0) + 0.002;  // Buffer
                     ineq_row_idx += y_segment.size();
                 }
             }
@@ -795,10 +795,14 @@ namespace torc::mpc {
         std::cerr << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
         // Line Search
+        torc::utils::TORCTimer ls_timer;
+        ls_timer.Tic();
         // TODO: Line search almost never does anything. Just seems to take time, for now removing it.
-        // const auto [constraint_vio, cost] = LineSearch(solution_);
-        // std::cout << "Post LS constraint violation: " << constraint_vio << std::endl;
-        // std::cout << "Post LS cost: " << cost << std::endl;
+        const auto [constraint_vio, cost] = LineSearch(solution_);
+        std::cout << "Post LS constraint violation: " << constraint_vio << std::endl;
+        std::cout << "Post LS cost: " << cost << std::endl;
+        ls_timer.Toc();
+        std::cerr << "line search time: " << ls_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
         ConvertQpSolToTraj(alpha_);
         traj_out = traj_;
@@ -830,6 +834,7 @@ namespace torc::mpc {
             log_file_ << stats.max_res_stat << "," << stats.max_res_eq << "," << stats.max_res_ineq << "," <<
                 stats.max_res_comp << ",";
             log_file_ << timer.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
+            log_file_ << alpha_ << "," << constraint_vio << "," << cost << ",";
 
             // log_file_ <<
             LogData(time, q0, v0);
@@ -1106,25 +1111,23 @@ namespace torc::mpc {
             // std::cout << "node: " << node << std::endl;
             // std::cout << "x: " << sol[node].x.transpose() << std::endl;
 
-            if (node < dynamics_constraint_->GetLastNode() - 1 && node < settings_.nodes - 1) {
+            if (dynamics_constraint_->IsInNodeRange(node) && node < settings_.nodes - 1) {
 
                 vectorx_t dq2 = sol[node+1].x.head(nv_);
                 vectorx_t dv2 = sol[node+1].x.tail(nv_);
                 dq2 *= alpha;
                 dv2 *= alpha;
 
-                // TODO: Remove after debugging!
-                // dv *= 0;
-                // dtau *= 0;
-                // df *= 0;
-                // dq *= 0;
-                // dq2 *= 0;
-                // dv2 *= 0;
-
-                const auto[int_vio, dyn_vio] = dynamics_constraint_->GetViolation(traj_.GetConfiguration(node),
+                auto[int_vio, dyn_vio] =
+                    dynamics_constraint_->GetViolation(traj_.GetConfiguration(node),
                     traj_.GetConfiguration(node + 1), traj_.GetVelocity(node),
                     traj_.GetVelocity(node + 1), traj_.GetTau(node), force, settings_.dt[node],
                     dq, dq2, dv, dv2, dtau, df);
+
+                if (node == dynamics_constraint_->GetLastNode() - 1) {
+                    // Boundary dynamics
+                    dyn_vio.tail(nv_ - FLOATING_VEL).setZero();
+                }
 
                 // std::cout << "Dynamics vio: |" << dyn_vio.squaredNorm() << "| " << dyn_vio.transpose() << std::endl;
                 // std::cout << "Integration vio: |" << int_vio.squaredNorm() << "| " << int_vio.transpose() << std::endl;
@@ -1237,6 +1240,13 @@ namespace torc::mpc {
                     vectorx_t vio_vec = swing_constraint_->GetViolation(traj_.GetConfiguration(node), dq,
                         swing_traj_[frame][node], frame);
 
+                    // For the buffer
+                    if (std::abs(vio_vec(0)) > 0.002) {
+                        vio_vec(0) = std::abs(vio_vec(0)) - 0.002;
+                    } else {
+                        vio_vec(0) = 0;
+                    }
+
                     // std::cout << "[" << frame << "] Swing vio: |" << vio_vec.squaredNorm() << "| " << vio_vec(0) << std::endl;
                     violation += vio_vec.squaredNorm();
                 }
@@ -1265,7 +1275,16 @@ namespace torc::mpc {
 
         // std::cout << "Total violation: " << settings_.dt.back()*std::sqrt(violation) << std::endl;
 
-        return settings_.dt.back()*std::sqrt(violation);
+        // Compute average dt
+        double dt_avg = 0;
+        for (int i = 0; i < settings_.dt.size(); i++) {
+            dt_avg += settings_.dt[i];
+        }
+
+        dt_avg /= settings_.dt.size();
+
+
+        return dt_avg*std::sqrt(violation);
     }
 
     double HpipmMpc::GetCost(const std::vector<hpipm::OcpQpSolution> &sol, double alpha) {
@@ -1344,6 +1363,8 @@ namespace torc::mpc {
         double theta_k = GetConstraintViolation(sol, 0);
         double phi_k = GetCost(sol, 0);
 
+        std::cout << "sol grad dot: " << SolutionGradientDot(sol) << std::endl;
+
         while (alpha_ > settings_.ls_alpha_min) {
             double theta_kp1 = GetConstraintViolation(sol, alpha_);
 
@@ -1356,9 +1377,9 @@ namespace torc::mpc {
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
                 // TODO: Fix for the new solver
-            } else if (std::max(theta_k, theta_kp1) < settings_.ls_theta_min) { // && osqp_instance_.objective_vector.dot(qp_res) < 0) {   // TODO: Fix/put back
+            } else if (std::max(theta_k, theta_kp1) < settings_.ls_theta_min && SolutionGradientDot(sol) < 0) {
                 double phi_kp1 = GetCost(sol, alpha_);
-                if (phi_kp1 < (phi_k)) { // + settings_.ls_eta*alpha*osqp_instance_.objective_vector.dot(qp_res))) {    // TODO: Fix/put back
+                if (phi_kp1 < (phi_k) + settings_.ls_eta*alpha_*SolutionGradientDot(sol)) {    // TODO: Fix/put back
                     // ls_condition_ = CostReduction;
                     std::cout << "COST REDUCTION" << std::endl;
                     std::cout << "alpha = " << alpha_ << std::endl;
@@ -1379,6 +1400,15 @@ namespace torc::mpc {
         alpha_ = 0;
 
         return std::make_pair(theta_k, phi_k);
+    }
+
+    double HpipmMpc::SolutionGradientDot(const std::vector<hpipm::OcpQpSolution> &sol) {
+        double prod = 0;
+        for (int i = 0; i < settings_.nodes; i++) {
+            prod += qp[i].q.dot(sol[i].x) + qp[i].r.dot(sol[i].u);
+        }
+
+        return prod;
     }
 
 
