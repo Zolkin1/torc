@@ -12,7 +12,7 @@ namespace torc::mpc {
         const std::vector<std::string> &contact_frames, const std::string &name,
         const std::filesystem::path &deriv_lib_path, bool compile_derivs,
         int first_node, int last_node)
-            : Constraint(first_node, last_node, name), model_(model) {
+            : Constraint(first_node, last_node, name), model_(model), pin_data_(model.GetModel()) {
 
         vel_dim_ = model_.GetVelDim();
         config_dim_ = model_.GetConfigDim();
@@ -62,7 +62,6 @@ namespace torc::mpc {
         p.resize(integration_function_->GetParameterSize());
         p << dt, q1_lin, q2_lin, v1_lin;
 
-        // TODO: Think about if the violation that is returned is really the delta that we want
         matrixx_t int_jac;
         integration_function_->GetJacobian(x_zero, p, int_jac);
 
@@ -73,8 +72,6 @@ namespace torc::mpc {
         B.setZero();
         b.setZero();
 
-
-        // TODO: Investigate this again
         matrixx_t dv2_inv = dyn_jac.middleCols(2*vel_dim_, FLOATING_VEL).inverse();
         matrixx_t dq2_inv = int_jac.middleCols(vel_dim_, vel_dim_).inverse();
 
@@ -113,10 +110,9 @@ namespace torc::mpc {
         const ad::ad_vector_t fk_curr = dfk + fk;
 
         // Intermediate values
-        // TODO: Do I need to account for the different local frames somehow?
+        // TODO: Do I need to account for the different local frames somehow? This subtraction is technically in two different frames for the base
         ad::ad_vector_t a(vel_dim_);
-        // TODO: At least add the v2 joint velocities for linearization!
-        a << (vkp1_curr - vk_curr)/dt; //(vkp1base_curr - vk_curr.head<FLOATING_VEL>())/dt, vectorx_t::Zero(vel_dim_ - FLOATING_VEL);
+        a << (vkp1_curr - vk_curr)/dt;  // Uses the joint accelerations and accounts for the changes in the current joint accelerations and not the future ones.
 
         std::vector<models::ExternalForce<ad::adcg_t>> f_ext;
         int idx = 0;
@@ -182,7 +178,6 @@ namespace torc::mpc {
         vectorx_t q_eval = models::ConvertdqToq(dq1, q1_lin);
         vectorx_t v_eval = (v1_lin + dv1);
         vectorx_t force_eval = force_lin + dforce;
-        pinocchio::Data data(model_.GetModel());    // TODO: Make this elsewhere
 
         int idx = 0;
         std::vector<models::ExternalForce<double>> f_ext;
@@ -192,25 +187,25 @@ namespace torc::mpc {
         }
 
         // Compute M
-        pinocchio::crba(model_.GetModel(), data, q_eval);
+        pinocchio::crba(model_.GetModel(), pin_data_, q_eval);
         // Make M symmetric
-        data.M.triangularView<Eigen::StrictlyLower>() = data.M.transpose().triangularView<Eigen::StrictlyLower>();
+        pin_data_.M.triangularView<Eigen::StrictlyLower>() = pin_data_.M.transpose().triangularView<Eigen::StrictlyLower>();
 
         // Compute nonlinear effects
-        pinocchio::nonLinearEffects(model_.GetModel(), data, q_eval, v_eval);
+        pinocchio::nonLinearEffects(model_.GetModel(), pin_data_, q_eval, v_eval);
 
         // Compute force Jacobians
         matrixx_t J = matrixx_t::Zero(3*num_contacts_, vel_dim_);
         for (int i = 0 ; i < num_contacts_; i++) {
             matrixx_t Jtemp = matrixx_t::Zero(6, vel_dim_);
-            pinocchio::computeFrameJacobian(model_.GetModel(), data, q_eval,
+            pinocchio::computeFrameJacobian(model_.GetModel(), pin_data_, q_eval,
                 model_.GetFrameIdx(contact_frames_[i]), pinocchio::LOCAL, Jtemp);
             J.middleRows<3>(3*i) = Jtemp.topRows<3>();
         }
 
         // Compute acceleration for the centroidal dynamics
-        vectorx_t a_base = data.M.topLeftCorner<6,6>().inverse()*(-data.nle.head<6>() +
-            -data.M.block(0, 6, 6, vel_dim_ - FLOATING_VEL)*(v_eval - v2_lin).tail(vel_dim_ - FLOATING_VEL) +
+        vectorx_t a_base = pin_data_.M.topLeftCorner<6,6>().inverse()*(-pin_data_.nle.head<6>() +
+            -pin_data_.M.block(0, 6, 6, vel_dim_ - FLOATING_VEL)*(v_eval - v2_lin).tail(vel_dim_ - FLOATING_VEL) +
             J.transpose().topRows<6>()*force_eval);
         vectorx_t dv2base = dt*a_base + (v_eval - v2_lin).head<FLOATING_VEL>();
 

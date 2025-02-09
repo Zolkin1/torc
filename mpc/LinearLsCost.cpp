@@ -30,7 +30,7 @@ namespace torc::mpc {
         vectorx_t linear_term;
 
         vectorx_t p_ad(cost_function_->GetParameterSize());
-        p_ad << x_lin, p, weight; // TODO: Check to make sure this is filled in by here
+        p_ad << x_lin, p, weight;
 
         matrixx_t jac;
         cost_function_->GetJacobian(x_zero, p_ad, jac);

@@ -44,6 +44,7 @@ namespace torc::mpc {
         std::vector<std::string> contact_frames_;
 
         models::FullOrderRigidBody model_;
+        pinocchio::Data pin_data_;
         std::unique_ptr<ad::CppADInterface> dynamics_function_;
         std::unique_ptr<ad::CppADInterface> integration_function_;
 

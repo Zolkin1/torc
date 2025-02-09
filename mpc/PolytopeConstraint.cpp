@@ -19,7 +19,7 @@ namespace torc::mpc {
                     name_ + "_" + frame + "_holonomic_constraint",
                     deriv_lib_path,
                     ad::DerivativeOrder::FirstOrder, model_.GetVelDim(),  model_.GetConfigDim() + POLYTOPE_SIZE,
-                    true //compile_derivs // TODO: Put back
+                    compile_derivs
                 ));
         }
     }
@@ -94,45 +94,6 @@ namespace torc::mpc {
 
         poly_val.resize(POLYTOPE_SIZE/2);
         poly_val = A*frame_pos.head<2>();
-
-        // violation << frame_pos.head<2>(), -frame_pos.head<2>();
-        // violation = violation - b;
-
-        // vector2_t x_temp;
-        // x_temp << 1, 1;
-        // violation = A*x_temp - b;
-
-        // const ad::ad_vector_t& qkbar = qk_A_b.head(config_dim_);
-        // ad::ad_matrix_t A = ad::ad_matrix_t::Zero(POLYTOPE_SIZE, 2);
-        // // ad::ad_matrix_t A = ad::ad_matrix_t::Identity(POLYTOPE_SIZE, 2);
-        //
-        // for (int i = 0; i < POLYTOPE_SIZE/2; i++) {
-        //     A.row(i) = qk_A_b.segment<2>(config_dim_ + i*2).transpose();
-        // }
-        //
-        // A.bottomRows<POLYTOPE_SIZE/2>() = -A.topRows<POLYTOPE_SIZE/2>();
-        //
-        // ad::ad_vector_t b = qk_A_b.tail<POLYTOPE_SIZE>();        // ub then lb
-        // b.tail<POLYTOPE_SIZE/2>() = -b.tail<POLYTOPE_SIZE/2>();
-        //
-        // const ad::ad_vector_t q = torc::models::ConvertdqToq(dqk, qkbar);
-        //
-        // // Forward kinematics
-        // pinocchio::forwardKinematics(model_.GetADPinModel(), *model_.GetADPinData(), q);
-        // const long frame_idx = model_.GetFrameIdx(frame);
-        // pinocchio::updateFramePlacement(model_.GetADPinModel(), *model_.GetADPinData(), frame_idx);
-        //
-        // // Get frame position in world frame (data oMf)
-        // ad::ad_vector_t frame_pos = model_.GetADPinData()->oMf.at(frame_idx).translation();
-        //
-        // violation.resize(POLYTOPE_SIZE);
-        // violation = A*frame_pos.head<2>() - b;
-        // // violation << frame_pos.head<2>(), -frame_pos.head<2>();
-        // // violation = violation - b;
-        //
-        // // vector2_t x_temp;
-        // // x_temp << 1, 1;
-        // // violation = A*x_temp - b;
     }
 
 

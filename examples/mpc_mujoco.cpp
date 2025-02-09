@@ -190,7 +190,7 @@ int main(int argc, const char** argv) {
     // --------------------------------- //
     // ---------- FO Dynamics ---------- //
     DynamicsConstraint dynamics_constraints(g1, contact_frames, "g1_full_order",
-        deriv_lib_path, settings.compile_derivs, true, 0, settings.nodes_full_dynamics);
+        deriv_lib_path, settings.compile_derivs, 0, settings.nodes_full_dynamics);
 
     // ---------- Centroidal Dynamics ---------- //
     CentroidalDynamicsConstraint centroidal_dynamics(g1, settings.contact_frames, "g1_centroidal", settings.deriv_lib_path,

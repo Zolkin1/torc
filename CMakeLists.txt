@@ -19,7 +19,7 @@ if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-if(CMAKE_PROJECT_NAME STREQUAL torc AND BUILD_EXAMPLES)
+if(CMAKE_PROJECT_NAME STREQUAL torc)
     add_subdirectory(examples)
 endif()
 
@@ -27,7 +27,6 @@ add_subdirectory(models)
 add_subdirectory(auto_diff)
 add_subdirectory(mpc)
 add_subdirectory(utils)
-add_subdirectory(examples)
 add_subdirectory(whole_body_control)
 
 # TODO: Figure out the install structure for the library

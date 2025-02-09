@@ -20,7 +20,7 @@ namespace torc::mpc {
                     name_ + "_" + frame + "_holonomic_constraint",
                     deriv_lib_path,
                     ad::DerivativeOrder::FirstOrder, 2*model_.GetVelDim(),  model_.GetConfigDim() + model_.GetVelDim(),
-                    true //compile_derivs // TODO: Put back
+                    compile_derivs
                 ));
         }
     }
@@ -63,16 +63,12 @@ namespace torc::mpc {
 
         // Get the frame velocity
         const long frame_idx = model_.GetFrameIdx(frame);
-        // LOCAL frame seems to work a bit better, but there needs to be more testing
-        // TODO: Consider going back to LOCAL
-        // TODO: Consider going back to WORLD
+        // TODO: Figure out which frame to use. I think either one should work
         const ad::ad_vector_t vel = pinocchio::getFrameVelocity(model_.GetADPinModel(), *model_.GetADPinData(), frame_idx, pinocchio::LOCAL).linear();
-        // const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
 
         // TODO: In the future we will want to rotate this into the ground frame so the constraint is always tangential to the terrain
 
         // Violation is the velocity as we want to drive it to 0
-        // TODO: Consider going back to 3
         violation = vel.head<2>();
     }
 

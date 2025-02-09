@@ -74,7 +74,7 @@ namespace torc::mpc {
         quat_target.coeffs() = q_target.segment<4>(3);
         // Eigen's inverse has an if statement, so we can't use it in codegen
         quat_target = Eigen::Quaternion<torc::ad::adcg_t>(quat_target.conjugate().coeffs() / quat_target.squaredNorm());   // Assumes norm > 0
-        x_diff.segment<3>(3) = pinocchio::quaternion::log3(quat_target * q_quat);    // TODO: Double check
+        x_diff.segment<3>(3) = pinocchio::quaternion::log3(quat_target * q_quat);
 
         x_diff.tail(nv_ - 6) = q.tail(nq_ - 7) - q_target.tail(nq_ - 7);
 

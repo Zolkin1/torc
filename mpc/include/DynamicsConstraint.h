@@ -8,16 +8,13 @@
 #include "full_order_rigid_body.h"
 #include <filesystem>
 
-#include <casadi/casadi.hpp>
-// #include "/home/zolkin/AmberLab/Project-TORC/casadi_dynamics/aba_dynamics_dynamics_functions.h"
-
 namespace torc::mpc {
     namespace fs = std::filesystem;
     class DynamicsConstraint : public Constraint {
     public:
         DynamicsConstraint(const models::FullOrderRigidBody& model,
             const std::vector<std::string>& contact_frames, const std::string& name, const fs::path& deriv_lib_path,
-            bool compile_derivs, bool full_order,
+            bool compile_derivs,
             int first_node, int last_node);
 
         void GetLinDynamics(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
@@ -26,26 +23,14 @@ namespace torc::mpc {
 
         int GetNumConstraints() const override;
 
-        // These dynamics convert the full order model to the centroidal ones.
-        std::pair<matrixx_t, matrixx_t> GetBoundaryDynamics();
-
-        // bool IsInNodeRange(int node) const override;
-
         std::pair<vectorx_t, vectorx_t> GetViolation(const vectorx_t& q1_lin, const vectorx_t& q2_lin,
             const vectorx_t& v1_lin, const vectorx_t& v2_lin, const vectorx_t& tau_lin, const vectorx_t& force_lin,
             double dt, const vectorx_t& dq1, const vectorx_t& dq2,
             const vectorx_t& dv1, const vectorx_t& dv2, const vectorx_t& dtau, const vectorx_t& dforce);
 
     protected:
-        // Forward dynamics constraint
-        // void ForwardDynamics(const std::vector<std::string>& frames,
-        // const ad::ad_vector_t& dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t& qk_vk_vkp1_tauk_fk_dt, ad::ad_vector_t& violation);
         void InverseDynamics(const std::vector<std::string> &frames,
             const ad::ad_vector_t &dqk_dvk_dvkp1_dtauk_dfk, const ad::ad_vector_t &qk_vk_vkp1_tauk_fk_dt,
-            ad::ad_vector_t &violation);
-
-        void CentroidalInverseDynamics(const std::vector<std::string> &frames,
-            const ad::ad_vector_t &dqk_dvk_dvkp1base_dfk, const ad::ad_vector_t &qk_vk_vkp1base_fk_dt,
             ad::ad_vector_t &violation);
 
         void IntegrationConstraint(const ad::ad_vector_t& dqk_dqkp1_dvk,
@@ -56,17 +41,14 @@ namespace torc::mpc {
             double dt, const vectorx_t& dq1, const vectorx_t& dv1, const vectorx_t& dtau,
             const vectorx_t& dforce, matrixx_t& Jdq, matrixx_t& Jdv, matrixx_t& Jdtau, matrixx_t& JdF, vectorx_t& b);
 
-        int nx_;
-        int nu_;
         int vel_dim_;
         int config_dim_;
         int tau_dim_;
         int num_contacts_;
         std::vector<std::string> contact_frames_;
 
-        bool full_order_;
-
         models::FullOrderRigidBody model_;
+        pinocchio::Data pin_data_;
         std::unique_ptr<ad::CppADInterface> dynamics_function_;
         std::unique_ptr<ad::CppADInterface> integration_function_;
 
@@ -75,12 +57,6 @@ namespace torc::mpc {
         static constexpr int QUAT_VARS = 4;
         static constexpr int FLOATING_BASE = 7;
         static constexpr int FLOATING_VEL = 6;
-
-        std::unique_ptr<casadi::Function> casadi_dynamics_function_;
-        std::unique_ptr<casadi::Function> casadi_dq_jac_function_;
-        std::unique_ptr<casadi::Function> casadi_dv_jac_function_;
-        std::unique_ptr<casadi::Function> casadi_dtau_jac_function_;
-        std::unique_ptr<casadi::Function> casadi_dF_jac_function_;
 
     private:
     };
