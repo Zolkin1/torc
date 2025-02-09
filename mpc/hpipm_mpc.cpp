@@ -311,6 +311,7 @@ namespace torc::mpc {
                     qp[node].ug.segment(ineq_row_idx, lin_seg.size()) = -lin_seg;
 
                     qp[node].ug(ineq_row_idx + 4) += settings_.max_grf;  // Upper bounding just the z part
+                    qp[node].lg(ineq_row_idx + 4) += 10;    // Requiring minimum force into the ground
                     qp[node].lg.segment<5>(ineq_row_idx) *= in_contact_[settings_.contact_frames[contact]][node];
                     qp[node].ug.segment<5>(ineq_row_idx) *= in_contact_[settings_.contact_frames[contact]][node];
 
@@ -334,8 +335,8 @@ namespace torc::mpc {
                         swing_constraint_->GetLinearization(traj_.GetConfiguration(node), swing_traj_[frame][node], frame);
                     qp[node].C.block(ineq_row_idx, 0, y_segment.size(), nv_) = c_block;
                     // TODO: Consider removing the buffer
-                    qp[node].lg(ineq_row_idx) = -y_segment(0) - 0.002;  // Buffer
-                    qp[node].ug(ineq_row_idx) = -y_segment(0) + 0.002;  // Buffer
+                    qp[node].lg(ineq_row_idx) = -y_segment(0) - 0.004;  // Buffer
+                    qp[node].ug(ineq_row_idx) = -y_segment(0) + 0.004;  // Buffer
                     ineq_row_idx += y_segment.size();
                 }
             }
@@ -792,8 +793,6 @@ namespace torc::mpc {
             std::cout << "Cost: " << GetCost(solution_, 1) << std::endl;
         }
 
-        std::cerr << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
-
         // Line Search
         torc::utils::TORCTimer ls_timer;
         ls_timer.Tic();
@@ -802,7 +801,7 @@ namespace torc::mpc {
         std::cout << "Post LS constraint violation: " << constraint_vio << std::endl;
         std::cout << "Post LS cost: " << cost << std::endl;
         ls_timer.Toc();
-        std::cerr << "line search time: " << ls_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+        std::cout << "line search time: " << ls_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
         ConvertQpSolToTraj(alpha_);
         traj_out = traj_;
@@ -1241,11 +1240,16 @@ namespace torc::mpc {
                         swing_traj_[frame][node], frame);
 
                     // For the buffer
-                    if (std::abs(vio_vec(0)) > 0.002) {
-                        vio_vec(0) = std::abs(vio_vec(0)) - 0.002;
+                    if (std::abs(vio_vec(0)) > 0.004) {
+                        vio_vec(0) = std::abs(vio_vec(0)) - 0.004;
                     } else {
                         vio_vec(0) = 0;
                     }
+
+                    // // TODO: Remove after debugging
+                    // if (vio_vec(0) > 0.02) {
+                    //     std::cerr << "node: " << node << " swing height: " << vio_vec(0) + 0.002 << std::endl;
+                    // }
 
                     // std::cout << "[" << frame << "] Swing vio: |" << vio_vec.squaredNorm() << "| " << vio_vec(0) << std::endl;
                     violation += vio_vec.squaredNorm();
@@ -1371,8 +1375,8 @@ namespace torc::mpc {
             if (theta_kp1 >= settings_.ls_theta_max) {
                 if (theta_kp1 < (1 - settings_.ls_gamma_theta)*theta_k) {
                     // ls_condition_ = ConstraintViolation;
-                    std::cout << "CONSTRAINT REDUCTION" << std::endl;
-                    std::cout << "alpha = " << alpha_ << std::endl;
+                    // std::cout << "CONSTRAINT REDUCTION" << std::endl;
+                    // std::cout << "alpha = " << alpha_ << std::endl;
                     double phi_kp1 = GetCost(sol, alpha_);
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
@@ -1381,16 +1385,16 @@ namespace torc::mpc {
                 double phi_kp1 = GetCost(sol, alpha_);
                 if (phi_kp1 < (phi_k) + settings_.ls_eta*alpha_*SolutionGradientDot(sol)) {    // TODO: Fix/put back
                     // ls_condition_ = CostReduction;
-                    std::cout << "COST REDUCTION" << std::endl;
-                    std::cout << "alpha = " << alpha_ << std::endl;
+                    // std::cout << "COST REDUCTION" << std::endl;
+                    // std::cout << "alpha = " << alpha_ << std::endl;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             } else {
                 double phi_kp1 = GetCost(sol, alpha_);
                 if (phi_kp1 < (1 - settings_.ls_gamma_phi)*phi_k || theta_kp1 < (1 - settings_.ls_gamma_theta)*theta_k) {
                     // ls_condition_ = Both;
-                    std::cout << "CONSTRAINT & COST REDUCTION" << std::endl;
-                    std::cout << "alpha = " << alpha_ << std::endl;
+                    // std::cout << "CONSTRAINT & COST REDUCTION" << std::endl;
+                    // std::cout << "alpha = " << alpha_ << std::endl;
                     return std::make_pair(theta_kp1, phi_kp1);
                 }
             }

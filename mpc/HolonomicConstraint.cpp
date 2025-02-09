@@ -64,6 +64,8 @@ namespace torc::mpc {
         // Get the frame velocity
         const long frame_idx = model_.GetFrameIdx(frame);
         // LOCAL frame seems to work a bit better, but there needs to be more testing
+        // TODO: Consider going back to LOCAL
+        // TODO: Consider going back to WORLD
         const ad::ad_vector_t vel = pinocchio::getFrameVelocity(model_.GetADPinModel(), *model_.GetADPinData(), frame_idx, pinocchio::LOCAL).linear();
         // const ad::ad_vector_t vel = pinocchio::getFrameVelocity(robot_model_->GetADPinModel(), *robot_model_->GetADPinData(), frame_idx, pinocchio::LOCAL_WORLD_ALIGNED).linear();
 
