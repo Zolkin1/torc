@@ -731,28 +731,31 @@ namespace torc::mpc {
         traj_.SetVelocity(0, v0);
 
         // TODO: If I don't create the constraints right now then I need to re-create the constraints that involve the IC!
-        torc::utils::TORCTimer timer;
-        timer.Tic();
+        torc::utils::TORCTimer constraint_timer;
+        constraint_timer.Tic();
         CreateConstraints();
-        timer.Toc();
+        constraint_timer.Toc();
         if (settings_.verbose) {
-            std::cout << "constraint time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+            std::cout << "constraint time: " << constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
         }
+        std::cout << "constraint time: " << constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
-        timer.Tic();
+        torc::utils::TORCTimer cost_timer;
+        cost_timer.Tic();
         CreateCost();
-        timer.Toc();
+        cost_timer.Toc();
         if (settings_.verbose) {
-            std::cout << "cost time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+            std::cout << "cost time: " << cost_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
         }
+        std::cout << "cost time: " << cost_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
         NanCheck();
 
-        // std::cerr << "Starting solve!" << std::endl;
-        timer.Tic();
+        torc::utils::TORCTimer solve_timer;
+        solve_timer.Tic();
         const auto res = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
             qp, solution_);
-        timer.Toc();
+        solve_timer.Toc();
 
         assert(solution_[0].x == vectorx_t::Zero(2*nv_));   // Verify the initial condition is correct
 
@@ -761,10 +764,13 @@ namespace torc::mpc {
         if (settings_.verbose) {
             std::cout << "Res: " << res << std::endl;
             std::cout << stats << std::endl;
-            std::cout << "solve time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+            std::cout << "solve time: " << solve_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
             std::cout << "Constraint violation: " << GetConstraintViolation(solution_, 1) << std::endl;
             std::cout << "Cost: " << GetCost(solution_, 1) << std::endl;
         }
+
+        std::cout << "solve time: " << solve_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+
 
         // Line Search
         torc::utils::TORCTimer ls_timer;
@@ -800,8 +806,11 @@ namespace torc::mpc {
             log_file_ << stats.obj[stats.obj.size()-2] << ",";
             log_file_ << stats.max_res_stat << "," << stats.max_res_eq << "," << stats.max_res_ineq << "," <<
                 stats.max_res_comp << ",";
-            log_file_ << timer.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
+            log_file_ << solve_timer.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
             log_file_ << alpha_ << "," << constraint_vio << "," << cost << ",";
+            log_file_ << constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "," <<
+                cost_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "," <<
+                ls_timer.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
 
             LogData(time, q0, v0);
         }

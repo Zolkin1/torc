@@ -18,7 +18,6 @@ namespace torc::mpc {
     using vector3_t = Eigen::Vector3d;
     using quat_t = Eigen::Quaterniond;
 
-    // TODO: Add a start_time field
     class Trajectory {
     public:
         Trajectory();

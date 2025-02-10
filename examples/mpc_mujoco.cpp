@@ -363,27 +363,48 @@ int main(int argc, const char** argv) {
         throw std::runtime_error("Mujoco model not 18dof!");
     }
 
-    // run main loop, target real-time simulation and 60 fps rendering
+    // Fake time delay
+    // COMPUTE_TIME  should be < MPC_PERIOD
+    double COMPUTE_TIME = 0.006; //0.008;    // Amount of time to compute the MPC from the time the state is grabbed
+    double MPC_PERIOD = 0.01;       // How often the MPC is asked to re-compute
+
+    vectorx_t q_delay, v_delay;     // Record the time-delayed initial conditions here
+
     while (!glfwWindowShouldClose(window)) {
-        // advance interactive simulation for 1/60 sec
-        //  Assuming MuJoCo can simulate faster than real-time, which it usually can,
-        //  this loop will finish on time for the next frame to be rendered at 60 fps.
-        //  Otherwise add a cpu timer and exit this loop when it is time to render.
-
         if (!user_pause) {
-            // Get the state from Mujoco
-            Eigen::Map<vectorx_t> q_map(d->qpos, m->nq);
-            Eigen::Map<vectorx_t> v_map(d->qvel, m->nv);
+            // State when the MPC starts computing
+            bool recorded_state = false;
 
-            vectorx_t q_temp = q_map;
-            vectorx_t v_temp = v_map;
+            if (first_loop) {
+                // Get the state from Mujoco
+                Eigen::Map<vectorx_t> q_map(d->qpos, m->nq);
+                Eigen::Map<vectorx_t> v_map(d->qvel, m->nv);
+
+                q_delay = q_map;
+                v_delay = v_map;
+            }
+
+            vectorx_t q_temp;
+            vectorx_t v_temp;
+            if (COMPUTE_TIME == 0) {
+                // Get the state from Mujoco
+                Eigen::Map<vectorx_t> q_map(d->qpos, m->nq);
+                Eigen::Map<vectorx_t> v_map(d->qvel, m->nv);
+
+                q_temp = q_map;
+                v_temp = v_map;
+            } else {
+                q_temp = q_delay;
+                v_temp = v_delay;
+            }
 
             // Re-order quat
             double w = q_temp(3);
-            q_temp(3) = q_map(4);
-            q_temp(4) = q_map(5);
-            q_temp(5) = q_map(6);
+            q_temp(3) = q_temp(4);
+            q_temp(4) = q_temp(5);
+            q_temp(5) = q_temp(6);
             q_temp(6) = w;
+
 
             // Change the velocity frame
             vector3_t v_world_linear = v_temp.head<3>();
@@ -433,9 +454,6 @@ int main(int argc, const char** argv) {
             q_mpc.tail(m->nq - FLOATING_BASE) = q_temp.tail(m->nq - FLOATING_BASE);
             v_mpc.tail(m->nv - FLOATING_VEL) = v_temp.tail(m->nv - FLOATING_VEL);
 
-            // std::cout << "q_map: " << q_map.transpose() << std::endl;
-            // std::cout << "v_map: " << v_map.transpose() << std::endl;
-            //
             // std::cout << "q: " << q_mpc.transpose() << std::endl;
             // std::cout << "v: " << v_mpc.transpose() << std::endl;
 
@@ -460,23 +478,26 @@ int main(int argc, const char** argv) {
             }
 
             // Update the contact schedule
-            cs.ShiftSwings(-0.01);
+            cs.ShiftSwings(-MPC_PERIOD);
             mpc.UpdateContactSchedule(cs);
 
             mpc.Compute(d->time, q_mpc, v_mpc, traj);
 
+            // TODO: Why does setting this to 0 (rather than COMPUTE_TIME) make the performance better???
+            double traj_start_time = 0;// COMPUTE_TIME;  // Compensate for the compute time
+
             mjtNum simstart = d->time;
-            while (d->time - simstart < 0.01) {
+            while (d->time - simstart < MPC_PERIOD) {
                 // Get control by interpolation
                 vectorx_t qctrl, vctrl, tauctrl, F;
-                traj.GetConfigInterp(d->time - simstart, qctrl);
-                traj.GetVelocityInterp(d->time - simstart, vctrl);
-                traj.GetTorqueInterp(d->time - simstart, tauctrl);
+                traj.GetConfigInterp(traj_start_time + d->time - simstart, qctrl);
+                traj.GetVelocityInterp(traj_start_time + d->time - simstart, vctrl);
+                traj.GetTorqueInterp(traj_start_time + d->time - simstart, tauctrl);
 
                 F.resize(12);
                 for (int i = 0; i < settings.num_contact_locations; i++) {
                     vector3_t f_temp;
-                    traj.GetForceInterp(d->time - simstart, settings.contact_frames[i], f_temp);
+                    traj.GetForceInterp(traj_start_time + d->time - simstart, settings.contact_frames[i], f_temp);
                     F.segment<3>(3*i) = f_temp;
                 }
 
@@ -528,15 +549,6 @@ int main(int argc, const char** argv) {
                 int ntau = m->nq - FLOATING_BASE;
                 vectorx_t u(3*ntau);
 
-                // TODO: Remove
-                // tau.setZero();
-                // v.setZero();
-                // q.setZero();
-
-                // Eigen::Map<vectorx_t> q_temp(d->qpos, m->nq);
-                // std::cout << "data q: " << q_temp.transpose() << std::endl;
-                // std::cout << "     q: " << q.transpose() << std::endl;
-
                 u << q.tail(ntau), v.tail(ntau), tau.tail(ntau);
 
                 if (u.size() != m->nu) {
@@ -548,6 +560,16 @@ int main(int argc, const char** argv) {
                 }
 
                 mj_step(m, d);
+
+                // State used my the next MPC is always MPC-COMPUTE after we start using the newest traj
+                if (!recorded_state && d->time - simstart >= MPC_PERIOD - COMPUTE_TIME) {
+                    recorded_state = true;
+                    Eigen::Map<vectorx_t> qcurrent(d->qpos, m->nq);
+                    Eigen::Map<vectorx_t> vcurrent(d->qvel, m->nv);
+
+                    q_delay = qcurrent;
+                    v_delay = vcurrent;
+                }
             }
 
             // Only render every other solve

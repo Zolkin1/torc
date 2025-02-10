@@ -201,9 +201,6 @@ namespace torc::mpc {
 
             time_tally += dt_[i];
         }
-
-        // TODO: Put back!
-        // std::cerr << "Time is too large! No interpolation provided!" << std::endl;
     }
 
     void Trajectory::GetVelocityInterp(double time, vectorx_t& v_out) {
@@ -245,9 +242,6 @@ namespace torc::mpc {
 
             time_tally += dt_[i];
         }
-
-        // TODO: Put back!
-        // std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
     }
 
 
@@ -282,9 +276,6 @@ namespace torc::mpc {
 
             time_tally += dt_[i];
         }
-
-        // TODO: Put back!
-        // std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
     }
 
     void Trajectory::SetDefault(const vectorx_t& q_default) {

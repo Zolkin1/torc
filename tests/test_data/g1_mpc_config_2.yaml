@@ -21,7 +21,7 @@ general_settings:
   # ------- Testing Params ------ #
   # ----------------------------- #
   nodes: 25 #32
-  verbose: True #False
+  verbose: False #False
   node_dt_type: two_groups # Even, two_groups, Adaptive
   node_group_1_n: 5
   node_group_2_n: 20 #27
