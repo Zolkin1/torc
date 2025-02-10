@@ -365,8 +365,8 @@ int main(int argc, const char** argv) {
 
     // Fake time delay
     // COMPUTE_TIME  should be < MPC_PERIOD
-    double COMPUTE_TIME = 0.006; //0.008;    // Amount of time to compute the MPC from the time the state is grabbed
-    double MPC_PERIOD = 0.01;       // How often the MPC is asked to re-compute
+    double COMPUTE_TIME = 0.008; //0.006; //0.008;    // Amount of time to compute the MPC from the time the state is grabbed
+    double MPC_PERIOD = 0.01; //0.01;       // How often the MPC is asked to re-compute
 
     vectorx_t q_delay, v_delay;     // Record the time-delayed initial conditions here
 
@@ -481,7 +481,9 @@ int main(int argc, const char** argv) {
             cs.ShiftSwings(-MPC_PERIOD);
             mpc.UpdateContactSchedule(cs);
 
+            mpc.CreateQPData();
             mpc.Compute(d->time, q_mpc, v_mpc, traj);
+            mpc.LogMPCCompute(d->time, q_mpc, v_mpc);
 
             // TODO: Why does setting this to 0 (rather than COMPUTE_TIME) make the performance better???
             double traj_start_time = 0;// COMPUTE_TIME;  // Compensate for the compute time

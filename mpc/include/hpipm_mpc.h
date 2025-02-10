@@ -9,6 +9,7 @@
 #include <Eigen/Geometry>
 #include <Eigen/Sparse>
 #include <filesystem>
+#include <torc_timer.h>
 
 #include "BoxConstraint.h"
 #include "CentroidalDynamicsConstraint.h"
@@ -77,8 +78,7 @@ namespace torc::mpc {
         void SetConfigTrackingCost(ConfigTrackingCost cost);
         void SetFowardKinematicsCost(ForwardKinematicsCost cost);
 
-        void CreateConstraints();
-        void CreateCost();
+        void CreateQPData();
 
         // NOTE: The time is just for logging purposes
         hpipm::HpipmStatus Compute(double time, const vectorx_t& q0, const vectorx_t& v0, Trajectory& traj_out);
@@ -104,6 +104,8 @@ namespace torc::mpc {
         Trajectory GetTrajectory() const;
 
         void PrintNodeInfo() const;
+
+        void LogMPCCompute(double time, const vectorx_t& q0, const vectorx_t& v0);
     protected:
 
         /**
@@ -114,6 +116,9 @@ namespace torc::mpc {
         std::pair<int, int> GetFrictionIndex(int node);
 
         void ConvertQpSolToTraj(double alpha);
+
+        void CreateConstraints(int start_node, int end_node);
+        void CreateCost(int start_node, int end_node);
 
         // TODO: Make these const refs
         vectorx_t GetVelocityTarget(int node) const;
@@ -136,6 +141,8 @@ namespace torc::mpc {
         void NanCheck();
 
         double SolutionGradientDot(const std::vector<hpipm::OcpQpSolution>& sol);
+
+        void CreateNode0Data();
 
         std::vector<Constraint> constraints;
         MpcSettings settings_;
@@ -188,6 +195,18 @@ namespace torc::mpc {
         hpipm::OcpQpIpmSolverSettings qp_settings;
         std::vector<hpipm::OcpQpSolution> solution_;
         std::unique_ptr<hpipm::OcpQpIpmSolver> solver_;
+        hpipm::HpipmStatus result_;
+        hpipm::OcpQpIpmSolverStatistics statistics_;
+
+        // Timers
+        torc::utils::TORCTimer solve_timer_;
+        torc::utils::TORCTimer constraint_timer_;
+        torc::utils::TORCTimer cost_timer_;
+        torc::utils::TORCTimer ls_timer_;
+
+        double prev_cost_;
+        double prev_violation_;
+
 
         // Trajectories
         Trajectory traj_;

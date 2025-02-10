@@ -169,7 +169,7 @@ namespace torc::mpc {
         settings_ = std::move(settings);
     }
 
-    void HpipmMpc::CreateConstraints() {
+    void HpipmMpc::CreateConstraints(int start_node, int end_node) {
         if (srb_constraint_ && centroidal_dynamics_constraint_) {
             throw std::runtime_error("Can't have both the SRB and centroidal constraint!");
         }
@@ -183,7 +183,7 @@ namespace torc::mpc {
             first_constraint_gen_ = false;
         }
 
-        for (int node = 0; node < settings_.nodes; node++) {
+        for (int node = start_node; node < end_node; node++) {
             // std::cerr << "node: " << node << std::endl;
 
             vectorx_t force(CONTACT_3DOF*settings_.num_contact_locations);
@@ -431,12 +431,12 @@ namespace torc::mpc {
         }
     }
 
-    void HpipmMpc::CreateCost() {
+    void HpipmMpc::CreateCost(int start_node, int end_node) {
         if (!vel_tracking_ || !tau_tracking_ || !force_tracking_) {
             throw std::runtime_error("[HpipmMpc] Required cost not set!");
         }
 
-        for (int node = 0; node < settings_.nodes - 1; node++) {
+        for (int node = start_node; node < end_node - 1; node++) {
 
             if (vel_tracking_->IsInNodeRange(node)) {
                 const auto [hess, lin]
@@ -512,35 +512,37 @@ namespace torc::mpc {
             // std::cout << "r:\n" << qp[node].r.transpose() << std::endl;
         }
 
-        // Terminal cost
-        int node = settings_.nodes - 1;
-        if (dynamics_constraint_->IsInNodeRange(node)) {
-            const auto [hess, lin]
-                = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node),
+        if (end_node == settings_.nodes) {
+            // Terminal cost
+            int node = settings_.nodes - 1;
+            if (dynamics_constraint_->IsInNodeRange(node)) {
+                const auto [hess, lin]
+                    = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node),
+                            dynamics_constraint_->IsInNodeRange(node) ?
+                            settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
+                qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
+                qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
+            }
+
+            const auto [hessq, linq] =
+                        config_tracking_->GetQuadraticApprox(traj_.GetConfiguration(node), GetConfigTarget(node),
                         dynamics_constraint_->IsInNodeRange(node) ?
-                        settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
-            qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
-            qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
+                        settings_.cost_data[fo_config_idx_].weight : settings_.cost_data[cent_config_idx_].weight);
+            qp[node].Q.topLeftCorner(nv_, nv_) = hessq;
+            qp[node].q.head(nv_) = linq;
+
+            for (const auto& frame : settings_.contact_frames) {
+                const auto [hess, lin] = fk_cost_->GetQuadraticApprox(
+                    traj_.GetConfiguration(node),
+                    GetEndEffectorTarget(node, frame),
+                    settings_.cost_data[frame_tracking_idx_].weight, frame);
+                qp[node].Q.topLeftCorner(nv_, nv_) += hess;
+                qp[node].q.head(nv_) += lin;
+            }
+
+            qp[node].Q *= settings_.terminal_weight*settings_.dt[node];
+            qp[node].q *= settings_.terminal_weight*settings_.dt[node];
         }
-
-        const auto [hessq, linq] =
-                    config_tracking_->GetQuadraticApprox(traj_.GetConfiguration(node), GetConfigTarget(node),
-                    dynamics_constraint_->IsInNodeRange(node) ?
-                    settings_.cost_data[fo_config_idx_].weight : settings_.cost_data[cent_config_idx_].weight);
-        qp[node].Q.topLeftCorner(nv_, nv_) = hessq;
-        qp[node].q.head(nv_) = linq;
-
-        for (const auto& frame : settings_.contact_frames) {
-            const auto [hess, lin] = fk_cost_->GetQuadraticApprox(
-                traj_.GetConfiguration(node),
-                GetEndEffectorTarget(node, frame),
-                settings_.cost_data[frame_tracking_idx_].weight, frame);
-            qp[node].Q.topLeftCorner(nv_, nv_) += hess;
-            qp[node].q.head(nv_) += lin;
-        }
-
-        qp[node].Q *= settings_.terminal_weight*settings_.dt[node];
-        qp[node].q *= settings_.terminal_weight*settings_.dt[node];
     }
 
 
@@ -720,6 +722,31 @@ namespace torc::mpc {
         }
     }
 
+    void HpipmMpc::CreateQPData() {
+        // Create the constraints
+        constraint_timer_.Tic();
+        CreateConstraints(1, settings_.nodes);
+        constraint_timer_.Toc();
+        if (settings_.verbose) {
+            std::cout << "constraint time: " << constraint_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+        }
+        // std::cout << "constraint time: " << constraint_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+
+        // Create the cost
+        cost_timer_.Tic();
+        CreateCost(1, settings_.nodes);
+        cost_timer_.Toc();
+        if (settings_.verbose) {
+            std::cout << "cost time: " << cost_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+        }
+        // std::cout << "cost time: " << cost_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+    }
+
+    void HpipmMpc::CreateNode0Data() {
+        CreateConstraints(0, 1);
+
+        CreateCost(0, 1);
+    }
 
     hpipm::HpipmStatus HpipmMpc::Compute(double time, const vectorx_t &q0, const vectorx_t &v0, Trajectory& traj_out) {
         if (std::abs(q0.segment<4>(3).norm() - 1) > 1e-8) {
@@ -730,58 +757,42 @@ namespace torc::mpc {
         traj_.SetConfiguration(0, q0);
         traj_.SetVelocity(0, v0);
 
-        // TODO: If I don't create the constraints right now then I need to re-create the constraints that involve the IC!
-        torc::utils::TORCTimer constraint_timer;
-        constraint_timer.Tic();
-        CreateConstraints();
-        constraint_timer.Toc();
-        if (settings_.verbose) {
-            std::cout << "constraint time: " << constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
-        }
-        std::cout << "constraint time: " << constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
-
-        torc::utils::TORCTimer cost_timer;
-        cost_timer.Tic();
-        CreateCost();
-        cost_timer.Toc();
-        if (settings_.verbose) {
-            std::cout << "cost time: " << cost_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
-        }
-        std::cout << "cost time: " << cost_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+        // Linearize node 0 (initial condition)
+        CreateNode0Data();
 
         NanCheck();
 
-        torc::utils::TORCTimer solve_timer;
-        solve_timer.Tic();
-        const auto res = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
+        solve_timer_.Tic();
+        result_ = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),
             qp, solution_);
-        solve_timer.Toc();
+        solve_timer_.Toc();
 
         assert(solution_[0].x == vectorx_t::Zero(2*nv_));   // Verify the initial condition is correct
 
-        const auto stats = solver_->getSolverStatistics();
+        statistics_ = solver_->getSolverStatistics();
 
         if (settings_.verbose) {
-            std::cout << "Res: " << res << std::endl;
-            std::cout << stats << std::endl;
-            std::cout << "solve time: " << solve_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+            std::cout << "Res: " << result_ << std::endl;
+            std::cout << statistics_ << std::endl;
+            std::cout << "solve time: " << solve_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
             std::cout << "Constraint violation: " << GetConstraintViolation(solution_, 1) << std::endl;
             std::cout << "Cost: " << GetCost(solution_, 1) << std::endl;
         }
-
-        std::cout << "solve time: " << solve_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+        // std::cout << "solve time: " << solve_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
 
         // Line Search
-        torc::utils::TORCTimer ls_timer;
-        ls_timer.Tic();
-        const auto [constraint_vio, cost] = LineSearch(solution_);
-        ls_timer.Toc();
+        ls_timer_.Tic();
+        // TODO: Put back
+        // std::tie(prev_violation_, prev_cost_) = LineSearch(solution_);
+        prev_violation_ = -1;
+        prev_cost_ = -1;
+        ls_timer_.Toc();
 
         if (settings_.verbose) {
-            std::cout << "Post LS constraint violation: " << constraint_vio << std::endl;
-            std::cout << "Post LS cost: " << cost << std::endl;
-            std::cout << "line search time: " << ls_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
+            std::cout << "Post LS constraint violation: " << prev_violation_ << std::endl;
+            std::cout << "Post LS cost: " << prev_cost_ << std::endl;
+            std::cout << "line search time: " << ls_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
         }
 
         ConvertQpSolToTraj(alpha_);
@@ -791,33 +802,9 @@ namespace torc::mpc {
             PrintNodeInfo();
         }
 
-        if (settings_.log) {
-            log_file_ << stats.iter << ",";
-            if (res == hpipm::HpipmStatus::Success) {
-                log_file_ << 1 << ",";
-            } else if (res == hpipm::HpipmStatus::MaxIterReached) {
-                log_file_ << 2 << ",";
-            } else if (res == hpipm::HpipmStatus::MinStepLengthReached) {
-                log_file_ << 3 << ",";
-            } else {
-                log_file_ << 4 << ",";
-            }
-
-            log_file_ << stats.obj[stats.obj.size()-2] << ",";
-            log_file_ << stats.max_res_stat << "," << stats.max_res_eq << "," << stats.max_res_ineq << "," <<
-                stats.max_res_comp << ",";
-            log_file_ << solve_timer.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
-            log_file_ << alpha_ << "," << constraint_vio << "," << cost << ",";
-            log_file_ << constraint_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "," <<
-                cost_timer.Duration<std::chrono::microseconds>().count()/1000.0 << "," <<
-                ls_timer.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
-
-            LogData(time, q0, v0);
-        }
-
         solve_counter_++;
 
-        return res;
+        return result_;
     }
 
     void HpipmMpc::ConvertQpSolToTraj(double alpha) {
@@ -1345,9 +1332,40 @@ namespace torc::mpc {
         return swing_traj_;
     }
 
-    void HpipmMpc::LogData(double time, const vectorx_t &q, const vectorx_t &v) {
+    void HpipmMpc::LogMPCCompute(double time, const vectorx_t& q0, const vectorx_t& v0) {
         torc::utils::TORCTimer timer;
         timer.Tic();
+
+        log_file_ << statistics_.iter << ",";
+        if (result_ == hpipm::HpipmStatus::Success) {
+            log_file_ << 1 << ",";
+        } else if (result_ == hpipm::HpipmStatus::MaxIterReached) {
+            log_file_ << 2 << ",";
+        } else if (result_ == hpipm::HpipmStatus::MinStepLengthReached) {
+            log_file_ << 3 << ",";
+        } else {
+            log_file_ << 4 << ",";
+        }
+
+        log_file_ << statistics_.obj[statistics_.obj.size()-2] << ",";
+        log_file_ << statistics_.max_res_stat << "," << statistics_.max_res_eq << "," << statistics_.max_res_ineq << "," <<
+            statistics_.max_res_comp << ",";
+        log_file_ << solve_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
+        log_file_ << alpha_ << "," << prev_violation_ << "," << prev_cost_ << ",";
+        log_file_ << constraint_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "," <<
+            cost_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "," <<
+            ls_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << ",";
+
+        LogData(time, q0, v0);
+
+        timer.Toc();
+        if (settings_.verbose) {
+            std::cout << "Logging took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << " ms" << std::endl;
+        }
+    }
+
+
+    void HpipmMpc::LogData(double time, const vectorx_t &q, const vectorx_t &v) {
         // Solve number
         log_file_ << time << "," << solve_counter_ << "," << settings_.nodes << ",";
 
@@ -1414,8 +1432,6 @@ namespace torc::mpc {
         }
 
         log_file_ << std::endl;
-        timer.Toc();
-        std::cout << "Logging took " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << " ms" << std::endl;
     }
 
     void HpipmMpc::LogEigenVec(const vectorx_t &x) {
