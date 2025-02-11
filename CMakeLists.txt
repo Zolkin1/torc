@@ -27,7 +27,7 @@ add_subdirectory(models)
 add_subdirectory(auto_diff)
 add_subdirectory(mpc)
 add_subdirectory(utils)
-add_subdirectory(whole_body_control)
+#add_subdirectory(whole_body_control)   # TODO: Remove OSQP from here to remove the terrible absl dep
 
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library

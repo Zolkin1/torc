@@ -21,17 +21,18 @@ namespace torc::mpc {
         matrixx_t A_temp = matrixx_t::Identity(2, 2);   // For now only in the plane
         vector2_t b_temp = vector2_t::Zero();
         vector2_t q_temp = vector2_t::Zero();
-        osqp_instance_.objective_matrix = A_temp.sparseView();
-        osqp_instance_.objective_vector = q_temp;
-        osqp_instance_.constraint_matrix = A_temp.sparseView();
-        osqp_instance_.lower_bounds = b_temp;
-        osqp_instance_.upper_bounds = b_temp;
-
-        osqp_settings_.verbose = false;
-        auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
-        if (!status.ok()) {
-            throw std::runtime_error("[Reference Generator] Could not initialize OSQP!");
-        }
+        // TODO: Re-implement w/o OSQP
+        // osqp_instance_.objective_matrix = A_temp.sparseView();
+        // osqp_instance_.objective_vector = q_temp;
+        // osqp_instance_.constraint_matrix = A_temp.sparseView();
+        // osqp_instance_.lower_bounds = b_temp;
+        // osqp_instance_.upper_bounds = b_temp;
+        //
+        // osqp_settings_.verbose = false;
+        // auto status = osqp_solver_.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
+        // if (!status.ok()) {
+        //     throw std::runtime_error("[Reference Generator] Could not initialize OSQP!");
+        // }
     }
 
     // TODO: Clean up!
@@ -544,72 +545,73 @@ namespace torc::mpc {
         // std::cerr << "A:\n" << polytope.A_ << std::endl;
         // std::cerr << "b:\n" << polytope.b_ << std::endl;
 
-        if (polytope.A_.size() == 0) {
-            throw std::runtime_error("[Reference Generator] polytope A is empty!");
-        }
-
-        if (polytope.b_.size() == 0) {
-            throw std::runtime_error("[Reference Generator] polytope b is empty!");
-        }
-
-        vector4_t polytope_margin;
-        polytope_margin << 1, 1, -1, -1;
-        polytope_margin *= polytope_delta_;
-        vector4_t b_modified = polytope.b_ - polytope_margin;
-
-        vector2_t c = polytope.A_*foot_position;
-        bool in_polytope = true;
-        for (int i = 0; i < polytope.b_.size(); i++) {
-            if (i < c.size()) {
-                if (c(i) > b_modified(i)) {
-                    in_polytope = false;
-                }
-            } else {
-                if (c(i - c.size()) < b_modified(i)) {
-                    in_polytope = false;
-                }
-            }
-        }
-
-        if (!in_polytope) {
-            // Not in the polytope, must project
-            // Update constraint matrix
-            auto status = osqp_solver_.UpdateConstraintMatrix(polytope.A_.sparseView());
-            if (!status.ok()) {
-                throw std::runtime_error("[Reference Generator] UpdateConstraintMatrix failed!");
-            }
-
-            vector2_t lb, ub;
-            lb << std::min(b_modified(0), b_modified(2)), std::min(b_modified(1), b_modified(3));
-            ub << std::max(b_modified(0), b_modified(2)), std::max(b_modified(1), b_modified(3));
-
-            status = osqp_solver_.SetBounds(lb, ub);
-            if (!status.ok()) {
-                throw std::runtime_error("[Reference Generator] SetBounds failed!");
-            }
-
-            status = osqp_solver_.SetObjectiveVector(-foot_position);
-            if (!status.ok()) {
-                throw std::runtime_error("[Reference Generator] SetObjectiveVector failed!");
-            }
-
-            auto solve_status = osqp_solver_.Solve();
-
-            if (solve_status == osqp::OsqpExitCode::kPrimalInfeasible || solve_status == osqp::OsqpExitCode::kPrimalInfeasibleInaccurate) {
-                std::cerr << "[Reference Generator] Infeasible!" << std::endl;
-                throw std::runtime_error("Infeasible!");
-            } else if (solve_status != osqp::OsqpExitCode::kOptimal) {
-                std::cerr << "[Reference Generator] projection not solved correctly!" << std::endl;
-                throw std::runtime_error("Projection not solved correctly!");
-            }
-
-            // Assign the projected value
-            foot_position = osqp_solver_.primal_solution();
-
-            return true;
-        } else {
-            return false;
-        }
+        throw std::runtime_error("Re-implement w/o OSQP!");
+        // if (polytope.A_.size() == 0) {
+        //     throw std::runtime_error("[Reference Generator] polytope A is empty!");
+        // }
+        //
+        // if (polytope.b_.size() == 0) {
+        //     throw std::runtime_error("[Reference Generator] polytope b is empty!");
+        // }
+        //
+        // vector4_t polytope_margin;
+        // polytope_margin << 1, 1, -1, -1;
+        // polytope_margin *= polytope_delta_;
+        // vector4_t b_modified = polytope.b_ - polytope_margin;
+        //
+        // vector2_t c = polytope.A_*foot_position;
+        // bool in_polytope = true;
+        // for (int i = 0; i < polytope.b_.size(); i++) {
+        //     if (i < c.size()) {
+        //         if (c(i) > b_modified(i)) {
+        //             in_polytope = false;
+        //         }
+        //     } else {
+        //         if (c(i - c.size()) < b_modified(i)) {
+        //             in_polytope = false;
+        //         }
+        //     }
+        // }
+        //
+        // if (!in_polytope) {
+        //     // Not in the polytope, must project
+        //     // Update constraint matrix
+        //     auto status = osqp_solver_.UpdateConstraintMatrix(polytope.A_.sparseView());
+        //     if (!status.ok()) {
+        //         throw std::runtime_error("[Reference Generator] UpdateConstraintMatrix failed!");
+        //     }
+        //
+        //     vector2_t lb, ub;
+        //     lb << std::min(b_modified(0), b_modified(2)), std::min(b_modified(1), b_modified(3));
+        //     ub << std::max(b_modified(0), b_modified(2)), std::max(b_modified(1), b_modified(3));
+        //
+        //     status = osqp_solver_.SetBounds(lb, ub);
+        //     if (!status.ok()) {
+        //         throw std::runtime_error("[Reference Generator] SetBounds failed!");
+        //     }
+        //
+        //     status = osqp_solver_.SetObjectiveVector(-foot_position);
+        //     if (!status.ok()) {
+        //         throw std::runtime_error("[Reference Generator] SetObjectiveVector failed!");
+        //     }
+        //
+        //     auto solve_status = osqp_solver_.Solve();
+        //
+        //     if (solve_status == osqp::OsqpExitCode::kPrimalInfeasible || solve_status == osqp::OsqpExitCode::kPrimalInfeasibleInaccurate) {
+        //         std::cerr << "[Reference Generator] Infeasible!" << std::endl;
+        //         throw std::runtime_error("Infeasible!");
+        //     } else if (solve_status != osqp::OsqpExitCode::kOptimal) {
+        //         std::cerr << "[Reference Generator] projection not solved correctly!" << std::endl;
+        //         throw std::runtime_error("Projection not solved correctly!");
+        //     }
+        //
+        //     // Assign the projected value
+        //     foot_position = osqp_solver_.primal_solution();
+        //
+        //     return true;
+        // } else {
+        //     return false;
+        // }
     }
 
     vector2_t ReferenceGenerator::InterpolateBasePositions(int node, const std::map<double, vector2_t> &base_pos,

@@ -69,9 +69,15 @@ valgrind --tool=massif ./mpc_app_test
 then use ms_print.
 
 ## Perf
-- Run with `-DCMAKE_CXX_FLAGS=-fno-omit-frame-pointer`
-- Get PID: `ps -eo pid,command | grep mpc_app_test | grep -v grep`
-- Recording: `sudo perf record -g -p PID`
-- Performance counter stats: `sudo perf stat -d -p PID`
-- Stop with Ctrl-C or when the program ends.
-- See data: `sudo perf report -i perf.data`
+See chat gpt
+[//]: # (- Run with `-DCMAKE_CXX_FLAGS=-fno-omit-frame-pointer`)
+
+[//]: # (- Get PID: `ps -eo pid,command | grep mpc_app_test | grep -v grep`)
+
+[//]: # (- Recording: `sudo perf record -g -p PID`)
+
+[//]: # (- Performance counter stats: `sudo perf stat -d -p PID`)
+
+[//]: # (- Stop with Ctrl-C or when the program ends.)
+
+[//]: # (- See data: `sudo perf report -i perf.data`)

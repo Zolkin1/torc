@@ -17,6 +17,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <pthread.h>
 
 #include <GLFW/glfw3.h>
 #include <mujoco/mujoco.h>
@@ -123,6 +124,10 @@ void LogEigenVec(std::ofstream& log_file, const torc::mpc::vectorx_t& x) {
 
 // main function
 int main(int argc, const char** argv) {
+
+    struct sched_param param;
+    param.sched_priority = 99;
+    pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
 
     const std::string mujoco_xml = "/home/zolkin/AmberLab/Project-Sample-Walking/sample-contact-walking/g1_model/mujoco/basic_scene.xml";
 
@@ -368,9 +373,12 @@ int main(int argc, const char** argv) {
     double COMPUTE_TIME = 0.008; //0.006; //0.008;    // Amount of time to compute the MPC from the time the state is grabbed
     double MPC_PERIOD = 0.01; //0.01;       // How often the MPC is asked to re-compute
 
+    std::ofstream timing_log;
+    timing_log.open("mpc_timing.csv");
+
     vectorx_t q_delay, v_delay;     // Record the time-delayed initial conditions here
 
-    while (!glfwWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(window) && d->time < 4.) {
         if (!user_pause) {
             // State when the MPC starts computing
             bool recorded_state = false;
@@ -475,15 +483,28 @@ int main(int argc, const char** argv) {
                 mpc.SetVelTarget(v_target);
 
                 first_loop = false;
+                mpc.CreateQPData();
+                mpc.Compute(d->time, q_mpc, v_mpc, traj);
+
             }
 
             // Update the contact schedule
             cs.ShiftSwings(-MPC_PERIOD);
             mpc.UpdateContactSchedule(cs);
 
+            mpc.LogMPCCompute(d->time, q_mpc, v_mpc);   // TODO: Should probably add the logging back into the time recording
+            torc::utils::TORCTimer prep_timer;
+            prep_timer.Tic();
             mpc.CreateQPData();
+            prep_timer.Toc();
+
+            torc::utils::TORCTimer feedback_timer;
+            feedback_timer.Tic();
             mpc.Compute(d->time, q_mpc, v_mpc, traj);
-            mpc.LogMPCCompute(d->time, q_mpc, v_mpc);
+            feedback_timer.Toc();
+
+            timing_log << d->time << "," << prep_timer.Duration<std::chrono::microseconds>().count()/1000.0 <<
+                "," << feedback_timer.Duration<std::chrono::microseconds>().count()/1000.0 << std::endl;
 
             // TODO: Why does setting this to 0 (rather than COMPUTE_TIME) make the performance better???
             double traj_start_time = 0;// COMPUTE_TIME;  // Compensate for the compute time
@@ -608,6 +629,8 @@ int main(int argc, const char** argv) {
             glfwPollEvents();
         }
     }
+
+    std::cout << "Done with while loop." << std::endl;
 
     //free visualization storage
     mjv_freeScene(&scn);

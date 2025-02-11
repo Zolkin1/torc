@@ -760,7 +760,7 @@ namespace torc::mpc {
         // Linearize node 0 (initial condition)
         CreateNode0Data();
 
-        NanCheck();
+        // NanCheck();
 
         solve_timer_.Tic();
         result_ = solver_->solve(vectorx_t::Zero(model_.GetVelDim() + model_.GetVelDim()),

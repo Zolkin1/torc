@@ -8,7 +8,7 @@
 #include <vector>
 #include <Eigen/Core>
 
-#include "osqp++.h"
+// #include "osqp++.h"
 
 #include "full_order_rigid_body.h"
 #include "simple_trajectory.h"
@@ -89,10 +89,10 @@ namespace torc::mpc {
 
         models::FullOrderRigidBody model_;
 
-        // OSQP Interface
-        osqp::OsqpInstance osqp_instance_;
-        osqp::OsqpSolver osqp_solver_;
-        osqp::OsqpSettings osqp_settings_;
+        // // OSQP Interface
+        // osqp::OsqpInstance osqp_instance_;
+        // osqp::OsqpSolver osqp_solver_;
+        // osqp::OsqpSettings osqp_settings_;
     };
 }
 

@@ -3,6 +3,7 @@
 //
 
 #include <torc_timer.h>
+#include <pthread.h>
 
 #include "CentroidalDynamicsConstraint.h"
 #include "DynamicsConstraint.h"
@@ -11,6 +12,11 @@
 #include "SRBConstraint.h"
 
 int main() {
+    // struct sched_param param;
+    // param.sched_priority = 99;
+    // pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+
+
     // Create all the constraints
     using namespace torc::mpc;
     std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand.urdf";
@@ -129,25 +135,25 @@ int main() {
     torc::mpc::ContactSchedule cs(settings.contact_frames);
 
     // TODO: When the swing time goes past the time horizon weird stuff happens
-    cs.InsertSwing("right_toe", 0.1, 0.5);
-    cs.InsertSwing("right_heel", 0.1, 0.5);
-    cs.InsertSwing("left_toe", 0.5, 0.9);
-    cs.InsertSwing("left_heel", 0.5, 0.9);
-
-    cs.InsertSwing("right_toe", 0.9, 1.2);
-    cs.InsertSwing("right_heel", 0.9, 1.2);
-    cs.InsertSwing("left_toe", 1.2, 1.6);
-    cs.InsertSwing("left_heel", 1.2, 1.6);
-
-    cs.InsertSwing("right_toe", 1.6, 2.0);
-    cs.InsertSwing("right_heel", 1.6, 2.0);
-    cs.InsertSwing("left_toe", 2.0, 2.4);
-    cs.InsertSwing("left_heel", 2.0, 2.4);
-
-    cs.InsertSwing("right_toe", 2.4, 2.8);
-    cs.InsertSwing("right_heel", 2.4, 2.8);
-    cs.InsertSwing("left_toe", 2.8, 3.2);
-    cs.InsertSwing("left_heel", 2.8, 3.2);
+    // cs.InsertSwing("right_toe", 0.1, 0.5);
+    // cs.InsertSwing("right_heel", 0.1, 0.5);
+    // cs.InsertSwing("left_toe", 0.5, 0.9);
+    // cs.InsertSwing("left_heel", 0.5, 0.9);
+    //
+    // cs.InsertSwing("right_toe", 0.9, 1.2);
+    // cs.InsertSwing("right_heel", 0.9, 1.2);
+    // cs.InsertSwing("left_toe", 1.2, 1.6);
+    // cs.InsertSwing("left_heel", 1.2, 1.6);
+    //
+    // cs.InsertSwing("right_toe", 1.6, 2.0);
+    // cs.InsertSwing("right_heel", 1.6, 2.0);
+    // cs.InsertSwing("left_toe", 2.0, 2.4);
+    // cs.InsertSwing("left_heel", 2.0, 2.4);
+    //
+    // cs.InsertSwing("right_toe", 2.4, 2.8);
+    // cs.InsertSwing("right_heel", 2.4, 2.8);
+    // cs.InsertSwing("left_toe", 2.8, 3.2);
+    // cs.InsertSwing("left_heel", 2.8, 3.2);
     // --------------------------------- //
     // -------------- MPC -------------- //
     // --------------------------------- //
@@ -228,7 +234,9 @@ int main() {
 
     torc::utils::TORCTimer timer;
     timer.Tic();
+    mpc.CreateQPData();
     mpc.Compute(time, q, v, traj);
+    mpc.LogMPCCompute(time, q, v);
     timer.Toc();
     std::cout << "total compute time: " << timer.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl << std::endl;
     traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output_1.csv");
@@ -282,14 +290,28 @@ int main() {
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
     // mpc.Compute(q, v, traj);
-    for (int i = 0; i < 50; i++) { // 50
+    for (int i = 0; i < 250; i++) { // 50
         cs.ShiftSwings(-0.01);
         vectorx_t q_traj, v_traj;
         traj.GetConfigInterp(0.01, q_traj);
         traj.GetVelocityInterp(0.01, v_traj);
         mpc.UpdateContactSchedule(cs);
         time += 0.01;
+        mpc.CreateQPData();
+
+        // To try and make the problem slightly harder
+        q_traj[0] += 0.005;
+        q_traj[1] -= 0.005;
+        q_traj[2] += 0.008;
+        q_traj[8] += 0.005;
+        q_traj[10] -= 0.009;
+
+        v_traj[0] += 0.01;
+        v_traj[1] -= 0.01;
+        v_traj[2] += 0.005;
+
         mpc.Compute(time, q_traj, v_traj, traj);
+        mpc.LogMPCCompute(time, q_traj, v_traj);
     }
     mpc.PrintNodeInfo();
 

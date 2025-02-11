@@ -4,7 +4,7 @@ set(MPC_INC "${torc_SOURCE_DIR}/mpc/include")
 set(MPC_HEADER_LIST
 #    "${MPC_INC}/mpc_base.h"
     "${MPC_INC}/trajectory.h"
-    "${MPC_INC}/full_order_mpc.h"
+#    "${MPC_INC}/full_order_mpc.h"
     "${MPC_INC}/cost_function.h"
     "${MPC_INC}/contact_schedule.h"
     "${MPC_INC}/configuration_tracking_cost.h"
@@ -34,7 +34,7 @@ set(MPC_HEADER_LIST
 
 set(MPC_SOURCE_LIST
 #        mpc_base.cpp
-        full_order_mpc.cpp
+#        full_order_mpc.cpp
 #        mpc_contact.cpp
         trajectory.cpp
         cost_function.cpp
@@ -94,20 +94,20 @@ target_link_libraries(Mpc PUBLIC Autodiff)
 # ------- Eigen ------ #
 find_package(Eigen3 REQUIRED)
 
-# ------- OSQP ------ #
-include(FetchContent)
-
-set(OSQP-CPP_BUILD_TESTS OFF CACHE BOOL "Build OSQP-CPP without tests")
-set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "Variable for OSQP-CPP ABSL dep")
-
-FetchContent_Declare(
-        osqp-cpp
-        GIT_REPOSITORY https://github.com/google/osqp-cpp.git
-        GIT_TAG 43433736334d6b515ea4b0247156fea9e56c0d3f
-)
-
-FetchContent_MakeAvailable(osqp-cpp)
-target_link_libraries(Mpc PUBLIC osqp-cpp)
+## ------- OSQP ------ #
+#include(FetchContent)
+#
+#set(OSQP-CPP_BUILD_TESTS OFF CACHE BOOL "Build OSQP-CPP without tests")
+#set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "Variable for OSQP-CPP ABSL dep")
+#
+#FetchContent_Declare(
+#        osqp-cpp
+#        GIT_REPOSITORY https://github.com/google/osqp-cpp.git
+#        GIT_TAG 43433736334d6b515ea4b0247156fea9e56c0d3f
+#)
+#
+#FetchContent_MakeAvailable(osqp-cpp)
+#target_link_libraries(Mpc PUBLIC osqp-cpp)
 
 # ------- HPIPM ------ #
 find_package(hpipm-cpp REQUIRED)
@@ -134,7 +134,7 @@ FetchContent_MakeAvailable(yaml-cpp)
 
 target_link_libraries(Mpc PUBLIC yaml-cpp::yaml-cpp)
 
-# Casadi
-find_package(casadi)
-target_link_libraries(Mpc PRIVATE casadi)
+## Casadi
+#find_package(casadi)
+#target_link_libraries(Mpc PRIVATE casadi)
 
