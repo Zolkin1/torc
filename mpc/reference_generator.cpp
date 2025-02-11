@@ -178,9 +178,10 @@ namespace torc::mpc {
                         throw std::runtime_error("[Reference generator] contact_idx_temp != contact_idx_temp");
                     }
 
+                    // TODO: Put back!!!
                     // Project onto the polytope
-                    bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(),
-                        contact_schedule.GetPolytopes(frame).at(i + polytope_idx_offset[frame]));
+                    // bool projected = ProjectOnPolytope(contact_foot_pos[frame].back(),
+                    //     contact_schedule.GetPolytopes(frame).at(i + polytope_idx_offset[frame]));
                     if (time < end_time_ && !base_pos.contains(time)) {
                         // This was removed because otherwise the foot would never get a chance to move to the next stone
                         // if (projected) {

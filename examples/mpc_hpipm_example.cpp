@@ -11,11 +11,20 @@
 #include "hpipm_mpc.h"
 #include "SRBConstraint.h"
 
-int main() {
+void thread_function() {
     // struct sched_param param;
     // param.sched_priority = 99;
     // pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
 
+    // Prevents uncessary cache misses
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(2, &cpuset);  // Pin to CPU 2
+
+    pthread_t thread = pthread_self();
+    if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset) != 0) {
+        perror("pthread_setaffinity_np");
+    }
 
     // Create all the constraints
     using namespace torc::mpc;
@@ -316,6 +325,14 @@ int main() {
     mpc.PrintNodeInfo();
 
     traj.ExportToCSV(std::filesystem::current_path() / "trajectory_output_2.csv");
+}
 
+int main() {
+    std::thread thread(thread_function);
+    thread.join();
+    // pthread_t thread;
+    // pthread_create(&thread, NULL, thread_function, NULL);
+    // pthread_join(thread, NULL);
+    return 0;
 }
 

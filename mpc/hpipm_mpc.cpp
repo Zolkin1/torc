@@ -1366,6 +1366,8 @@ namespace torc::mpc {
 
 
     void HpipmMpc::LogData(double time, const vectorx_t &q, const vectorx_t &v) {
+        // I can always put some of the logging back (at the expense of timing)
+
         // Solve number
         log_file_ << time << "," << solve_counter_ << "," << settings_.nodes << ",";
 
@@ -1375,12 +1377,12 @@ namespace torc::mpc {
 
         // Computed traj & dt
         for (int i = 0; i < settings_.nodes; i++) {
-            LogEigenVec(traj_.GetConfiguration(i));
-            LogEigenVec(traj_.GetVelocity(i));
-            LogEigenVec(traj_.GetTau(i));
-            for (const auto& frame : settings_.contact_frames) {
-                LogEigenVec(traj_.GetForce(i, frame));
-            }
+            // LogEigenVec(traj_.GetConfiguration(i));
+            // LogEigenVec(traj_.GetVelocity(i));
+            // LogEigenVec(traj_.GetTau(i));
+            // for (const auto& frame : settings_.contact_frames) {
+            //     LogEigenVec(traj_.GetForce(i, frame));
+            // }
             log_file_ << settings_.dt[i] <<  ",";
         }
 
@@ -1391,12 +1393,12 @@ namespace torc::mpc {
             }
         }
 
-        // Swing traj
-        for (int i = 0; i < settings_.nodes; i++) {
-            for (const auto& frame : settings_.contact_frames) {
-                log_file_ << swing_traj_[frame][i] << ",";
-            }
-        }
+        // // Swing traj
+        // for (int i = 0; i < settings_.nodes; i++) {
+        //     for (const auto& frame : settings_.contact_frames) {
+        //         log_file_ << swing_traj_[frame][i] << ",";
+        //     }
+        // }
 
         // Current frame positions
         for (const auto& frame : settings_.contact_frames) {
@@ -1408,12 +1410,12 @@ namespace torc::mpc {
             LogEigenVec(model_.GetFrameState(frame, q, v, pinocchio::WORLD).vel.linear());
         }
 
-        // Target frame positions
-        for (int i = 0; i < settings_.nodes; i++) {
-            for (const auto& frame : settings_.contact_frames) {
-                LogEigenVec(end_effector_targets_[frame][i]);
-            }
-        }
+        // // Target frame positions
+        // for (int i = 0; i < settings_.nodes; i++) {
+        //     for (const auto& frame : settings_.contact_frames) {
+        //         LogEigenVec(end_effector_targets_[frame][i]);
+        //     }
+        // }
 
         // Optimized frame positions
         for (int i = 0; i < settings_.nodes; i++) {
