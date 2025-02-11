@@ -258,6 +258,7 @@ namespace torc::mpc {
         YAML::Node constraint_settings = config["constraints"];
         friction_coef = constraint_settings["friction_coef"].as<double>();
         max_grf = constraint_settings["max_grf"].as<double>();
+        min_grf = constraint_settings["min_grf"].as<double>();
         friction_margin = (constraint_settings["friction_margin"] ? constraint_settings["friction_margin"].as<double>() : 0.05);
         polytope_delta = (constraint_settings["polytope_delta"] ? constraint_settings["polytope_delta"].as<double>() : 0.0);
         polytope_shrinking_rad = (constraint_settings["polytope_shrinking_rad"]

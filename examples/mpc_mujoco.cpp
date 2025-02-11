@@ -238,6 +238,27 @@ int main(int argc, const char** argv) {
         g1.GetTorqueJointLimits().tail(g1.GetVelDim() - torc::mpc::FLOATING_VEL),
         tau_lims_idxs);
 
+    // Force
+    std::vector<int> force_lim_idxs;
+    for (int i = 0; i < 3; i++) {
+        force_lim_idxs.push_back(i);
+    }
+    vectorx_t stance_lb(3), stance_ub(3);
+    stance_lb << -1000, -1000, settings.min_grf;
+    stance_ub << 1000, 1000, settings.max_grf;
+    BoxConstraint stance_force_box(0, settings.nodes, "stance_force_box",
+        stance_lb, // Minimum force on the ground
+        stance_ub,
+        force_lim_idxs);
+
+    vectorx_t swing_lb(3), swing_ub(3);
+    swing_lb << 0, 0, 0;
+    swing_ub << 0, 0, 0;
+    BoxConstraint swing_force_box(0, settings.nodes, "swing_force_box",
+        swing_lb, // Minimum force on the ground
+        swing_ub,
+        force_lim_idxs);
+
     // ---------- Friction Cone Constraints ---------- //
     FrictionConeConstraint friction_cone_constraint(0,settings.nodes - 1, "friction_cone_cone",
         settings.friction_coef, settings.friction_margin, settings.deriv_lib_path, settings.compile_derivs);
@@ -290,7 +311,6 @@ int main(int argc, const char** argv) {
     // --------------------------------- //
     torc::mpc::ContactSchedule cs(settings.contact_frames);
 
-    // TODO: When the swing time goes past the time horizon weird stuff happens
     cs.InsertSwing("right_toe", 0.1, 0.5);
     cs.InsertSwing("right_heel", 0.1, 0.5);
     cs.InsertSwing("left_toe", 0.5, 0.9);
@@ -322,6 +342,7 @@ int main(int argc, const char** argv) {
     mpc.SetConfigBox(config_box);
     mpc.SetVelBox(vel_box);
     mpc.SetTauBox(tau_box);
+    mpc.SetForceBox(stance_force_box, swing_force_box);
     mpc.SetFrictionCone(std::move(friction_cone_constraint));
     mpc.SetSwingConstraint(std::move(swing_constraint));
     mpc.SetHolonomicConstraint(std::move(holonomic_constraint));

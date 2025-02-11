@@ -72,6 +72,7 @@ constraints:
   friction_coef: 0.6 #0.6 #0.7  # TODO: Tune this
   friction_margin: 2
   max_grf: 800 #500 #8000
+  min_grf: 10
   collisions:
     - frame1: "left_toe"
       frame2: "right_toe"

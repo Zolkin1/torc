@@ -65,6 +65,7 @@ namespace torc::mpc {
         void SetConfigBox(const BoxConstraint& constraints);
         void SetVelBox(const BoxConstraint& constraints);
         void SetTauBox(const BoxConstraint& constraints);
+        void SetForceBox(const BoxConstraint& stance_box, const BoxConstraint& swing_box);
         void SetFrictionCone(FrictionConeConstraint constraints);
         void SetSwingConstraint(SwingConstraint constraints);
         void SetHolonomicConstraint(HolonomicConstraint constraints);
@@ -155,6 +156,8 @@ namespace torc::mpc {
         std::unique_ptr<BoxConstraint> config_box_;
         std::unique_ptr<BoxConstraint> vel_box_;
         std::unique_ptr<BoxConstraint> tau_box_;
+        std::unique_ptr<BoxConstraint> swing_force_box_;
+        std::unique_ptr<BoxConstraint> stance_force_box_;
 
         std::unique_ptr<FrictionConeConstraint> friction_cone_;
 

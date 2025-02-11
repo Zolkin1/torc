@@ -51,6 +51,7 @@ namespace torc::mpc {
         // Constraints
         double friction_coef;
         double max_grf;
+        double min_grf;
         double friction_margin;
         double polytope_delta;
         double polytope_shrinking_rad;
