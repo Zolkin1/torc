@@ -22,7 +22,10 @@ namespace torc::ad {
 
     using sparsity_pattern_t = std::vector<std::set<size_t>>;
     using ad_vector_t = Eigen::VectorX<adcg_t>;
+    using ad_vector3_t = Eigen::Vector3<adcg_t>;
     using ad_matrix_t = Eigen::MatrixX<adcg_t>;
+    using ad_matrix3_t = Eigen::Matrix3<adcg_t>;
+    using ad_quat = Eigen::Quaternion<adcg_t>;
 
     using ad_fcn_t = std::function<void(const ad_vector_t&, const ad_vector_t&, ad_vector_t&)>;
 }   // namepsace torc::ad

@@ -32,7 +32,8 @@ target_link_libraries(utils_tests PUBLIC Utils)
 catch_discover_tests(utils_tests)
 
 # --------- MPC Tests --------- #
-add_executable(mpc_tests mpc_tests.cpp mpc_test_class.cpp mpc_test_class.h)
+add_executable(mpc_tests mpc_tests.cpp mpc_test_class.cpp mpc_test_class.h
+        hpipm_mpc_test.cpp)
 target_link_libraries(mpc_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(mpc_tests PUBLIC Mpc)
 catch_discover_tests(mpc_tests)
@@ -43,6 +44,11 @@ target_link_libraries(ad_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(ad_tests PUBLIC Autodiff)
 catch_discover_tests(ad_tests)
 
+# --------- HPIPM Tests --------- #
+add_executable(mpc_hpipm_tests hpipm_mpc_test.cpp constraints/DynamicsConstraintsTest.cpp constraints/DynamicsConstraintsTest.h)
+target_link_libraries(mpc_hpipm_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(mpc_hpipm_tests PUBLIC Mpc)
+catch_discover_tests(mpc_hpipm_tests)
 
 # Dynamics
 add_executable(dynamics_tests dynamics_tests.cpp)

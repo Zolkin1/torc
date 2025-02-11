@@ -453,6 +453,12 @@ namespace torc::mpc {
                     CHECK(row2 == row1);
                     row1 += NumCollisionConstraintsNode();
                 }
+
+                if (node > 0) {
+                    row2 = GetConstraintRow(node, FootPolytope);
+                    CHECK(row2 == row1);
+                    row1 += NumFootPolytopeConstraintsNode();
+                }
             }
 
             CHECK(row1 == GetConstraintRowStartNode(nodes_));

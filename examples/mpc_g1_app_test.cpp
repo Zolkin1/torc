@@ -4,7 +4,6 @@
 
 #include "full_order_mpc.h"
 
-// TODO: Fix the new constraint violation issues
 
 int main() {
     using namespace torc::mpc;
@@ -23,6 +22,15 @@ int main() {
     cs.InsertSwing("right_toe", 0.3, 0.6);
     cs.InsertSwing("right_heel", 0.3, 0.6);
 
+    matrixx_t A_temp = matrixx_t::Identity(2, 2);
+    Eigen::Vector4d b_temp = Eigen::Vector4d::Zero();
+    b_temp << 10, 10, -10, -10;
+    for (const auto& frame : mpc.GetContactFrames()) {
+        for (int i = 0; i < cs.GetNumContacts(frame); i++) {
+            cs.SetPolytope(frame, i, A_temp, b_temp);
+        }
+    }
+
     const double apex_height = 0.08;
     const std::vector<double> foot_height = {0.01, 0.01, 0.01, 0.01};
     const double apex_time = 0.75;
@@ -32,24 +40,23 @@ int main() {
     }
 
     // Print swing trajectory to csv for checking
-    std::ofstream traj_file;
-    traj_file.open("swing_traj.txt");
-    double t = 0.2;
-    for (int i = 0; i < 100; i++) {
-        double height = cs.GetSwingHeight(apex_height, foot_height[0], apex_time, t, 0.2, 0.5);
-        t += 0.3/100;
-        traj_file << height << ", " << t << std::endl;
-    }
+    // std::ofstream traj_file;
+    // traj_file.open("swing_traj.txt");
+    // double t = 0.2;
+    // for (int i = 0; i < 100; i++) {
+    //     double height = cs.GetSwingHeight(apex_height, foot_height[0], apex_time, t, 0.2, 0.5);
+    //     t += 0.3/100;
+    //     traj_file << height << ", " << t << std::endl;
+    // }
     std::cout << "Apex time: " << apex_time << " foot height: " << foot_height[0] << " start time: " << 0 << " end time: " << 0.3 << std::endl;
-    traj_file.close();
+    // traj_file.close();
 
     vectorx_t q_target, v_target;
     q_target.resize(g1.GetConfigDim());
     q_target << 0, 0, 0.793,
                 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0,
+                0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
                 0, 0, 0, 1.1,
                 0, 0, 0, 1.1;
 
@@ -58,9 +65,8 @@ int main() {
     v_target.resize(g1.GetVelDim());
     v_target << 0., 0, 0,
                 0, 0, 0,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0,
-                0, 0, 0,
+                0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
                 0, 0, 0, 0,
                 0, 0, 0, 0;
     mpc.SetConstantVelTarget(v_target);
@@ -103,7 +109,14 @@ int main() {
 
     // mpc.Compute(q_target, v_target, traj);
 
-    mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>());
+    SimpleTrajectory q_target_traj(q_target.size(), mpc.GetNumNodes());
+    SimpleTrajectory v_target_traj(v_target.size(), mpc.GetNumNodes());
+    for (int node = 0; node < mpc.GetNumNodes(); node++) {
+        q_target_traj[node] = q_target;
+        v_target_traj[node] = v_target;
+    }
+
+    mpc.GenerateCostReference(q_target, v_target, q_target_traj, v_target_traj, cs);
     std::cout << "\nTargets:" << std::endl;
     for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
         std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;
@@ -112,35 +125,7 @@ int main() {
     // q_target(0) += 0.2;
     mpc.ComputeNLP(q_target, v_target, traj);
 
-    // for (int node = 0; node < mpc.GetNumNodes(); node++) {
-    //     vectorx_t q_ic = traj.GetConfiguration(node);
-    //     vectorx_t v_ic = (traj.GetVelocity(node) + traj.GetVelocity(node + 1))/2;
-    //     vectorx_t tau = traj.GetTau(node);
-    //
-    //     std::vector<torc::models::ExternalForce<double>> f_ext;
-    //     for (const auto& frame : mpc.GetContactFrames()) {
-    //         f_ext.emplace_back(frame, traj.GetForce(0, frame));
-    //     }
-    //
-    //
-    //     vectorx_t xdot = achilles.GetDynamics(q_ic, v_ic, tau, f_ext);
-    //     double dt = traj.GetDtVec()[node];
-    //     vectorx_t q_next = vectorx_t::Zero(q_ic.size());
-    //     pinocchio::integrate(achilles.GetModel(), q_ic, dt*xdot.head(v_ic.size()), q_next);
-    //     vectorx_t v_next = v_ic + dt*xdot.tail(v_ic.size());
-    //
-    //     std::cout << "Node: " << node << std::endl;
-    //     std::cout << "Integrated dynamics: " << std::endl;
-    //     std::cout << "q next: " << q_next.transpose() << std::endl;
-    //     std::cout << "v next: " << v_next.transpose() << std::endl << std::endl;
-    //
-    //     std::cout << "Next node: " << std::endl;
-    //     std::cout << "q[1]: " << traj.GetConfiguration(1).transpose() << std::endl;
-    //     std::cout << "v[1]: " << traj.GetVelocity(1).transpose() << std::endl << std::endl << std::endl;
-    //     // std::cout << "v[1]: " << ((traj.GetVelocity(1) + traj.GetVelocity(2))/2).transpose() << std::endl;
-    // }
-
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 20; i++) {
     // TODO: put back!
         vectorx_t q_current;
         traj.GetConfigInterp(0.01, q_current);
@@ -151,7 +136,10 @@ int main() {
         // cs.ShiftSwings(-0.01);
         mpc.UpdateContactScheduleAndSwingTraj(cs, apex_height, foot_height, apex_time);
 
-        mpc.ShiftWarmStart(0.01);
+        // mpc.ShiftWarmStart(0.01);
+
+        // TODO: Put back
+        // mpc.GenerateCostReference(q_target,  v_target, v_target.head<3>(), cs);
 
         mpc.Compute(q_current, v_current, traj);
         // mpc.Compute(q_target, v_target, traj);

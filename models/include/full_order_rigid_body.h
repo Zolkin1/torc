@@ -8,6 +8,7 @@
 #include "pinocchio/algorithm/crba.hpp"
 #include "pinocchio/algorithm/rnea.hpp"
 
+#include "ExternalForce.h"
 #include "pinocchio_model.h"
 #include "robot_contact_info.h"
 
@@ -16,17 +17,6 @@ namespace torc::models {
     using matrixx_t = Eigen::MatrixXd;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using matrix3x_t = Eigen::Matrix<double, 3, Eigen::Dynamic>;
-
-    template <typename ScalarT>
-    struct ExternalForce {
-        std::string frame_name;
-        Eigen::Vector3<ScalarT> force_linear;
-
-        ExternalForce(const std::string& frame, const Eigen::Vector3<ScalarT>& force) {
-            frame_name = frame;
-            force_linear = force;
-        }
-    };
 
     class FullOrderRigidBody : public PinocchioModel {
     public:
@@ -149,7 +139,7 @@ namespace torc::models {
         * @param frames corresponding frame names
         */
         vectorx_t InverseKinematics(const vectorx_t& base_config, const std::vector<vector3_t>& positions, const std::vector<std::string>& frames,
-            const vectorx_t& q_guess);
+            const vectorx_t& q_guess, bool use_floating_base=false);
 
         // DEBUG ------
         pinocchio::Model GetModel() const;

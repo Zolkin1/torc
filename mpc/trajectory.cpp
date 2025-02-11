@@ -6,6 +6,8 @@
 #include "pinocchio/math/quaternion.hpp"
 #include "trajectory.h"
 
+#include <fstream>
+
 namespace torc::mpc {
     Trajectory::Trajectory()
         : q_(0, 0), v_(0, 0), tau_(0, 0) {}
@@ -34,6 +36,7 @@ namespace torc::mpc {
             tau_.InsertData(node, vectorx_t::Zero(tau_size_));
             for (int frame = 0; frame < num_frames_; frame++) {
                 forces_[node][frame].setZero();
+                in_contact_[node][frame] = true;   // Default to in contact
             }
         }
     }
@@ -48,9 +51,14 @@ namespace torc::mpc {
         v_.SetSizes(vel_size_, nodes_);
         tau_.SetSizes(tau_size_, nodes_);
         forces_.resize(nodes_);
+        in_contact_.resize(nodes_);
         dt_.resize(nodes_);
         for (auto& force : forces_) {
             force.resize(num_frames_);
+        }
+
+        for (auto& contact : in_contact_) {
+            contact.resize(num_frames_);
         }
     }
 
@@ -68,6 +76,10 @@ namespace torc::mpc {
 
     void Trajectory::SetForce(int node, const std::string& frame, const torc::mpc::vector3_t& f) {
         forces_[node][force_frames_[frame]] = f;
+    }
+
+    void Trajectory::SetInContact(int node, const std::string &frame, bool in_contact) {
+        in_contact_[node][force_frames_[frame]] = in_contact;
     }
 
     void Trajectory::SetDtVector(const std::vector<double>& dt) {
@@ -121,16 +133,29 @@ namespace torc::mpc {
         return  total_time;
     }
 
-
+    bool Trajectory::GetInContact(const std::string &frame, int node) const {
+        return in_contact_[node][force_frames_.at(frame)];
+    }
 
 
     // -------------------------- //
     // ----- Interpolations ----- //
     // -------------------------- //
+    bool Trajectory::GetInContactInterp(double time, const std::string &frame) {
+        const auto node = GetNode(time);
+        if (node.has_value()) {
+            return in_contact_[node.value()][force_frames_[frame]];
+        } else {
+            throw std::runtime_error("Trajectory::GetInContact : invalid time!");
+        }
+    }
+
+
     void Trajectory::GetConfigInterp(double time, vectorx_t& q_out) {
         if (time < 0) {
             std::cerr << "Interpolation time < 0! Returning 0!" << std::endl;
             q_out = vectorx_t::Zero(q_[0].size());
+            q_out(6) = 1;   // For a normalized quat
             return;
         }
 
@@ -167,14 +192,15 @@ namespace torc::mpc {
                 quat_t quat_out; // = GetQuat(i-1).slerp(forward_weight, GetQuat(i));
                 pinocchio::quaternion::slerp(forward_weight, GetQuat(i-1), GetQuat(i), quat_out);
                 q_out.segment<QUAT_VARS>(POS_VARS) = quat_out.coeffs();
+                if (std::abs(q_out.segment<QUAT_VARS>(POS_VARS).norm() - 1) > 1e-8) {
+                    std::cerr << "q: " << q_out.transpose() << std::endl;
+                    throw std::runtime_error("[Trajectory] Interpolation invalid quaternion!");
+                }
                 return;
             }
 
             time_tally += dt_[i];
         }
-
-        // TODO: Put back!
-        // std::cerr << "Time is too large! No interpolation provided!" << std::endl;
     }
 
     void Trajectory::GetVelocityInterp(double time, vectorx_t& v_out) {
@@ -216,9 +242,6 @@ namespace torc::mpc {
 
             time_tally += dt_[i];
         }
-
-        // TODO: Put back!
-        // std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
     }
 
 
@@ -253,9 +276,6 @@ namespace torc::mpc {
 
             time_tally += dt_[i];
         }
-
-        // TODO: Put back!
-        // std::cerr << "Interpolation time is too large! No interpolation provided!" << std::endl;
     }
 
     void Trajectory::SetDefault(const vectorx_t& q_default) {
@@ -281,5 +301,40 @@ namespace torc::mpc {
         return std::nullopt;
     }
 
+    void Trajectory::ExportToCSV(const std::string &file_path) {
+        std::cout << "Writing trajectory to " << file_path << std::endl;
+        std::ofstream csv_file(file_path, std::ios_base::out);
+        for (int node = 0; node < nodes_; node++) {
+            vectorx_t q = q_[node];
+            for (int i = 0; i < q.size(); i++) {
+                csv_file << q[i] << ",";
+            }
 
+            vectorx_t v = v_[node];
+            for (int i = 0; i < v.size(); i++) {
+                csv_file << v[i] << ",";
+            }
+
+            vectorx_t tau = tau_[node];
+            for (int i = 0; i < tau.size(); i++) {
+                csv_file << tau[i] << ",";
+            }
+            for (int frame = 0; frame < num_frames_; frame++) {
+                for (int i = 0; i < 3; i++) {
+                    csv_file << forces_[node][frame][i] << ",";
+                }
+            }
+
+            csv_file << dt_[node] << std::endl;
+        }
+        csv_file.close();
+    }
+
+    SimpleTrajectory Trajectory::GetConfigTrajectory() const {
+        return q_;
+    }
+
+    SimpleTrajectory Trajectory::GetVelocityTrajectory() const {
+        return v_;
+    }
 } //torc::mpc

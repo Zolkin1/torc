@@ -110,7 +110,7 @@ int main() {
     // mpc.Compute(q_target, v_target, traj);
 
     std::cout << "\nTargets:" << std::endl;
-    mpc.GenerateCostReference(q_target, v_target, v_target.head<3>());
+    // mpc.GenerateCostReference(q_target, v_target, v_target.head<3>(), cs);
     for (int i = 0; i < mpc.GetConfigTargets().GetNumNodes(); i++) {
         std::cout << "i: " << i << ", target: " << mpc.GetConfigTargets()[i].transpose() << std::endl;
     }
@@ -119,7 +119,6 @@ int main() {
     mpc.ComputeNLP(q_target, v_target, traj);
 
     for (int i = 0; i < 20; i++) {
-    // TODO: put back!
         vectorx_t q_current;
         traj.GetConfigInterp(0.01, q_current);
         std::cout << "q: " << q_current.transpose() << std::endl;
@@ -131,7 +130,8 @@ int main() {
 
         mpc.ShiftWarmStart(0.01);
 
-        mpc.GenerateCostReference(q_current, v_current, v_target.head<3>());
+        // TODO: Put back
+        // mpc.GenerateCostReference(q_current, v_current, v_target.head<3>(), cs);
 
         mpc.Compute(q_current, v_current, traj);
         // mpc.Compute(q_target, v_target, traj);

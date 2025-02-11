@@ -8,6 +8,16 @@
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/multibody/data.hpp"
 
+// #if (defined __GNUG__) && !((__GNUC__==4) && (__GNUC_MINOR__==3))
+//    #define EIGEN_EMPTY_STRUCT_CTOR(X) \
+//    EIGEN_STRONG_INLINE X() {} \
+//    EIGEN_STRONG_INLINE X(const X& ) {}
+// #else
+//     #define EIGEN_EMPTY_STRUCT_CTOR(X)
+// #endif
+// #include "pinocchio/autodiff/casadi.hpp"
+
+
 #include "base_model.h"
 #include "robot_contact_info.h"
 #include "frame_state_types.h"
@@ -17,6 +27,16 @@ namespace torc::models {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using ad_pin_model_t = pinocchio::ModelTpl<torc::ad::adcg_t>;
     using ad_pin_data_t = pinocchio::DataTpl<torc::ad::adcg_t>;
+
+    // // TODO: Move
+    // typedef double Scalar;
+    // typedef ::casadi::SX ADScalar;
+    //
+    // typedef pinocchio::ModelTpl<Scalar> Model;
+    // typedef Model::Data Data;
+    //
+    // typedef pinocchio::ModelTpl<ADScalar> ADModel;
+    // typedef ADModel::Data ADData;
 
     class PinocchioModel : public BaseModel {
     public:
@@ -126,6 +146,9 @@ namespace torc::models {
         [[nodiscard]] const ad_pin_model_t& GetADPinModel() const;
         std::shared_ptr<ad_pin_data_t> GetADPinData();
 
+        // [[nodiscard]] const ADModel& GetCasadiPinModel() const;
+        // std::shared_ptr<ADData> GetCasadiPinData();
+
     protected:
 
         void MakePinocchioContacts(const RobotContactInfo& contact_info,
@@ -141,6 +164,10 @@ namespace torc::models {
         // Autodiff compatible model and data
         ad_pin_model_t pin_ad_model_;
         std::shared_ptr<ad_pin_data_t> pin_ad_data_;
+
+        // // Casadi Models
+        // ADModel casadi_ad_model_;
+        // std::shared_ptr<ADData> casadi_ad_data_;
 
         double mass_;
 

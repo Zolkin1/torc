@@ -22,7 +22,8 @@ list(APPEND MODELS_HEADER_LIST
         "${MODELS_INC}/full_order_rigid_body.h"
         "${MODELS_INC}/frame_state_types.h"
         "${MODELS_INC}/single_rigid_body.h"
-        "${MODELS_INC}/pinocchio_interface.h")
+        "${MODELS_INC}/pinocchio_interface.h"
+        "${MODELS_INC}/ExternalForce.h")
 
 # -------  Create Library -------- #
 add_library(Models
@@ -38,10 +39,12 @@ find_package(Eigen3 REQUIRED)
 target_link_libraries(Models PUBLIC Eigen3::Eigen)
 
 #----------- Autodiff ----------- #
-find_package(Eigen3 REQUIRED)
 target_link_libraries(Models PUBLIC Autodiff)
 
 #----------- Pinocchio -----------#
 list(APPEND CMAKE_PREFIX_PATH /opt/openrobots/)
 find_package(pinocchio 3.0.0 REQUIRED)
 target_link_libraries(Models PUBLIC pinocchio::pinocchio)
+
+#target_link_libraries(Models PRIVATE casadi)
+

@@ -23,7 +23,6 @@ namespace torc::ad {
 
     // Heavily inspired by the OCS2 toolbox
     class CppADInterface {
-        // TODO: Check if Forward(0, x) (i.e. zero order forward) is as quick as evaluating the double function
     public:
         CppADInterface(ad_fcn_t cg_fn,
                        std::string identifier, fs::path deriv_path,

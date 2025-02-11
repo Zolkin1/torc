@@ -5,9 +5,16 @@
 #ifndef PINOCCHIOINTERFACE_H
 #define PINOCCHIOINTERFACE_H
 
+#include <iostream>
 #include <Eigen/Core>
+#include <pinocchio/algorithm/aba.hpp>
 #include <pinocchio/math/quaternion.hpp>
 #include <pinocchio/spatial/explog-quaternion.hpp>
+#include "pinocchio/algorithm/frames.hpp"
+#include "pinocchio/algorithm/rnea.hpp"
+#include "pinocchio/algorithm/crba.hpp"
+
+#include "ExternalForce.h"
 
 namespace torc::models {
 
@@ -16,8 +23,8 @@ namespace torc::models {
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& q) {
 
         if (dq.size() != q.size() - 1) {
-            std::cerr << "dq size: " << dq.size() << std::endl;
-            throw std::runtime_error("dq size is incorrect!");
+            std::cerr << "dq size: " << dq.size() << ", q size: " << q.size() << std::endl;
+            throw std::runtime_error("dq and q are incompatible!");
         }
 
         Eigen::Vector<ScalarT, Eigen::Dynamic> q_out(q.size());
@@ -35,16 +42,59 @@ namespace torc::models {
         return q_out;
     }
 
+    /**
+     * @brief computes q1 - q2
+     * @tparam ScalarT
+     * @param q1
+     * @param q
+     * @return
+     */
+    template<typename ScalarT>
+    Eigen::Vector<ScalarT, Eigen::Dynamic> qDifference(const Eigen::Vector<ScalarT, Eigen::Dynamic>& q1,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& q2) {
+
+        if (q1.size() != q2.size()) {
+            throw std::runtime_error("q1 and q2 do not have the same size!");
+        }
+
+        Eigen::Vector<ScalarT, Eigen::Dynamic> q_out(q1.size() - 1);
+
+        // Position variables
+        q_out.template head<3>() = q1.template head<3>() - q2.template head<3>();
+
+        // Quaternion
+        Eigen::Quaternion<ScalarT> quat1(q1.template segment<4>(3));
+        Eigen::Quaternion<ScalarT> quat2(q2.template segment<4>(3));
+        q_out.template segment<3>(3) = pinocchio::quaternion::log3(quat2.inverse()*quat1);
+
+        // Joints
+        q_out.tail(q_out.size() - 6) = q1.tail(q1.size() - 7) - q2.tail(q2.size() - 7);
+
+        return q_out;
+    }
+
     template<typename ScalarT>
     Eigen::Vector<ScalarT, Eigen::Dynamic> InverseDynamics(const pinocchio::ModelTpl<ScalarT>& pin_model, pinocchio::DataTpl<ScalarT>& data,
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& q,
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& v,
         const Eigen::Vector<ScalarT, Eigen::Dynamic>& a,
-        const std::vector<ExternalForce<ad::adcg_t>>& f_ext) {
+        const std::vector<ExternalForce<ScalarT>>& f_ext) {
 
         const auto forces = ConvertExternalForcesToPin(pin_model, data, q, f_ext);
 
         return pinocchio::rnea(pin_model, data, q, v, a, forces);
+    }
+
+    template<typename ScalarT>
+    Eigen::Vector<ScalarT, Eigen::Dynamic> ForwardDynamics(const pinocchio::ModelTpl<ScalarT>& pin_model, pinocchio::DataTpl<ScalarT>& data,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& q,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& v,
+    const Eigen::Vector<ScalarT, Eigen::Dynamic>& tau,
+    const std::vector<ExternalForce<ScalarT>>& f_ext) {
+
+        const auto forces = ConvertExternalForcesToPin(pin_model, data, q, f_ext);
+
+        return pinocchio::aba(pin_model, data, q, v, tau, forces);
     }
 
     template<typename ScalarT>
@@ -80,6 +130,25 @@ namespace torc::models {
         }
 
         return forces;
+    }
+
+    template<typename ScalarT>
+    Eigen::Vector<ScalarT, Eigen::Dynamic> ForwardWithCrba(const pinocchio::ModelTpl<ScalarT>& pin_model, pinocchio::DataTpl<ScalarT>& data,
+        const Eigen::Vector<ScalarT, Eigen::Dynamic>& q,
+        const Eigen::Vector<ScalarT, Eigen::Dynamic>& v,
+        const Eigen::Vector<ScalarT, Eigen::Dynamic>& tau,
+        const std::vector<ExternalForce<ScalarT>>& f_ext) {
+
+        // Compute bias term that includes external forces
+        const Eigen::Vector<ScalarT, Eigen::Dynamic> a = Eigen::Vector<ScalarT, Eigen::Dynamic>::Zero(v.size());
+        const Eigen::Vector<ScalarT, Eigen::Dynamic> b = InverseDynamics(pin_model, data, q, v, a, f_ext);
+
+        // Compute M
+        pinocchio::crba(pin_model, data, q);
+        data.M.template triangularView<Eigen::StrictlyLower>() = data.M.transpose().template triangularView<Eigen::StrictlyLower>();  // Make full
+
+        // Compute a
+        return data.M.llt().solve(tau - b);
     }
 
     template<typename ScalarT>

@@ -18,7 +18,6 @@ namespace torc::mpc {
     using vector3_t = Eigen::Vector3d;
     using quat_t = Eigen::Quaterniond;
 
-    // TODO: Add a start_time field
     class Trajectory {
     public:
         Trajectory();
@@ -33,6 +32,7 @@ namespace torc::mpc {
         void SetTau(int node, const vectorx_t& tau);
         void SetForce(int node, const std::string& frame, const vector3_t& f);
         void SetDtVector(const std::vector<double>& dt);
+        void SetInContact(int node, const std::string &frame, bool in_contact);
 
         [[nodiscard]] vectorx_t GetConfiguration(int node) const;
         [[nodiscard]] quat_t GetQuat(int node) const;
@@ -42,17 +42,20 @@ namespace torc::mpc {
         [[nodiscard]] const std::vector<double>& GetDtVec() const;
         [[nodiscard]] std::vector<std::string> GetContactFrames() const;
         [[nodiscard]] double GetTotalTime() const;
+        [[nodiscard]] bool GetInContact(const std::string& frame, int node) const;
 
         void GetConfigInterp(double time, vectorx_t& q_out);
         void GetVelocityInterp(double time, vectorx_t& v_out);
         void GetTorqueInterp(double time, vectorx_t& torque_out);
         void GetForceInterp(double time, const std::string& frame, vector3_t& force_out);
+        bool GetInContactInterp(double time, const std::string& frame);
 
         void SetDefault(const vectorx_t& q_default);
 
-//        void Reset();
+        void ExportToCSV(const std::string& file_path);
 
-        // TODO: Add interpolation function
+        SimpleTrajectory GetConfigTrajectory() const;
+        SimpleTrajectory GetVelocityTrajectory() const;
 
     protected:
     private:
@@ -71,6 +74,7 @@ namespace torc::mpc {
         std::vector<std::vector<vector3_t>> forces_;
         std::map<std::string, int> force_frames_;
         std::vector<double> dt_;
+        std::vector<std::vector<bool>> in_contact_;
         int num_frames_;
         int nodes_;
         int config_size_;

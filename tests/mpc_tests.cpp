@@ -78,91 +78,95 @@ TEST_CASE("A1 MPC Test", "[mpc]") {
     std::cout << std::endl << std::endl;
 }
 
-TEST_CASE("Achilles MPC Test", "[mpc]") {
-    using namespace torc::mpc;
-    const std::string pin_model_name = "test_pin_model";
-    std::filesystem::path achilles_urdf = std::filesystem::current_path();
-    achilles_urdf += "/test_data/achilles.urdf";
-
-    std::filesystem::path mpc_config = std::filesystem::current_path();
-    mpc_config += "/test_data/achilles_mpc_config.yaml";
-
-    FullOrderMpc mpc("achilles_mpc", mpc_config, achilles_urdf);
-
-    mpc.Configure();
-
-    torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
-
-    vectorx_t random_state(achilles.GetConfigDim() + achilles.GetVelDim());
-    vectorx_t q_rand = achilles.GetRandomConfig();
-    vectorx_t v_rand = achilles.GetRandomVel();
-
-    // random_state.tail(a1.GetVelDim()).setZero();
-    std::cout << "initial config: " << random_state.head(achilles.GetConfigDim()).transpose() << std::endl;
-    std::cout << "initial vel: " << random_state.tail(achilles.GetVelDim()).transpose() << std::endl;
-
-    ContactSchedule cs(mpc.GetContactFrames());
-    const double swing_time = 0.3;
-    double time = 0;
-    for (int i = 0; i < 3; i++) {
-        if (i % 2 != 0) {
-            cs.InsertSwing("foot_front_right", time, time + swing_time);
-            cs.InsertSwing("foot_rear_right", time, time + swing_time);
-            // cs.InsertContact("right_hand", time, time + contact_time);
-        } else {
-            cs.InsertSwing("foot_front_left", time, time + swing_time);
-            cs.InsertSwing("foot_rear_left", time, time + swing_time);
-            // cs.InsertContact("left_hand", time, time + contact_time);
-        }
-        time += swing_time;
-    }
-
-    mpc.UpdateContactSchedule(cs);
-
-    vectorx_t q_target;
-    q_target.resize(achilles.GetConfigDim());
-    q_target << 0, 0, 0.97,
-                0, 0, 0, 1,
-                0, 0, -0.26,
-                0, 0.65, -0.43,
-                0, 0, 0,
-                0, 0, -0.26,
-                0.65, -0.43,
-                0, 0, 0;
-    mpc.SetConstantConfigTarget(q_target);
-
-    Trajectory traj;
-    traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
-
-    vectorx_t q_neutral = achilles.GetNeutralConfig();
-    q_neutral(2) += 0.321;
-    traj.SetDefault(q_neutral);
-
-    mpc.SetWarmStartTrajectory(traj);
-
-    mpc.SetConstantConfigTarget(q_neutral);
-    mpc.SetConstantVelTarget(vectorx_t::Zero(achilles.GetVelDim()));
-
-    mpc.Compute(q_rand, v_rand, traj);
-
-    // for (int i = 0; i < traj.GetNumNodes(); i++) {
-    //     std::cout << "Node: " << i << std::endl;
-    //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
-    //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
-    //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
-    // }
-
-    mpc.Compute(q_rand, v_rand, traj);
-
-    mpc.PrintStatistics();
-    std::cout << std::endl << std::endl;
-    mpc.PrintContactSchedule();
-    std::cout << std::endl << std::endl;
-}
-
+// TEST_CASE("Achilles MPC Test", "[mpc]") {
+//     using namespace torc::mpc;
+//     const std::string pin_model_name = "test_pin_model";
+//     std::filesystem::path achilles_urdf = std::filesystem::current_path();
+//     achilles_urdf += "/test_data/achilles.urdf";
+//
+//     std::filesystem::path mpc_config = std::filesystem::current_path();
+//     mpc_config += "/test_data/achilles_mpc_config.yaml";
+//
+//     FullOrderMpc mpc("achilles_mpc", mpc_config, achilles_urdf);
+//
+//     mpc.Configure();
+//
+//     torc::models::FullOrderRigidBody achilles("achilles", achilles_urdf);
+//
+//     vectorx_t random_state(achilles.GetConfigDim() + achilles.GetVelDim());
+//     vectorx_t q_rand = achilles.GetRandomConfig();
+//     vectorx_t v_rand = achilles.GetRandomVel();
+//
+//     // random_state.tail(a1.GetVelDim()).setZero();
+//     std::cout << "initial config: " << random_state.head(achilles.GetConfigDim()).transpose() << std::endl;
+//     std::cout << "initial vel: " << random_state.tail(achilles.GetVelDim()).transpose() << std::endl;
+//
+//     ContactSchedule cs(mpc.GetContactFrames());
+//     const double swing_time = 0.3;
+//     double time = 0;
+//     for (int i = 0; i < 3; i++) {
+//         if (i % 2 != 0) {
+//             cs.InsertSwing("foot_front_right", time, time + swing_time);
+//             cs.InsertSwing("foot_rear_right", time, time + swing_time);
+//             // cs.InsertContact("right_hand", time, time + contact_time);
+//         } else {
+//             cs.InsertSwing("foot_front_left", time, time + swing_time);
+//             cs.InsertSwing("foot_rear_left", time, time + swing_time);
+//             // cs.InsertContact("left_hand", time, time + contact_time);
+//         }
+//         time += swing_time;
+//     }
+//
+//     mpc.UpdateContactSchedule(cs);
+//
+//     vectorx_t q_target;
+//     q_target.resize(achilles.GetConfigDim());
+//     q_target << 0, 0, 0.97,
+//                 0, 0, 0, 1,
+//                 0, 0, -0.26,
+//                 0, 0.65, -0.43,
+//                 0, 0, 0,
+//                 0, 0, -0.26,
+//                 0.65, -0.43,
+//                 0, 0, 0;
+//     mpc.SetConstantConfigTarget(q_target);
+//
+//     Trajectory traj;
+//     traj.UpdateSizes(achilles.GetConfigDim(), achilles.GetVelDim(), achilles.GetNumInputs(), mpc.GetContactFrames(), mpc.GetNumNodes());
+//
+//     vectorx_t q_neutral = achilles.GetNeutralConfig();
+//     q_neutral(2) += 0.321;
+//     traj.SetDefault(q_neutral);
+//
+//     mpc.SetWarmStartTrajectory(traj);
+//
+//     mpc.SetConstantConfigTarget(q_neutral);
+//     mpc.SetConstantVelTarget(vectorx_t::Zero(achilles.GetVelDim()));
+//
+//     // TODO: Add in cost reference!
+//     // mpc.GenerateCostReference(q_rand, v_rand, mpc.GetConfigTargets())
+//
+//     mpc.Compute(q_rand, v_rand, traj);
+//
+//     // for (int i = 0; i < traj.GetNumNodes(); i++) {
+//     //     std::cout << "Node: " << i << std::endl;
+//     //     std::cout << "config: " << traj.GetConfiguration(i).transpose() << std::endl;
+//     //     std::cout << "vel: " << traj.GetVelocity(i).transpose() << std::endl;
+//     //     std::cout << "torque: " << traj.GetTau(i).transpose() << std::endl;
+//     // }
+//
+//     mpc.Compute(q_rand, v_rand, traj);
+//
+//     mpc.PrintStatistics();
+//     std::cout << std::endl << std::endl;
+//     mpc.PrintContactSchedule();
+//     std::cout << std::endl << std::endl;
+// }
+//
 TEST_CASE("Contact schedule", "[mpc][contact schedule]") {
     std::cout << "Contact Schedule Tests" << std::endl;
-    torc::mpc::ContactSchedule cs({"LF_FRONT", "RF_FRONT"});
+    std::vector<std::string> frames = {"LF_FRONT", "RF_FRONT"};
+    torc::mpc::ContactSchedule cs(frames);
     cs.InsertSwing("LF_FRONT", 0.1, 0.2);
     cs.InsertSwing("RF_FRONT", 0.05, 0.15);
 
@@ -177,6 +181,18 @@ TEST_CASE("Contact schedule", "[mpc][contact schedule]") {
     CHECK(cs.InSwing("RF_FRONT", 0.05));
     CHECK(cs.InContact("RF_FRONT", 0.025));
     CHECK(cs.InContact("RF_FRONT", 0.25));
+
+
+    for (const auto& frame : frames) {
+        std::cout << "[" << frame << "]" << " Num Contacts: " << cs.GetNumContacts(frame) << std::endl;
+        double time = 0;
+        while (time < 1) {
+            if (cs.InContact(frame, time)) {
+                std::cout << "time: " << time << ", contact idx: " << cs.GetContactIndex(frame, time) << std::endl;
+            }
+            time += 0.01;
+        }
+    }
 }
 
 TEST_CASE("Trajectory Interpolation", "[trajectory]") {

@@ -29,9 +29,11 @@ namespace torc::models {
         : BaseModel(other.name_, other.system_type_) {
         model_path_ = other.model_path_;
         pin_model_ = other.pin_model_;
-        pin_data_ = std::make_unique<pinocchio::Data>(*other.pin_data_); // TODO: Check that this works as expected
+        pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
         mass_ = other.mass_;
         n_input_ = other.n_input_;
+        pin_ad_model_ = other.pin_ad_model_;
+        pin_ad_data_ = std::make_shared<ad_pin_data_t>(pin_ad_model_);
     }
 
     PinocchioModel::PinocchioModel(const std::string& name, const std::filesystem::path& model_path,
@@ -40,6 +42,7 @@ namespace torc::models {
             : BaseModel(name, system_type), model_path_(model_path) {
         // Create the pin model with some fixed joints
         CreatePinModel(true, joint_skip_names, joint_skip_values);
+        mass_ = pinocchio::computeTotalMass(pin_model_);
     }
 
 
@@ -62,6 +65,9 @@ namespace torc::models {
 
                 // AD Model
                 pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
+
+                // // Casadi Model
+                // casadi_ad_model_ = pin_model_.cast<ADScalar>();
             } else {
                 // Verify that we are given a .xml
                 if (model_path_.extension() != ".xml") {
@@ -95,6 +101,9 @@ namespace torc::models {
 
             // AD Model
             pin_ad_model_ = pin_model_.cast<torc::ad::adcg_t>();
+
+            // // Casadi Model
+            // casadi_ad_model_ = pin_model_.cast<ADScalar>();
         }
 
         // Normal data
@@ -102,6 +111,9 @@ namespace torc::models {
 
         // AD data
         pin_ad_data_ = std::make_shared<ad_pin_data_t>(pin_ad_model_);
+
+        // // Casadi data
+        // ADData casadi_ad_data_(casadi_ad_model_);
     }
 
     long PinocchioModel::GetNumInputs() const {
@@ -289,7 +301,7 @@ namespace torc::models {
                              pinocchio::getFrameVelocity(pin_model_, *pin_data_, idx, ref));
             return state;
         }
-        throw std::runtime_error("Provided frame does not exist.");
+        throw std::runtime_error(frame + " does not exist.");
     }
 
      FrameState PinocchioModel::GetFrameState(const std::string& frame, const vectorx_t& q, const vectorx_t& v, const pinocchio::ReferenceFrame& ref) {
@@ -344,6 +356,14 @@ namespace torc::models {
     std::shared_ptr<ad_pin_data_t> PinocchioModel::GetADPinData() {
         return pin_ad_data_;
     }
+
+    // const ADModel& PinocchioModel::GetCasadiPinModel() const {
+    //     return casadi_ad_model_;
+    // }
+    //
+    // std::shared_ptr<ADData> PinocchioModel::GetCasadiPinData() {
+    //     return casadi_ad_data_;
+    // }
 
 
 } // torc::models
