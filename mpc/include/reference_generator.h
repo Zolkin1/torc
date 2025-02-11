@@ -8,7 +8,7 @@
 #include <vector>
 #include <Eigen/Core>
 
-// #include "osqp++.h"
+#include <proxsuite/proxqp/dense/dense.hpp>
 
 #include "full_order_rigid_body.h"
 #include "simple_trajectory.h"
@@ -22,6 +22,7 @@ namespace torc::mpc {
     using quat_t = Eigen::Quaterniond;
     using matrixx_t = Eigen::MatrixXd;
     using matrix3_t = Eigen::Matrix3d;
+    using matrix2_t = Eigen::Matrix2d;
 
     /**
     * @brief Generate references for MPC given the user input and desired footholds.
@@ -89,10 +90,8 @@ namespace torc::mpc {
 
         models::FullOrderRigidBody model_;
 
-        // // OSQP Interface
-        // osqp::OsqpInstance osqp_instance_;
-        // osqp::OsqpSolver osqp_solver_;
-        // osqp::OsqpSettings osqp_settings_;
+        // ProxQpInterface
+        proxsuite::proxqp::dense::QP<double> qp_;
     };
 }
 
