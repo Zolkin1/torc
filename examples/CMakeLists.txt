@@ -41,3 +41,10 @@ find_package(glfw3 REQUIRED)
 add_executable(mpc_mujoco mpc_mujoco.cpp)
 target_link_libraries(mpc_mujoco PUBLIC Mpc mujoco glfw)
 
+# Parallel Example
+add_executable(mpc_parallel parallel_mpc_example.cpp)
+target_link_libraries(mpc_parallel PUBLIC Mpc)
+
+find_package(OpenMP REQUIRED)
+target_link_libraries(mpc_parallel PUBLIC OpenMP::OpenMP_CXX)
+

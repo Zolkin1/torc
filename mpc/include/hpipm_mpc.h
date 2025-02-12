@@ -57,6 +57,10 @@ namespace torc::mpc {
     class HpipmMpc {
     public:
         HpipmMpc(MpcSettings settings, const models::FullOrderRigidBody& model);
+
+        // Move constructor
+        HpipmMpc(HpipmMpc&& other) noexcept = default;  // TODO: Can I verify this moved everything correctly?
+
         ~HpipmMpc();
 
         void SetDynamicsConstraints(DynamicsConstraint constraint);

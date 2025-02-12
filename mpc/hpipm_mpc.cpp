@@ -104,6 +104,11 @@ namespace torc::mpc {
         }
     }
 
+    // HpipmMpc::HpipmMpc(HpipmMpc&& other) noexcept
+    //     :  {
+    //
+    // }
+
     HpipmMpc::~HpipmMpc() {
         if (settings_.log) {
             log_file_.close();
