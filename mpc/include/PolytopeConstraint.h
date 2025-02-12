@@ -12,7 +12,7 @@ namespace torc::mpc {
     class PolytopeConstraint : public Constraint {
     public:
         PolytopeConstraint(int first_node, int last_node, const std::string& name,
-        const std::vector<std::string>& contact_frames,
+        const std::vector<std::string>& polytope_frames,
         const std::filesystem::path& deriv_lib_path, bool compile_derivs,
         const models::FullOrderRigidBody& model);
 
@@ -26,6 +26,8 @@ namespace torc::mpc {
 
         static constexpr int POLYTOPE_SIZE = 4;
 
+        std::vector<std::string> GetPolytopeFrames() const;
+
     protected:
     private:
         void FootPolytopeConstraint(const std::string& frame, const ad::ad_vector_t& dqk,
@@ -35,6 +37,8 @@ namespace torc::mpc {
         models::FullOrderRigidBody model_;
 
         int config_dim_;
+
+        std::vector<std::string> polytope_frames_;
     };
 }
 

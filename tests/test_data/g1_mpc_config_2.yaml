@@ -110,7 +110,7 @@ constraints:
   collision_end_node: 32
   polytope_start_node: 2
   polytope_end_node: 32
-  # swing_kp: 0 #950.
+  polytope_frames: ["left_foot_middle", "right_foot_middle"]
 costs:
   # --------------------------------------------------------------- #
   # ---------------------- Simulation Params ---------------------- #

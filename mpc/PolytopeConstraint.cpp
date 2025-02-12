@@ -8,18 +8,19 @@
 
 namespace torc::mpc {
     PolytopeConstraint::PolytopeConstraint(int first_node, int last_node, const std::string &name,
-        const std::vector<std::string> &contact_frames,
+        const std::vector<std::string> &polytope_frames,
         const std::filesystem::path &deriv_lib_path, bool compile_derivs,
         const models::FullOrderRigidBody &model)
-            : Constraint(first_node, last_node, name), model_(model), config_dim_(model.GetConfigDim()) {
-        for (const auto& frame : contact_frames) {
+            : Constraint(first_node, last_node, name), model_(model), config_dim_(model.GetConfigDim()),
+                polytope_frames_(polytope_frames) {
+        for (const auto& frame : polytope_frames) {
             constraint_functions_.emplace(frame,
                 std::make_unique<ad::CppADInterface>(
                     std::bind(&PolytopeConstraint::FootPolytopeConstraint, this, frame, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3),
                     name_ + "_" + frame + "_holonomic_constraint",
                     deriv_lib_path,
                     ad::DerivativeOrder::FirstOrder, model_.GetVelDim(),  model_.GetConfigDim() + POLYTOPE_SIZE,
-                    compile_derivs
+                    true //compile_derivs
                 ));
         }
     }
@@ -71,7 +72,6 @@ namespace torc::mpc {
     }
 
 
-
     void PolytopeConstraint::FootPolytopeConstraint(const std::string &frame, const ad::ad_vector_t &dqk,
         const ad::ad_vector_t &qk_A, ad::ad_vector_t &poly_val) {
 
@@ -94,6 +94,10 @@ namespace torc::mpc {
 
         poly_val.resize(POLYTOPE_SIZE/2);
         poly_val = A*frame_pos.head<2>();
+    }
+
+    std::vector<std::string> PolytopeConstraint::GetPolytopeFrames() const {
+        return polytope_frames_;
     }
 
 

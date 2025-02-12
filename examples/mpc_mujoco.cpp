@@ -174,12 +174,20 @@ int main(int argc, const char** argv) {
 
     // Create all the constraints
     using namespace torc::mpc;
-    std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand.urdf";
+    std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand_v2.urdf";
 
     std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_mpc_config_2.yaml";
 
     MpcSettings settings(mpc_config);
     settings.Print();
+
+    std::vector<std::pair<std::string, std::string>> poly_contact_frames;
+    poly_contact_frames.emplace_back(settings.polytope_frames[0], settings.contact_frames[0]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[0], settings.contact_frames[1]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[1], settings.contact_frames[2]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[1], settings.contact_frames[3]);
+
+    settings.poly_contact_pairs = poly_contact_frames;
 
     const std::string pin_model_name = "test_pin_model";
 
@@ -277,7 +285,7 @@ int main(int argc, const char** argv) {
 
     // ---------- Polytope Constraints ---------- //
     PolytopeConstraint polytope_constraint(settings.polytope_start_node, settings.polytope_end_node, "polytope_constraint",
-        settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1);
+        settings.polytope_frames, settings.deriv_lib_path, settings.compile_derivs, g1);
 
     std::cout << "===== Constraints Created =====" << std::endl;
 

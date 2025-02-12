@@ -28,12 +28,20 @@ void thread_function() {
 
     // Create all the constraints
     using namespace torc::mpc;
-    std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand.urdf";
+    std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand_v2.urdf";
 
-    std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_mpc_config.yaml";
+    std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_mpc_config_2.yaml";
 
     MpcSettings settings(mpc_config);
     settings.Print();
+
+    std::vector<std::pair<std::string, std::string>> poly_contact_frames;
+    poly_contact_frames.emplace_back(settings.polytope_frames[0], settings.contact_frames[0]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[0], settings.contact_frames[1]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[1], settings.contact_frames[2]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[1], settings.contact_frames[3]);
+
+    settings.poly_contact_pairs = poly_contact_frames;
 
     const std::string pin_model_name = "test_pin_model";
 
@@ -42,12 +50,11 @@ void thread_function() {
     fs::path deriv_lib_path = fs::current_path();
     deriv_lib_path = deriv_lib_path / "deriv_libs";
 
-    std::vector<std::string> contact_frames = settings.contact_frames;
     // --------------------------------- //
     // ---------- Constraints ---------- //
     // --------------------------------- //
     // ---------- FO Dynamics ---------- //
-    DynamicsConstraint dynamics_constraints(g1, contact_frames, "g1_full_order",
+    DynamicsConstraint dynamics_constraints(g1, settings.contact_frames, "g1_full_order",
         deriv_lib_path, settings.compile_derivs, 0, settings.nodes_full_dynamics);
 
     // ---------- Centroidal Dynamics ---------- //
@@ -118,11 +125,11 @@ void thread_function() {
 
     // ---------- Swing Constraints ---------- //
     SwingConstraint swing_constraint(settings.swing_start_node, settings.swing_end_node,
-        "swing_constraint", g1, contact_frames, settings.deriv_lib_path, settings.compile_derivs);
+        "swing_constraint", g1, settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
     HolonomicConstraint holonomic_constraint(settings.holonomic_start_node, settings.holonomic_end_node,
-        "holonomic_constraint", g1, contact_frames, settings.deriv_lib_path, settings.compile_derivs);
+        "holonomic_constraint", g1, settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Collision Constraints ---------- //
     CollisionConstraint collision_constraint(settings.collision_start_node, settings.collision_end_node,
@@ -130,7 +137,7 @@ void thread_function() {
 
     // ---------- Polytope Constraints ---------- //
     PolytopeConstraint polytope_constraint(settings.polytope_start_node, settings.polytope_end_node, "polytope_constraint",
-        settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1);
+        settings.polytope_frames, settings.deriv_lib_path, settings.compile_derivs, g1);
 
     std::cout << "===== Constraints Created =====" << std::endl;
 

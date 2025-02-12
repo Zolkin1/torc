@@ -65,6 +65,8 @@ namespace torc::mpc {
         int polytope_end_node;
         double swing_buffer;    // TODO: Fill in
         std::vector<CollisionData> collision_data;
+        std::vector<std::string> polytope_frames;
+        std::vector<std::pair<std::string, std::string>> poly_contact_pairs; // Poly frame first, contact frame second
 
         std::vector<CostData> cost_data;
 
