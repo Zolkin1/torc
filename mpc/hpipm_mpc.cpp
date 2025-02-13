@@ -33,16 +33,25 @@ namespace torc::mpc {
         for (const auto& frame : settings_.contact_frames) {
             in_contact_.insert({frame, {}});
             swing_traj_.insert({frame, {}});
-            contact_info_.insert({frame, {}});
             end_effector_targets_.insert({frame, {}});
             for (int i = 0; i < settings_.nodes; i++) {
                 in_contact_[frame].push_back(1);
                 swing_traj_[frame].push_back(0);
-                contact_info_[frame].push_back(ContactSchedule::GetDefaultContactInfo());
                 end_effector_targets_[frame].emplace_back(settings_.hip_offsets[2*frame_idx], settings_.hip_offsets[2*frame_idx + 1], 0);
                 // std::cout << "A:\n" << contact_info_[frame][i].A_ << std::endl;
             }
             frame_idx++;
+        }
+
+        if (settings_.poly_contact_pairs.empty()) {
+            throw std::runtime_error("Polytope frame & contact frame pairs are empty! This must be filled manually right now!");
+        }
+
+        for (const auto& [poly_frame, contact_frame] : settings_.poly_contact_pairs) {
+            contact_info_.insert({poly_frame, {}});
+            for (int i = 0; i < settings_.nodes; i++) {
+                contact_info_[poly_frame].push_back(ContactSchedule::GetDefaultContactInfo());
+            }
         }
 
         for (int i = 0; i < settings_.nodes; i++) {
@@ -94,6 +103,11 @@ namespace torc::mpc {
             log_file_.open("hpipm_mpc_log.csv");
         }
     }
+
+    // HpipmMpc::HpipmMpc(HpipmMpc&& other) noexcept
+    //     :  {
+    //
+    // }
 
     HpipmMpc::~HpipmMpc() {
         if (settings_.log) {
@@ -412,14 +426,16 @@ namespace torc::mpc {
             if (polytope_->IsInNodeRange(node)) {
                 // std::cerr << "Adding polytope..." << std::endl;
                 int slack_idx = 0;
-                for (const auto& frame : settings_.contact_frames) {
+                // TODO: Put back after debugging
+                for (const auto& frame : polytope_->GetPolytopeFrames()) {
+                // const std::string frame = polytope_->GetPolytopeFrames()[0];
                     matrixx_t jac;
                     vectorx_t ub, lb;
                     polytope_->GetLinearization(traj_.GetConfiguration(node),
                         contact_info_[frame][node], frame, jac, ub, lb);
                     // std::cout << "frame: " << frame << std::endl;
 
-                    // std::cout << "node: " << node << " in contact " << in_contact_[frame][node] << std::endl;
+                    // std::cout << "node: " << node << std::endl;
                     // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
                     // std::cout << "polytope b: " << contact_info_[frame][node].b_.transpose() << std::endl;
 
@@ -997,25 +1013,42 @@ namespace torc::mpc {
 
                         contact_idx = sched.GetContactIndex(frame, time);
 
-                        contact_info_[frame][node] = polytopes[contact_idx];
-                        if (contact_idx != current_contact) {
-                            // Only add the margin for future polytopes
-                            contact_info_[frame][node].b_ -= polytope_delta;
+                        for (int i = 0; i < settings_.poly_contact_pairs.size(); i++) {
+                            // NOTE: If two contact frames associated with the same polytope frame have different
+                            //  polytopes this will take the one listed second in the contact schedule. They
+                            //  should have the same polytope.
+                            if (settings_.poly_contact_pairs[i].second == frame) {
+                                const std::string& poly_frame = settings_.poly_contact_pairs[i].first;
+                                contact_info_[poly_frame][node] = polytopes[contact_idx];
+                                if (contact_idx != current_contact) {
+                                    // Only add the margin for future polytopes
+                                    contact_info_[poly_frame][node].b_ -= polytope_delta;
+                                }
+                            }
                         }
+
                     } else {
                         in_contact_[frame][node] = 0;
                         traj_.SetInContact(node, frame, false);
 
-                        contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
+                        for (int i = 0; i < settings_.poly_contact_pairs.size(); i++) {
+                            // NOTE: If two contact frames associated with the same polytope frame have different
+                            //  polytopes this will take the one listed second in the contact schedule. They
+                            //  should have the same polytope.
+                            if (settings_.poly_contact_pairs[i].second == frame) {
+                                const std::string& poly_frame = settings_.poly_contact_pairs[i].first;
+                                contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
 
-                        // TODO: This seems to make it worse, might need to be careful with the function used for the scaling
-                        // if (contact_idx + 1 < polytopes.size()) {
-                        //     contact_info_[frame][node] = polytopes[contact_idx + 1];
-                        //     contact_info_[frame][node].b_ = contact_info_[frame][node].b_  //- polytope_delta
-                        //     + GetPolytopeConvergence(frame, time, sched)*polytope_convergence_scalar;
-                        // } else {
-                        //     contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
-                        // }
+                                // // TODO: This seems to make it worse, might need to be careful with the function used for the scaling
+                                // if (contact_idx + 1 < polytopes.size()) {
+                                //     contact_info_[poly_frame][node] = polytopes[contact_idx + 1];
+                                //     contact_info_[poly_frame][node].b_ = contact_info_[poly_frame][node].b_  //- polytope_delta
+                                //     + GetPolytopeConvergence(frame, time, sched)*polytope_convergence_scalar;
+                                // } else {
+                                //     contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                // }
+                            }
+                        }
                     }
                     time += settings_.dt[node];
                 }

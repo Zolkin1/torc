@@ -273,6 +273,8 @@ namespace torc::mpc {
         polytope_start_node = constraint_settings["polytope_start_node"].as<int>();
         polytope_end_node = constraint_settings["polytope_end_node"].as<int>();
 
+        polytope_frames = constraint_settings["polytope_frames"].as<std::vector<std::string>>();
+
         YAML::Node collision_settings = constraint_settings["collisions"];
         if (!collision_settings.IsSequence()) {
             throw std::runtime_error("Collision settings must be a sequence!");

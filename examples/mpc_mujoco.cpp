@@ -28,7 +28,9 @@
 #include "DynamicsConstraint.h"
 #include "ForwardKinematicsCost.h"
 #include "hpipm_mpc.h"
+#include "reference_generator.h"
 #include "SRBConstraint.h"
+#include "step_planner.h"
 
 // MuJoCo data structures
 mjModel* m = NULL;                  // MuJoCo model
@@ -174,12 +176,20 @@ int main(int argc, const char** argv) {
 
     // Create all the constraints
     using namespace torc::mpc;
-    std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand.urdf";
+    std::filesystem::path g1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_hand_v2.urdf";
 
     std::filesystem::path mpc_config = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/g1_mpc_config_2.yaml";
 
     MpcSettings settings(mpc_config);
     settings.Print();
+
+    std::vector<std::pair<std::string, std::string>> poly_contact_frames;
+    poly_contact_frames.emplace_back(settings.polytope_frames[0], settings.contact_frames[0]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[0], settings.contact_frames[1]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[1], settings.contact_frames[2]);
+    poly_contact_frames.emplace_back(settings.polytope_frames[1], settings.contact_frames[3]);
+
+    settings.poly_contact_pairs = poly_contact_frames;
 
     const std::string pin_model_name = "test_pin_model";
 
@@ -189,12 +199,11 @@ int main(int argc, const char** argv) {
     fs::path deriv_lib_path = fs::current_path();
     deriv_lib_path = deriv_lib_path / "deriv_libs";
 
-    std::vector<std::string> contact_frames = settings.contact_frames;
     // --------------------------------- //
     // ---------- Constraints ---------- //
     // --------------------------------- //
     // ---------- FO Dynamics ---------- //
-    DynamicsConstraint dynamics_constraints(g1, contact_frames, "g1_full_order",
+    DynamicsConstraint dynamics_constraints(g1, settings.contact_frames, "g1_full_order",
         deriv_lib_path, settings.compile_derivs, 0, settings.nodes_full_dynamics);
 
     // ---------- Centroidal Dynamics ---------- //
@@ -265,11 +274,11 @@ int main(int argc, const char** argv) {
 
     // ---------- Swing Constraints ---------- //
     SwingConstraint swing_constraint(settings.swing_start_node, settings.swing_end_node,
-        "swing_constraint", g1, contact_frames, settings.deriv_lib_path, settings.compile_derivs);
+        "swing_constraint", g1, settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Holonomic Constraints ---------- //
     HolonomicConstraint holonomic_constraint(settings.holonomic_start_node, settings.holonomic_end_node,
-        "holonomic_constraint", g1, contact_frames, settings.deriv_lib_path, settings.compile_derivs);
+        "holonomic_constraint", g1, settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs);
 
     // ---------- Collision Constraints ---------- //
     CollisionConstraint collision_constraint(settings.collision_start_node, settings.collision_end_node,
@@ -277,7 +286,7 @@ int main(int argc, const char** argv) {
 
     // ---------- Polytope Constraints ---------- //
     PolytopeConstraint polytope_constraint(settings.polytope_start_node, settings.polytope_end_node, "polytope_constraint",
-        settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1);
+        settings.polytope_frames, settings.deriv_lib_path, settings.compile_derivs, g1);
 
     std::cout << "===== Constraints Created =====" << std::endl;
 
@@ -388,6 +397,18 @@ int main(int argc, const char** argv) {
     if (m->nq != 18 + FLOATING_BASE) {
         throw std::runtime_error("Mujoco model not 18dof!");
     }
+
+    // Step Planning
+    std::vector<torc::mpc::ContactInfo> contact_polytopes;
+    vector4_t b;
+    b << 10, 10, -10, -10;
+    contact_polytopes.emplace_back(matrix2_t::Identity(), b);
+    std::vector<double> contact_offsets;
+    for (int i = 0; i < settings.num_contact_locations*2; i++) {
+        contact_offsets.push_back(0);
+    }
+    torc::step_planning::StepPlanner step_planner(contact_polytopes, settings.contact_frames, contact_offsets,
+        0.1, settings.polytope_delta);
 
     // Fake time delay
     // COMPUTE_TIME  should be < MPC_PERIOD
@@ -511,6 +532,9 @@ int main(int argc, const char** argv) {
 
             // Update the contact schedule
             cs.ShiftSwings(-MPC_PERIOD);
+            std::map<std::string, std::vector<vector2_t>> nom_footholds, projected_footholds;
+            step_planner.PlanStepsHeuristic(q_target, settings.dt, cs,
+                nom_footholds, projected_footholds);
             mpc.UpdateContactSchedule(cs);
 
             mpc.LogMPCCompute(d->time, q_mpc, v_mpc);   // TODO: Should probably add the logging back into the time recording

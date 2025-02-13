@@ -263,6 +263,12 @@
     <child link="left_heel"/>
   </joint>
 
+  <link name="left_foot_middle"/>
+  <joint name="left_foot_middle_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.035 0 -0.03"/>
+    <parent link="left_ankle_roll_link"/>
+    <child link="left_foot_middle"/>
+  </joint>
 
   <link name="ll_toe"/>
   <joint name="ll_toe_joint" type="fixed">
@@ -501,6 +507,12 @@
     <child link="right_heel"/>
   </joint>
 
+  <link name="right_foot_middle"/>
+  <joint name="right_foot_middle_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.035 0 -0.03"/>
+    <parent link="right_ankle_roll_link"/>
+    <child link="right_foot_middle"/>
+  </joint>
 
   <link name="rl_toe"/>
   <joint name="rl_toe_joint" type="fixed">
