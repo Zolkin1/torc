@@ -426,14 +426,16 @@ namespace torc::mpc {
             if (polytope_->IsInNodeRange(node)) {
                 // std::cerr << "Adding polytope..." << std::endl;
                 int slack_idx = 0;
+                // TODO: Put back after debugging
                 for (const auto& frame : polytope_->GetPolytopeFrames()) {
+                // const std::string frame = polytope_->GetPolytopeFrames()[0];
                     matrixx_t jac;
                     vectorx_t ub, lb;
                     polytope_->GetLinearization(traj_.GetConfiguration(node),
                         contact_info_[frame][node], frame, jac, ub, lb);
                     // std::cout << "frame: " << frame << std::endl;
 
-                    // std::cout << "node: " << node << " in contact " << in_contact_[frame][node] << std::endl;
+                    // std::cout << "node: " << node << std::endl;
                     // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
                     // std::cout << "polytope b: " << contact_info_[frame][node].b_.transpose() << std::endl;
 
@@ -1036,17 +1038,17 @@ namespace torc::mpc {
                             if (settings_.poly_contact_pairs[i].second == frame) {
                                 const std::string& poly_frame = settings_.poly_contact_pairs[i].first;
                                 contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+
+                                // // TODO: This seems to make it worse, might need to be careful with the function used for the scaling
+                                // if (contact_idx + 1 < polytopes.size()) {
+                                //     contact_info_[poly_frame][node] = polytopes[contact_idx + 1];
+                                //     contact_info_[poly_frame][node].b_ = contact_info_[poly_frame][node].b_  //- polytope_delta
+                                //     + GetPolytopeConvergence(frame, time, sched)*polytope_convergence_scalar;
+                                // } else {
+                                //     contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                // }
                             }
                         }
-
-                        // TODO: This seems to make it worse, might need to be careful with the function used for the scaling
-                        // if (contact_idx + 1 < polytopes.size()) {
-                        //     contact_info_[frame][node] = polytopes[contact_idx + 1];
-                        //     contact_info_[frame][node].b_ = contact_info_[frame][node].b_  //- polytope_delta
-                        //     + GetPolytopeConvergence(frame, time, sched)*polytope_convergence_scalar;
-                        // } else {
-                        //     contact_info_[frame][node] = ContactSchedule::GetDefaultContactInfo();
-                        // }
                     }
                     time += settings_.dt[node];
                 }

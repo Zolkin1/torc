@@ -44,6 +44,9 @@ namespace torc::step_planning {
 
         for (int j = 0; j < contact_frames_.size(); j++) {
             const std::string frame = contact_frames_[j];
+
+            // TODO: There is some kind of bug where the polytopes for the frames in contact don't align with there the foot is
+
             nominal_footholds.insert({frame, {}});
             projected_footholds.insert({frame, {}});
 
@@ -53,17 +56,56 @@ namespace torc::step_planning {
                 throw std::runtime_error("[PlanStepsHeuristic] Computed midtimes size does not match contact schedule contact size!");
             }
 
+            // // TODO: Remove after debugging
+            // if (contact_schedule.InContact(frame, 0)) {
+            //     vector4_t b_expect, b_expect2;
+            //     b_expect << 1.25, 1, -0.75, -1;
+            //     b_expect2 << 10, 10, -10, -10;
+            //     if (!contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.isApprox(b_expect) &&
+            //         !contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.isApprox(b_expect2) &&
+            //         !contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.isApprox(mpc::ContactSchedule::GetDefaultContactInfo().b_)) {
+            //         std::cerr << "contact idx: " << contact_schedule.GetContactIndex(frame, 0) << std::endl;
+            //         std::cerr << "midtime: " << midtimes[contact_schedule.GetContactIndex(frame, 0)] << std::endl;
+            //         std::cerr << "frame: " << frame << std::endl;
+            //         std::cerr << "got b: " << contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.transpose() << std::endl;
+            //         throw std::runtime_error("[StepPlanner] [1] Current polytope is not the starting polytope!");
+            //         }
+            // }
+
+            // std::cerr << "--- " << frame << " ---" << std::endl;
             // Get target state at contact midtimes
             for (int i = 0; i < midtimes.size(); i++) {
+                // std::cerr << "i: " << i << " midtime: " << midtimes[i] << std::endl;
                 if (contact_schedule.InContact(frame, 0) && i > contact_schedule.GetContactIndex(frame, 0)) {
+                    // std::cerr << "In contact branch!" << std::endl;
                     SetFootTargetAndPolytope(midtimes[i], i, q_target, dt_vec, j, contact_schedule,
                         nominal_footholds, projected_footholds);
-                } else if (midtimes[i] > contact_schedule.GetSwingDuration(frame, 0)
-                        + contact_schedule.GetSwingStartTime(frame, 0) && midtimes[i] > current_time_buffer_) {
+                    // } else if (midtimes[i] > contact_schedule.GetSwingDuration(frame, 0)
+                    //         + contact_schedule.GetSwingStartTime(frame, 0) && midtimes[i] > current_time_buffer_) {
+                } else
+                if (contact_schedule.InSwing(frame, 0) && midtimes[i] > current_time_buffer_) {
+                    // std::cerr << "In swing branch!" << std::endl;
                     SetFootTargetAndPolytope(midtimes[i], i, q_target, dt_vec, j, contact_schedule,
                                             nominal_footholds, projected_footholds);
                 }
+                // else {
+                //     std::cerr << "In no branch!" << std::endl;
+                // }
             }
+
+            // if (contact_schedule.InContact(frame, 0)) {
+            //     vector4_t b_expect, b_expect2;
+            //     b_expect << 1.25, 1, -0.75, -1;
+            //     b_expect2 << 10, 10, -10, -10;
+            //     if (!contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.isApprox(b_expect) &&
+            //         !contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.isApprox(b_expect2) &&
+            //         !contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.isApprox(mpc::ContactSchedule::GetDefaultContactInfo().b_)) {
+            //         std::cerr << "contact idx: " << contact_schedule.GetContactIndex(frame, 0) << std::endl;
+            //         std::cerr << "frame: " << frame << std::endl;
+            //         std::cerr << "got b: " << contact_schedule.GetPolytopes(frame)[contact_schedule.GetContactIndex(frame, 0)].b_.transpose() << std::endl;
+            //         throw std::runtime_error("[StepPlanner] [2] Current polytope is not the starting polytope!");
+            //     }
+            // }
         }
     }
 
@@ -118,7 +160,7 @@ namespace torc::step_planning {
 
     bool StepPlanner::InPolytope(const mpc::ContactInfo &polytope, const vector2_t &point) {
         vector2_t mat_res = polytope.A_*point;
-        return (mat_res[0] <= polytope.b_[0] && mat_res[1] >= polytope.b_[2]) &&
+        return (mat_res[0] <= polytope.b_[0] && mat_res[0] >= polytope.b_[2]) &&
             (mat_res[1] <= polytope.b_[1] && mat_res[1] >= polytope.b_[3]);
     }
 
@@ -187,6 +229,11 @@ namespace torc::step_planning {
         std::map<std::string, std::vector<vector2_t>>& nominal_footholds,
         std::map<std::string, std::vector<vector2_t>>& projected_footholds) {
 
+        // DEBUG CHECK
+        if (midtime <= 0) {
+            throw std::runtime_error("[StepPlanner] Midtime must be positive!");
+        }
+
         const std::string frame = contact_frames_[frame_idx];
 
         // Get base target
@@ -202,25 +249,30 @@ namespace torc::step_planning {
         nominal_footholds[frame].push_back(target_state.head<2>());
 
         // Check if we are in a polytope
-        bool not_in_polytope = false;
+        bool not_in_any_polytope = true;
         for (const auto& poly : contact_polytopes_) {
-            if (!InPolytope(poly, nominal_footholds[frame].back())) {
-                not_in_polytope = true;
-            } else {
+            if (InPolytope(poly, nominal_footholds[frame].back())) {
                 projected_footholds[frame].push_back(nominal_footholds[frame].back());  // Projected matches nominal
 
                 // Update contact schedule
                 contact_schedule.SetPolytope(frame, contact_idx, poly.A_, poly.b_);
+                // std::cerr << "[no projection] updating contact idx: " << contact_idx << std::endl;
+
+                not_in_any_polytope = false;
+                break;
             }
         }
 
-        if (not_in_polytope) {
+        if (not_in_any_polytope) {
             // Project onto closest polytope
-            const auto [projected_point, contact_idx] = ProjectOntoClosestPolytope(nominal_footholds[frame].back());
+            const auto [projected_point, polytope_idx] = ProjectOntoClosestPolytope(nominal_footholds[frame].back());
             projected_footholds[frame].push_back(projected_point);
 
+            // std::cout << "[" << frame << "] " << contact_polytopes_[polytope_idx].b_.transpose() << std::endl;
+
             // Update contact schedule
-            contact_schedule.SetPolytope(frame, contact_idx, contact_polytopes_[contact_idx].A_, contact_polytopes_[contact_idx].b_);
+            contact_schedule.SetPolytope(frame, contact_idx, contact_polytopes_[polytope_idx].A_, contact_polytopes_[polytope_idx].b_);
+            // std::cerr << "[projection] updating contact idx: " << contact_idx << std::endl;
         }
     }
 
