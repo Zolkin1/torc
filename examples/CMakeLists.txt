@@ -39,7 +39,7 @@ set_target_properties(mujoco PROPERTIES
 find_package(glfw3 REQUIRED)
 
 add_executable(mpc_mujoco mpc_mujoco.cpp)
-target_link_libraries(mpc_mujoco PUBLIC Mpc mujoco glfw)
+target_link_libraries(mpc_mujoco PUBLIC Mpc mujoco glfw StepPlanning)
 
 # Parallel Example
 add_executable(mpc_parallel parallel_mpc_example.cpp)
