@@ -18,6 +18,7 @@ namespace torc::mpc {
      struct ContactInfo {
          matrixx_t A_;
          vector4_t b_;
+         double height_;
      };
 
     /**
@@ -104,13 +105,13 @@ namespace torc::mpc {
          * @param dt_vec the list of dt's. The length of which should be the number of nodes in the MPC
          * @param swing_traj the swing trajectory to populate
          */
-        void CreateSwingTraj(const std::string& frame, double apex_height, double end_height,
+        void CreateSwingTraj(const std::string& frame, double apex_height, double height_offset,
                              double apex_time, const std::vector<double>& dt_vec,  std::vector<double>& swing_traj) const;
 
 
         const std::map<std::string, std::vector<std::pair<double, double>>>&  GetScheduleMap() const;
 
-        static double GetSwingHeight(double apex_height, double ground_height, double apex_time, double time,
+        static double GetSwingHeight(double apex_height, double end_height, double start_height, double apex_time, double time,
             double start_time, double end_time);
 
      // double GetLastContactTime(const std::string& frame);
@@ -118,7 +119,7 @@ namespace torc::mpc {
 
         std::vector<ContactInfo> GetPolytopes(const std::string& frame) const;
 
-        void SetPolytope(const std::string& frame, int contact_num, const matrixx_t& A, const vector4_t& b);
+        void SetPolytope(const std::string& frame, int contact_num, const ContactInfo& polytope);
 
         int GetNumContacts(const std::string& frame) const;
 

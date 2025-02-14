@@ -1059,7 +1059,7 @@ namespace torc::mpc {
 
         int frame_idx = 0;
         for (auto& [frame, traj] : swing_traj_) {
-            sched.CreateSwingTraj(frame, settings_.apex_height, settings_.default_ground_height,    // TODO: make the height adjustable
+            sched.CreateSwingTraj(frame, settings_.apex_height, settings_.default_ground_height,
                 settings_.apex_time, settings_.dt, traj);
             frame_idx++;
         }

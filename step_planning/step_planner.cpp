@@ -214,7 +214,7 @@ namespace torc::step_planning {
                 projected_footholds[frame].push_back(nominal_footholds[frame].back());  // Projected matches nominal
 
                 // Update contact schedule
-                contact_schedule.SetPolytope(frame, contact_idx, poly.A_, poly.b_);
+                contact_schedule.SetPolytope(frame, contact_idx, poly);
 
                 not_in_any_polytope = false;
                 break;
@@ -227,7 +227,7 @@ namespace torc::step_planning {
             projected_footholds[frame].push_back(projected_point);
 
             // Update contact schedule
-            contact_schedule.SetPolytope(frame, contact_idx, contact_polytopes_[polytope_idx].A_, contact_polytopes_[polytope_idx].b_);
+            contact_schedule.SetPolytope(frame, contact_idx, contact_polytopes_[polytope_idx]);
         }
     }
 
