@@ -127,6 +127,8 @@ namespace torc::mpc {
 
         int GetContactIndex(const std::string& frame, double time) const;
 
+        double GetInterpolatedHeight(const std::string& frame, double time) const;
+
     protected:
         static double GetTime(const std::vector<double>& dt_vec, int node);
 

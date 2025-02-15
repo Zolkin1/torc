@@ -91,6 +91,8 @@ namespace torc::mpc {
         void SetConfigTarget(const SimpleTrajectory& q_target);
         void SetVelTarget(const SimpleTrajectory& v_target);
         void SetForwardKinematicsTarget(const std::map<std::string, std::vector<vector3_t>>& fk_positions);
+        void SetConfigBaseTarget(const SimpleTrajectory& q_base_target);
+        void SetVelBaseTarget(const SimpleTrajectory& v_base_target);
 
         void SetLinTraj(const Trajectory& traj_in);
         void SetLinTrajConfig(const SimpleTrajectory& config_traj);

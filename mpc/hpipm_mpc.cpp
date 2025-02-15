@@ -957,6 +957,25 @@ namespace torc::mpc {
         end_effector_targets_ = fk_positions;
     }
 
+    void HpipmMpc::SetConfigBaseTarget(const SimpleTrajectory &q_base_target) {
+        if (q_base_target.GetSize() != FLOATING_BASE) {
+            throw std::runtime_error("[SetConfigBaseTarget] q_base target has invalid size!");
+        }
+
+        for (int i = 0; i < q_base_target.GetNumNodes(); i++) {
+            q_target_[i].head<FLOATING_BASE>() = q_base_target[i];
+        }
+    }
+
+    void HpipmMpc::SetVelBaseTarget(const SimpleTrajectory &v_base_target) {
+        if (v_base_target.GetSize() != FLOATING_VEL) {
+            throw std::runtime_error("[SetVelBaseTarget] q_base target has invalid size!");
+        }
+
+        for (int i = 0; i < v_base_target.GetNumNodes(); i++) {
+            v_target_[i].head<FLOATING_VEL>() = v_base_target[i];
+        }
+    }
 
     void HpipmMpc::SetLinTraj(const Trajectory &traj_in) {
         traj_ = traj_in;
@@ -1037,7 +1056,37 @@ namespace torc::mpc {
                             //  should have the same polytope.
                             if (settings_.poly_contact_pairs[i].second == frame) {
                                 const std::string& poly_frame = settings_.poly_contact_pairs[i].first;
-                                contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+
+                                // TODO: Change where we make this variable
+                                double height_buffer = 0.05;
+
+                                // Check if there is a height difference in the polytopes
+                                if (contact_idx < sched.GetNumContacts(frame) - 1 && contact_idx > current_contact) {   // TODO: Not sure if this is the right metric here
+                                    if (std::abs(polytopes[contact_idx + 1].height_ - polytopes[contact_idx].height_) > height_buffer) {
+                                        // Keep the foot in the polytope at contact_idx until apex time
+                                        // Determine if we are before or after apex
+                                        double swing_start = sched.GetSwingStartTime(frame, time);
+                                        double swing_dur = sched.GetSwingDuration(frame, time);
+                                        double apex_time = swing_start + settings_.apex_time*swing_dur;
+                                        if (time < apex_time) {
+                                            // Keep in previous polytope
+                                            std::cerr << "time: " << time << std::endl;
+                                            contact_info_[poly_frame][node] = polytopes[contact_idx];
+                                            contact_info_[poly_frame][node].b_ -= polytope_delta;
+                                        } else {
+                                            // Let the foot be anywhere
+                                            contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                        }
+                                    } else {
+                                        // Let the foot be anywhere
+                                        contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+
+                                    }
+                                } else {
+                                    contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                }
+
+                                // contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
 
                                 // // TODO: This seems to make it worse, might need to be careful with the function used for the scaling
                                 // if (contact_idx + 1 < polytopes.size()) {

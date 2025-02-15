@@ -160,15 +160,10 @@ namespace torc::mpc {
         for (int node = 0; node < nodes; node++) {
             double time = GetTime(dt_vec, node);
 
-            // TODO: Issues:
-            //  - When moving at any speed but an absolute creep, we get artifacts where the heights are not correct
-            //  - Feet intersect the stairs during swing. Need a way to shape the trajectory to avoid collisions
-
             // Check if we are in swing
             if (InSwing(frame, time)) {
                 for (const auto& [start, end] : frame_schedule_map.at(frame)) {
                     if (time >= start && time <= end) {
-                        // TODO: Need to fix this! I am getting weird heights when stepping on the stairs
                         const int next_contact_idx = GetContactIndex(frame, end + 0.001);
                         const double end_height = contact_polytopes.at(frame).at(next_contact_idx).height_ + height_offset;
                         // FOR DEBUGGING
@@ -179,7 +174,6 @@ namespace torc::mpc {
 
                         // // std::cout << "b: " << contact_polytopes.at(frame).at(next_contact_idx).b_.transpose() << std::endl;
                         //
-                        // //TODO: I think I am seeing something weird here when stepping down stairs
                         const int prev_contact_idx = GetContactIndex(frame, start - 0.001);
                         // FOR DEBUGGING
                         // double start_height = 0;
@@ -367,6 +361,23 @@ namespace torc::mpc {
         }
 
         return swings.size();
+    }
+
+    double ContactSchedule::GetInterpolatedHeight(const std::string &frame, double time) const {
+        if (InContact(frame, time)) {
+            const int contact_idx = GetContactIndex(frame, time);
+            return contact_polytopes.at(frame)[contact_idx].height_;
+        }
+
+        const double start = GetSwingStartTime(frame, time);
+        const double end = start + GetSwingDuration(frame, time);
+
+        const int prev_contact_idx = GetContactIndex(frame, start - 0.001);
+        const int next_contact_idx = GetContactIndex(frame, end + 0.001);
+        const double h1 = contact_polytopes.at(frame)[prev_contact_idx].height_;
+        const double h2 = contact_polytopes.at(frame)[next_contact_idx].height_;
+
+        return h1 + (h2 - h1) * (time - start) / (end - start);
     }
 
 } // namespace torc::mpc

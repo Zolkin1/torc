@@ -131,7 +131,7 @@ int main(int argc, const char** argv) {
     param.sched_priority = 99;
     pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
 
-    const std::string mujoco_xml = "/home/zolkin/AmberLab/Project-Sample-Walking/sample-contact-walking/g1_model/mujoco/basic_scene.xml";
+    const std::string mujoco_xml = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/basic_scene.xml";
 
     // load and compile model
     char error[1000] = "Could not load binary model";
