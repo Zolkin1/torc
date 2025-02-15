@@ -57,8 +57,9 @@ namespace torc::mpc {
             // std::cerr << "swings[0]: " << swings[0].second << " first: " << swings[0].first << std::endl;
             contact_midtimes.insert({frame, {}});
 
-            double swing_time = swings[0].second - swings[0].first;
             if (!swings.empty()) {
+                double swing_time = swings[0].second - swings[0].first;
+
                 // Handle the contact midpoint before the first swing
                 contact_midtimes[frame].emplace_back(swings[0].first - swing_time/2.0);
                 // contact_midtimes[frame].emplace_back(std::max(0.0, swings[0].first - 0.15));
