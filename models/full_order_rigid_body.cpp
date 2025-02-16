@@ -783,6 +783,41 @@ namespace torc::models {
     }
     // DEBUG ------
 
+    pinocchio::Motion FullOrderRigidBody::TransformVelocity(const pinocchio::Motion &v_a,
+        const std::string &frame_a, const std::string &frame_b, const vectorx_t& q) const {
+        throw std::runtime_error("Not supported yet!");
+
+        // Update frame positions
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+
+        // Get the frame transformations in the world
+        pinocchio::SE3 frame_a_world = pin_data_->oMf[GetFrameIdx(frame_a)];
+        pinocchio::SE3 frame_b_world = pin_data_->oMf[GetFrameIdx(frame_b)];
+
+        // TODO: verify!
+        // Compute transform from frame A to frame B
+        // pinocchio::SE3 frame_a_to_b = frame_b_world.inverse() * frame_a_world;
+        pinocchio::SE3 frame_a_to_b = frame_b_world * frame_a_world.inverse();
+
+        return frame_a_to_b.act(v_a);
+    }
+
+    pinocchio::SE3 FullOrderRigidBody::TransformPose(const pinocchio::SE3& pose_world,
+        const std::string &frame_a, const std::string &frame_b, const vectorx_t &q) const {
+        // Update frame positions
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+
+        // Get the frame transformations in the world
+        pinocchio::SE3 frame_a_world = pin_data_->oMf[GetFrameIdx(frame_a)];
+        pinocchio::SE3 frame_b_world = pin_data_->oMf[GetFrameIdx(frame_b)];
+
+        // Compute transform from frame A to frame B
+        pinocchio::SE3 frame_a_to_b = frame_b_world.inverse() * frame_a_world;
+
+        return pose_world*frame_a_to_b.inverse();
+    }
+
+
 
 //    vectorx_t FullOrderRigidBody::TauToInputs(const vectorx_t& tau) const {
 //        assert(tau == this->GetNumJoints());

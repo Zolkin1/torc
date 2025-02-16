@@ -145,6 +145,15 @@ namespace torc::models {
         pinocchio::Model GetModel() const;
         // ------------
 
+        // Transform a velocity from one frame to another
+        pinocchio::Motion TransformVelocity(const pinocchio::Motion& v_a,
+            const std::string& frame_a, const std::string& frame_b, const vectorx_t& q) const;
+
+        // pose_world give the pose of frame_a in the world and
+        // the goal is to determine the pose of frame_b given this and the current configuration (ignoring the floating base position)
+        pinocchio::SE3 TransformPose(const pinocchio::SE3& pose_world,
+            const std::string& frame_a, const std::string& frame_b, const vectorx_t& q) const;
+
         constexpr static size_t STATE_Q_IDX = 0;
         constexpr static size_t STATE_V_IDX = 1;
 
