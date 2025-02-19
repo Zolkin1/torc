@@ -163,6 +163,7 @@ namespace torc::mpc {
             terminal_weight = (general_settings["terminal_cost_weight"] ? general_settings["terminal_cost_weight"].as<double>() : 1.0);
 
             log = (general_settings["log"] ? general_settings["log"].as<bool>() : true);
+            log_file_name = (general_settings["log_file_name"] ? general_settings["log_file_name"].as<std::string>() : "hpipm_mpc_log.csv");
         }
     }
 

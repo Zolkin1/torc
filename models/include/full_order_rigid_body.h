@@ -147,7 +147,7 @@ namespace torc::models {
 
         // Transform a velocity from one frame to another
         pinocchio::Motion TransformVelocity(const pinocchio::Motion& v_a,
-            const std::string& frame_a, const std::string& frame_b, const vectorx_t& q) const;
+            const std::string& frame_a, const std::string& frame_b, const vectorx_t& q, const vectorx_t& v) const;
 
         // pose_world give the pose of frame_a in the world and
         // the goal is to determine the pose of frame_b given this and the current configuration (ignoring the floating base position)

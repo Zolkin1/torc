@@ -14,7 +14,7 @@ namespace torc::mpc {
             name_ + "_friction_cone_constraint",
             deriv_lib_path,
             ad::DerivativeOrder::FirstOrder, 3, 5,
-            true); //compile_derivs);
+            compile_derivs);
     }
 
     int FrictionConeConstraint::GetNumConstraints() const {

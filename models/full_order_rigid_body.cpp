@@ -784,8 +784,7 @@ namespace torc::models {
     // DEBUG ------
 
     pinocchio::Motion FullOrderRigidBody::TransformVelocity(const pinocchio::Motion &v_a,
-        const std::string &frame_a, const std::string &frame_b, const vectorx_t& q) const {
-        throw std::runtime_error("Not supported yet!");
+        const std::string &frame_a, const std::string &frame_b, const vectorx_t& q, const vectorx_t& v) const {
 
         // Update frame positions
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);

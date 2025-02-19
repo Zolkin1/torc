@@ -100,7 +100,8 @@ namespace torc::mpc {
         }
 
         if (settings_.log) {
-            log_file_.open("hpipm_mpc_log.csv");
+            log_file_.open(settings_.log_file_name);
+            std::cout << "Opened a log file at: " << settings_.log_file_name << std::endl;
         }
     }
 
@@ -508,12 +509,21 @@ namespace torc::mpc {
             }
 
             if (tau_tracking_->IsInNodeRange(node) && dynamics_constraint_->IsInNodeRange(node)) {
-                const auto [hess, lin]
-                    = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
-                        settings_.cost_data[fo_tau_idx_].weight);
+                if (node == 0 || node == 1) {
+                    const auto [hess, lin]
+                        = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
+                            100*settings_.cost_data[fo_tau_idx_].weight);   // TODO: Tune this number!
 
-                qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
-                qp[node].r.head(ntau_) = lin;
+                    qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
+                    qp[node].r.head(ntau_) = lin;
+                } else {
+                    const auto [hess, lin]
+                        = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
+                            settings_.cost_data[fo_tau_idx_].weight);
+
+                    qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
+                    qp[node].r.head(ntau_) = lin;
+                }
             }
 
             if (force_tracking_->IsInNodeRange(node)) {
@@ -792,6 +802,9 @@ namespace torc::mpc {
         }
         // std::cout << "constraint time: " << constraint_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
+        // Set the torque target at the first two nodes to the current torque
+        tau_target_[0] = traj_.GetTau(0);
+        tau_target_[1] = traj_.GetTau(0);
         // Create the cost
         cost_timer_.Tic();
         CreateCost(1, settings_.nodes);
@@ -809,13 +822,14 @@ namespace torc::mpc {
     }
 
     hpipm::HpipmStatus HpipmMpc::Compute(double time, const vectorx_t &q0, const vectorx_t &v0, Trajectory& traj_out) {
-        if (std::abs(q0.segment<4>(3).norm() - 1) > 1e-8) {
-            std::cerr << "q: " << q0.transpose() << std::endl;
-            throw std::runtime_error("Initial condition does not have a normalized quaternion!");
-        }
-
         traj_.SetConfiguration(0, q0);
         traj_.SetVelocity(0, v0);
+
+        if (std::abs(q0.segment<4>(3).norm() - 1) > 1e-4) {
+            traj_.GetConfiguration(0).segment<4>(3).normalize();
+            // std::cerr << "q: " << q0.transpose() << std::endl;
+            // throw std::runtime_error("Initial condition does not have a normalized quaternion!");
+        }
 
         // Linearize node 0 (initial condition)
         CreateNode0Data();
@@ -905,8 +919,9 @@ namespace torc::mpc {
             }
 
             if (std::abs(traj_.GetConfiguration(node).segment<4>(3).norm() - 1) > 1e-8) {
-                std::cerr << "q: " << traj_.GetConfiguration(node) << std::endl;
-                throw std::runtime_error("Output quaternion is not normalized!");
+                std::cerr << "NORMALIZING q: " << traj_.GetConfiguration(node) << std::endl;
+                traj_.GetConfiguration(node).segment<4>(3).normalize();
+                // throw std::runtime_error("Output quaternion is not normalized!");
             }
         }
     }
@@ -1459,12 +1474,12 @@ namespace torc::mpc {
 
         // Computed traj & dt
         for (int i = 0; i < settings_.nodes; i++) {
-            // LogEigenVec(traj_.GetConfiguration(i));
-            // LogEigenVec(traj_.GetVelocity(i));
-            // LogEigenVec(traj_.GetTau(i));
-            // for (const auto& frame : settings_.contact_frames) {
-            //     LogEigenVec(traj_.GetForce(i, frame));
-            // }
+            LogEigenVec(traj_.GetConfiguration(i));
+            LogEigenVec(traj_.GetVelocity(i));
+            LogEigenVec(traj_.GetTau(i));
+            for (const auto& frame : settings_.contact_frames) {
+                LogEigenVec(traj_.GetForce(i, frame));
+            }
             log_file_ << settings_.dt[i] <<  ",";
         }
 
