@@ -783,22 +783,46 @@ namespace torc::models {
     }
     // DEBUG ------
 
-    pinocchio::Motion FullOrderRigidBody::TransformVelocity(const pinocchio::Motion &v_a,
-        const std::string &frame_a, const std::string &frame_b, const vectorx_t& q, const vectorx_t& v) const {
+    pinocchio::Motion FullOrderRigidBody::DeduceBaseVelocity(const pinocchio::Motion& v_a,
+        const pinocchio::ReferenceFrame& velocity_frame,
+        const std::string& frame_a, const std::string& frame_b, const vectorx_t& q, const vectorx_t& v) const {
 
-        // Update frame positions
-        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+        vectorx_t v_mod = v;
+        v_mod.head<6>().setZero();
 
-        // Get the frame transformations in the world
-        pinocchio::SE3 frame_a_world = pin_data_->oMf[GetFrameIdx(frame_a)];
-        pinocchio::SE3 frame_b_world = pin_data_->oMf[GetFrameIdx(frame_b)];
+        // Update frame positions and update joint vels
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v_mod);
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
 
-        // TODO: verify!
-        // Compute transform from frame A to frame B
-        // pinocchio::SE3 frame_a_to_b = frame_b_world.inverse() * frame_a_world;
-        pinocchio::SE3 frame_a_to_b = frame_b_world * frame_a_world.inverse();
+        // Get expected velocity due to the joint motion
+        pinocchio::Motion ex_vel = pinocchio::getFrameVelocity(pin_model_, *pin_data_, GetFrameIdx(frame_a), velocity_frame);
 
-        return frame_a_to_b.act(v_a);
+        // Compute difference in velocities to get the base motion
+        pinocchio::Motion vel_diff = v_a - ex_vel;
+
+        // Need to get the effect of the base velocity on this frame then invert that transform
+        matrix6x_t J = matrix6x_t::Zero(6, GetVelDim());
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, GetFrameIdx(frame_a), velocity_frame, J);
+
+        pinocchio::Motion base_vel;
+        base_vel.ref() = J.leftCols<6>().inverse()*vel_diff.toVector(); //.ldlt().solve(vel_diff.toVector());
+
+        // Return
+        return base_vel;
+    }
+
+    vector3_t FullOrderRigidBody::DeduceBasePosition(const vector3_t &frame_position, const std::string &frame,
+        const vectorx_t &q) {
+        // Compute the FK with the given q
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+        pinocchio::updateFramePlacement(pin_model_, *pin_data_, GetFrameIdx(frame));
+        vector3_t frame_expected = pin_data_->oMf[GetFrameIdx(frame)].translation();
+
+        // Compute the error
+        vector3_t frame_error = frame_position - frame_expected;
+
+        // Add the error to q
+        return q.head<3>() + frame_error;
     }
 
     pinocchio::SE3 FullOrderRigidBody::TransformPose(const pinocchio::SE3& pose_world,

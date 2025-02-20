@@ -7,7 +7,7 @@
 
 #include <fstream>
 
-#include "osqp++.h"
+#include <proxsuite/proxqp/dense/dense.hpp>
 
 #include "cpp_ad_interface.h"
 #include "full_order_rigid_body.h"
@@ -35,6 +35,8 @@ namespace torc::controller {
         std::vector<double> joint_values;
         std::vector<std::string> contact_frames;
 
+        vectorx_t custom_torque_lims;
+
         bool log;
         int log_period;
 
@@ -57,11 +59,13 @@ namespace torc::controller {
 
     protected:
         matrixx_t HolonomicConstraint(const vectorx_t& q, const vectorx_t& v,
-            const std::vector<bool>& in_contact, vectorx_t& lb, vectorx_t& ub);
+            const std::vector<bool>& in_contact, vectorx_t& b);
 
         matrixx_t ForceConstraint(const std::vector<bool>& in_contact, vectorx_t& lb, vectorx_t& ub);
 
-        matrixx_t DynamicsConstraint(const vectorx_t& q, const vectorx_t& v, vectorx_t& lb, vectorx_t& ub);
+        matrixx_t NoForceConstraint(const std::vector<bool>& in_contact, vectorx_t& b);
+
+        matrixx_t DynamicsConstraint(const vectorx_t& q, const vectorx_t& v, vectorx_t& b);
 
         matrixx_t TorqueBoxConstraint() const;
 
@@ -99,11 +103,6 @@ namespace torc::controller {
         int nF_;
         int ncontact_frames_;
         int ncontacts_;
-
-        // OSQP Interface
-        osqp::OsqpInstance osqp_instance_;
-        osqp::OsqpSolver osqp_solver_;
-        osqp::OsqpSettings osqp_settings_;
 
         int nd_;    // Number of decision variables
         int nc_;    // Number of constraints

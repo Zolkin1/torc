@@ -29,7 +29,7 @@ add_subdirectory(mpc)
 add_subdirectory(utils)
 add_subdirectory(step_planning)
 add_subdirectory(state_estimation)
-#add_subdirectory(whole_body_control)   # TODO: Remove OSQP from here to remove the terrible absl dep
+add_subdirectory(whole_body_control)
 
 # TODO: Figure out the install structure for the library
 # TODO: Make different linking targets if they only want part of the library
