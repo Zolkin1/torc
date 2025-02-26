@@ -313,7 +313,7 @@ namespace torc::mpc {
             }
 
             // Torque box constraints
-            if (dynamics_constraint_->IsInNodeRange(node) && tau_box_->IsInNodeRange(node)) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
+            if (dynamics_constraint_->IsInNodeRange(node) && tau_box_->IsInNodeRange(node) && node < settings_.nodes - 1) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
                 // std::cerr << "Adding tau box..." << std::endl;
                 // Set box indexes
                 const auto& idxs = tau_box_->GetIdxs();
@@ -423,32 +423,32 @@ namespace torc::mpc {
                 }
             }
 
-            // Polytope
-            if (polytope_->IsInNodeRange(node)) {
-                // std::cerr << "Adding polytope..." << std::endl;
-                int slack_idx = 0;
-                // TODO: Put back after debugging
-                for (const auto& frame : polytope_->GetPolytopeFrames()) {
-                // const std::string frame = polytope_->GetPolytopeFrames()[0];
-                    matrixx_t jac;
-                    vectorx_t ub, lb;
-                    polytope_->GetLinearization(traj_.GetConfiguration(node),
-                        contact_info_[frame][node], frame, jac, ub, lb);
-                    // std::cout << "frame: " << frame << std::endl;
-
-                    // std::cout << "node: " << node << std::endl;
-                    // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
-                    // std::cout << "polytope b: " << contact_info_[frame][node].b_.transpose() << std::endl;
-
-                    qp[node].C.block(ineq_row_idx, 0, PolytopeConstraint::POLYTOPE_SIZE/2, nv_)
-                        = jac;
-
-                    qp[node].lg.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = lb;
-                    qp[node].ug.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = ub;
-
-                    ineq_row_idx += PolytopeConstraint::POLYTOPE_SIZE/2;
-                }
-            }
+            // // Polytope
+            // if (polytope_->IsInNodeRange(node)) {
+            //     // std::cerr << "Adding polytope..." << std::endl;
+            //     int slack_idx = 0;
+            //     // TODO: Put back after debugging
+            //     for (const auto& frame : polytope_->GetPolytopeFrames()) {
+            //     // const std::string frame = polytope_->GetPolytopeFrames()[0];
+            //         matrixx_t jac;
+            //         vectorx_t ub, lb;
+            //         polytope_->GetLinearization(traj_.GetConfiguration(node),
+            //             contact_info_[frame][node], frame, jac, ub, lb);
+            //         // std::cout << "frame: " << frame << std::endl;
+            //
+            //         // std::cout << "node: " << node << std::endl;
+            //         // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
+            //         // std::cout << "polytope b: " << contact_info_[frame][node].b_.transpose() << std::endl;
+            //
+            //         qp[node].C.block(ineq_row_idx, 0, PolytopeConstraint::POLYTOPE_SIZE/2, nv_)
+            //             = jac;
+            //
+            //         qp[node].lg.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = lb;
+            //         qp[node].ug.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = ub;
+            //
+            //         ineq_row_idx += PolytopeConstraint::POLYTOPE_SIZE/2;
+            //     }
+            // }
 
             // std::cout << "node: " << node << std::endl;
             // for (const auto& frame : settings_.contact_frames) {
@@ -802,7 +802,7 @@ namespace torc::mpc {
         }
         // std::cout << "constraint time: " << constraint_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
-        // Set the torque target at the first two nodes to the current torque
+        // // // Set the torque target at the first two nodes to the current torque
         tau_target_[0] = traj_.GetTau(0);
         tau_target_[1] = traj_.GetTau(0);
         // Create the cost
@@ -1424,6 +1424,13 @@ namespace torc::mpc {
     int HpipmMpc::GetSolveCounter() const {
         return solve_counter_;
     }
+
+    matrixx_t HpipmMpc::GetRiccatiFeedback() {
+        // TODO: Verify this
+        // return solution_[0].K;   // TODO: I think this one is getting compute incorrectly
+        return solution_[1].K;
+    }
+
 
     std::map<std::string, std::vector<double> > HpipmMpc::GetSwingTrajectory() const {
         return swing_traj_;

@@ -825,6 +825,74 @@ namespace torc::models {
         return q.head<3>() + frame_error;
     }
 
+    matrix3_t FullOrderRigidBody::FitBasePose(const std::vector<std::string> &foot_frames, double z_offset,
+        const vectorx_t &q) {
+        // ---------- Fit the ground plane to feet frames ---------- //
+        // Get all the frame positions
+        std::vector<vector3_t> foot_positions;
+        FirstOrderFK(q);
+        for (const auto& frame : foot_frames) {
+            foot_positions.emplace_back(GetFrameState(frame).placement.translation());
+            std::cout << frame << " position: " << foot_positions.back().transpose() << std::endl;
+        }
+
+        // Add the foot offsets
+        for (auto& pos : foot_positions) {
+            pos[2] += z_offset;
+        }
+
+        // Fit the plane
+        // (1) Fit plane to hip data
+        matrixx_t A = matrixx_t::Zero(foot_positions.size(), 3);
+        vectorx_t b = vectorx_t::Zero(foot_positions.size());
+
+        for (int ee = 0; ee < foot_positions.size(); ee++) {
+            A.row(ee) << foot_positions[ee](0), foot_positions[ee](1), 1;
+            b(ee) = foot_positions[ee](2);
+        }
+
+        // Compute pseudo inverse
+        matrixx_t AtA;
+        AtA.noalias() = A.transpose()*A;
+
+        // Solve for the plane variables
+        vector3_t plane_vars = AtA.ldlt().solve(A.transpose()*b);
+        std::cout << "plane vars: " << plane_vars.transpose() << std::endl;
+
+        vector3_t plane_normal;
+        plane_normal << -plane_vars.head<2>(), 1;
+        plane_normal.normalize();
+        std::cout << "plane normal: " << plane_normal.transpose() << std::endl;
+
+        // Rotate the ground plane to fit the "nominal" ground plane
+        vector3_t nominal_normal = {0, 0, 1};
+
+        // Compute the rotation axis (cross product)
+        Eigen::Vector3d axis = plane_normal.cross(nominal_normal);
+        double sin_theta = axis.norm();
+        double cos_theta = plane_normal.dot(nominal_normal);
+
+        // If the normals are already aligned, return identity matrix
+        if (sin_theta < 1e-6) {
+            return matrix3_t::Identity();
+        }
+
+        // Normalize the rotation axis
+        axis /= sin_theta;
+
+        // Construct the skew-symmetric cross-product matrix
+        matrix3_t K;
+        K <<     0, -axis.z(),  axis.y(),
+             axis.z(),      0, -axis.x(),
+            -axis.y(),  axis.x(),      0;
+
+        // Compute rotation matrix using Rodrigues' formula
+        matrix3_t R = matrix3_t::Identity() + sin_theta * K + (1 - cos_theta) * K * K;
+
+        return R;
+    }
+
+
     pinocchio::SE3 FullOrderRigidBody::TransformPose(const pinocchio::SE3& pose_world,
         const std::string &frame_a, const std::string &frame_b, const vectorx_t &q) const {
         // Update frame positions

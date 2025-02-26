@@ -17,6 +17,7 @@ namespace torc::models {
     using matrixx_t = Eigen::MatrixXd;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using matrix3x_t = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+    using matrix3_t = Eigen::Matrix<double, 3, 3>;
 
     class FullOrderRigidBody : public PinocchioModel {
     public:
@@ -148,6 +149,8 @@ namespace torc::models {
         // Transform a velocity from one frame to another
         pinocchio::Motion DeduceBaseVelocity(const pinocchio::Motion& v_a, const pinocchio::ReferenceFrame& linear_frame,
             const std::string& frame_a, const std::string& frame_b, const vectorx_t& q, const vectorx_t& v) const;
+
+        matrix3_t FitBasePose(const std::vector<std::string>& foot_frames, double z_offset, const vectorx_t& q);
 
         vector3_t DeduceBasePosition (const vector3_t& frame_position, const std::string& frame, const vectorx_t& q);
 
