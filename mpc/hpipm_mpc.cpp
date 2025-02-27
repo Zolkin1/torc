@@ -34,6 +34,7 @@ namespace torc::mpc {
             in_contact_.insert({frame, {}});
             swing_traj_.insert({frame, {}});
             end_effector_targets_.insert({frame, {}});
+            ground_height_.insert({frame, settings_.default_ground_height});
             for (int i = 0; i < settings_.nodes; i++) {
                 in_contact_[frame].push_back(1);
                 swing_traj_[frame].push_back(0);
@@ -972,6 +973,10 @@ namespace torc::mpc {
         end_effector_targets_ = fk_positions;
     }
 
+    void HpipmMpc::SetDefaultGroundHeight(const std::string &frame, double height) {
+        ground_height_[frame] = height;
+    }
+
 
     void HpipmMpc::SetLinTraj(const Trajectory &traj_in) {
         traj_ = traj_in;
@@ -1074,7 +1079,7 @@ namespace torc::mpc {
 
         int frame_idx = 0;
         for (auto& [frame, traj] : swing_traj_) {
-            sched.CreateSwingTraj(frame, settings_.apex_height, settings_.default_ground_height,    // TODO: make the height adjustable
+            sched.CreateSwingTraj(frame, settings_.apex_height, ground_height_[frame],    // TODO: make the height adjustable
                 settings_.apex_time, settings_.dt, traj);
             frame_idx++;
         }
