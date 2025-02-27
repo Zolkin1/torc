@@ -811,6 +811,28 @@ namespace torc::models {
         return base_vel;
     }
 
+    pinocchio::Motion FullOrderRigidBody::TransformVelocityToBase(const pinocchio::Motion& v_a,
+            const std::string& velocity_frame, const vectorx_t& q) {
+
+        FirstOrderFK(q);
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+
+        // Get transform between the frame and the base. Assuming there are no joints in between
+        pinocchio::SE3 frame_placement_wrt_world = pin_data_->oMf[GetFrameIdx(velocity_frame)];
+        pinocchio::SE3 base_wrt_world(quat_t(q.segment<4>(3)), q.head<3>());
+
+        // std::cout << "frame wrt world: " << frame_placement_wrt_world << std::endl;
+        // std::cout << "base wrt world: " << base_wrt_world << std::endl;
+
+        // pinocchio::SE3 base_wrt_frame = base_wrt_world.inverse().actInv(frame_placement_wrt_world.inverse());
+        pinocchio::SE3 base_wrt_frame = base_wrt_world.actInv(frame_placement_wrt_world);
+
+        // std::cout << "base_wrt_frame: " << base_wrt_frame << std::endl;
+
+        // Return
+        return base_wrt_frame.act(v_a);
+    }
+
     vector3_t FullOrderRigidBody::DeduceBasePosition(const vector3_t &frame_position, const std::string &frame,
         const vectorx_t &q) {
         // Compute the FK with the given q

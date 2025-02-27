@@ -135,3 +135,34 @@ TEST_CASE("Base Position Test") {
         std::cout << "actual position: " << q_rand.head<3>().transpose() << std::endl;
     }
 }
+
+TEST_CASE("Velocity Base Test") {
+    using namespace torc::models;
+
+    // Load in the model
+    std::filesystem::path a1_urdf = "/home/zolkin/AmberLab/Project-TORC/torc/tests/test_data/test_a1.urdf";
+    torc::models::FullOrderRigidBody a1("a1", a1_urdf);
+
+    for (int i = 0; i < 10; i++) {
+        // Choose a random configuration
+        vectorx_t q_rand = a1.GetRandomConfig();
+        // Choose a random velocity
+        vectorx_t v_rand = a1.GetRandomVel();
+
+        // Get frame vel in the local frame
+        a1.SecondOrderFK(q_rand, v_rand);
+        pinocchio::Motion frame_vel = a1.GetFrameState("imu_link", pinocchio::LOCAL).vel;
+
+        // Try to get the velocity of another frame given the robot's configuration and velocity of the current frame
+        vectorx_t q_guess = q_rand;
+        q_guess.head<6>().setZero();
+        pinocchio::Motion base_vel = a1.TransformVelocityToBase(frame_vel, "imu_link", q_guess);
+
+        // Check result
+        CHECK(base_vel.linear().isApprox(v_rand.head<3>()));
+        CHECK(base_vel.angular().isApprox(v_rand.segment<3>(3)));
+
+        std::cout << "res motion: " << base_vel << std::endl;
+        std::cout << "actual motion: " << v_rand.head<6>().transpose() << std::endl;
+    }
+}

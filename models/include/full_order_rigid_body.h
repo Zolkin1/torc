@@ -150,6 +150,10 @@ namespace torc::models {
         pinocchio::Motion DeduceBaseVelocity(const pinocchio::Motion& v_a, const pinocchio::ReferenceFrame& linear_frame,
             const std::string& frame_a, const std::string& frame_b, const vectorx_t& q, const vectorx_t& v) const;
 
+        // NOTE: Only good if there are no joint in between the frame and the base
+        pinocchio::Motion TransformVelocityToBase(const pinocchio::Motion& v_a, const std::string& velocity_frame,
+            const vectorx_t& q);
+
         matrix3_t FitBasePose(const std::vector<std::string>& foot_frames, double z_offset, const vectorx_t& q);
 
         vector3_t DeduceBasePosition (const vector3_t& frame_position, const std::string& frame, const vectorx_t& q);
