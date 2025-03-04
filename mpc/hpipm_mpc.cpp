@@ -488,7 +488,7 @@ namespace torc::mpc {
         if (!vel_tracking_ || !tau_tracking_ || !force_tracking_) {
             throw std::runtime_error("[HpipmMpc] Required cost not set!");
         }
-
+\
         for (int node = start_node; node < end_node - 1; node++) {
 
             if (vel_tracking_->IsInNodeRange(node)) {
@@ -513,7 +513,7 @@ namespace torc::mpc {
                 if (node == 0 || node == 1) {
                     const auto [hess, lin]
                         = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
-                            100*settings_.cost_data[fo_tau_idx_].weight);   // TODO: Tune this number!
+                            100*settings_.cost_data[fo_tau_idx_].weight);   // TODO: Tune this number! // 100
 
                     qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
                     qp[node].r.head(ntau_) = lin;
@@ -580,10 +580,10 @@ namespace torc::mpc {
             if (dynamics_constraint_->IsInNodeRange(node)) {
                 const auto [hess, lin]
                     = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node),
-                            dynamics_constraint_->IsInNodeRange(node) ?
-                            settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
-                qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
-                qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
+                            settings_.cost_data[fo_vel_idx_].weight);
+                // Always full order here
+                qp[node].Q.bottomRightCorner(nv_, nv_) = hess;
+                qp[node].q.tail(nv_) = lin;
             }
 
             const auto [hessq, linq] =
@@ -1079,7 +1079,7 @@ namespace torc::mpc {
 
         int frame_idx = 0;
         for (auto& [frame, traj] : swing_traj_) {
-            sched.CreateSwingTraj(frame, settings_.apex_height, ground_height_[frame],    // TODO: make the height adjustable
+            sched.CreateSwingTraj(frame, settings_.apex_height + ground_height_[frame], ground_height_[frame],    // TODO: make the height adjustable
                 settings_.apex_time, settings_.dt, traj);
             frame_idx++;
         }
