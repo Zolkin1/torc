@@ -338,7 +338,7 @@
   <joint name="imu_joint" type="fixed">
     <parent link="trunk"/>
     <child link="imu_link"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <origin rpy="0.1 0.5 0.9" xyz="0.1 0.03 0.02"/>
   </joint>
   <link name="imu_link">
     <inertial>

@@ -34,6 +34,7 @@ namespace torc::mpc {
             in_contact_.insert({frame, {}});
             swing_traj_.insert({frame, {}});
             end_effector_targets_.insert({frame, {}});
+            ground_height_.insert({frame, settings_.default_ground_height});
             for (int i = 0; i < settings_.nodes; i++) {
                 in_contact_[frame].push_back(1);
                 swing_traj_[frame].push_back(0);
@@ -100,7 +101,8 @@ namespace torc::mpc {
         }
 
         if (settings_.log) {
-            log_file_.open("hpipm_mpc_log.csv");
+            log_file_.open(settings_.log_file_name);
+            std::cout << "Opened a log file at: " << settings_.log_file_name << std::endl;
         }
     }
 
@@ -312,7 +314,7 @@ namespace torc::mpc {
             }
 
             // Torque box constraints
-            if (dynamics_constraint_->IsInNodeRange(node) && tau_box_->IsInNodeRange(node)) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
+            if (dynamics_constraint_->IsInNodeRange(node) && tau_box_->IsInNodeRange(node) && node < settings_.nodes - 1) { //(node >= tau_box_->GetFirstNode() && node < tau_box_->GetLastNode() + 1) && node != boundary_node_) {
                 // std::cerr << "Adding tau box..." << std::endl;
                 // Set box indexes
                 const auto& idxs = tau_box_->GetIdxs();
@@ -425,9 +427,8 @@ namespace torc::mpc {
             // Polytope
             if (polytope_->IsInNodeRange(node)) {
                 // std::cerr << "Adding polytope..." << std::endl;
-                int slack_idx = 0;
-                // TODO: Put back after debugging
                 for (const auto& frame : polytope_->GetPolytopeFrames()) {
+                    // std::cerr << "node: " << node << " frame: " << frame << std::endl;
                 // const std::string frame = polytope_->GetPolytopeFrames()[0];
                     matrixx_t jac;
                     vectorx_t ub, lb;
@@ -486,7 +487,7 @@ namespace torc::mpc {
         if (!vel_tracking_ || !tau_tracking_ || !force_tracking_) {
             throw std::runtime_error("[HpipmMpc] Required cost not set!");
         }
-
+\
         for (int node = start_node; node < end_node - 1; node++) {
 
             if (vel_tracking_->IsInNodeRange(node)) {
@@ -508,12 +509,21 @@ namespace torc::mpc {
             }
 
             if (tau_tracking_->IsInNodeRange(node) && dynamics_constraint_->IsInNodeRange(node)) {
-                const auto [hess, lin]
-                    = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
-                        settings_.cost_data[fo_tau_idx_].weight);
+                if (node == 0 || node == 1) {
+                    const auto [hess, lin]
+                        = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
+                            100*settings_.cost_data[fo_tau_idx_].weight);   // TODO: Tune this number! // 100
 
-                qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
-                qp[node].r.head(ntau_) = lin;
+                    qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
+                    qp[node].r.head(ntau_) = lin;
+                } else {
+                    const auto [hess, lin]
+                        = tau_tracking_->GetQuadraticApprox(traj_.GetTau(node), GetTauTarget(node),
+                            settings_.cost_data[fo_tau_idx_].weight);
+
+                    qp[node].R.topLeftCorner(ntau_, ntau_) = hess;
+                    qp[node].r.head(ntau_) = lin;
+                }
             }
 
             if (force_tracking_->IsInNodeRange(node)) {
@@ -569,10 +579,10 @@ namespace torc::mpc {
             if (dynamics_constraint_->IsInNodeRange(node)) {
                 const auto [hess, lin]
                     = vel_tracking_->GetQuadraticApprox(traj_.GetVelocity(node), GetVelocityTarget(node),
-                            dynamics_constraint_->IsInNodeRange(node) ?
-                            settings_.cost_data[fo_vel_idx_].weight : settings_.cost_data[cent_vel_idx_].weight);
-                qp[node].Q.bottomRightCorner<FLOATING_VEL, FLOATING_VEL>() = hess.topLeftCorner<FLOATING_VEL, FLOATING_VEL>();
-                qp[node].q.tail<FLOATING_VEL>() = lin.head<FLOATING_VEL>();
+                            settings_.cost_data[fo_vel_idx_].weight);
+                // Always full order here
+                qp[node].Q.bottomRightCorner(nv_, nv_) = hess;
+                qp[node].q.tail(nv_) = lin;
             }
 
             const auto [hessq, linq] =
@@ -792,6 +802,9 @@ namespace torc::mpc {
         }
         // std::cout << "constraint time: " << constraint_timer_.Duration<std::chrono::microseconds>().count()/1000.0 << "ms" << std::endl;
 
+        // // // Set the torque target at the first two nodes to the current torque
+        tau_target_[0] = traj_.GetTau(0);
+        tau_target_[1] = traj_.GetTau(0);
         // Create the cost
         cost_timer_.Tic();
         CreateCost(1, settings_.nodes);
@@ -809,13 +822,14 @@ namespace torc::mpc {
     }
 
     hpipm::HpipmStatus HpipmMpc::Compute(double time, const vectorx_t &q0, const vectorx_t &v0, Trajectory& traj_out) {
-        if (std::abs(q0.segment<4>(3).norm() - 1) > 1e-8) {
-            std::cerr << "q: " << q0.transpose() << std::endl;
-            throw std::runtime_error("Initial condition does not have a normalized quaternion!");
-        }
-
         traj_.SetConfiguration(0, q0);
         traj_.SetVelocity(0, v0);
+
+        if (std::abs(q0.segment<4>(3).norm() - 1) > 1e-4) {
+            traj_.GetConfiguration(0).segment<4>(3).normalize();
+            // std::cerr << "q: " << q0.transpose() << std::endl;
+            // throw std::runtime_error("Initial condition does not have a normalized quaternion!");
+        }
 
         // Linearize node 0 (initial condition)
         CreateNode0Data();
@@ -905,8 +919,9 @@ namespace torc::mpc {
             }
 
             if (std::abs(traj_.GetConfiguration(node).segment<4>(3).norm() - 1) > 1e-8) {
-                std::cerr << "q: " << traj_.GetConfiguration(node) << std::endl;
-                throw std::runtime_error("Output quaternion is not normalized!");
+                std::cerr << "NORMALIZING q: " << traj_.GetConfiguration(node) << std::endl;
+                traj_.GetConfiguration(node).segment<4>(3).normalize();
+                // throw std::runtime_error("Output quaternion is not normalized!");
             }
         }
     }
@@ -955,6 +970,10 @@ namespace torc::mpc {
 
     void HpipmMpc::SetForwardKinematicsTarget(const std::map<std::string, std::vector<vector3_t> > &fk_positions) {
         end_effector_targets_ = fk_positions;
+    }
+
+    void HpipmMpc::SetDefaultGroundHeight(const std::string &frame, double height) {
+        ground_height_[frame] = height;
     }
 
     void HpipmMpc::SetConfigBaseTarget(const SimpleTrajectory &q_base_target) {
@@ -1042,6 +1061,9 @@ namespace torc::mpc {
                                 if (contact_idx != current_contact) {
                                     // Only add the margin for future polytopes
                                     contact_info_[poly_frame][node].b_ -= polytope_delta;
+                                } else {
+                                    // For the current contact effectively don't enforce a polytope constraint
+                                    contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
                                 }
                             }
                         }
@@ -1459,6 +1481,13 @@ namespace torc::mpc {
         return solve_counter_;
     }
 
+    matrixx_t HpipmMpc::GetRiccatiFeedback() {
+        // TODO: Verify this
+        // return solution_[0].K;   // TODO: I think this one is getting compute incorrectly
+        return solution_[1].K;
+    }
+
+
     std::map<std::string, std::vector<double> > HpipmMpc::GetSwingTrajectory() const {
         return swing_traj_;
     }
@@ -1508,12 +1537,12 @@ namespace torc::mpc {
 
         // Computed traj & dt
         for (int i = 0; i < settings_.nodes; i++) {
-            // LogEigenVec(traj_.GetConfiguration(i));
-            // LogEigenVec(traj_.GetVelocity(i));
-            // LogEigenVec(traj_.GetTau(i));
-            // for (const auto& frame : settings_.contact_frames) {
-            //     LogEigenVec(traj_.GetForce(i, frame));
-            // }
+            LogEigenVec(traj_.GetConfiguration(i));
+            LogEigenVec(traj_.GetVelocity(i));
+            LogEigenVec(traj_.GetTau(i));
+            for (const auto& frame : settings_.contact_frames) {
+                LogEigenVec(traj_.GetForce(i, frame));
+            }
             log_file_ << settings_.dt[i] <<  ",";
         }
 

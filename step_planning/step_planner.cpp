@@ -164,7 +164,7 @@ namespace torc::step_planning {
         // return target[index1] + alpha * (target[index2] - target[index1]);
 
         // For now, to approximate, just take the one that is closest, no interpolation
-        double min_time_diff = 100;
+        double min_time_diff = 1e10;
         int time_idx = -1;
         double traj_time = 0;
         for (int i = 0; i < dt_vec.size(); i++) {

@@ -129,6 +129,8 @@ namespace torc::mpc {
 
         double GetInterpolatedHeight(const std::string& frame, double time) const;
 
+        void Log(std::ostream& log_file, double time);
+
     protected:
         static double GetTime(const std::vector<double>& dt_vec, int node);
 

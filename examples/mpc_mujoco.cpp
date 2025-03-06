@@ -124,6 +124,45 @@ void LogEigenVec(std::ofstream& log_file, const torc::mpc::vectorx_t& x) {
     }
 }
 
+std::pair<torc::mpc::vectorx_t, torc::mpc::vectorx_t> ConvertMujocoToMPC(torc::models::FullOrderRigidBody& mpc_model,
+    torc::models::FullOrderRigidBody& full_model,
+    const torc::mpc::vectorx_t& q_mujoco, const torc::mpc::vectorx_t& v_mujoco) {
+    torc::mpc::vectorx_t q_out(mpc_model.GetConfigDim());
+    torc::mpc::vectorx_t v_out(mpc_model.GetVelDim());
+
+    q_out.head<7>() = q_mujoco.head<7>();
+    v_out.head<6>() = v_mujoco.head<6>();
+
+    // Reduce states down to just the MPC states
+    for (size_t i = 0; i < m->nq - 7; i++) {
+        const auto joint_idx = mpc_model.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1));
+        if (joint_idx.has_value()) {
+            if (joint_idx.value() < 2) {
+                std::cerr << "Invalid joint name!" << std::endl;
+            }
+            q_out(joint_idx.value() - 2 + 7) = q_mujoco(i + 7);     // Offset for the root and base joints
+        } else if (!full_model.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1)).has_value()) {
+            std::cerr << "Joint " << mj_id2name(m, mjOBJ_JOINT, i) << " not found in the full robot model!";
+            throw std::runtime_error("[UpdateXHat] Joint name not found!");
+        }
+    }
+
+    for (size_t i = 0; i < m->nv - 6; i++) {
+        const auto joint_idx = mpc_model.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1));
+        if (joint_idx.has_value()) {
+            if (joint_idx.value() < 2) {
+                std::cerr << "Invalid joint name!" << std::endl;
+            }
+            v_out(joint_idx.value() - 2 + 6) = v_mujoco(i +6);     // Offset for the root and base joints
+        } else if (!full_model.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1)).has_value()) {
+            std::cerr << "Joint " << mj_id2name(m, mjOBJ_JOINT, i) << " not found in the full robot model!";
+            throw std::runtime_error("[UpdateXHat] Joint name not found!");
+        }
+    }
+
+    return {q_out, v_out};
+}
+
 // main function
 int main(int argc, const char** argv) {
 
@@ -210,10 +249,10 @@ int main(int argc, const char** argv) {
     CentroidalDynamicsConstraint centroidal_dynamics(g1, settings.contact_frames, "g1_centroidal", settings.deriv_lib_path,
         settings.compile_derivs, settings.nodes_full_dynamics, settings.nodes);
 
-    // ---------- SRB Dynamics ---------- //
-    SRBConstraint srb_dynamics(settings.nodes_full_dynamics, settings.nodes,
-        "g1_srb",
-        settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1, settings.q_target);
+    // // ---------- SRB Dynamics ---------- //
+    // SRBConstraint srb_dynamics(settings.nodes_full_dynamics, settings.nodes,
+    //     "g1_srb",
+    //     settings.contact_frames, settings.deriv_lib_path, settings.compile_derivs, g1, settings.q_target);
 
     // ---------- Box Constraints ---------- //
     // Config
@@ -320,25 +359,26 @@ int main(int argc, const char** argv) {
     // --------------------------------- //
     torc::mpc::ContactSchedule cs(settings.contact_frames);
 
-    cs.InsertSwing("right_toe", 0.1, 0.5);
-    cs.InsertSwing("right_heel", 0.1, 0.5);
-    cs.InsertSwing("left_toe", 0.5, 0.9);
-    cs.InsertSwing("left_heel", 0.5, 0.9);
+    // cs.InsertSwing("right_toe", 0.1, 0.5);
+    // cs.InsertSwing("right_heel", 0.1, 0.5);
+    // cs.InsertSwing("left_toe", 0.5, 0.9);
+    // cs.InsertSwing("left_heel", 0.5, 0.9);
+    //
+    // cs.InsertSwing("right_toe", 0.9, 1.2);
+    // cs.InsertSwing("right_heel", 0.9, 1.2);
+    // cs.InsertSwing("left_toe", 1.2, 1.6);
+    // cs.InsertSwing("left_heel", 1.2, 1.6);
+    //
+    // cs.InsertSwing("right_toe", 1.6, 2.0);
+    // cs.InsertSwing("right_heel", 1.6, 2.0);
+    // cs.InsertSwing("left_toe", 2.0, 2.4);
+    // cs.InsertSwing("left_heel", 2.0, 2.4);
+    //
+    // cs.InsertSwing("right_toe", 2.4, 2.8);
+    // cs.InsertSwing("right_heel", 2.4, 2.8);
+    // cs.InsertSwing("left_toe", 2.8, 3.2);
+    // cs.InsertSwing("left_heel", 2.8, 3.2);
 
-    cs.InsertSwing("right_toe", 0.9, 1.2);
-    cs.InsertSwing("right_heel", 0.9, 1.2);
-    cs.InsertSwing("left_toe", 1.2, 1.6);
-    cs.InsertSwing("left_heel", 1.2, 1.6);
-
-    cs.InsertSwing("right_toe", 1.6, 2.0);
-    cs.InsertSwing("right_heel", 1.6, 2.0);
-    cs.InsertSwing("left_toe", 2.0, 2.4);
-    cs.InsertSwing("left_heel", 2.0, 2.4);
-
-    cs.InsertSwing("right_toe", 2.4, 2.8);
-    cs.InsertSwing("right_heel", 2.4, 2.8);
-    cs.InsertSwing("left_toe", 2.8, 3.2);
-    cs.InsertSwing("left_heel", 2.8, 3.2);
     // --------------------------------- //
     // -------------- MPC -------------- //
     // --------------------------------- //
@@ -376,15 +416,33 @@ int main(int argc, const char** argv) {
 
     double time = 0;
 
-    const std::array<int, 25> mpc_skip_joints = {5, 11,
-                       12, 13, 14,
-                       19, 20, 21,
-                       22, 23, 24, 25, 26, 27, 28,
-                       33, 34, 35,
-                       36, 37, 38, 39, 40, 41, 42};
+    // const std::array<int, 25> mpc_skip_joints = {5, 11,
+    //                    12, 13, 14,
+    //                    19, 20, 21,
+    //                    22, 23, 24, 25, 26, 27, 28,
+    //                    33, 34, 35,
+    //                    36, 37, 38, 39, 40, 41, 42};
+
+    const std::vector<double> mpc_skipped_joint_vals_ = {0, // Left ankle roll
+                          0,  // Right ankle roll
+                          0,  // Left wrist roll
+                          0,  // Left wrist pitch
+                          0,  // Left wrist yaw
+                          0,  // Right wrist roll
+                          0,  // Right wrist pitch
+                          0};   // Right wrist yaw
+        const std::vector<int> mpc_skipped_joint_indexes_ = {5,   // Left ankle roll
+                           11,  // Right ankle roll
+                           17,  // Left wrist roll
+                           18,  // Left wrist pitch
+                           19,  // Left wrist yaw
+                           24,  // Right wrist roll
+                           25,  // Right wrist pitch
+                           26};
 
     // Load in the correct key frame
-    mj_resetDataKeyframe(m, d, 0);
+    mj_resetDataKeyframe(m, d, 1);
+    std::cerr << "d_qpos[2]: " << d->qpos[2] << std::endl;
     std::vector<double> shared_data_tmp;
     for (int i = 0; i < m->nu; i++) {
         shared_data_tmp.push_back(d->ctrl[i]);
@@ -394,9 +452,9 @@ int main(int argc, const char** argv) {
     log_file.open("mpc_sync_mujoco.csv");
     bool first_loop = true;
 
-    if (m->nq != 18 + FLOATING_BASE) {
-        throw std::runtime_error("Mujoco model not 18dof!");
-    }
+    // if (m->nq != 18 + FLOATING_BASE) {
+    //     throw std::runtime_error("Mujoco model not 18dof!");
+    // }
 
     // Step Planning
     std::vector<torc::mpc::ContactInfo> contact_polytopes;
@@ -412,7 +470,7 @@ int main(int argc, const char** argv) {
 
     // Fake time delay
     // COMPUTE_TIME  should be < MPC_PERIOD
-    double COMPUTE_TIME = 0.008; //0.006; //0.008;    // Amount of time to compute the MPC from the time the state is grabbed
+    double COMPUTE_TIME = 0; //0.008; //0.006; //0.008;    // Amount of time to compute the MPC from the time the state is grabbed
     double MPC_PERIOD = 0.01; //0.01;       // How often the MPC is asked to re-compute
 
     std::ofstream timing_log;
@@ -430,8 +488,11 @@ int main(int argc, const char** argv) {
                 Eigen::Map<vectorx_t> q_map(d->qpos, m->nq);
                 Eigen::Map<vectorx_t> v_map(d->qvel, m->nv);
 
-                q_delay = q_map;
-                v_delay = v_map;
+                std::tie(q_delay, v_delay) = ConvertMujocoToMPC(g1, g1full, q_map, v_map);
+
+                // TODO: Only use when the model is 18DOF
+                // q_delay = q_map;
+                // v_delay = v_map;
             }
 
             vectorx_t q_temp;
@@ -441,8 +502,13 @@ int main(int argc, const char** argv) {
                 Eigen::Map<vectorx_t> q_map(d->qpos, m->nq);
                 Eigen::Map<vectorx_t> v_map(d->qvel, m->nv);
 
-                q_temp = q_map;
-                v_temp = v_map;
+                std::tie(q_temp, v_temp) = ConvertMujocoToMPC(g1, g1full, q_map, v_map);
+
+                // std::cout << "q map: " << q_map.transpose() << std::endl;
+                // std::cout << "q temp: " << q_temp.transpose() << std::endl;
+
+                // q_temp = q_map;
+                // v_temp = v_map;
             } else {
                 q_temp = q_delay;
                 v_temp = v_delay;
@@ -473,36 +539,8 @@ int main(int argc, const char** argv) {
             q_mpc.head<FLOATING_BASE>() = q_temp.head<FLOATING_BASE>();
             v_mpc.head<FLOATING_VEL>() = local_vel;
 
-            // TODO: Only use this when the non-18dof robot is in use
-            // // Reduce states down to just the MPC states
-            // for (size_t i = 0; i < m->nq - FLOATING_BASE; i++) {
-            //     const auto joint_idx = g1.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1));
-            //     if (joint_idx.has_value()) {
-            //         if (joint_idx.value() < 2) {
-            //             std::cerr << "Invalid joint name!" << std::endl;
-            //         }
-            //         q_mpc(joint_idx.value() - 2 + FLOATING_BASE) = q_map(i + FLOATING_BASE);     // Offset for the root and base joints
-            //     } else if (!g1full.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1)).has_value()) {
-            //         std::cerr << "Joint " << mj_id2name(m, mjOBJ_JOINT, i) << " not found in the full robot model!";
-            //         throw std::runtime_error("[UpdateXHat] Joint name not found!");
-            //     }
-            // }
-            //
-            // for (size_t i = 0; i < m->nv - FLOATING_VEL; i++) {
-            //     const auto joint_idx = g1.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1));
-            //     if (joint_idx.has_value()) {
-            //         if (joint_idx.value() < 2) {
-            //             std::cerr << "Invalid joint name!" << std::endl;
-            //         }
-            //         v_mpc(joint_idx.value() - 2 + FLOATING_VEL) = v_map(i +FLOATING_VEL);     // Offset for the root and base joints
-            //     } else if (!g1full.GetJointID(mj_id2name(m, mjOBJ_JOINT, i + 1)).has_value()) {
-            //         std::cerr << "Joint " << mj_id2name(m, mjOBJ_JOINT, i) << " not found in the full robot model!";
-            //         throw std::runtime_error("[UpdateXHat] Joint name not found!");
-            //     }
-            // }
-
-            q_mpc.tail(m->nq - FLOATING_BASE) = q_temp.tail(m->nq - FLOATING_BASE);
-            v_mpc.tail(m->nv - FLOATING_VEL) = v_temp.tail(m->nv - FLOATING_VEL);
+            q_mpc.tail(g1.GetConfigDim() - FLOATING_BASE) = q_temp.tail(g1.GetConfigDim() - FLOATING_BASE);
+            v_mpc.tail(g1.GetVelDim() - FLOATING_VEL) = v_temp.tail(g1.GetVelDim() - FLOATING_VEL);
 
             // std::cout << "q: " << q_mpc.transpose() << std::endl;
             // std::cout << "v: " << v_mpc.transpose() << std::endl;
@@ -518,15 +556,24 @@ int main(int argc, const char** argv) {
             if (first_loop) {
                 q_target.SetAllData(settings.q_target);
                 v_target.SetAllData(settings.v_target);
+                q_target[0][11] = -.4;
+                q_target[0][16] = -.4;
                 mpc.SetLinTrajConfig(q_target);
                 mpc.SetLinTrajVel(v_target);
 
+
+                vectorx_t q_target_mod = q_mpc;
+                q_target_mod[2] = 0.75; // Setting the z target to match previous stuff
+                q_target.SetAllData(q_target_mod);
                 mpc.SetConfigTarget(q_target);
                 mpc.SetVelTarget(v_target);
+
+                mpc.GetTrajectory().ExportToCSV("mpc_logs/mpc_first_traj.csv");
 
                 first_loop = false;
                 mpc.CreateQPData();
                 mpc.Compute(d->time, q_mpc, v_mpc, traj);
+                traj.ExportToCSV("mpc_logs/mpc_first_traj_result.csv");
 
             }
 
@@ -574,35 +621,38 @@ int main(int argc, const char** argv) {
                 LogEigenVec(log_file, vctrl);
                 LogEigenVec(log_file, tauctrl);
                 LogEigenVec(log_file, F);
+                LogEigenVec(log_file, tauctrl);
                 log_file << std::endl;
 
                 // TODO: Only use when the non-18dof robot is in
-                // // Expand states up to the full mujoco model
-                // const auto& joint_skip_values = settings.joint_skip_values;
-                //
-                // std::vector<double> q_vec(qctrl.data(), qctrl.data() + qctrl.size());
-                // std::vector<double> v_vec(vctrl.data(), vctrl.data() + vctrl.size());
-                // std::vector<double> tau_vec(tauctrl.data(), tauctrl.data() + tauctrl.size());
-                //
-                // for (int i = 0; i < mpc_skip_joints.size(); i++) {
-                //     q_vec.insert(q_vec.begin() + FLOATING_BASE + mpc_skip_joints[i], joint_skip_values[i]);
-                //     v_vec.insert(v_vec.begin() + FLOATING_VEL + mpc_skip_joints[i], 0);
-                //     tau_vec.insert(tau_vec.begin() + mpc_skip_joints[i], 0);
-                // }
-                //
-                // Eigen::Map<Eigen::VectorXd> q_ctrl_map(q_vec.data(), q_vec.size());
-                // Eigen::Map<Eigen::VectorXd> v_ctrl_map(v_vec.data(), v_vec.size());
-                // Eigen::Map<Eigen::VectorXd> tau_ctrl_map(tau_vec.data(), tau_vec.size());
-                //
-                // vectorx_t q = q_ctrl_map;
-                // vectorx_t v = v_ctrl_map;
-                // vectorx_t tau = tau_ctrl_map;
+                // Expand states up to the full mujoco model
 
-                vectorx_t q = qctrl;
-                vectorx_t v = vctrl;
-                vectorx_t tau = tauctrl;
+                std::vector<double> q_vec(qctrl.data(), qctrl.data() + qctrl.size());
+                std::vector<double> v_vec(vctrl.data(), vctrl.data() + vctrl.size());
+                std::vector<double> tau_vec(tauctrl.data(), tauctrl.data() + tauctrl.size());
+
+                for (int i = 0; i < mpc_skipped_joint_vals_.size(); i++) {
+                    q_vec.insert(q_vec.begin() + FLOATING_BASE + mpc_skipped_joint_indexes_[i], mpc_skipped_joint_vals_[i]);
+                    v_vec.insert(v_vec.begin() + FLOATING_VEL + mpc_skipped_joint_indexes_[i], 0);
+                    tau_vec.insert(tau_vec.begin() + mpc_skipped_joint_indexes_[i], 0);
+                }
+
+                Eigen::Map<Eigen::VectorXd> q_ctrl_map(q_vec.data(), q_vec.size());
+                Eigen::Map<Eigen::VectorXd> v_ctrl_map(v_vec.data(), v_vec.size());
+                Eigen::Map<Eigen::VectorXd> tau_ctrl_map(tau_vec.data(), tau_vec.size());
+
+                vectorx_t q = q_ctrl_map;
+                vectorx_t v = v_ctrl_map;
+                vectorx_t tau = tau_ctrl_map;
+
+                // TODO: Only use when the model is 18DOF
+                // vectorx_t q = qctrl;
+                // vectorx_t v = vctrl;
+                // vectorx_t tau = tauctrl;
 
                 if (q.size() != m->nq) {
+                    std::cerr << "q.size(): " << q.size() << std::endl;
+                    std::cerr << "m->nq: " << m->nq << std::endl;
                     throw std::runtime_error("Invalid q size!");
                 }
 

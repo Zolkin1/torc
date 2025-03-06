@@ -94,6 +94,8 @@ namespace torc::mpc {
         void SetConfigBaseTarget(const SimpleTrajectory& q_base_target);
         void SetVelBaseTarget(const SimpleTrajectory& v_base_target);
 
+        void SetDefaultGroundHeight(const std::string& frame, double height);   // TODO: Replace by height when I merge that in
+
         void SetLinTraj(const Trajectory& traj_in);
         void SetLinTrajConfig(const SimpleTrajectory& config_traj);
         void SetLinTrajVel(const SimpleTrajectory& vel_traj);
@@ -102,6 +104,8 @@ namespace torc::mpc {
         double GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol, double alpha);
         double GetCost(const std::vector<hpipm::OcpQpSolution>& sol, double alpha);
         int GetSolveCounter() const;
+
+        matrixx_t GetRiccatiFeedback();
 
         std::map<std::string, std::vector<double>> GetSwingTrajectory() const;
 
@@ -234,6 +238,7 @@ namespace torc::mpc {
         std::map<std::string, std::vector<double>> swing_traj_;
         std::map<std::string, std::vector<int>> in_contact_;
         std::map<std::string, std::vector<ContactInfo>> contact_info_;
+        std::map<std::string, double> ground_height_;
 
         static constexpr int CONTACT_3DOF = 3;
 

@@ -17,6 +17,7 @@ namespace torc::models {
     using matrixx_t = Eigen::MatrixXd;
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
     using matrix3x_t = Eigen::Matrix<double, 3, Eigen::Dynamic>;
+    using matrix3_t = Eigen::Matrix<double, 3, 3>;
 
     class FullOrderRigidBody : public PinocchioModel {
     public:
@@ -144,6 +145,23 @@ namespace torc::models {
         // DEBUG ------
         pinocchio::Model GetModel() const;
         // ------------
+
+        // Transform a velocity from one frame to another
+        pinocchio::Motion DeduceBaseVelocity(const pinocchio::Motion& v_a, const pinocchio::ReferenceFrame& linear_frame,
+            const std::string& frame_a, const std::string& frame_b, const vectorx_t& q, const vectorx_t& v) const;
+
+        // NOTE: Only good if there are no joint in between the frame and the base
+        pinocchio::Motion TransformVelocityToBase(const pinocchio::Motion& v_a, const std::string& velocity_frame,
+            const vectorx_t& q);
+
+        matrix3_t FitBasePose(const std::vector<std::string>& foot_frames, double z_offset, const vectorx_t& q);
+
+        vector3_t DeduceBasePosition (const vector3_t& frame_position, const std::string& frame, const vectorx_t& q);
+
+        // pose_world give the pose of frame_a in the world and
+        // the goal is to determine the pose of frame_b given this and the current configuration (ignoring the floating base position)
+        pinocchio::SE3 TransformPose(const pinocchio::SE3& pose_world,
+            const std::string& frame_a, const std::string& frame_b, const vectorx_t& q) const;
 
         constexpr static size_t STATE_Q_IDX = 0;
         constexpr static size_t STATE_V_IDX = 1;

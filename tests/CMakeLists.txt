@@ -56,3 +56,15 @@ target_link_libraries(dynamics_tests PUBLIC Models SamplePlanner Mpc) # Sample p
 
 # Copy additional test data to the build directory
 file(COPY test_data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+# --------- LPF Tests --------- #
+add_executable(lpf_tests LowPassFilterTests.cpp)
+target_link_libraries(lpf_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(lpf_tests PUBLIC StateEstimation)
+catch_discover_tests(lpf_tests)
+
+# --------- Frame Transform Tests --------- #
+add_executable(frame_tests frame_transform_tests.cpp)
+target_link_libraries(frame_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(frame_tests PUBLIC Models)
+catch_discover_tests(frame_tests)

@@ -29,12 +29,6 @@ namespace torc::mpc {
                 base_to_com_[2], 0, -base_to_com_[0],
                 -base_to_com_[1], base_to_com_[0], 0;
 
-        for (int i = 0; i < 10; i++) {
-            std::cout << "joint " << i << " inertia:" << std::endl;
-            std::cout << "name: " << model_.GetJointName(i) << std::endl;
-            std::cout << model_.GetModel().inertias[i].inertia().matrix() << std::endl;
-        }
-
         // Make a new model with all the joints locked
         std::vector<pinocchio::JointIndex> joint_ids;
         vectorx_t q = pinocchio::neutral((model.GetModel()));

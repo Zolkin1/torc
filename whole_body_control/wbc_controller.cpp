@@ -45,6 +45,11 @@ namespace torc::controller {
             std::vector<double> kd_vec = wbc_settings["kd"].as<std::vector<double>>();
             kd = utils::StdToEigenVector(kd_vec);
 
+            if (wbc_settings["custom_torque_lims"]) {
+                std::vector<double> torque_lims = wbc_settings["custom_torque_lims"].as<std::vector<double>>();
+                custom_torque_lims = utils::StdToEigenVector(torque_lims);
+            }
+
             verbose = wbc_settings["verbose"].as<bool>();
 
             // Load in the frame tracking settings
@@ -88,6 +93,9 @@ namespace torc::controller {
         nd_ = nv_ + ntau_ + nF_;
 
         if (settings_.kd.size() != settings_.kp.size() || settings_.kp.size() != nv_) {
+            std::cerr << "kd size: " << settings_.kd.size() << std::endl;
+            std::cerr << "kp size: " << settings_.kp.size() << std::endl;
+            std::cerr << "nv size: " << nv_ << std::endl;
             throw std::runtime_error("[WBC] kd and kp sizes do not match or they do not match the model!");
         }
 
@@ -96,6 +104,8 @@ namespace torc::controller {
         }
 
         if (settings_.tau_weight.size() != ntau_) {
+            std::cerr << "tau weight size: " << settings_.tau_weight.size() << std::endl;
+            std::cerr << "ntau: " << ntau_ << std::endl;
             throw std::runtime_error("[WBC] tau_weight size does not match!");
         }
 
@@ -109,12 +119,9 @@ namespace torc::controller {
             compile_derivs
         );
 
-        osqp_settings_.max_iter = 1000; //1000;  // TODO: Consider tuning this
-        osqp_settings_.polish = true;
-        osqp_settings_.eps_abs = 1e-4; //1e-6;
-        osqp_settings_.eps_rel = 1e-4; //1e-6;
-
-        // osqp_settings_.rho = 1e-3;
+        if (settings_.custom_torque_lims.size() != 0 && settings_.custom_torque_lims.size() != ntau_) {
+            throw std::runtime_error("Custom torque limits are not the correct size!");
+        }
     }
 
     vectorx_t WbcController::ComputeControl(const vectorx_t &q, const vectorx_t &v,
@@ -153,8 +160,6 @@ namespace torc::controller {
             throw std::runtime_error("[WBC] incorrect v_des size! Expected " + std::to_string(nv_) + " got: " + std::to_string(v_des.size()));
         }
 
-        osqp::OsqpSolver osqp_solver;
-
         // For now, updating the size with every solve depending on the contacts
         ncontacts_ = 0;
         for (const auto& contact : in_contact) {
@@ -165,99 +170,122 @@ namespace torc::controller {
         // std::cerr << "tau: " << tau_des.transpose() << std::endl;
 
         // Dynamics, no-slip, friction cone, no force, torque box
-        nc_ = nv_ + ncontacts_*6 + ncontacts_*5 + (ncontact_frames_ - ncontacts_)*3 + ntau_;
+        nc_ = nv_ + ncontacts_*3 + ncontacts_*5 + (ncontact_frames_ - ncontacts_)*3 + ntau_;
+        int neq = nv_ + ncontacts_*3 + (ncontact_frames_ - ncontacts_)*3;
+        int nineq = ncontacts_*5 + ntau_;
+
+        // ProxQpInterface
+        proxsuite::proxqp::dense::QP<double> qp(nd_, neq, nineq);
+        matrixx_t H = matrixx_t::Zero(nd_, nd_);
+        vectorx_t g = vectorx_t::Zero(nd_);
+        matrixx_t Aeq = matrixx_t::Zero(neq, nd_);
+        vectorx_t beq = vectorx_t::Zero(neq);
+        matrixx_t Cineq = matrixx_t::Zero(nineq, nd_);
+        vectorx_t uineq = vectorx_t::Zero(nineq);
+        vectorx_t lineq = vectorx_t::Zero(nineq);
 
         // --------- Constraints ---------- //
-        matrixx_t A = matrixx_t::Zero(nc_, nd_);
-        osqp_instance_.lower_bounds = vectorx_t::Zero(nc_);
-        osqp_instance_.upper_bounds = vectorx_t::Zero(nc_);
 
+        // Equality
         int rowc = 0;
-        vectorx_t lb(nv_), ub(nv_);
-        A.topRows(nv_) = DynamicsConstraint(q, v, lb, ub);
-        osqp_instance_.lower_bounds.segment(rowc, nv_) = lb;
-        osqp_instance_.upper_bounds.segment(rowc, nv_) = ub;
+        // Dynamics
+        vectorx_t b(nv_);
+        Aeq.topRows(nv_) = DynamicsConstraint(q, v, b);
+        beq.topRows(nv_) = b;
         rowc += nv_;
 
-        lb.resize(5*ncontacts_ + (ncontact_frames_ - ncontacts_)*3);
-        ub.resize(5*ncontacts_ + (ncontact_frames_ - ncontacts_)*3);
-        A.middleRows(rowc, 5*ncontacts_ + (ncontact_frames_ - ncontacts_)*3) = ForceConstraint(in_contact, lb, ub);
-        osqp_instance_.lower_bounds.segment(rowc, 5*ncontacts_ + (ncontact_frames_ - ncontacts_)*3) = lb;
-        osqp_instance_.upper_bounds.segment(rowc, 5*ncontacts_ + (ncontact_frames_ - ncontacts_)*3) = ub;
-        rowc += 5*ncontacts_ + (ncontact_frames_ - ncontacts_)*3;
+        // No Force in swing
+        b.resize((ncontact_frames_ - ncontacts_)*3);
+        Aeq.middleRows(rowc, (ncontact_frames_ - ncontacts_)*3) = NoForceConstraint(in_contact, b);
+        beq.segment(rowc, (ncontact_frames_ - ncontacts_)*3) = b;
+        rowc += (ncontact_frames_ - ncontacts_)*3;
 
-        lb.resize(ncontacts_*6);
-        ub.resize(ncontacts_*6);
-        A.middleRows(rowc, ncontacts_*6) = HolonomicConstraint(q, v, in_contact, lb, ub);
-        osqp_instance_.lower_bounds.segment(rowc, ncontacts_*6) = lb;
-        osqp_instance_.upper_bounds.segment(rowc, ncontacts_*6) = ub;
-        rowc += 6*ncontacts_;
+        // Holonomic
+        b.resize(ncontacts_*3);
+        Aeq.middleRows(rowc, ncontacts_*3) = HolonomicConstraint(q, v, in_contact, b);
+        beq.segment(rowc, ncontacts_*3) = b;
+        rowc += 3*ncontacts_;
 
-        A.middleRows(rowc, ntau_) = TorqueBoxConstraint();
-        osqp_instance_.lower_bounds.segment(rowc, ntau_) = -model_.GetTorqueJointLimits().tail(ntau_);
-        osqp_instance_.upper_bounds.segment(rowc, ntau_) = model_.GetTorqueJointLimits().tail(ntau_);
 
+        // // Inequality
+        rowc = 0;
+        // Friction Cone
+        vectorx_t ub, lb;
+        ub.resize(5*ncontacts_);
+        lb.resize(5*ncontacts_);
+        Cineq.middleRows(rowc, 5*ncontacts_) = ForceConstraint(in_contact, lb, ub);
+        uineq.segment(0, 5*ncontacts_) = ub;
+        lineq.segment(0, 5*ncontacts_) = lb;
+        rowc += 5*ncontacts_;
+
+        // Torque box
+        Cineq.middleRows(rowc, ntau_) = TorqueBoxConstraint();
+        if (settings_.custom_torque_lims.size() == 0) {
+            uineq.segment(rowc, ntau_) = model_.GetTorqueJointLimits().tail(ntau_);
+            lineq.segment(rowc, ntau_) = -model_.GetTorqueJointLimits().tail(ntau_);
+        } else {
+            uineq.segment(rowc, ntau_) = settings_.custom_torque_lims;
+            lineq.segment(rowc, ntau_) = -settings_.custom_torque_lims;
+        }
         // --------- Cost ---------- //
-        matrixx_t P = matrixx_t::Zero(nd_, nd_);
-        osqp_instance_.objective_vector = vectorx_t::Zero(nd_);
-
         const auto [stateP, stateq] = StateTracking(q, v, q_des, v_des);
-        P.topLeftCorner(nv_, nv_) = stateP;
-        osqp_instance_.objective_vector.head(nv_) = stateq;
+        H.topLeftCorner(nv_, nv_) = stateP;
+        g.head(nv_) = stateq;
 
         const auto [trackingP, trackingq] = FrameTracking(q, v, q_des, v_des,
             in_contact);
-        P.topLeftCorner(nv_, nv_) += trackingP;
-        osqp_instance_.objective_vector.head(nv_) += trackingq;
+        H.topLeftCorner(nv_, nv_) += trackingP;
+        g.head(nv_) += trackingq;
 
         const auto [tauP, tauq] = TorqueTracking(tau_des);
-        P.block(nv_, nv_, ntau_, ntau_) = tauP;
-        osqp_instance_.objective_vector.segment(nv_, ntau_) = tauq;
+        H.block(nv_, nv_, ntau_, ntau_) = tauP;
+        g.segment(nv_, ntau_) = tauq;
 
         const auto [FP, Fq] = ForceTracking(F_des);
-        P.bottomRightCorner(CONTACT_3DOF*ncontact_frames_, CONTACT_3DOF*ncontact_frames_) = FP;
-        osqp_instance_.objective_vector.segment(nv_ + ntau_, nF_) = Fq;
+        H.bottomRightCorner(CONTACT_3DOF*ncontact_frames_, CONTACT_3DOF*ncontact_frames_) = FP;
+        g.segment(nv_ + ntau_, nF_) = Fq;
 
         // --------- Solve ---------- //
-        // TODO: Consider doing this once in the constructor if its slow
-        // Initialize OSQP
-        osqp_instance_.objective_matrix = P.sparseView();
-        osqp_instance_.constraint_matrix = A.sparseView();
-
-        // std::cout << "P:\n" << P << std::endl;
-        // std::cout << "A:\n" << A << std::endl;
-        //
-        // throw;
-
-        osqp_settings_.verbose = verbose_;
-        auto status = osqp_solver.Init(osqp_instance_, osqp_settings_);    // Takes about 5ms for 20 nodes
-        if (!status.ok()) {
-            std::cerr << "P:\n" << P << std::endl;
-            std::cerr << "A:\n" << A << std::endl;
-
-            throw std::runtime_error("[WBC] Could not initialize OSQP!");
-        }
+        qp.init(H, g, Aeq, beq, Cineq, lineq, uineq);
         timer.Toc();
 
-        osqp::OsqpExitCode exit_code = osqp_solver.Solve();
-        if (exit_code != osqp::OsqpExitCode::kOptimal //&& exit_code != osqp::OsqpExitCode::kMaxIterations
-            && exit_code != osqp::OsqpExitCode::kOptimalInaccurate) {
-            std::cerr << "Bad QP solve!" << std::endl;
-            status = osqp_solver.UpdateVerbose(true);
-            osqp_solver.Solve();
-            throw std::runtime_error("[WBC] Could not solve QP!");
-        }
+        utils::TORCTimer solve_timer;
+        solve_timer.Tic();
+        qp.solve();
+        solve_timer.Toc();
 
         if (verbose_) {
-            std::cout << "num contacts: " << ncontacts_ << std::endl;
-            std::cout << "tau: " << osqp_solver.primal_solution().segment(nv_, ntau_).transpose() << std::endl;
-            std::cout << "a: " << osqp_solver.primal_solution().head(nv_).transpose() << std::endl;
-            std::cout << "F: " << osqp_solver.primal_solution().segment(nv_ + ntau_, nF_).transpose() << std::endl;
+            // std::cout << "num contacts: " << ncontacts_ << std::endl;
+            // std::cout << "tau: " << qp.results.x.segment(nv_, ntau_).transpose() << std::endl;
+            // std::cout << "a: " << qp.results.x.head(nv_).transpose() << std::endl;
+            // std::cout << "F: " << qp.results.x.segment(nv_ + ntau_, nF_).transpose() << std::endl;
             std::cout << "Setup took " << timer.Duration<std::chrono::microseconds>().count()*1e-3 << " ms" << std::endl;
+            std::cout << "Solve [T1] took " << solve_timer.Duration<std::chrono::microseconds>().count()*1e-3 << " ms" << std::endl;
+            std::cout << "Solve [T2] took " << qp.results.info.solve_time << " ms" << std::endl;
+        }
+
+        if (qp.results.info.status != proxsuite::proxqp::QPSolverOutput::PROXQP_SOLVED) {
+            std::cerr << "iters: " << qp.results.info.iter << std::endl;
+            std::cerr << "run time: " << qp.results.info.run_time << std::endl;
+            std::cerr << "status: ";
+            if (qp.results.info.status == proxsuite::proxqp::QPSolverOutput::PROXQP_NOT_RUN) {
+                std::cerr << "NOT RUN" << std::endl;
+            } else if (qp.results.info.status == proxsuite::proxqp::QPSolverOutput::PROXQP_DUAL_INFEASIBLE) {
+                std::cerr << "Dual infeasible" << std::endl;
+            } else if (qp.results.info.status == proxsuite::proxqp::QPSolverOutput::PROXQP_MAX_ITER_REACHED) {
+                std::cerr << "MAX_ITER_REACHED" << std::endl;
+            } else if (qp.results.info.status == proxsuite::proxqp::QPSolverOutput::PROXQP_PRIMAL_INFEASIBLE) {
+                std::cerr << "PRIMAL_INFEASIBLE" << std::endl;
+            } else if (qp.results.info.status == proxsuite::proxqp::QPSolverOutput::PROXQP_SOLVED_CLOSEST_PRIMAL_FEASIBLE) {
+                std::cerr << "SOLVED_CLOSEST_PRIMAL_FEASIBLE" << std::endl;
+            }
+            std::cerr << "primal resid: " << qp.results.info.pri_res << std::endl;
+            std::cerr << "dual resid: " << qp.results.info.dua_res << std::endl;
+            throw std::runtime_error("WBC not solved!");
         }
 
         if (settings_.log && solve_count_ % settings_.log_period == 0) {
-            LogEigenVec(osqp_solver.primal_solution());
+            LogEigenVec(qp.results.x);
             for (const auto& contact : in_contact) {
                 log_file_ << contact << ",";
             }
@@ -282,7 +310,7 @@ namespace torc::controller {
         p << q, v;
 
         vectorx_t y;
-        inverse_dynamics_->GetFunctionValue(osqp_solver.primal_solution(), p, y);
+        inverse_dynamics_->GetFunctionValue(qp.results.x, p, y);
         // if (y.norm() > 1e-4) {
         //     std::cout << "dynamics vio: " << y.transpose() << std::endl;
         //     pinocchio::computeAllTerms(model_.GetModel(), pin_data_, q, v);
@@ -335,12 +363,12 @@ namespace torc::controller {
         solve_count_++;
 
         // Return the torques
-        return osqp_solver.primal_solution().segment(nv_, ntau_);
+        return qp.results.x.segment(nv_, ntau_);
     }
 
     matrixx_t WbcController::HolonomicConstraint(const vectorx_t &q, const vectorx_t &v,
-        const std::vector<bool> &in_contact, vectorx_t& lb, vectorx_t& ub) {
-        matrixx_t A = matrixx_t::Zero(6*ncontacts_, nd_);
+        const std::vector<bool> &in_contact, vectorx_t& b) {
+        matrixx_t A = matrixx_t::Zero(3*ncontacts_, nd_);
 
         pinocchio::forwardKinematics(model_.GetModel(), pin_data_, q, v, vectorx_t::Zero(nv_));
 
@@ -352,26 +380,24 @@ namespace torc::controller {
                 // Get the frame Jacobian
                 matrix6_t J = matrix6_t::Zero(6, nv_);
                 model_.GetFrameJacobian(contact_frames_.at(i), q, J, pinocchio::LOCAL);
-                A.block(A_row, 0, 6, nv_) = J;
+                A.block(A_row, 0, 3, nv_) = J.topRows<3>();
 
                 // // Get the Jdot term
-                lb.segment<3>(A_row) = -pinocchio::getFrameAcceleration(model_.GetModel(), pin_data_,
+                b.segment<3>(A_row) = -pinocchio::getFrameAcceleration(model_.GetModel(), pin_data_,
                     model_.GetFrameIdx(contact_frames_.at(i)), pinocchio::LOCAL).linear().head<3>();
-                lb.segment<3>(A_row + 3) = -pinocchio::getFrameAcceleration(model_.GetModel(), pin_data_,
-                    model_.GetFrameIdx(contact_frames_.at(i)), pinocchio::LOCAL).angular().head<3>();
-                lb.segment<6>(A_row) -= settings_.alpha*J*v;
+                // b.segment<3>(A_row + 3) = -pinocchio::getFrameAcceleration(model_.GetModel(), pin_data_,
+                //     model_.GetFrameIdx(contact_frames_.at(i)), pinocchio::LOCAL).angular().head<3>();
+                // b.segment<6>(A_row) -= settings_.alpha*J*v;
                 // lb(A_row + 2) = 0;
-                A_row += 6;
+                A_row += 3;
             }
         }
-        // Equality constraint
-        ub = lb;
 
         return A;
     }
 
     matrixx_t WbcController::ForceConstraint(const std::vector<bool> &in_contact, vectorx_t &lb, vectorx_t &ub) {
-        matrixx_t A = matrixx_t::Zero(5*ncontacts_ + 3*(ncontact_frames_ - ncontacts_), nd_);
+        matrixx_t A = matrixx_t::Zero(5*ncontacts_, nd_);
 
         int row_idx = 0;
         for (int i = 0; i < in_contact.size(); i++) {
@@ -391,11 +417,21 @@ namespace torc::controller {
                 lb(row_idx) = 10;
                 ub(row_idx) = 1000;
                 row_idx++;
-            } else {
+            }
+        }
+
+        return A;
+    }
+
+    matrixx_t WbcController::NoForceConstraint(const std::vector<bool> &in_contact, vectorx_t &b) {
+        matrixx_t A = matrixx_t::Zero(3*(ncontact_frames_ - ncontacts_), nd_);
+
+        int row_idx = 0;
+        for (int i = 0; i < in_contact.size(); i++) {
+            if (!in_contact[i]) {
                 A.block(row_idx, nv_ + ntau_ + 3*i, 3, 3).setIdentity();
 
-                lb.segment<3>(row_idx).setZero();
-                ub.segment<3>(row_idx).setZero();
+                b.segment<3>(row_idx).setZero();
 
                 row_idx += 3;
             }
@@ -404,7 +440,8 @@ namespace torc::controller {
         return A;
     }
 
-    matrixx_t WbcController::DynamicsConstraint(const vectorx_t &q, const vectorx_t &v, vectorx_t& lb, vectorx_t& ub) {
+
+    matrixx_t WbcController::DynamicsConstraint(const vectorx_t &q, const vectorx_t &v, vectorx_t& b) {
         matrixx_t A(nv_, nd_);
         // Compute the terms via auto diff
         vectorx_t x_zero = vectorx_t::Zero(nd_);    // Linearize about 0, but it doesn't matter bc its already linear
@@ -449,9 +486,7 @@ namespace torc::controller {
         // std::cout << "Aforce:\n" << A.rightCols(nF_) << std::endl;
         A.rightCols(nF_) = -J.transpose();  // TODO: Remove after debugging
 
-        lb = -y;
-        ub = -y;
-
+        b = -y;
         return A;
     }
 
