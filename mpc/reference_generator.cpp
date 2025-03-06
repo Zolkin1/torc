@@ -83,6 +83,8 @@ namespace torc::mpc {
             if (contact_schedule.GetPolytopes(frame).size() != contact_midtimes[frame].size()) {
                 throw std::runtime_error("[Reference generator] Polytopes size != contact_midtimes.size()");
             }
+
+            // TODO: Consider adding this to the other case
             // DEBUG CHECK
             if (contact_midtimes[frame].size() != contact_schedule.GetNumContacts(frame)) {
                 std::cerr << "frame: " << frame << std::endl;
@@ -95,13 +97,25 @@ namespace torc::mpc {
         std::map<std::string, int> polytope_idx_offset;     // Account for the deleted times when accessing the polytopes
         // Remove all negative time contacts
         for (auto& [frame, midtimes] : contact_midtimes) {
+            // For now, assuming that there is always at least one contact in the horizon
+            if (contact_midtimes[frame].size() == 0) {
+                throw std::runtime_error("[Reference generator] contact_midtimes[" + frame + "].size() == 0 before removal!");
+            }
+
             polytope_idx_offset.insert({frame, 0});
             for (int i = 0; i < midtimes.size(); i++) {
-                if (midtimes[i] < 0) {
+                if (i == midtimes.size() - 1 && midtimes[i] < 0) {  // All midtimes are negative
+                    midtimes[i] = 0;    // Project to 0
+                } else if (midtimes[i] < 0) {
                     midtimes.erase(midtimes.begin() + i);
                     i--;
                     polytope_idx_offset[frame]++;
                 }
+            }
+
+            // For now, assuming that there is always at least one contact in the horizon
+            if (contact_midtimes[frame].size() == 0) {
+                throw std::runtime_error("[Reference generator] contact_midtimes[" + frame + "].size() == 0 after removing negatives!");
             }
         }
 
@@ -219,6 +233,7 @@ namespace torc::mpc {
                             std::cerr << "contact_foot_pos.size(): " << contact_foot_pos[frame].size() << std::endl;
                             std::cerr << "num contacts: " << contact_schedule.GetNumContacts(frame) << std::endl;
                             std::cerr << "node: " << node << " frame: " << frame << " time: " << time << std::endl;
+                            std::cerr << "contact_mid_times size: " << contact_midtimes[frame].size() << std::endl;
                             std::cerr << "contact mid times: " << std::endl;
                             for (int k = 0; k < contact_midtimes[frame].size(); k++) {
                                 std::cerr << contact_midtimes[frame][k] << ", ";
@@ -431,6 +446,7 @@ namespace torc::mpc {
         // Return
         // -------------------------------------------------- //
         // -------------------------------------------------- //
+        // std::cerr << "Reference generation complete!" << std::endl;
         return {q_ref, v_ref};
     }
 

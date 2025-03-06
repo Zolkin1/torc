@@ -424,32 +424,31 @@ namespace torc::mpc {
                 }
             }
 
-            // // Polytope
-            // if (polytope_->IsInNodeRange(node)) {
-            //     // std::cerr << "Adding polytope..." << std::endl;
-            //     int slack_idx = 0;
-            //     // TODO: Put back after debugging
-            //     for (const auto& frame : polytope_->GetPolytopeFrames()) {
-            //     // const std::string frame = polytope_->GetPolytopeFrames()[0];
-            //         matrixx_t jac;
-            //         vectorx_t ub, lb;
-            //         polytope_->GetLinearization(traj_.GetConfiguration(node),
-            //             contact_info_[frame][node], frame, jac, ub, lb);
-            //         // std::cout << "frame: " << frame << std::endl;
-            //
-            //         // std::cout << "node: " << node << std::endl;
-            //         // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
-            //         // std::cout << "polytope b: " << contact_info_[frame][node].b_.transpose() << std::endl;
-            //
-            //         qp[node].C.block(ineq_row_idx, 0, PolytopeConstraint::POLYTOPE_SIZE/2, nv_)
-            //             = jac;
-            //
-            //         qp[node].lg.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = lb;
-            //         qp[node].ug.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = ub;
-            //
-            //         ineq_row_idx += PolytopeConstraint::POLYTOPE_SIZE/2;
-            //     }
-            // }
+            // Polytope
+            if (polytope_->IsInNodeRange(node)) {
+                // std::cerr << "Adding polytope..." << std::endl;
+                for (const auto& frame : polytope_->GetPolytopeFrames()) {
+                    // std::cerr << "node: " << node << " frame: " << frame << std::endl;
+                // const std::string frame = polytope_->GetPolytopeFrames()[0];
+                    matrixx_t jac;
+                    vectorx_t ub, lb;
+                    polytope_->GetLinearization(traj_.GetConfiguration(node),
+                        contact_info_[frame][node], frame, jac, ub, lb);
+                    // std::cout << "frame: " << frame << std::endl;
+
+                    // std::cout << "node: " << node << std::endl;
+                    // std::cout << "polytope A:\n" << contact_info_[frame][node].A_ << std::endl;
+                    // std::cout << "polytope b: " << contact_info_[frame][node].b_.transpose() << std::endl;
+
+                    qp[node].C.block(ineq_row_idx, 0, PolytopeConstraint::POLYTOPE_SIZE/2, nv_)
+                        = jac;
+
+                    qp[node].lg.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = lb;
+                    qp[node].ug.segment<PolytopeConstraint::POLYTOPE_SIZE/2>(ineq_row_idx) = ub;
+
+                    ineq_row_idx += PolytopeConstraint::POLYTOPE_SIZE/2;
+                }
+            }
 
             // std::cout << "node: " << node << std::endl;
             // for (const auto& frame : settings_.contact_frames) {
@@ -1043,6 +1042,9 @@ namespace torc::mpc {
                                 if (contact_idx != current_contact) {
                                     // Only add the margin for future polytopes
                                     contact_info_[poly_frame][node].b_ -= polytope_delta;
+                                } else {
+                                    // For the current contact effectively don't enforce a polytope constraint
+                                    contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
                                 }
                             }
                         }
