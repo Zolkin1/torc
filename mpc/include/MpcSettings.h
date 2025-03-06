@@ -47,6 +47,7 @@ namespace torc::mpc {
         double initial_solve_tolerance;
         int nodes_full_dynamics;
         double terminal_weight;
+        std::string log_file_name;
 
         // Constraints
         double friction_coef;

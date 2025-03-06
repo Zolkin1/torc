@@ -396,4 +396,17 @@ namespace torc::mpc {
         return swings.size();
     }
 
+    void ContactSchedule::Log(std::ostream& log_file, double time) {
+        // TODO: In the future also add in the heights
+        log_file << time << ",";
+        for (const auto& [frame, sched] : frame_schedule_map) {
+            log_file << sched.size() << ",";    // Number of swings
+            for (const auto& [start, stop] : sched) {
+                log_file << start << "," << stop << ",";
+            }
+        }
+        log_file << std::endl;
+    }
+
+
 } // namespace torc::mpc

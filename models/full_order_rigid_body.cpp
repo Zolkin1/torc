@@ -783,6 +783,154 @@ namespace torc::models {
     }
     // DEBUG ------
 
+    pinocchio::Motion FullOrderRigidBody::DeduceBaseVelocity(const pinocchio::Motion& v_a,
+        const pinocchio::ReferenceFrame& velocity_frame,
+        const std::string& frame_a, const std::string& frame_b, const vectorx_t& q, const vectorx_t& v) const {
+
+        vectorx_t v_mod = v;
+        v_mod.head<6>().setZero();
+
+        // Update frame positions and update joint vels
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v_mod);
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+
+        // Get expected velocity due to the joint motion
+        pinocchio::Motion ex_vel = pinocchio::getFrameVelocity(pin_model_, *pin_data_, GetFrameIdx(frame_a), velocity_frame);
+
+        // Compute difference in velocities to get the base motion
+        pinocchio::Motion vel_diff = v_a - ex_vel;
+
+        // Need to get the effect of the base velocity on this frame then invert that transform
+        matrix6x_t J = matrix6x_t::Zero(6, GetVelDim());
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, GetFrameIdx(frame_a), velocity_frame, J);
+
+        pinocchio::Motion base_vel;
+        base_vel.ref() = J.leftCols<6>().inverse()*vel_diff.toVector(); //.ldlt().solve(vel_diff.toVector());
+
+        // Return
+        return base_vel;
+    }
+
+    pinocchio::Motion FullOrderRigidBody::TransformVelocityToBase(const pinocchio::Motion& v_a,
+            const std::string& velocity_frame, const vectorx_t& q) {
+
+        FirstOrderFK(q);
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+
+        // Get transform between the frame and the base. Assuming there are no joints in between
+        pinocchio::SE3 frame_placement_wrt_world = pin_data_->oMf[GetFrameIdx(velocity_frame)];
+        pinocchio::SE3 base_wrt_world(quat_t(q.segment<4>(3)), q.head<3>());
+
+        // std::cout << "frame wrt world: " << frame_placement_wrt_world << std::endl;
+        // std::cout << "base wrt world: " << base_wrt_world << std::endl;
+
+        // pinocchio::SE3 base_wrt_frame = base_wrt_world.inverse().actInv(frame_placement_wrt_world.inverse());
+        pinocchio::SE3 base_wrt_frame = base_wrt_world.actInv(frame_placement_wrt_world);
+
+        // std::cout << "base_wrt_frame: " << base_wrt_frame << std::endl;
+
+        // Return
+        return base_wrt_frame.act(v_a);
+    }
+
+    vector3_t FullOrderRigidBody::DeduceBasePosition(const vector3_t &frame_position, const std::string &frame,
+        const vectorx_t &q) {
+        // Compute the FK with the given q
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+        pinocchio::updateFramePlacement(pin_model_, *pin_data_, GetFrameIdx(frame));
+        vector3_t frame_expected = pin_data_->oMf[GetFrameIdx(frame)].translation();
+
+        // Compute the error
+        vector3_t frame_error = frame_position - frame_expected;
+
+        // Add the error to q
+        return q.head<3>() + frame_error;
+    }
+
+    matrix3_t FullOrderRigidBody::FitBasePose(const std::vector<std::string> &foot_frames, double z_offset,
+        const vectorx_t &q) {
+        // ---------- Fit the ground plane to feet frames ---------- //
+        // Get all the frame positions
+        std::vector<vector3_t> foot_positions;
+        FirstOrderFK(q);
+        for (const auto& frame : foot_frames) {
+            foot_positions.emplace_back(GetFrameState(frame).placement.translation());
+            std::cout << frame << " position: " << foot_positions.back().transpose() << std::endl;
+        }
+
+        // Add the foot offsets
+        for (auto& pos : foot_positions) {
+            pos[2] += z_offset;
+        }
+
+        // Fit the plane
+        // (1) Fit plane to hip data
+        matrixx_t A = matrixx_t::Zero(foot_positions.size(), 3);
+        vectorx_t b = vectorx_t::Zero(foot_positions.size());
+
+        for (int ee = 0; ee < foot_positions.size(); ee++) {
+            A.row(ee) << foot_positions[ee](0), foot_positions[ee](1), 1;
+            b(ee) = foot_positions[ee](2);
+        }
+
+        // Compute pseudo inverse
+        matrixx_t AtA;
+        AtA.noalias() = A.transpose()*A;
+
+        // Solve for the plane variables
+        vector3_t plane_vars = AtA.ldlt().solve(A.transpose()*b);
+        std::cout << "plane vars: " << plane_vars.transpose() << std::endl;
+
+        vector3_t plane_normal;
+        plane_normal << -plane_vars.head<2>(), 1;
+        plane_normal.normalize();
+        std::cout << "plane normal: " << plane_normal.transpose() << std::endl;
+
+        // Rotate the ground plane to fit the "nominal" ground plane
+        vector3_t nominal_normal = {0, 0, 1};
+
+        // Compute the rotation axis (cross product)
+        Eigen::Vector3d axis = plane_normal.cross(nominal_normal);
+        double sin_theta = axis.norm();
+        double cos_theta = plane_normal.dot(nominal_normal);
+
+        // If the normals are already aligned, return identity matrix
+        if (sin_theta < 1e-6) {
+            return matrix3_t::Identity();
+        }
+
+        // Normalize the rotation axis
+        axis /= sin_theta;
+
+        // Construct the skew-symmetric cross-product matrix
+        matrix3_t K;
+        K <<     0, -axis.z(),  axis.y(),
+             axis.z(),      0, -axis.x(),
+            -axis.y(),  axis.x(),      0;
+
+        // Compute rotation matrix using Rodrigues' formula
+        matrix3_t R = matrix3_t::Identity() + sin_theta * K + (1 - cos_theta) * K * K;
+
+        return R;
+    }
+
+
+    pinocchio::SE3 FullOrderRigidBody::TransformPose(const pinocchio::SE3& pose_world,
+        const std::string &frame_a, const std::string &frame_b, const vectorx_t &q) const {
+        // Update frame positions
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
+
+        // Get the frame transformations in the world
+        pinocchio::SE3 frame_a_world = pin_data_->oMf[GetFrameIdx(frame_a)];
+        pinocchio::SE3 frame_b_world = pin_data_->oMf[GetFrameIdx(frame_b)];
+
+        // Compute transform from frame A to frame B
+        pinocchio::SE3 frame_a_to_b = frame_b_world.inverse() * frame_a_world;
+
+        return pose_world*frame_a_to_b.inverse();
+    }
+
+
 
 //    vectorx_t FullOrderRigidBody::TauToInputs(const vectorx_t& tau) const {
 //        assert(tau == this->GetNumJoints());

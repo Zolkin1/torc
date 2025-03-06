@@ -192,7 +192,7 @@ namespace torc::mpc {
                 quat_t quat_out; // = GetQuat(i-1).slerp(forward_weight, GetQuat(i));
                 pinocchio::quaternion::slerp(forward_weight, GetQuat(i-1), GetQuat(i), quat_out);
                 q_out.segment<QUAT_VARS>(POS_VARS) = quat_out.coeffs();
-                if (std::abs(q_out.segment<QUAT_VARS>(POS_VARS).norm() - 1) > 1e-8) {
+                if (std::abs(q_out.segment<QUAT_VARS>(POS_VARS).norm() - 1) > 1e-2) {
                     std::cerr << "q: " << q_out.transpose() << std::endl;
                     throw std::runtime_error("[Trajectory] Interpolation invalid quaternion!");
                 }

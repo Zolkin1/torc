@@ -27,20 +27,9 @@ target_link_libraries(Wbc PUBLIC Autodiff)
 # ------- Eigen ------ #
 find_package(Eigen3 REQUIRED)
 
-# ------- OSQP ------ #
-include(FetchContent)
-
-set(OSQP-CPP_BUILD_TESTS OFF CACHE BOOL "Build OSQP-CPP without tests")
-set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "Variable for OSQP-CPP ABSL dep")
-
-FetchContent_Declare(
-        osqp-cpp
-        GIT_REPOSITORY https://github.com/google/osqp-cpp.git
-        GIT_TAG 43433736334d6b515ea4b0247156fea9e56c0d3f
-)
-
-FetchContent_MakeAvailable(osqp-cpp)
-target_link_libraries(Wbc PUBLIC osqp-cpp)
+# ----------- ProxQp ----------- #
+find_package(proxsuite REQUIRED)
+target_link_libraries(Wbc PUBLIC proxsuite::proxsuite)
 
 #----------- YAML ----------- #
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
