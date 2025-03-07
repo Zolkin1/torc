@@ -91,8 +91,10 @@ namespace torc::mpc {
         void SetConfigTarget(const SimpleTrajectory& q_target);
         void SetVelTarget(const SimpleTrajectory& v_target);
         void SetForwardKinematicsTarget(const std::map<std::string, std::vector<vector3_t>>& fk_positions);
+        void SetConfigBaseTarget(const SimpleTrajectory& q_base_target);
+        void SetVelBaseTarget(const SimpleTrajectory& v_base_target);
 
-        void SetDefaultGroundHeight(const std::string& frame, double height);   // TODO: Replace by height when I merge that in
+        void SetFootOffset(const std::string& frame, double height);
 
         void SetLinTraj(const Trajectory& traj_in);
         void SetLinTrajConfig(const SimpleTrajectory& config_traj);
@@ -236,7 +238,7 @@ namespace torc::mpc {
         std::map<std::string, std::vector<double>> swing_traj_;
         std::map<std::string, std::vector<int>> in_contact_;
         std::map<std::string, std::vector<ContactInfo>> contact_info_;
-        std::map<std::string, double> ground_height_;
+        std::map<std::string, double> foot_offset_;
 
         static constexpr int CONTACT_3DOF = 3;
 

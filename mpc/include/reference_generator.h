@@ -40,7 +40,10 @@ namespace torc::mpc {
             const std::map<std::string, std::vector<double>>& swing_traj,
             const std::vector<double>& hip_offsets,
             const ContactSchedule& contact_schedule,
-            std::map<std::string, std::vector<vector3_t>>& contact_foot_pos);
+            double target_height_offset, double current_ground_height,
+            std::map<std::string, std::vector<vector3_t>>& contact_foot_pos,
+            SimpleTrajectory& q_base_ref,
+            SimpleTrajectory& v_base_ref);
 
     protected:
     private:
@@ -92,6 +95,9 @@ namespace torc::mpc {
 
         // ProxQpInterface
         proxsuite::proxqp::dense::QP<double> qp_;
+
+        static constexpr int FLOATING_BASE = 7;
+        static constexpr int FLOATING_VEL = 6;
     };
 }
 

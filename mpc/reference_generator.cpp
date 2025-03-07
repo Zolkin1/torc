@@ -31,13 +31,17 @@ namespace torc::mpc {
         const std::map<std::string, std::vector<double>>& swing_traj,
         const std::vector<double>& hip_offsets,
         const ContactSchedule& contact_schedule,
-        std::map<std::string, std::vector<vector3_t>>& des_foot_pos) {
+        double target_height_offset, double current_ground_height,
+        std::map<std::string, std::vector<vector3_t>>& des_foot_pos,
+        SimpleTrajectory& q_base_ref,
+        SimpleTrajectory& v_base_ref) {
         // std::cerr << "In reference generator!" << std::endl;
 
         if (hip_offsets.size() != 2*contact_frames_.size()) {
             throw std::runtime_error("Hip offsets size != 2*contact_frames_.size()");
         }
 
+        // TODO: Remove
         SimpleTrajectory q_ref(config_size_, nodes_);
         SimpleTrajectory v_ref(vel_size_, nodes_);
 
@@ -157,7 +161,6 @@ namespace torc::mpc {
                     // contact_foot_pos[frame].emplace_back((R*hip_offset).head<2>()
                     //     + q_command.head<2>());
                     contact_foot_pos[frame].emplace_back(R.topLeftCorner<2,2>()*hip_offset.head<2>().head<2>() + q_command.head<2>());
-
                     // TODO: Put back!
                     // TODO: Need to use the MPC desired trajectory I think rather than the commanded traj
                     //  As it is right now, I get oscillations but the MPC is commanding the velocities seen as error
@@ -165,7 +168,7 @@ namespace torc::mpc {
                     if (i == 0) {
                         // For now just in the plane
                         constexpr double g = 9.81;
-                        const double hnom = q_target[0][2];
+                        const double hnom = target_height_offset;
                         contact_foot_pos[frame].back() = contact_foot_pos[frame].back() + (R.topLeftCorner<2,2>()*std::sqrt(hnom/g)*(v.head<2>() - v_target[0].head<2>())).head<2>();
                     }
 
@@ -311,6 +314,12 @@ namespace torc::mpc {
                     foot_pos << contact_foot_pos[frame].at(current_contact_idx), swing_traj.at(frame)[node];
                     des_foot_pos[frame].emplace_back(foot_pos);
                 }
+
+                if (std::isnan(des_foot_pos[frame][node][0]) || std::isnan(des_foot_pos[frame][node][1])
+                    || std::isnan(des_foot_pos[frame][node][2])) {
+                    std::cerr << "des_foot_pos["<< frame <<"][" << node << "]: " << des_foot_pos[frame][node].transpose() << std::endl;
+                    throw std::runtime_error("[ReferenceGenerator] Nan in the desired foot position!");
+                }
             }
             if (des_foot_pos[frame].size() != nodes_) {
                 throw std::runtime_error("[Reference Generator] node_foot_pos size != nodes_");
@@ -362,52 +371,6 @@ namespace torc::mpc {
 
         // -------------------------------------------------- //
         // -------------------------------------------------- //
-        // Adjust base position to avoid IK issues (for now skipping)
-        // -------------------------------------------------- //
-        // -------------------------------------------------- //
-        // // Then do IK on the floating base and leg joints to find a position that fits this step location
-        //
-        // // TODO: May want to do this IK with the floating base when the leg is the most extended, not on the midtime points!
-        // // TODO: Probably want to do this for both the end of the swing points (most extended) and the mid points of the contacts
-        // std::vector<std::pair<double, vectorx_t>> times_and_bases;
-        // std::vector<double> base_times;
-        // // For all the contact frames
-        // for (const auto& frame : contact_frames_) {
-        //     // For all the contact midpoint times
-        //     for (const auto& time : contact_midtimes[frame]) {
-        //         // Only check if we haven't used this time
-        //         if (std::find(base_times.begin(), base_times.end(), time) == base_times.end() && time <= end_time_ && time >= 0) {
-        //             const int node = GetNode(time);
-        //
-        //             // Determine all feet locations at the give time
-        //             std::vector<vector3_t> foot_pos(contact_frames_.size());
-        //             for (int j = 0; j < contact_frames_.size(); j++) {
-        //                 foot_pos[j] << node_foot_pos[contact_frames_[j]][node], swing_traj.at(frame)[node];
-        //             }
-        //
-        //
-        //             base_config << GetCommandedConfig(GetNode(time), q_target).head<7>();
-        //             // std::cout << "Base config: " << base_config.transpose() << ", time: " << time << ", end time: " << end_time_ << std::endl;
-        //
-        //             // IK
-        //             // TODO: Put back to true!
-        //             q_ik = model_->InverseKinematics(base_config, foot_pos, contact_frames_, q, false);
-        //
-        //             // Record base and time
-        //             times_and_bases.emplace_back(time, q_ik.head<7>());
-        //             base_times.emplace_back(time);
-        //         }
-        //     }
-        // }
-        //
-        // // Now sort on the times so we can interpolate
-        // auto time_sort = [](std::pair<double, vectorx_t> p1, std::pair<double, vectorx_t> p2) {
-        //     return p1.first < p2.first;
-        // };
-        // std::sort(times_and_bases.begin(), times_and_bases.end(), time_sort);
-
-        // -------------------------------------------------- //
-        // -------------------------------------------------- //
         // Run IK on all the nodes with the fixed base positions
         // -------------------------------------------------- //
         // -------------------------------------------------- //
@@ -439,6 +402,48 @@ namespace torc::mpc {
             // TODO: Should I keep the 0?
             v_ref[node] = 0*v_target[node];
             v_ref[node].head<6>() = v_target[node].head<6>();
+        }
+
+        // -------------------------------------------------- //
+        // -------------------------------------------------- //
+        // Update the base references
+        // -------------------------------------------------- //
+        // -------------------------------------------------- //
+        q_base_ref.SetSizes(FLOATING_BASE, nodes_);
+        v_base_ref.SetSizes(FLOATING_VEL, nodes_);
+        q_base_ref[0] = q.head<FLOATING_BASE>();
+        v_base_ref[0] = v.head<FLOATING_VEL>();
+
+        q_base_ref[0][2] = current_ground_height + target_height_offset;
+        for (int i = 1; i < nodes_; i++) {
+            q_base_ref[i] = q_target[i].head<FLOATING_BASE>();
+            v_base_ref[i] = v_target[i].head<FLOATING_VEL>();
+
+            // Adjust height target
+            // TODO: Do I want to use the average height here?
+            // Compute avg height
+            double avg_height = 0;
+            for (const auto& frame : contact_frames_) {
+                avg_height += contact_schedule.GetInterpolatedHeight(frame, GetTime(i));
+            }
+            if (contact_frames_.size() == 0) {
+                throw std::runtime_error("[ReferenceGenerator] contact frames size = 0");
+            }
+            avg_height /= contact_frames_.size();
+            // If at a node that is currently in contact (for any frame) then add z_target to the current ground height
+            bool first_contact = false;
+            for (const auto& frame : contact_frames_) {
+                if (contact_schedule.InContact(frame, GetTime(i)) && (contact_schedule.InContact(frame, 0) &&
+                    contact_schedule.GetContactIndex(frame, 0) == contact_schedule.GetContactIndex(frame, GetTime(i)))) {
+                    q_base_ref[i][2] = current_ground_height + target_height_offset;
+                    first_contact = true;
+                }
+            }
+            if (!first_contact) {
+                q_base_ref[i][2] = avg_height + target_height_offset;
+            }
+
+            // TODO: Fit the base orientation
         }
 
         // -------------------------------------------------- //
