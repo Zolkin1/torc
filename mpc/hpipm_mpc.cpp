@@ -34,7 +34,7 @@ namespace torc::mpc {
             in_contact_.insert({frame, {}});
             swing_traj_.insert({frame, {}});
             end_effector_targets_.insert({frame, {}});
-            ground_height_.insert({frame, settings_.default_ground_height});
+            foot_offset_.insert({frame, settings_.default_ground_height});
             for (int i = 0; i < settings_.nodes; i++) {
                 in_contact_[frame].push_back(1);
                 swing_traj_[frame].push_back(0);
@@ -387,6 +387,7 @@ namespace torc::mpc {
                     qp[node].lg(ineq_row_idx) = -y_segment(0) - settings_.swing_buffer;  // Buffer
                     qp[node].ug(ineq_row_idx) = -y_segment(0) + settings_.swing_buffer;  // Buffer
                     ineq_row_idx += y_segment.size();
+                    // std::cout << "desired y height: " << y_segment(0) << std::endl;
                 }
             }
 
@@ -972,8 +973,8 @@ namespace torc::mpc {
         end_effector_targets_ = fk_positions;
     }
 
-    void HpipmMpc::SetDefaultGroundHeight(const std::string &frame, double height) {
-        ground_height_[frame] = height;
+    void HpipmMpc::SetFootOffset(const std::string &frame, double height) {
+        foot_offset_[frame] = height;
     }
 
     void HpipmMpc::SetConfigBaseTarget(const SimpleTrajectory &q_base_target) {
@@ -1064,6 +1065,7 @@ namespace torc::mpc {
                                 } else {
                                     // For the current contact effectively don't enforce a polytope constraint
                                     contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                    contact_info_[poly_frame][node].height_ = polytopes[contact_idx].height_;
                                 }
                             }
                         }
@@ -1079,36 +1081,36 @@ namespace torc::mpc {
                             if (settings_.poly_contact_pairs[i].second == frame) {
                                 const std::string& poly_frame = settings_.poly_contact_pairs[i].first;
 
-                                // TODO: Change where we make this variable
-                                double height_buffer = 0.05;
+                                // The following is for the collision avoidance constraint
+                                // // TODO: Change where we make this variable
+                                // double height_buffer = 0.05;
+                                //
+                                // // Check if there is a height difference in the polytopes
+                                // if (contact_idx < sched.GetNumContacts(frame) - 1 && contact_idx > current_contact) {   // TODO: Not sure if this is the right metric here
+                                //     if (std::abs(polytopes[contact_idx + 1].height_ - polytopes[contact_idx].height_) > height_buffer) {
+                                //         // Keep the foot in the polytope at contact_idx until apex time
+                                //         // Determine if we are before or after apex
+                                //         double swing_start = sched.GetSwingStartTime(frame, time);
+                                //         double swing_dur = sched.GetSwingDuration(frame, time);
+                                //         double apex_time = swing_start + settings_.apex_time*swing_dur;
+                                //         if (time < apex_time) {
+                                //             // Keep in previous polytope
+                                //             // std::cerr << "time: " << time << std::endl;
+                                //             contact_info_[poly_frame][node] = polytopes[contact_idx];
+                                //             contact_info_[poly_frame][node].b_ -= polytope_delta;
+                                //         } else {
+                                //             // Let the foot be anywhere
+                                //             contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                //         }
+                                //     } else {
+                                //         // Let the foot be anywhere
+                                //         contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                //     }
+                                // } else {
+                                //     contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                // }
 
-                                // Check if there is a height difference in the polytopes
-                                if (contact_idx < sched.GetNumContacts(frame) - 1 && contact_idx > current_contact) {   // TODO: Not sure if this is the right metric here
-                                    if (std::abs(polytopes[contact_idx + 1].height_ - polytopes[contact_idx].height_) > height_buffer) {
-                                        // Keep the foot in the polytope at contact_idx until apex time
-                                        // Determine if we are before or after apex
-                                        double swing_start = sched.GetSwingStartTime(frame, time);
-                                        double swing_dur = sched.GetSwingDuration(frame, time);
-                                        double apex_time = swing_start + settings_.apex_time*swing_dur;
-                                        if (time < apex_time) {
-                                            // Keep in previous polytope
-                                            std::cerr << "time: " << time << std::endl;
-                                            contact_info_[poly_frame][node] = polytopes[contact_idx];
-                                            contact_info_[poly_frame][node].b_ -= polytope_delta;
-                                        } else {
-                                            // Let the foot be anywhere
-                                            contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
-                                        }
-                                    } else {
-                                        // Let the foot be anywhere
-                                        contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
-
-                                    }
-                                } else {
-                                    contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
-                                }
-
-                                // contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
+                                contact_info_[poly_frame][node] = ContactSchedule::GetDefaultContactInfo();
 
                                 // // TODO: This seems to make it worse, might need to be careful with the function used for the scaling
                                 // if (contact_idx + 1 < polytopes.size()) {
@@ -1130,7 +1132,7 @@ namespace torc::mpc {
 
         int frame_idx = 0;
         for (auto& [frame, traj] : swing_traj_) {
-            sched.CreateSwingTraj(frame, settings_.apex_height, settings_.default_ground_height,
+            sched.CreateSwingTraj(frame, settings_.apex_height, foot_offset_[frame],
                 settings_.apex_time, settings_.dt, traj);
             frame_idx++;
         }

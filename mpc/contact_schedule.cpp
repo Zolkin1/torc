@@ -193,6 +193,8 @@ namespace torc::mpc {
             if (!InSwing(frame, time)) {
                 const int contact_idx = GetContactIndex(frame, time);
                 const double end_height = contact_polytopes.at(frame)[contact_idx].height_ + height_offset;
+                std::cout << "polytope height: " << contact_polytopes.at(frame)[contact_idx].height_ <<
+                    ", height offset: " << height_offset << ", end height: " << end_height << ", frame: " << frame << ", contact idx: " << contact_idx << std::endl;
                 // FOR DEBUGGING
                 // double end_height = 0;
                 // if (!contact_polytopes.at(frame)[contact_idx].b_.isApprox(vector4_t({1.250000, 1.000000, -0.750000, -1.000000}))) {
@@ -329,6 +331,8 @@ namespace torc::mpc {
             throw std::runtime_error("[Contact schedule] Invalid contact num!");
         }
         contact_polytopes[frame][contact_num] = polytope;
+        std::cout << "[ContactSchedule] Received height: " << contact_polytopes[frame][contact_num].height_ <<
+            ", frame: " << frame << ", contact idx: " << contact_num << std::endl;
     }
 
     int ContactSchedule::GetNumContacts(const std::string& frame) const {

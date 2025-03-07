@@ -40,6 +40,7 @@ namespace torc::mpc {
             const std::map<std::string, std::vector<double>>& swing_traj,
             const std::vector<double>& hip_offsets,
             const ContactSchedule& contact_schedule,
+            double target_height_offset, double current_ground_height,
             std::map<std::string, std::vector<vector3_t>>& contact_foot_pos,
             SimpleTrajectory& q_base_ref,
             SimpleTrajectory& v_base_ref);

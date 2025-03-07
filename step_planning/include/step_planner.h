@@ -38,7 +38,8 @@ namespace torc::step_planning {
                                 const std::vector<double>& dt_vec,
                                 mpc::ContactSchedule& contact_schedule,
                                 std::map<std::string, std::vector<vector2_t>>& nominal_footholds,
-                                std::map<std::string, std::vector<vector2_t>>& projected_footholds);
+                                std::map<std::string, std::vector<vector2_t>>& projected_footholds,
+                                bool first_loop = false);
 
         void UpdateContactPolytopes(const std::vector<mpc::ContactInfo>& contact_polytopes);
 

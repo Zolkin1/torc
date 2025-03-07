@@ -31,6 +31,7 @@ namespace torc::mpc {
         const std::map<std::string, std::vector<double>>& swing_traj,
         const std::vector<double>& hip_offsets,
         const ContactSchedule& contact_schedule,
+        double target_height_offset, double current_ground_height,
         std::map<std::string, std::vector<vector3_t>>& des_foot_pos,
         SimpleTrajectory& q_base_ref,
         SimpleTrajectory& v_base_ref) {
@@ -407,6 +408,8 @@ namespace torc::mpc {
         v_base_ref.SetSizes(FLOATING_VEL, nodes_);
         q_base_ref[0] = q.head<FLOATING_BASE>();
         v_base_ref[0] = v.head<FLOATING_VEL>();
+
+        q_base_ref[0][2] = current_ground_height + target_height_offset;
         for (int i = 1; i < nodes_; i++) {
             q_base_ref[i] = q_target[i].head<FLOATING_BASE>();
             v_base_ref[i] = v_target[i].head<FLOATING_VEL>();
@@ -419,7 +422,21 @@ namespace torc::mpc {
                 avg_height += contact_schedule.GetInterpolatedHeight(frame, GetTime(i));
             }
             avg_height /= contact_frames_.size();
-            q_base_ref[i][2] += avg_height;
+            // If at a node that is currently in contact (for any frame) then add z_target to the current ground height
+            bool first_contact = false;
+            for (const auto& frame : contact_frames_) {
+                if (contact_schedule.InContact(frame, GetTime(i)) &&
+                    contact_schedule.GetContactIndex(frame, 0) == contact_schedule.GetContactIndex(frame, GetTime(i))) {
+                    q_base_ref[i][2] = current_ground_height + target_height_offset;
+                    first_contact = true;
+                }
+            }
+            if (!first_contact) {
+                q_base_ref[i][2] = avg_height + target_height_offset;
+            }
+
+            // TODO: Remove after debugging
+            q_base_ref[i][2] = current_ground_height + target_height_offset;
 
             // TODO: Fit the base orientation
         }
