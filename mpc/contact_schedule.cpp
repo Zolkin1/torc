@@ -42,13 +42,15 @@ namespace torc::mpc {
     void ContactSchedule::InsertSwing(const std::string& frame, double start_time, double stop_time) {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, stop_time);
-        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1, GetDefaultContactInfo());
+        ContactInfo prev_polytope = contact_polytopes[frame].back();
+        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1, prev_polytope);
     }
 
     void ContactSchedule::InsertSwingByDuration(const std::string& frame, double start_time, double duration) {
         // TODO: Consider verifying that there is no overlap with another contact
         frame_schedule_map[frame].emplace_back(start_time, start_time + duration);
-        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1, GetDefaultContactInfo());
+        ContactInfo prev_polytope = contact_polytopes[frame].back();
+        contact_polytopes[frame].resize(frame_schedule_map[frame].size() + 1, prev_polytope);
     }
 
     bool ContactSchedule::InContact(const std::string& frame, double time) const {
@@ -157,6 +159,8 @@ namespace torc::mpc {
         const int nodes = dt_vec.size();
         swing_traj.resize(nodes);
 
+        // std::cout << "height_offset: " << height_offset << ", apex height: " << apex_height << std::endl;
+
         for (int node = 0; node < nodes; node++) {
             double time = GetTime(dt_vec, node);
 
@@ -193,8 +197,8 @@ namespace torc::mpc {
             if (!InSwing(frame, time)) {
                 const int contact_idx = GetContactIndex(frame, time);
                 const double end_height = contact_polytopes.at(frame)[contact_idx].height_ + height_offset;
-                std::cout << "polytope height: " << contact_polytopes.at(frame)[contact_idx].height_ <<
-                    ", height offset: " << height_offset << ", end height: " << end_height << ", frame: " << frame << ", contact idx: " << contact_idx << std::endl;
+                // std::cout << "polytope height: " << contact_polytopes.at(frame)[contact_idx].height_ <<
+                //     ", height offset: " << height_offset << ", end height: " << end_height << ", frame: " << frame << ", contact idx: " << contact_idx << std::endl;
                 // FOR DEBUGGING
                 // double end_height = 0;
                 // if (!contact_polytopes.at(frame)[contact_idx].b_.isApprox(vector4_t({1.250000, 1.000000, -0.750000, -1.000000}))) {
@@ -202,6 +206,7 @@ namespace torc::mpc {
                 // }
                 swing_traj[node] = end_height;   // TODO: This should be fine
             }
+            // std::cout << frame << ", node: " << node << ", height: " << swing_traj[node] << std::endl;
         }
 
         // NO SWING HEIGHT
@@ -331,8 +336,8 @@ namespace torc::mpc {
             throw std::runtime_error("[Contact schedule] Invalid contact num!");
         }
         contact_polytopes[frame][contact_num] = polytope;
-        std::cout << "[ContactSchedule] Received height: " << contact_polytopes[frame][contact_num].height_ <<
-            ", frame: " << frame << ", contact idx: " << contact_num << std::endl;
+        // std::cout << "[ContactSchedule] Received height: " << contact_polytopes[frame][contact_num].height_ <<
+        //     ", frame: " << frame << ", contact idx: " << contact_num << std::endl;
     }
 
     int ContactSchedule::GetNumContacts(const std::string& frame) const {
@@ -380,6 +385,10 @@ namespace torc::mpc {
         const int next_contact_idx = GetContactIndex(frame, end + 0.001);
         const double h1 = contact_polytopes.at(frame)[prev_contact_idx].height_;
         const double h2 = contact_polytopes.at(frame)[next_contact_idx].height_;
+
+        if (end == start) {
+            throw std::runtime_error("[ContactSchedule] end time = start time!");
+        }
 
         return h1 + (h2 - h1) * (time - start) / (end - start);
     }

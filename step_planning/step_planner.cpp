@@ -56,6 +56,7 @@ namespace torc::step_planning {
             }
 
             // Get target state at contact midtimes
+            bool midtimes_negative = true;
             for (int i = 0; i < midtimes.size(); i++) {
                 if (contact_schedule.InContact(frame, 0) && (first_loop || i > contact_schedule.GetContactIndex(frame, 0))) {
                     SetFootTargetAndPolytope(midtimes[i], i, q_target, dt_vec, j, contact_schedule,
@@ -64,6 +65,17 @@ namespace torc::step_planning {
                     SetFootTargetAndPolytope(midtimes[i], i, q_target, dt_vec, j, contact_schedule,
                                             nominal_footholds, projected_footholds);
                 }
+
+                if (midtimes[i] > 0) {
+                    midtimes_negative = false;
+                }
+            }
+
+            if (midtimes_negative) {
+                // All the contacts are in the past so we still need to update the current polytope to what we are currently on
+                // otherwise the polytope won't update and we will get the default polytope which might have a different height
+                SetFootTargetAndPolytope(0.01, 0, q_target, dt_vec, j, contact_schedule,
+                        nominal_footholds, projected_footholds);
             }
         }
     }
@@ -215,7 +227,7 @@ namespace torc::step_planning {
 
                 // Update contact schedule
                 contact_schedule.SetPolytope(frame, contact_idx, poly);
-                std::cout << "[StepPlanner] Polytope height" << poly.height_ << std::endl;
+                // std::cout << "[StepPlanner] Polytope height" << poly.height_ << std::endl;
 
                 not_in_any_polytope = false;
                 break;

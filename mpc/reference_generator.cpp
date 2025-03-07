@@ -161,7 +161,6 @@ namespace torc::mpc {
                     // contact_foot_pos[frame].emplace_back((R*hip_offset).head<2>()
                     //     + q_command.head<2>());
                     contact_foot_pos[frame].emplace_back(R.topLeftCorner<2,2>()*hip_offset.head<2>().head<2>() + q_command.head<2>());
-
                     // TODO: Put back!
                     // TODO: Need to use the MPC desired trajectory I think rather than the commanded traj
                     //  As it is right now, I get oscillations but the MPC is commanding the velocities seen as error
@@ -169,7 +168,7 @@ namespace torc::mpc {
                     if (i == 0) {
                         // For now just in the plane
                         constexpr double g = 9.81;
-                        const double hnom = q_target[0][2];
+                        const double hnom = target_height_offset;
                         contact_foot_pos[frame].back() = contact_foot_pos[frame].back() + (R.topLeftCorner<2,2>()*std::sqrt(hnom/g)*(v.head<2>() - v_target[0].head<2>())).head<2>();
                     }
 
@@ -315,6 +314,12 @@ namespace torc::mpc {
                     foot_pos << contact_foot_pos[frame].at(current_contact_idx), swing_traj.at(frame)[node];
                     des_foot_pos[frame].emplace_back(foot_pos);
                 }
+
+                if (std::isnan(des_foot_pos[frame][node][0]) || std::isnan(des_foot_pos[frame][node][1])
+                    || std::isnan(des_foot_pos[frame][node][2])) {
+                    std::cerr << "des_foot_pos["<< frame <<"][" << node << "]: " << des_foot_pos[frame][node].transpose() << std::endl;
+                    throw std::runtime_error("[ReferenceGenerator] Nan in the desired foot position!");
+                }
             }
             if (des_foot_pos[frame].size() != nodes_) {
                 throw std::runtime_error("[Reference Generator] node_foot_pos size != nodes_");
@@ -421,12 +426,15 @@ namespace torc::mpc {
             for (const auto& frame : contact_frames_) {
                 avg_height += contact_schedule.GetInterpolatedHeight(frame, GetTime(i));
             }
+            if (contact_frames_.size() == 0) {
+                throw std::runtime_error("[ReferenceGenerator] contact frames size = 0");
+            }
             avg_height /= contact_frames_.size();
             // If at a node that is currently in contact (for any frame) then add z_target to the current ground height
             bool first_contact = false;
             for (const auto& frame : contact_frames_) {
-                if (contact_schedule.InContact(frame, GetTime(i)) &&
-                    contact_schedule.GetContactIndex(frame, 0) == contact_schedule.GetContactIndex(frame, GetTime(i))) {
+                if (contact_schedule.InContact(frame, GetTime(i)) && (contact_schedule.InContact(frame, 0) &&
+                    contact_schedule.GetContactIndex(frame, 0) == contact_schedule.GetContactIndex(frame, GetTime(i)))) {
                     q_base_ref[i][2] = current_ground_height + target_height_offset;
                     first_contact = true;
                 }
@@ -435,8 +443,8 @@ namespace torc::mpc {
                 q_base_ref[i][2] = avg_height + target_height_offset;
             }
 
-            // TODO: Remove after debugging
-            q_base_ref[i][2] = current_ground_height + target_height_offset;
+            // // TODO: Remove after debugging
+            // q_base_ref[i][2] = current_ground_height + target_height_offset;
 
             // TODO: Fit the base orientation
         }
