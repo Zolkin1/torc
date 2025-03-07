@@ -70,13 +70,6 @@ namespace torc::step_planning {
                     midtimes_negative = false;
                 }
             }
-
-            if (midtimes_negative) {
-                // All the contacts are in the past so we still need to update the current polytope to what we are currently on
-                // otherwise the polytope won't update and we will get the default polytope which might have a different height
-                SetFootTargetAndPolytope(0.01, 0, q_target, dt_vec, j, contact_schedule,
-                        nominal_footholds, projected_footholds);
-            }
         }
     }
 

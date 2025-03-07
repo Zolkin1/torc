@@ -159,8 +159,6 @@ namespace torc::mpc {
         const int nodes = dt_vec.size();
         swing_traj.resize(nodes);
 
-        // std::cout << "height_offset: " << height_offset << ", apex height: " << apex_height << std::endl;
-
         for (int node = 0; node < nodes; node++) {
             double time = GetTime(dt_vec, node);
 
@@ -176,8 +174,6 @@ namespace torc::mpc {
                         //     end_height = 0.1;
                         // }
 
-                        // // std::cout << "b: " << contact_polytopes.at(frame).at(next_contact_idx).b_.transpose() << std::endl;
-                        //
                         const int prev_contact_idx = GetContactIndex(frame, start - 0.001);
                         // FOR DEBUGGING
                         // double start_height = 0;
@@ -197,8 +193,6 @@ namespace torc::mpc {
             if (!InSwing(frame, time)) {
                 const int contact_idx = GetContactIndex(frame, time);
                 const double end_height = contact_polytopes.at(frame)[contact_idx].height_ + height_offset;
-                // std::cout << "polytope height: " << contact_polytopes.at(frame)[contact_idx].height_ <<
-                //     ", height offset: " << height_offset << ", end height: " << end_height << ", frame: " << frame << ", contact idx: " << contact_idx << std::endl;
                 // FOR DEBUGGING
                 // double end_height = 0;
                 // if (!contact_polytopes.at(frame)[contact_idx].b_.isApprox(vector4_t({1.250000, 1.000000, -0.750000, -1.000000}))) {
@@ -206,7 +200,6 @@ namespace torc::mpc {
                 // }
                 swing_traj[node] = end_height;   // TODO: This should be fine
             }
-            // std::cout << frame << ", node: " << node << ", height: " << swing_traj[node] << std::endl;
         }
 
         // NO SWING HEIGHT

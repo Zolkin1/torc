@@ -443,9 +443,6 @@ namespace torc::mpc {
                 q_base_ref[i][2] = avg_height + target_height_offset;
             }
 
-            // // TODO: Remove after debugging
-            // q_base_ref[i][2] = current_ground_height + target_height_offset;
-
             // TODO: Fit the base orientation
         }
 
