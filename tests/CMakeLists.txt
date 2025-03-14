@@ -68,3 +68,9 @@ add_executable(frame_tests frame_transform_tests.cpp)
 target_link_libraries(frame_tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(frame_tests PUBLIC Models)
 catch_discover_tests(frame_tests)
+
+# --------- Step Planner Tests --------- #
+add_executable(step_planner_tests step_planner_tests.cpp)
+target_link_libraries(step_planner_tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(step_planner_tests PUBLIC StepPlanning)
+catch_discover_tests(step_planner_tests)
