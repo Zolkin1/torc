@@ -5,10 +5,12 @@
 #include "torc_timer.h"
 #include "step_planner.h"
 
+#include <boost/mpl/aux_/numeric_op.hpp>
+
 namespace torc::step_planning {
     StepPlanner::StepPlanner(const std::vector<mpc::ContactInfo> &contact_polytopes,
         const std::vector<std::string> &contact_frames, const std::vector<double> &contact_offsets,
-        double current_time_buffer, double polytope_buffer)
+        double current_time_buffer, double polytope_buffer, const std::string& log_file_name)
             : contact_polytopes_(contact_polytopes), contact_frames_(contact_frames),
                 current_time_buffer_(current_time_buffer), qp_(2,0,2), polytope_buffer_(polytope_buffer) {
 
@@ -22,12 +24,20 @@ namespace torc::step_planning {
             contact_offsets_.emplace_back(contact_offsets[i], contact_offsets[i+1]);
         }
 
+        // TODO: Why did I put this in? I think it was for something related to the initialization
+        // contact_polytopes_.push_back(mpc::ContactSchedule::GetDefaultContactInfo());
+
+        log_file_.open(log_file_name);
+    }
+
+    StepPlanner::~StepPlanner() {
+        log_file_.close();
     }
 
     StepPlanner::StepPlanner(const std::vector<mpc::ContactInfo> &contact_polytopes,
         const std::vector<std::string> &contact_frames, const std::vector<double> &contact_offsets,
-        double current_time_buffer, double polytope_buffer, int seed) : StepPlanner(contact_polytopes,
-            contact_frames, contact_offsets, current_time_buffer, polytope_buffer) {
+        double current_time_buffer, double polytope_buffer, const std::string& log_file_name, int seed) : StepPlanner(contact_polytopes,
+            contact_frames, contact_offsets, current_time_buffer, polytope_buffer, log_file_name) {
         gen_.seed(seed);
     }
 
@@ -41,6 +51,7 @@ namespace torc::step_planning {
         mpc::ContactSchedule &contact_schedule,
         std::map<std::string, std::vector<vector2_t>>& nominal_footholds,
         std::map<std::string, std::vector<vector2_t>>& projected_footholds,
+        double time,
         bool first_loop) {
 
         nominal_footholds.clear();
@@ -53,6 +64,8 @@ namespace torc::step_planning {
 
         for (int j = 0; j < contact_frames_.size(); j++) {
             const std::string frame = contact_frames_[j];
+
+            log_file_ << frame << ",R," << contact_schedule.GetPolytopes(frame).size() << ","; // "R" for raibert
 
             nominal_footholds.insert({frame, {}});
             projected_footholds.insert({frame, {}});
@@ -77,13 +90,18 @@ namespace torc::step_planning {
                 if (midtimes[i] > 0) {
                     midtimes_negative = false;
                 }
+
+                log_file_ << midtimes[i] + time << "," << GetPolytopeIdx(contact_schedule.GetPolytopes(frame)[i]) << ",";
             }
+            log_file_ << std::endl;
         }
     }
 
     void StepPlanner::PlanStepsSampling(const mpc::SimpleTrajectory &q_target, const std::vector<double> &dt_vec,
         std::vector<mpc::ContactSchedule>& contact_schedule, std::map<std::string, std::vector<vector2_t> > &nominal_footholds,
-        std::map<std::string, std::vector<vector2_t> > &projected_footholds, bool first_loop) {
+        std::map<std::string, std::vector<vector2_t> > &projected_footholds,
+        double time,
+        bool first_loop) {
         nominal_footholds.clear();
         projected_footholds.clear();
 
@@ -101,46 +119,78 @@ namespace torc::step_planning {
             }
         }
 
+        std::map<double, std::vector<std::vector<int>>> sampled_polys_midtimes;
+
+        // --------- Get the Midtimes --------- //
+        // All the contact schedules are assumed to have the same timing for now
+        mpc::ContactSchedule& sched = contact_schedule[0];
+        std::vector<std::vector<double>> midtimes_all_frames;
+
+        for (int j = 0; j < contact_frames_.size(); j++) {
+            const std::string frame = contact_frames_[j];
+
+            nominal_footholds.insert({frame, {}});
+            projected_footholds.insert({frame, {}});
+
+            // Compute contact midtimes
+            midtimes_all_frames.push_back(ComputeContactMidtimes(frame, sched, traj_end_time));
+            if (midtimes_all_frames.back().size() != sched.GetNumContacts(frame)) {
+                throw std::runtime_error("[PlanStepsHeuristic] Computed midtimes size does not match contact schedule contact size!");
+            }
+        }
+        std::cerr << "All contact midtimes computed!" << std::endl;
+
+        // Group the frames by having the same midtimes
+        std::map<std::vector<double>, std::vector<std::string>> frame_groups;   // Indexed by midtime
+        for (int j = 0; j < contact_frames_.size(); j++) {
+            frame_groups[midtimes_all_frames[j]].push_back(contact_frames_[j]);
+        }
+        std::cerr << "Frames grouped!" << std::endl;
+
+        for (const auto& [midtimes, frames] : frame_groups) {
+            for (const auto& mt : midtimes) {
+                sampled_polys_midtimes.insert({mt, {}});    // Make elements for all midtimes
+            }
+        }
+        std::cerr << "sampled_polys created!" << std::endl;
+        // ------------------------------------ //
+
         // Iterate through each contact schedule, one for each parallel MPC
-        for (int k = 1; k < contact_schedule.size(); k++) {
-            mpc::ContactSchedule& sched = contact_schedule[k];
+        for (int sched_idx = 0; sched_idx < contact_schedule.size(); sched_idx++) {
+            std::vector<int> sample_frame_idxs;
+            std::vector<int> nominal_idx;
 
-            for (int j = 0; j < contact_frames_.size(); j++) {
-                const std::string frame = contact_frames_[j];
-
-                nominal_footholds.insert({frame, {}});
-                projected_footholds.insert({frame, {}});
-
-                // Compute contact midtimes
-                std::vector<double> midtimes = ComputeContactMidtimes(frame, sched, traj_end_time);
-                if (midtimes.size() != sched.GetNumContacts(frame)) {
-                    throw std::runtime_error("[PlanStepsHeuristic] Computed midtimes size does not match contact schedule contact size!");
-                }
-
+            for (const auto& [midtimes, frames] : frame_groups) {
                 // Get target state at contact midtimes
                 for (int i = 0; i < midtimes.size(); i++) {
-                    // Get all the previously sampled polytope combos
-                    std::vector<std::vector<int>> sampled_polys;
-                    for (int kk = 0; kk < k; kk++) {    // Go through all the contact schedules we have already sampled
-                        sampled_polys.push_back({});    // Make a vector for each contact schedule we have already sampled
-
-                        // Go through all the end effector frames looking for the ones in swing at the given mid-time
-                        for (const auto& frame_inner : contact_frames_) {
-                            if (contact_schedule[kk].InContact(frame_inner, midtimes[i])) {
-                                // We are in contact, so add the corresponding polytope to the sampled polytopes
-                                sampled_polys.back().push_back(GetPolytopeIdx(contact_schedule[kk].GetPolytopes(frame)[i]));
-                            }
-                        }
+                    if ((sched.InContact(frames[0], 0) && (first_loop || i > sched.GetContactIndex(frames[0], 0))) ||
+                        sched.InSwing(frames[0], 0) && midtimes[i] > current_time_buffer_) {
+                        std::cerr << "Valid contact to sample! (midtime: " << midtimes[i] << ")(frame1: "
+                            << frames[0] << ", frame2: " << frames[1] << ")" << std::endl;
+                        // std::cout << "i: " << i << std::endl;
+                        // std::cout << "midtimes size: " << midtimes.size() << std::endl;
+                        // std::cout << "num contacts: " << sched.GetNumContacts(frames[0]) << std::endl;
+                        sampled_polys_midtimes[midtimes[i]].push_back(SetFootTargetAndPolytopeSampling(midtimes[i], i,
+                            frames, q_target, dt_vec, sampled_polys_midtimes[midtimes[i]], sched,
+                            nominal_footholds, projected_footholds));
+                        std::cerr << "Sample successful!" << std::endl;
                     }
-
-                    if ((sched.InContact(frame, 0) && (first_loop || i > sched.GetContactIndex(frame, 0))) ||
-                        sched.InSwing(frame, 0) && midtimes[i] > current_time_buffer_) {
-                        // TODO: This does NOT need to be called for every frame, just for every midtime.
-                        SetFootTargetAndPolytopeSampling(midtimes[i], i, q_target, dt_vec, sampled_polys, sched,
-                            nominal_footholds, projected_footholds);
-                    }
+                    // std::cout << "-----" << std::endl;
                 }
             }
+            std::cerr << "Sampling completed!" << std::endl;
+
+            for (int i = 0; i < contact_frames_.size(); i++) {
+                const std::string frame = contact_frames_[i];
+                log_file_ << frame << ",S," << sched.GetPolytopes(frame).size() << ","; // "S" for sampling
+                for (int j = 0; j < midtimes_all_frames[i].size(); j++) {
+                    log_file_ << midtimes_all_frames[i][j] + time << "," << GetPolytopeIdx(sched.GetPolytopes(frame)[j]) << ",";
+                }
+                log_file_ << std::endl;
+            }
+
+            std::cerr << "Logging completed!" << std::endl;
+
         }
     }
 
@@ -371,12 +421,11 @@ namespace torc::step_planning {
         return {qp_.results.x, qp_.results.info.objValue};
     }
 
-    void StepPlanner::SetFootTargetAndPolytopeSampling(double midtime, int contact_idx,
+    std::vector<int> StepPlanner::SetFootTargetAndPolytopeSampling(double midtime, int contact_idx, const std::vector<std::string>& frames,
         const mpc::SimpleTrajectory &q_target, const std::vector<double> &dt_vec,
         const std::vector<std::vector<int> > &used_polys, mpc::ContactSchedule &contact_schedule,
         std::map<std::string, std::vector<vector2_t> > &nominal_footholds,
         std::map<std::string, std::vector<vector2_t> > &projected_footholds) {
-        throw std::runtime_error("[StepPlanner] The sampling stuff needs to be thourghly tested!");
 
         // DEBUG CHECK
         if (midtime <= 0) {
@@ -384,9 +433,21 @@ namespace torc::step_planning {
         }
 
         std::vector<int> sample_frame_idxs;
-        std::vector<int> nominal_idx;
-        for (int i = 0; i < contact_frames_.size(); i++) {
-            const std::string frame = contact_frames_[i];
+        std::map<std::string, int> nominal_idx;
+        for (int i = 0; i < frames.size(); i++) {
+            const std::string frame = frames[i];
+            std::cerr << "frame: " << frame << std::endl;
+
+            nominal_idx.insert({frame, {}});
+
+            int frame_idx = 0;
+            for (int j = 0; j < contact_frames_.size(); j++) {
+                if (frame == contact_frames_[j]) {
+                    frame_idx = j;
+                    std::cerr << "frame at frame idx: " << contact_frames_[frame_idx] << std::endl;
+                    break;
+                }
+            }
 
             if (contact_schedule.InContact(frame, midtime)) {
                 // Get base target
@@ -398,7 +459,7 @@ namespace torc::step_planning {
                 const quat_t quat(quat_vec);
                 const matrix3_t R = quat.toRotationMatrix();
 
-                target_state.head<2>() += R.topLeftCorner<2,2>()*contact_offsets_[i];
+                target_state.head<2>() += R.topLeftCorner<2,2>()*contact_offsets_[frame_idx];
                 nominal_footholds[frame].push_back(target_state.head<2>());
 
                 // Check if we are in a polytope
@@ -417,42 +478,71 @@ namespace torc::step_planning {
                 }
 
                 if (not_in_any_polytope) {
-                    sample_frame_idxs.push_back(i);
-                    nominal_idx.push_back(nominal_footholds[frame].size()-1);
+                    sample_frame_idxs.push_back(frame_idx);
+                    std::cerr << "Just added " << contact_frames_[sample_frame_idxs.back()] << std::endl;
+                    nominal_idx[frame] = nominal_footholds[frame].size()-1;
                 }
+            } else {
+                throw std::runtime_error("[StepPlanner] Frame is not in contact!");
             }
         }
 
+        std::vector<int> sampled_polys;
+
+        // Sample the points that are not nominally in a polytope for this midtime
         if (!sample_frame_idxs.empty()) {
             // Get the points we need to sample around
             std::vector<vector2_t> points;
             for (int i = 0; i < sample_frame_idxs.size(); i++) {
-                points.push_back(nominal_footholds[contact_frames_[sample_frame_idxs[i]]][nominal_idx[i]]);
+                const std::string& frame = contact_frames_[sample_frame_idxs[i]];
+                std::cerr << frame << " at time " << midtime << " needs to be sampled!" << std::endl;
+                std::cerr << "point: " << nominal_footholds[frame][nominal_idx[frame]].transpose() << std::endl;
+                points.push_back(nominal_footholds[frame][nominal_idx[frame]]);
+                // DEBUG CHECK
+                for (const auto& poly : contact_polytopes_) {
+                    if (InPolytope(poly, points.back())) {
+                        std::cerr << "point: " << points.back().transpose() << std::endl;
+                        std::cerr << "nominal idx: " << nominal_idx[frame] << std::endl;
+                        std::cerr << "nominal foothold size: " << nominal_footholds.size() << std::endl;
+                        throw std::runtime_error("[StepPlanner][DEBUG] Point is in polytope!");
+                    }
+                }
             }
 
-            int polytope_idx = -1;
-            vector2_t projected_point;
             std::vector<std::pair<vector2_t, int>> projected_polytopes = SamplePolytopes(points, used_polys);
+            for (const auto& [point, idx] : projected_polytopes) {
+                sampled_polys.push_back(idx);
+            }
 
-            for (int i = 0; i < sample_frame_idxs.size(); i++) {
-                projected_footholds[contact_frames_[sample_frame_idxs[i]]].push_back(projected_point);
+            assert(projected_polytopes.size() == sample_frame_idxs.size());
+
+            for (int i = 0; i < projected_polytopes.size(); i++) {
+                projected_footholds[contact_frames_[sample_frame_idxs[i]]].push_back(projected_polytopes[i].first);
 
                 // Update contact schedule
-                contact_schedule.SetPolytope(contact_frames_[sample_frame_idxs[i]], contact_idx, contact_polytopes_[polytope_idx]);
+                contact_schedule.SetPolytope(contact_frames_[sample_frame_idxs[i]], contact_idx, contact_polytopes_[projected_polytopes[i].second]);
             }
         }
 
+        return sampled_polys;
     }
 
 
     int StepPlanner::GetPolytopeIdx(const mpc::ContactInfo &polytope) {
         for (int i = 0; i < contact_polytopes_.size(); i++) {
-            mpc::ContactInfo& planner_poly = contact_polytopes_[i];
+            const mpc::ContactInfo& planner_poly = contact_polytopes_[i];
             if (polytope.A_ == planner_poly.A_ && polytope.b_ == planner_poly.b_ && polytope.height_ == planner_poly.height_) {
                 return i;
             }
         }
 
+        if (polytope.A_ == mpc::ContactSchedule::GetDefaultContactInfo().A_ && polytope.b_ == mpc::ContactSchedule::GetDefaultContactInfo().b_) {
+            return -1;
+        }
+
+        std::cerr << "A: " << polytope.A_ << std::endl;
+        std::cerr << "b: " << polytope.b_ << std::endl;
+        std::cerr << "height: " << polytope.height_ << std::endl;
         throw std::runtime_error("[StepPlanner] provided polytope does not match any polytopes to select from!");
     }
 
@@ -465,6 +555,11 @@ namespace torc::step_planning {
 
         // Prune previously used samples out of the tree
         for (int i = 0; i < used_polys.size(); i++) {
+            // std::cerr << "used_polys[i]: " << "\t";
+            // for (int i = 0; i < used_polys[i].size(); i++) {
+            //     std::cerr << used_polys[i][i] << ", ";
+            // }
+            // std::cerr << std::endl;
             root->PruneBranch(used_polys[i]);
         }
 
@@ -485,7 +580,7 @@ namespace torc::step_planning {
                 for (int i = 0; i < node->GetNumChildren(); i++) {
                     total_area += node->children[i]->area;
                 }
-                for (int i = 0; i < root->GetNumChildren(); i++) {
+                for (int i = 0; i < node->GetNumChildren(); i++) {
                     node->children[i]->area /= total_area;
                 }
             }
@@ -533,9 +628,14 @@ namespace torc::step_planning {
         // TODO: Might need to sort the polygon point counterclockwise
 
         // We don't support having the point inside the polytope (because then no sampling is needed)
-        vector2_t temp = polytope.A_ * point;
-        if ((temp(0) < polytope.b_[0] && temp(0) > polytope.b_[2]) &&
-            (temp(1) < polytope.b_[1] && temp(1) > polytope.b_[3])) {
+        // vector2_t temp = polytope.A_ * point;
+        // if ((temp(0) < polytope.b_[0] && temp(0) > polytope.b_[2]) &&
+        //     (temp(1) < polytope.b_[1] && temp(1) > polytope.b_[3])) {
+        //     throw std::runtime_error("[StepPlanner] Circle center in the polytope is unsupported!");
+        // }
+
+        if (InPolytope(polytope, point)) {
+            std::cerr << "Point: " << point.transpose() << std::endl;
             throw std::runtime_error("[StepPlanner] Circle center in the polytope is unsupported!");
         }
 

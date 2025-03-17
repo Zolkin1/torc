@@ -103,6 +103,7 @@ namespace torc::mpc {
         // Computes constraint violation for traj_
         double GetConstraintViolation(const std::vector<hpipm::OcpQpSolution>& sol, double alpha);
         double GetCost(const std::vector<hpipm::OcpQpSolution>& sol, double alpha);
+        double GetMostRecentCost();
         int GetSolveCounter() const;
 
         matrixx_t GetRiccatiFeedback();

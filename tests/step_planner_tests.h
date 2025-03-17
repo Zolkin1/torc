@@ -12,7 +12,7 @@ namespace torc::step_planning {
     class StepPlanTester : public StepPlanner {
         public:
         StepPlanTester(const std::vector<mpc::ContactInfo>& contact_polytopes, const std::vector<std::string>& contact_frames,
-            const std::vector<double>& contact_offsets) : StepPlanner(contact_polytopes, contact_frames, contact_offsets, 0, 0, 0) {}
+            const std::vector<double>& contact_offsets) : StepPlanner(contact_polytopes, contact_frames, contact_offsets, 0, 0, "temp_log.csv", 0) {}
 
         void CheckPolytopeCircleArea() {
             // Make a polytope that has known area
@@ -31,25 +31,25 @@ namespace torc::step_planning {
             CHECK(computed_area == 0);
 
             // Make a partial covering
-            point = {100, 100};
+            point = {100.000001, 100.000001};
             rad = 10;
             computed_area = GetPolytopeCircleArea(poly, point, rad);
             CHECK(std::abs(computed_area - 100.*0.78539816339) < 1e-3);
 
             // Make a partial covering
-            point = {-100, -100};
+            point = {-100.000001, -100.000001};
             rad = 10;
             computed_area = GetPolytopeCircleArea(poly, point, rad);
             CHECK(std::abs(computed_area - 100.*0.78539816339) < 1e-3);
 
             // Make a partial covering
-            point = {0, 100};
+            point = {0, 100.000001};
             rad = 10;
             computed_area = GetPolytopeCircleArea(poly, point, rad);
             CHECK(std::abs(computed_area - 100.*2.*0.78539816339) < 1e-3);
 
             // Make a partial covering
-            point = {100, 0};
+            point = {100.000001, 0};
             rad = 10;
             computed_area = GetPolytopeCircleArea(poly, point, rad);
             CHECK(std::abs(computed_area - 100.*2.*0.78539816339) < 1e-3);
@@ -215,11 +215,143 @@ namespace torc::step_planning {
             points.push_back(vector2_t(0, 0));
             std::vector<std::vector<int>> used_polys;
 
+            for (int i = 0; i < contact_polytopes_.size(); i++) {
+                std::cout << "contact polytope b" << contact_polytopes_[i].b_.transpose() << std::endl;
+            }
+
             auto sampled = SamplePolytopes(points, used_polys);
             REQUIRE(sampled.size() == points.size());
             CHECK(sampled[0].second == 2);
 
-            // TODO: Add more tests
+            points.clear();
+            points.push_back(vector2_t(0, 0));
+            points.push_back(vector2_t(0, 0.5));
+
+            sampled = SamplePolytopes(points, used_polys);
+            REQUIRE(sampled.size() == points.size());
+            CHECK(sampled[0].second == 3);
+            CHECK(sampled[1].second == 1);
+
+            points.clear();
+            points.push_back(vector2_t(0, 0));
+            points.push_back(vector2_t(0, 0.5));
+
+            used_polys.push_back({3, 1});
+
+            sampled = SamplePolytopes(points, used_polys);
+            REQUIRE(sampled.size() == points.size());
+            CHECK(sampled[0].second == 3);
+            CHECK(sampled[1].second == 0);
+
+            points.clear();
+            points.push_back(vector2_t(0, 0));
+            points.push_back(vector2_t(0, 0.5));
+
+            used_polys.clear();
+            used_polys.push_back({1, 1});
+            used_polys.push_back({1, 0});
+
+            sampled = SamplePolytopes(points, used_polys);
+            REQUIRE(sampled.size() == points.size());
+            CHECK(sampled[0].second == 2);
+            CHECK(sampled[1].second == 0);
+
+            points.clear();
+            points.push_back(vector2_t(0, 0));
+            points.push_back(vector2_t(0, 0.5));
+
+            used_polys.clear();
+            used_polys.push_back({1, 1});
+            used_polys.push_back({1, 0});
+            used_polys.push_back({2, 0});
+            used_polys.push_back({2, 1});
+            used_polys.push_back({3, 0});
+            used_polys.push_back({3, 1});
+            used_polys.push_back({0, 0});
+
+            sampled = SamplePolytopes(points, used_polys);
+            REQUIRE(sampled.size() == points.size());
+            CHECK(sampled[0].second == 0);
+            CHECK(sampled[1].second == 1);
+
+            sampled = SamplePolytopes(points, used_polys);
+            REQUIRE(sampled.size() == points.size());
+            CHECK(sampled[0].second == 0);
+            CHECK(sampled[1].second == 1);
+        }
+
+        void CheckFullSampling() {
+            mpc::ContactSchedule sched({"1", "2", "3", "4"});
+            sched.InsertSwing("1", 0.1, 0.4);
+            sched.InsertSwing("2", 0.1, 0.4);
+            sched.InsertSwing("1", 0.7, 1.);
+            sched.InsertSwing("2", 0.7, 1.);
+            sched.InsertSwing("3", 0.4, 0.7);
+            sched.InsertSwing("4", 0.4, 0.7);
+
+            double midtime = 0.55;
+
+            mpc::SimpleTrajectory q_target(7, 20);
+            q_target.SetAllData(vectorx_t::Zero(7));
+
+            std::vector<double> dt_vec;
+            dt_vec.resize(20, 0.05);
+
+            std::vector<std::vector<int>> used_polys;
+
+            std::map<std::string, std::vector<vector2_t>> nom_footholds;
+            nom_footholds.insert({"1", {}});
+            nom_footholds.insert({"2", {}});
+
+            // nom_footholds.insert({"3", {{0, 0}}});
+            // nom_footholds.insert({"4", {{0, 0}}});
+
+            std::map<std::string, std::vector<vector2_t>> projected_footholds;
+            projected_footholds.insert({"1", {}});
+            projected_footholds.insert({"2", {}});
+            projected_footholds.insert({"3", {}});
+            projected_footholds.insert({"4", {}});
+
+            std::vector<std::string> frames = {"1", "2"}; //, "3", "4"};
+
+            SetFootTargetAndPolytopeSampling(midtime, 1, frames, q_target, dt_vec, used_polys, sched, nom_footholds, projected_footholds);
+
+            vector4_t correct_b = {-0.125, 1, -1, 0.125};
+            CHECK(sched.GetPolytopes("1")[1].b_ == correct_b);
+
+            correct_b = {1, -0.125, 0.125, -1};
+            CHECK(sched.GetPolytopes("2")[1].b_ == correct_b);
+
+
+            // Try removing some combinations
+            used_polys.clear();
+            used_polys.push_back({1, 3});
+            nom_footholds["1"].clear();
+            nom_footholds["2"].clear();
+
+            SetFootTargetAndPolytopeSampling(midtime, 1, frames, q_target, dt_vec, used_polys, sched, nom_footholds, projected_footholds);
+
+            correct_b = {-0.125, 1, -1, 0.125};
+            CHECK(sched.GetPolytopes("1")[1].b_ == correct_b);
+
+            correct_b = {-0.125, -0.125, -1, -1};
+            CHECK(sched.GetPolytopes("2")[1].b_ == correct_b);
+
+            // Try removing some combinations
+            used_polys.clear();
+            used_polys.push_back({1, 3});
+            used_polys.push_back({1, 2});
+            nom_footholds["1"].clear();
+            nom_footholds["2"].clear();
+
+            SetFootTargetAndPolytopeSampling(midtime, 1, frames, q_target, dt_vec, used_polys, sched, nom_footholds, projected_footholds);
+
+            correct_b = {1, 1, 0.125, 0.125};
+            CHECK(sched.GetPolytopes("1")[1].b_ == correct_b);
+
+            correct_b = {-0.125, -0.125, -1, -1};
+            CHECK(sched.GetPolytopes("2")[1].b_ == correct_b);
+
         }
     };
 }

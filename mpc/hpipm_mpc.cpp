@@ -1421,6 +1421,13 @@ namespace torc::mpc {
         return std::sqrt(cost);
     }
 
+    double HpipmMpc::GetMostRecentCost() {
+        if (result_ != hpipm::HpipmStatus::NaNDetected && result_ != hpipm::HpipmStatus::UnknownFailure) {
+            return GetCost(solution_, 1);
+        }
+
+        return 1e11;    // If the solver failed return a hight cost
+    }
 
     std::pair<double, double> HpipmMpc::LineSearch(const std::vector<hpipm::OcpQpSolution> &sol) {
         alpha_ = 1;

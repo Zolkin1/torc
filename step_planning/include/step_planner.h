@@ -61,7 +61,7 @@ namespace torc::step_planning {
                     std::cerr << "i: " << i << " is a nullptr!" << ", ";
                 }
             }
-            throw std::runtime_error("[SampleTree] Could not find a child of SampleTreeNode");
+            throw std::runtime_error("[SampleTree] Could not find a child of SampleTreeNode!\nProvided index: " + std::to_string(polytope_idx));
         }
 
         void PruneBranch(std::vector<int> branch_idxs) {
@@ -81,6 +81,7 @@ namespace torc::step_planning {
                     }
                 } else {
                     std::cerr << "Looking for idx: " << branch_idxs[0] << std::endl;
+                    std::cerr << "Children size: " << children.size() << std::endl;
                     throw std::runtime_error("[SampleTree] Invalid branch to prune!");
                 }
             } else {
@@ -96,10 +97,12 @@ namespace torc::step_planning {
     class StepPlanner {
     public:
         StepPlanner(const std::vector<mpc::ContactInfo>& contact_polytopes, const std::vector<std::string>& contact_frames,
-            const std::vector<double>& contact_offsets, double current_time_buffer, double polytope_buffer);
+            const std::vector<double>& contact_offsets, double current_time_buffer, double polytope_buffer, const std::string& log_file_name);
 
         StepPlanner(const std::vector<mpc::ContactInfo>& contact_polytopes, const std::vector<std::string>& contact_frames,
-            const std::vector<double>& contact_offsets, double current_time_buffer, double polytope_buffer, int seed);
+            const std::vector<double>& contact_offsets, double current_time_buffer, double polytope_buffer, const std::string& log_file_name, int seed);
+
+        ~StepPlanner();
         /**
          * @brief Chooses the contact polytopes based on the raibert heuristic
          * @param q current state
@@ -115,6 +118,7 @@ namespace torc::step_planning {
                                 mpc::ContactSchedule& contact_schedule,
                                 std::map<std::string, std::vector<vector2_t>>& nominal_footholds,
                                 std::map<std::string, std::vector<vector2_t>>& projected_footholds,
+                                double time,
                                 bool first_loop = false);
 
         // TODO: I will need to adjust this based on how it will be used.
@@ -135,6 +139,7 @@ namespace torc::step_planning {
                                 std::vector<mpc::ContactSchedule>& contact_schedule,
                                 std::map<std::string, std::vector<vector2_t>>& nominal_footholds,
                                 std::map<std::string, std::vector<vector2_t>>& projected_footholds,
+                                double time,
                                 bool first_loop = false);
 
         void UpdateContactPolytopes(const std::vector<mpc::ContactInfo>& contact_polytopes);
@@ -166,7 +171,7 @@ namespace torc::step_planning {
          */
         std::vector<std::pair<vector2_t, int>> SamplePolytopes(const std::vector<vector2_t>& points, const std::vector<std::vector<int>>& used_polys);
 
-        void SetFootTargetAndPolytopeSampling(double midtime, int contact_idx,
+        std::vector<int> SetFootTargetAndPolytopeSampling(double midtime, int contact_idx, const std::vector<std::string>& frames,
             const mpc::SimpleTrajectory& q_target, const std::vector<double>& dt_vec,
             const std::vector<std::vector<int>>& used_polys,
             mpc::ContactSchedule& contact_schedule,
@@ -196,6 +201,9 @@ namespace torc::step_planning {
 
         // ProxQpInterface
         proxsuite::proxqp::dense::QP<double> qp_;
+
+        // Log file
+        std::ofstream log_file_;
 
     private:
     };
