@@ -65,7 +65,7 @@ namespace torc::step_planning {
         for (int j = 0; j < contact_frames_.size(); j++) {
             const std::string frame = contact_frames_[j];
 
-            log_file_ << frame << ",R," << contact_schedule.GetPolytopes(frame).size() << ","; // "R" for raibert
+            log_file_ << 1 << "," << frame << ",R," << time << "," << contact_schedule.GetPolytopes(frame).size() << ","; // "R" for raibert
 
             nominal_footholds.insert({frame, {}});
             projected_footholds.insert({frame, {}});
@@ -90,7 +90,6 @@ namespace torc::step_planning {
                 if (midtimes[i] > 0) {
                     midtimes_negative = false;
                 }
-
                 log_file_ << midtimes[i] + time << "," << GetPolytopeIdx(contact_schedule.GetPolytopes(frame)[i]) << ",";
             }
             log_file_ << std::endl;
@@ -138,21 +137,21 @@ namespace torc::step_planning {
                 throw std::runtime_error("[PlanStepsHeuristic] Computed midtimes size does not match contact schedule contact size!");
             }
         }
-        std::cerr << "All contact midtimes computed!" << std::endl;
+        // std::cerr << "All contact midtimes computed!" << std::endl;
 
         // Group the frames by having the same midtimes
         std::map<std::vector<double>, std::vector<std::string>> frame_groups;   // Indexed by midtime
         for (int j = 0; j < contact_frames_.size(); j++) {
             frame_groups[midtimes_all_frames[j]].push_back(contact_frames_[j]);
         }
-        std::cerr << "Frames grouped!" << std::endl;
+        // std::cerr << "Frames grouped!" << std::endl;
 
         for (const auto& [midtimes, frames] : frame_groups) {
             for (const auto& mt : midtimes) {
                 sampled_polys_midtimes.insert({mt, {}});    // Make elements for all midtimes
             }
         }
-        std::cerr << "sampled_polys created!" << std::endl;
+        // std::cerr << "sampled_polys created!" << std::endl;
         // ------------------------------------ //
 
         // Iterate through each contact schedule, one for each parallel MPC
@@ -165,20 +164,20 @@ namespace torc::step_planning {
                 for (int i = 0; i < midtimes.size(); i++) {
                     if ((sched.InContact(frames[0], 0) && (first_loop || i > sched.GetContactIndex(frames[0], 0))) ||
                         sched.InSwing(frames[0], 0) && midtimes[i] > current_time_buffer_) {
-                        std::cerr << "Valid contact to sample! (midtime: " << midtimes[i] << ")(frame1: "
-                            << frames[0] << ", frame2: " << frames[1] << ")" << std::endl;
+                        // std::cerr << "Valid contact to sample! (midtime: " << midtimes[i] << ")(frame1: "
+                            // << frames[0] << ", frame2: " << frames[1] << ")" << std::endl;
                         // std::cout << "i: " << i << std::endl;
                         // std::cout << "midtimes size: " << midtimes.size() << std::endl;
                         // std::cout << "num contacts: " << sched.GetNumContacts(frames[0]) << std::endl;
                         sampled_polys_midtimes[midtimes[i]].push_back(SetFootTargetAndPolytopeSampling(midtimes[i], i,
                             frames, q_target, dt_vec, sampled_polys_midtimes[midtimes[i]], sched,
                             nominal_footholds, projected_footholds));
-                        std::cerr << "Sample successful!" << std::endl;
+                        // std::cerr << "Sample successful!" << std::endl;
                     }
                     // std::cout << "-----" << std::endl;
                 }
             }
-            std::cerr << "Sampling completed!" << std::endl;
+            // std::cerr << "Sampling completed!" << std::endl;
 
             for (int i = 0; i < contact_frames_.size(); i++) {
                 const std::string frame = contact_frames_[i];
@@ -189,7 +188,7 @@ namespace torc::step_planning {
                 log_file_ << std::endl;
             }
 
-            std::cerr << "Logging completed!" << std::endl;
+            // std::cerr << "Logging completed!" << std::endl;
 
         }
     }
@@ -345,6 +344,7 @@ namespace torc::step_planning {
                 // std::cout << "[StepPlanner] Polytope height" << poly.height_ << std::endl;
 
                 not_in_any_polytope = false;
+                std::cerr << "In polytope: " << poly.b_.transpose() << std::endl;
                 break;
             }
         }
@@ -355,6 +355,8 @@ namespace torc::step_planning {
             vector2_t projected_point;
             std::tie(projected_point, polytope_idx) = ProjectOntoClosestPolytope(nominal_footholds[frame].back());
             projected_footholds[frame].push_back(projected_point);
+
+            std::cerr << "Projected onto polytope: " << contact_polytopes_[polytope_idx].b_.transpose() << std::endl;
 
             // Update contact schedule
             contact_schedule.SetPolytope(frame, contact_idx, contact_polytopes_[polytope_idx]);
@@ -436,7 +438,7 @@ namespace torc::step_planning {
         std::map<std::string, int> nominal_idx;
         for (int i = 0; i < frames.size(); i++) {
             const std::string frame = frames[i];
-            std::cerr << "frame: " << frame << std::endl;
+            // std::cerr << "frame: " << frame << std::endl;
 
             nominal_idx.insert({frame, {}});
 
@@ -444,7 +446,7 @@ namespace torc::step_planning {
             for (int j = 0; j < contact_frames_.size(); j++) {
                 if (frame == contact_frames_[j]) {
                     frame_idx = j;
-                    std::cerr << "frame at frame idx: " << contact_frames_[frame_idx] << std::endl;
+                    // std::cerr << "frame at frame idx: " << contact_frames_[frame_idx] << std::endl;
                     break;
                 }
             }
@@ -479,7 +481,7 @@ namespace torc::step_planning {
 
                 if (not_in_any_polytope) {
                     sample_frame_idxs.push_back(frame_idx);
-                    std::cerr << "Just added " << contact_frames_[sample_frame_idxs.back()] << std::endl;
+                    // std::cerr << "Just added " << contact_frames_[sample_frame_idxs.back()] << std::endl;
                     nominal_idx[frame] = nominal_footholds[frame].size()-1;
                 }
             } else {
@@ -495,15 +497,15 @@ namespace torc::step_planning {
             std::vector<vector2_t> points;
             for (int i = 0; i < sample_frame_idxs.size(); i++) {
                 const std::string& frame = contact_frames_[sample_frame_idxs[i]];
-                std::cerr << frame << " at time " << midtime << " needs to be sampled!" << std::endl;
-                std::cerr << "point: " << nominal_footholds[frame][nominal_idx[frame]].transpose() << std::endl;
+                // std::cerr << frame << " at time " << midtime << " needs to be sampled!" << std::endl;
+                // std::cerr << "point: " << nominal_footholds[frame][nominal_idx[frame]].transpose() << std::endl;
                 points.push_back(nominal_footholds[frame][nominal_idx[frame]]);
                 // DEBUG CHECK
                 for (const auto& poly : contact_polytopes_) {
                     if (InPolytope(poly, points.back())) {
-                        std::cerr << "point: " << points.back().transpose() << std::endl;
-                        std::cerr << "nominal idx: " << nominal_idx[frame] << std::endl;
-                        std::cerr << "nominal foothold size: " << nominal_footholds.size() << std::endl;
+                        // std::cerr << "point: " << points.back().transpose() << std::endl;
+                        // std::cerr << "nominal idx: " << nominal_idx[frame] << std::endl;
+                        // std::cerr << "nominal foothold size: " << nominal_footholds.size() << std::endl;
                         throw std::runtime_error("[StepPlanner][DEBUG] Point is in polytope!");
                     }
                 }
@@ -537,12 +539,13 @@ namespace torc::step_planning {
         }
 
         if (polytope.A_ == mpc::ContactSchedule::GetDefaultContactInfo().A_ && polytope.b_ == mpc::ContactSchedule::GetDefaultContactInfo().b_) {
+            throw std::runtime_error("[StepPlanner] getting the polytope idx for the default polytope!");
             return -1;
         }
 
-        std::cerr << "A: " << polytope.A_ << std::endl;
-        std::cerr << "b: " << polytope.b_ << std::endl;
-        std::cerr << "height: " << polytope.height_ << std::endl;
+        // std::cerr << "A: " << polytope.A_ << std::endl;
+        // std::cerr << "b: " << polytope.b_ << std::endl;
+        // std::cerr << "height: " << polytope.height_ << std::endl;
         throw std::runtime_error("[StepPlanner] provided polytope does not match any polytopes to select from!");
     }
 
@@ -560,58 +563,63 @@ namespace torc::step_planning {
             //     std::cerr << used_polys[i][i] << ", ";
             // }
             // std::cerr << std::endl;
-            if (used_polys[i].size() != 0) {
+            if (root->BranchExists(used_polys[i])) {    // Only check the unique used polys
                 // Only prune brnaches that we took
                 root->PruneBranch(used_polys[i]);
             }
         }
 
+        std::vector<int> sampled_idxs;
         if (root->GetNumChildren() == 0) {
             // No available branches to sample
             std::cerr << "[StepPlanner] No available unique sample paths to take!" << std::endl;    // TODO: Fix
-            throw std::runtime_error("[StepPlanner] need to address no unique sample paths!");
-        }
+            static int other_samples = 0;
+            other_samples = other_samples%used_polys.size();
+            for (int i = 0; i < used_polys[other_samples].size(); i++) {
+                sampled_idxs.push_back(used_polys[other_samples][i]);
+            }
+            other_samples = (other_samples + 1);
+        } else {
+            // TODO: The way this is currently coded it will only work for two points at a time
+            // Normalize the areas to 1
+            double total_area = 0;
+            for (int i = 0; i < root->GetNumChildren(); i++) {
+                total_area += root->children[i]->area;
+            }
+            for (int i = 0; i < root->GetNumChildren(); i++) {
+                root->children[i]->area /= total_area;
+            }
 
-        // TODO: The way this is currently coded it will only work for two points at a time
-        // Normalize the areas to 1
-        double total_area = 0;
-        for (int i = 0; i < root->GetNumChildren(); i++) {
-            total_area += root->children[i]->area;
-        }
-        for (int i = 0; i < root->GetNumChildren(); i++) {
-            root->children[i]->area /= total_area;
-        }
-
-        if (points.size() == 2) {
-            for (int child_idx = 0; child_idx < root->GetNumChildren(); child_idx++) {
-                auto node = root->children[child_idx];
-                double total_area = 0;
-                for (int i = 0; i < node->GetNumChildren(); i++) {
-                    total_area += node->children[i]->area;
-                }
-                for (int i = 0; i < node->GetNumChildren(); i++) {
-                    node->children[i]->area /= total_area;
+            if (points.size() == 2) {
+                for (int child_idx = 0; child_idx < root->GetNumChildren(); child_idx++) {
+                    auto node = root->children[child_idx];
+                    double total_area = 0;
+                    for (int i = 0; i < node->GetNumChildren(); i++) {
+                        total_area += node->children[i]->area;
+                    }
+                    for (int i = 0; i < node->GetNumChildren(); i++) {
+                        node->children[i]->area /= total_area;
+                    }
                 }
             }
-        }
 
-        // Sample
-        // Generate a number between 0-1 from a given distribution
-        std::uniform_real_distribution<double> dist(0., 1.);
-        std::vector<int> sampled_idxs;
-        SampleTreeNode node = *root;
-        for (int i = 0; i < points.size(); i++) {
-            double sample = dist(gen_);  // Generate the samples
-            // See which polytope it is in
-            double start_area = 0;
-            for (const auto& child : node.children) {
-                if (sample >= start_area && sample < child->area + start_area) {
-                    // By construction, there will be a feasible sample
-                    sampled_idxs.push_back(child->polytope_idx);
-                    node = *child;
-                    break;
+            // Sample
+            // Generate a number between 0-1 from a given distribution
+            std::uniform_real_distribution<double> dist(0., 1.);
+            SampleTreeNode node = *root;
+            for (int i = 0; i < points.size(); i++) {
+                double sample = dist(gen_);  // Generate the samples
+                // See which polytope it is in
+                double start_area = 0;
+                for (const auto& child : node.children) {
+                    if (sample >= start_area && sample < child->area + start_area) {
+                        // By construction, there will be a feasible sample
+                        sampled_idxs.push_back(child->polytope_idx);
+                        node = *child;
+                        break;
+                    }
+                    start_area += child->area;
                 }
-                start_area += child->area;
             }
         }
 
@@ -676,28 +684,29 @@ namespace torc::step_planning {
             return 0;
         }
 
-        if (clipped_poly_points.size() != 2) {
-            throw std::runtime_error("[StepPlanner] got more than 2 circle-polytope intersections!");
-        }
-
-        double theta = acos((clipped_poly_points[0] - point).dot(clipped_poly_points[1] - point)/
-            ((clipped_poly_points[0] - point).norm()*(clipped_poly_points[1] - point).norm()));
+        if (clipped_poly_points.size() == 2) {
+            double theta = acos((clipped_poly_points[0] - point).dot(clipped_poly_points[1] - point)/
+                ((clipped_poly_points[0] - point).norm()*(clipped_poly_points[1] - point).norm()));
             // std::abs(std::atan2(std::abs(clipped_poly_points[0][1] - clipped_poly_points[1][1]),
             // std::abs(clipped_poly_points[0][0] - clipped_poly_points[1][0])));
 
-        // Now grab all the polytope points inside the circle
-        for (int i = 0; i < poly_points.size(); i++) {
-            if ((poly_points[i] - point).norm() < radius) {
-                clipped_poly_points.push_back(poly_points[i]);
+            // Now grab all the polytope points inside the circle
+            for (int i = 0; i < poly_points.size(); i++) {
+                if ((poly_points[i] - point).norm() < radius) {
+                    clipped_poly_points.push_back(poly_points[i]);
+                }
             }
+
+            // TODO: Might need to sort the polygon point counterclockwise
+            double poly_area = ComputePolytopeArea(clipped_poly_points);
+            double circ_segment_area = (radius*radius/2)*(theta - sin(theta));
+
+            return poly_area + circ_segment_area;
+        } else {
+            // TODO: Fix up
+            // For now just use the whole area
+            return ComputePolytopeArea(poly_points);
         }
-
-        // TODO: Might need to sort the polygon point counterclockwise
-        double poly_area = ComputePolytopeArea(clipped_poly_points);
-        double circ_segment_area = (radius*radius/2)*(theta - sin(theta));
-
-        return poly_area + circ_segment_area;
-
         // Determine the two points where the circle intersects the polytope
 
         // If there is an intersection then:

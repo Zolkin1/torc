@@ -92,6 +92,24 @@ namespace torc::step_planning {
                 RemoveChild(branch_idxs[0]);
             }
         }
+
+        bool BranchExists(std::vector<int> branch_idxs) {
+            if (branch_idxs.size() == 0) {
+                return true;
+            }
+
+            auto it = std::find_if(children.begin(), children.end(),
+               [&](const std::shared_ptr<SampleTreeNode>& child) {
+                   return child->polytope_idx == branch_idxs[0];
+               });
+
+            if (it != children.end()) {
+                branch_idxs.erase(branch_idxs.begin()); // Remove the first element
+                return BranchExists(branch_idxs);
+            } else {
+                return false;
+            }
+        }
     };
 
     class StepPlanner {
