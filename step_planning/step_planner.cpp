@@ -182,7 +182,7 @@ namespace torc::step_planning {
 
             for (int i = 0; i < contact_frames_.size(); i++) {
                 const std::string frame = contact_frames_[i];
-                log_file_ << frame << ",S," << sched.GetPolytopes(frame).size() << ","; // "S" for sampling
+                log_file_ << sched_idx << "," << frame << ",S," << time << "," << sched.GetPolytopes(frame).size() << ","; // "S" for sampling
                 for (int j = 0; j < midtimes_all_frames[i].size(); j++) {
                     log_file_ << midtimes_all_frames[i][j] + time << "," << GetPolytopeIdx(sched.GetPolytopes(frame)[j]) << ",";
                 }
@@ -560,7 +560,16 @@ namespace torc::step_planning {
             //     std::cerr << used_polys[i][i] << ", ";
             // }
             // std::cerr << std::endl;
-            root->PruneBranch(used_polys[i]);
+            if (used_polys[i].size() != 0) {
+                // Only prune brnaches that we took
+                root->PruneBranch(used_polys[i]);
+            }
+        }
+
+        if (root->GetNumChildren() == 0) {
+            // No available branches to sample
+            std::cerr << "[StepPlanner] No available unique sample paths to take!" << std::endl;    // TODO: Fix
+            throw std::runtime_error("[StepPlanner] need to address no unique sample paths!");
         }
 
         // TODO: The way this is currently coded it will only work for two points at a time
