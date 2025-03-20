@@ -105,7 +105,7 @@ namespace torc::step_planning {
 
             if (it != children.end()) {
                 branch_idxs.erase(branch_idxs.begin()); // Remove the first element
-                return BranchExists(branch_idxs);
+                return (*it)->BranchExists(branch_idxs);
             } else {
                 return false;
             }

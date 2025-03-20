@@ -344,7 +344,7 @@ namespace torc::step_planning {
                 // std::cout << "[StepPlanner] Polytope height" << poly.height_ << std::endl;
 
                 not_in_any_polytope = false;
-                std::cerr << "In polytope: " << poly.b_.transpose() << std::endl;
+                // std::cerr << "In polytope: " << poly.b_.transpose() << std::endl;
                 break;
             }
         }
@@ -356,7 +356,7 @@ namespace torc::step_planning {
             std::tie(projected_point, polytope_idx) = ProjectOntoClosestPolytope(nominal_footholds[frame].back());
             projected_footholds[frame].push_back(projected_point);
 
-            std::cerr << "Projected onto polytope: " << contact_polytopes_[polytope_idx].b_.transpose() << std::endl;
+            // std::cerr << "Projected onto polytope: " << contact_polytopes_[polytope_idx].b_.transpose() << std::endl;
 
             // Update contact schedule
             contact_schedule.SetPolytope(frame, contact_idx, contact_polytopes_[polytope_idx]);
@@ -516,7 +516,15 @@ namespace torc::step_planning {
                 sampled_polys.push_back(idx);
             }
 
+            if (sampled_polys.empty()) {
+                throw std::runtime_error("[StepPlanner] No sampled polytopes!");
+            }
+
             assert(projected_polytopes.size() == sample_frame_idxs.size());
+
+            if (sample_frame_idxs.size() != projected_polytopes.size()) {
+                throw std::runtime_error("[StepPlanner] Number of sampled polytopes does not match the number of sample frames!");
+            }
 
             for (int i = 0; i < projected_polytopes.size(); i++) {
                 projected_footholds[contact_frames_[sample_frame_idxs[i]]].push_back(projected_polytopes[i].first);
@@ -525,7 +533,6 @@ namespace torc::step_planning {
                 contact_schedule.SetPolytope(contact_frames_[sample_frame_idxs[i]], contact_idx, contact_polytopes_[projected_polytopes[i].second]);
             }
         }
-
         return sampled_polys;
     }
 
@@ -551,10 +558,15 @@ namespace torc::step_planning {
 
     std::vector<std::pair<vector2_t, int>> StepPlanner::SamplePolytopes(const std::vector<vector2_t>& points,
         const std::vector<std::vector<int> > &used_polys) {
-        double sample_rad = 0.25;   // TODO: Read this in elsewhere
+        double sample_rad = 0.25; // NOTE: Used to 0.25   // TODO: Read this in elsewhere
 
         // Create the sampling tree
         std::shared_ptr<SampleTreeNode> root = CreateSampleTree(points, sample_rad);
+
+        // while (root->GetNumChildren() == 0) {
+        //     sample_rad += 0.2;
+        //     root = CreateSampleTree(points, sample_rad);
+        // }
 
         // Prune previously used samples out of the tree
         for (int i = 0; i < used_polys.size(); i++) {
@@ -572,8 +584,13 @@ namespace torc::step_planning {
         std::vector<int> sampled_idxs;
         if (root->GetNumChildren() == 0) {
             // No available branches to sample
-            std::cerr << "[StepPlanner] No available unique sample paths to take!" << std::endl;    // TODO: Fix
+            // std::cerr << "[StepPlanner] No available unique sample paths to take!" << std::endl;    // TODO: Fix
             static int other_samples = 0;
+            if (used_polys.empty()) {
+                std::vector<std::pair<vector2_t, int>> sampled_polytopes;
+                throw std::runtime_error("[StepPlanner] used_polys is empty!");
+                return sampled_polytopes;
+            }
             other_samples = other_samples%used_polys.size();
             for (int i = 0; i < used_polys[other_samples].size(); i++) {
                 sampled_idxs.push_back(used_polys[other_samples][i]);
@@ -630,7 +647,6 @@ namespace torc::step_planning {
                 sampled_idxs[i]);
             sampled_polytopes.push_back(s);
         }
-
         return sampled_polytopes;
     }
 
